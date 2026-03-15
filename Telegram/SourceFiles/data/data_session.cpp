@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_session.h"
 
+#include "custom_db.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "main/main_app_config.h"
@@ -2911,6 +2912,9 @@ void Session::checkFormattedDateUpdates() {
 void Session::processMessagesDeleted(
 		PeerId peerId,
 		const QVector<MTPint> &data) {
+	for (const auto &messageId : data) {
+		CustomDB::MarkDeleted(messageId.v, QString::number(peerId.value));
+	}
 	const auto list = messagesList(peerId);
 	const auto affected = historyLoaded(peerId);
 	if (!list && !affected) {
@@ -2939,6 +2943,7 @@ void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
 	auto historiesToCheck = base::flat_set<not_null<History*>>();
 	for (const auto &messageId : data) {
 		if (const auto item = nonChannelMessage(messageId.v)) {
+			CustomDB::MarkDeleted(messageId.v, QString::number(item->history()->peer->id.value));
 			const auto history = item->history();
 			item->destroy();
 			if (!history->chatListMessageKnown()) {

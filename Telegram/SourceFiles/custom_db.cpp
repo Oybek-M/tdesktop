@@ -24,23 +24,31 @@ void Init() {
     gDataLocation = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
     QDir().mkpath(gDataLocation);
 	
-	// Create the DB once in the main thread to ensure the table exists
-	auto db = QSqlDatabase::addDatabase("QSQLITE", "tdesktop_custom_init");
-	db.setDatabaseName(gDataLocation + "/tdesktop_custom.sqlite");
+	// PostgreSQL ulanish sozlamalari
+	auto db = QSqlDatabase::addDatabase("QPSQL", "tdesktop_custom_init");
+	db.setHostName("localhost");
+	db.setDatabaseName("telegram_db");
+	db.setUserName("saidjon");
+	db.setPassword("1234");
+    db.setPort(5432);
+
 	if (db.open()) {
 		QSqlQuery query(db);
 		query.exec(
 			"CREATE TABLE IF NOT EXISTS messages ("
-			"id INTEGER PRIMARY KEY AUTOINCREMENT, "
-			"msg_id INTEGER, "
+			"id SERIAL PRIMARY KEY, "
+			"msg_id BIGINT, "
 			"peer_id TEXT, "
 			"peer_name TEXT, "
 			"date INTEGER, "
 			"text TEXT, "
-			"is_out INTEGER"
+			"is_out INTEGER, "
+			"is_deleted INTEGER DEFAULT 0"
 			")"
 		);
 		db.close();
+	} else {
+		qDebug() << "PostgreSQL ulanishda xato:" << db.lastError().text();
 	}
 	QSqlDatabase::removeDatabase("tdesktop_custom_init");
 	gInitialized = true;
@@ -52,7 +60,6 @@ void SaveMessage(not_null<HistoryItem*> item) {
     const auto text = item->originalText().text;
     if (text.isEmpty()) return;
 
-	// Extract data needed for DB before jumping to background thread
 	struct MsgData {
 		qint64 msgId;
 		QString peerId;
@@ -71,18 +78,18 @@ void SaveMessage(not_null<HistoryItem*> item) {
 		item->out() ? 1 : 0
 	};
 
-	// Run DB operation in background to prevent UI lag
 	QtConcurrent::run([data = std::move(data)]() {
-		// Each thread needs its own unique connection name
 		const QString connectionName = "tdesktop_custom_" + QString::number((quintptr)QThread::currentThreadId());
-		
 		{
 			QSqlDatabase db;
 			if (QSqlDatabase::contains(connectionName)) {
 				db = QSqlDatabase::database(connectionName);
 			} else {
-				db = QSqlDatabase::addDatabase("QSQLITE", connectionName);
-				db.setDatabaseName(gDataLocation + "/tdesktop_custom.sqlite");
+				db = QSqlDatabase::addDatabase("QPSQL", connectionName);
+				db.setHostName("localhost");
+				db.setDatabaseName("telegram_db");
+				db.setUserName("saidjon");
+				db.setPassword("1234");
 			}
 
 			if (db.open()) {
@@ -101,8 +108,37 @@ void SaveMessage(not_null<HistoryItem*> item) {
 				db.close();
 			}
 		}
-		// Clean up the connection after we are done
-		// QSqlDatabase::removeDatabase(connectionName); // Optional, but helps avoid connection leaks if threads die. We'll leave it out for connection pooling effect in Qt.
+	});
+}
+
+void MarkDeleted(qint64 msgId, const QString &peerId) {
+    if (!gInitialized) return;
+
+	QtConcurrent::run([msgId, peerId]() {
+		const QString connectionName = "tdesktop_custom_del_" + QString::number((quintptr)QThread::currentThreadId());
+		{
+			QSqlDatabase db;
+			if (QSqlDatabase::contains(connectionName)) {
+				db = QSqlDatabase::database(connectionName);
+			} else {
+				db = QSqlDatabase::addDatabase("QPSQL", connectionName);
+				db.setHostName("localhost");
+				db.setDatabaseName("telegram_db");
+				db.setUserName("saidjon");
+				db.setPassword("1234");
+			}
+
+			if (db.open()) {
+				QSqlQuery query(db);
+				query.prepare(
+					"UPDATE messages SET is_deleted = 1 WHERE msg_id = :msg_id AND peer_id = :peer_id"
+				);
+				query.bindValue(":msg_id", msgId);
+				query.bindValue(":peer_id", peerId);
+				query.exec();
+				db.close();
+			}
+		}
 	});
 }
 
