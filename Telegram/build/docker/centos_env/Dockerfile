@@ -22,6 +22,8 @@ RUN dnf -y install epel-release \
 		at-spi2-core-devel gtk3-devel \
 	&& dnf clean all
 
+RUN dnf -y install postgresql-devel && dnf clean all
+
 RUN alternatives --set python3 /usr/bin/python3.11
 RUN python3 -m pip install meson ninja
 RUN cat <<EOF > /usr/local/bin/pkg-config && chmod +x /usr/local/bin/pkg-config

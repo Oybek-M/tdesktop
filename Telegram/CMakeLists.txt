@@ -53,8 +53,6 @@ endif()
 
 set_target_properties(Telegram PROPERTIES AUTOMOC ON)
 
-target_link_libraries(Telegram
-PRIVATE
     tdesktop::lib_tgcalls
 
     # Order in this list defines the order of include paths in command line.

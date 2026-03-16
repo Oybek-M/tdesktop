@@ -24,34 +24,28 @@ void Init() {
     gDataLocation = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
     QDir().mkpath(gDataLocation);
 	
-	// PostgreSQL ulanish sozlamalari
-	auto db = QSqlDatabase::addDatabase("QPSQL", "tdesktop_custom_init");
-	db.setHostName("localhost");
-	db.setDatabaseName("telegram_db");
-	db.setUserName("saidjon");
-	db.setPassword("1234");
-    db.setPort(5432);
-
+	auto db = QSqlDatabase::addDatabase("QSQLITE", "tdesktop_custom_init");
+	db.setDatabaseName(gDataLocation + "/tdesktop_custom.sqlite");
 	if (db.open()) {
 		QSqlQuery query(db);
 		query.exec(
 			"CREATE TABLE IF NOT EXISTS messages ("
-			"id SERIAL PRIMARY KEY, "
+			"id INTEGER PRIMARY KEY AUTOINCREMENT, "
 			"msg_id BIGINT, "
 			"peer_id TEXT, "
 			"peer_name TEXT, "
 			"date INTEGER, "
 			"text TEXT, "
 			"is_out INTEGER, "
-			"is_deleted INTEGER DEFAULT 0"
+			"is_deleted INTEGER DEFAULT 0, "
+            "version INTEGER DEFAULT 1"
 			")"
 		);
 		db.close();
-	} else {
-		qDebug() << "PostgreSQL ulanishda xato:" << db.lastError().text();
 	}
 	QSqlDatabase::removeDatabase("tdesktop_custom_init");
 	gInitialized = true;
+    qDebug() << "Custom SQLite DB initialized!";
 }
 
 void SaveMessage(not_null<HistoryItem*> item) {
@@ -73,7 +67,7 @@ void SaveMessage(not_null<HistoryItem*> item) {
 		(qint64)item->id.bare,
 		QString::number(item->history()->peer->id.value),
 		item->history()->peer->name(),
-		item->date(),
+		(int)item->date(),
 		text,
 		item->out() ? 1 : 0
 	};
@@ -85,18 +79,25 @@ void SaveMessage(not_null<HistoryItem*> item) {
 			if (QSqlDatabase::contains(connectionName)) {
 				db = QSqlDatabase::database(connectionName);
 			} else {
-				db = QSqlDatabase::addDatabase("QPSQL", connectionName);
-				db.setHostName("localhost");
-				db.setDatabaseName("telegram_db");
-				db.setUserName("saidjon");
-				db.setPassword("1234");
+				db = QSqlDatabase::addDatabase("QSQLITE", connectionName);
+				db.setDatabaseName(gDataLocation + "/tdesktop_custom.sqlite");
 			}
 
 			if (db.open()) {
 				QSqlQuery query(db);
+                
+                int version = 1;
+                QSqlQuery check(db);
+                check.prepare("SELECT MAX(version) FROM messages WHERE msg_id = :msg_id AND peer_id = :peer_id");
+                check.bindValue(":msg_id", data.msgId);
+                check.bindValue(":peer_id", data.peerId);
+                if (check.exec() && check.next()) {
+                    version = check.value(0).toInt() + 1;
+                }
+
 				query.prepare(
-					"INSERT INTO messages (msg_id, peer_id, peer_name, date, text, is_out) "
-					"VALUES (:msg_id, :peer_id, :peer_name, :date, :text, :is_out)"
+					"INSERT INTO messages (msg_id, peer_id, peer_name, date, text, is_out, version) "
+					"VALUES (:msg_id, :peer_id, :peer_name, :date, :text, :is_out, :version)"
 				);
 				query.bindValue(":msg_id", data.msgId);
 				query.bindValue(":peer_id", data.peerId);
@@ -104,6 +105,7 @@ void SaveMessage(not_null<HistoryItem*> item) {
 				query.bindValue(":date", data.date);
 				query.bindValue(":text", data.text);
 				query.bindValue(":is_out", data.isOut);
+                query.bindValue(":version", version);
 				query.exec();
 				db.close();
 			}
@@ -121,11 +123,8 @@ void MarkDeleted(qint64 msgId, const QString &peerId) {
 			if (QSqlDatabase::contains(connectionName)) {
 				db = QSqlDatabase::database(connectionName);
 			} else {
-				db = QSqlDatabase::addDatabase("QPSQL", connectionName);
-				db.setHostName("localhost");
-				db.setDatabaseName("telegram_db");
-				db.setUserName("saidjon");
-				db.setPassword("1234");
+				db = QSqlDatabase::addDatabase("QSQLITE", connectionName);
+				db.setDatabaseName(gDataLocation + "/tdesktop_custom.sqlite");
 			}
 
 			if (db.open()) {
