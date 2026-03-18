@@ -5,6 +5,13 @@ the official desktop application for the Telegram messaging service.
 For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
+#include <QtCore/QSettings>
+#include <QtCore/QDir>
+#include <QtCore/QFile>
+#include <QtCore/QStandardPaths>
+#include "data/data_document.h"
+#include "data/data_photo.h"
+#include "data/data_media_types.h"
 #include "history/history_item.h"
 
 #include <QtCore/QSettings>
@@ -2159,6 +2166,15 @@ void HistoryItem::applyEdition(HistoryMessageEdition &&edition) {
 		setServiceText(std::move(serviceText));
 		addToSharedMediaIndex();
 	} else {
+		QSettings customSettings("CustomMod", "TelegramDesktop");
+		if (customSettings.value("anti_edit", true).toBool()) {
+			if (!_text.text.isEmpty() && _text.text != updatedText.text) {
+				auto newCombinedText = _text;
+				newCombinedText.append(QString::fromUtf8("\n\n\xe2\x80\x94\xe2\x80\x94 EDITED \xe2\x80\x94\xe2\x80\x94\n"));
+				newCombinedText.append(std::move(updatedText));
+				updatedText = std::move(newCombinedText);
+			}
+		}
 		setText(std::move(updatedText));
 		addToSharedMediaIndex();
 	}
@@ -2887,6 +2903,43 @@ bool HistoryItem::forbidsSaving() const {
 
 bool HistoryItem::hasNoForwardsFlag() const {
 	return (_flags & MessageFlag::NoForwards);
+}
+
+void HistoryItem::setDeletedLocally() {
+	_isDeletedLocally = true;
+	QString destPath;
+	
+	// True Offline Media Backup
+	if (const auto m = media()) {
+		QString cachePath;
+		QString fileName;
+		if (const auto doc = m->document()) {
+			cachePath = doc->filepath(true);
+			fileName = doc->filename();
+			if (fileName.isEmpty()) fileName = QString::number(doc->id) + ".file";
+		}
+
+		if (!cachePath.isEmpty() && QFile::exists(cachePath)) {
+			QString backupDir = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation) + "/Telegram_AntiDelete/";
+			QDir().mkpath(backupDir);
+			destPath = backupDir + QString::number(id.bare) + "_" + fileName;
+			QFile::copy(cachePath, destPath);
+		}
+	}
+
+	CustomDB::MarkDeleted(id.bare, QString::number(history()->peer->id.value), destPath);
+
+	// Modifying the text globally so it appears everywhere (chat, replies, recent messages list)
+	if (!_text.text.startsWith(QString::fromUtf8("\xe2\x80\x94\xe2\x80\x94 DELETED \xe2\x80\x94\xe2\x80\x94"))) {
+		auto newText = TextWithEntities();
+		newText.append(QString::fromUtf8("\xe2\x80\x94\xe2\x80\x94 DELETED \xe2\x80\x94\xe2\x80\x94\n\n"));
+		newText.append(std::move(_text));
+		_text = std::move(newText);
+	}
+
+	if (_mainView) {
+		history()->owner().requestViewResize(_mainView);
+	}
 }
 
 bool HistoryItem::canDelete() const {

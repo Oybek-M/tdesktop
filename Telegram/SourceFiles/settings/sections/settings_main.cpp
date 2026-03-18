@@ -115,6 +115,8 @@ void CustomModBox(not_null<Ui::GenericBox*> box) {
 	addToggle("ghost_mode", "Ghost Mode (Hide Read/Typing/Online)");
 	addToggle("bypass_restrictions", "Bypass Forward/Copy Restrictions");
 	addToggle("offline_db", "Save Messages to Offline DB");
+	addToggle("anti_delete", "Anti-Delete (Keep deleted messages)");
+	addToggle("anti_edit", "Anti-Edit (Show edit history in chat)");
 
 	box->addButton(tr::lng_box_ok(), [=] { box->closeBox(); });
 }

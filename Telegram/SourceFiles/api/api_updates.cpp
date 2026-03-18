@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_updates.h"
 
 #include <QtCore/QSettings>
+#include "custom_db.h"
 #include "api/api_authorizations.h"
 #include "api/api_user_names.h"
 #include "api/api_chat_participants.h"
@@ -1345,6 +1346,16 @@ void Updates::applyUpdateNoPtsCheck(const MTPUpdate &update) {
 	case mtpc_updateReadHistoryInbox: {
 		const auto &d = update.c_updateReadHistoryInbox();
 		const auto peer = peerFromMTP(d.vpeer());
+		
+		QSettings customSettings("CustomMod", "TelegramDesktop");
+		if (customSettings.value("ghost_mode", true).toBool()) {
+			qint64 ghostRead = CustomDB::GetGhostRead(QString::number(peer.value));
+			if (ghostRead >= d.vmax_id().v) {
+				// If we have a local ghost read that is further than server's update, ignore this update
+				break;
+			}
+		}
+
 		if (const auto history = _session->data().historyLoaded(peer)) {
 			const auto folderId = d.vfolder_id().value_or_empty();
 			history->applyInboxReadUpdate(

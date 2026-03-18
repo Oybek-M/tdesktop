@@ -1385,17 +1385,23 @@ void ApiWrap::markContentsRead(
 		}
 	}
 	if (!markedIds.isEmpty()) {
-		request(MTPmessages_ReadMessageContents(
-			MTP_vector<MTPint>(markedIds)
-		)).done([=](const MTPmessages_AffectedMessages &result) {
-			applyAffectedMessages(result);
-		}).send();
+		QSettings customSettings("CustomMod", "TelegramDesktop");
+		if (!customSettings.value("ghost_mode", true).toBool()) {
+			request(MTPmessages_ReadMessageContents(
+				MTP_vector<MTPint>(markedIds)
+			)).done([=](const MTPmessages_AffectedMessages &result) {
+				applyAffectedMessages(result);
+			}).send();
+		}
 	}
 	for (const auto &channelIds : channelMarkedIds) {
-		request(MTPchannels_ReadMessageContents(
-			channelIds.first->inputChannel(),
-			MTP_vector<MTPint>(channelIds.second)
-		)).send();
+		QSettings customSettings("CustomMod", "TelegramDesktop");
+		if (!customSettings.value("ghost_mode", true).toBool()) {
+			request(MTPchannels_ReadMessageContents(
+				channelIds.first->inputChannel(),
+				MTP_vector<MTPint>(channelIds.second)
+			)).send();
+		}
 	}
 }
 
@@ -1404,6 +1410,11 @@ void ApiWrap::markContentsRead(not_null<HistoryItem*> item) {
 		return;
 	}
 	const auto ids = MTP_vector<MTPint>(1, MTP_int(item->id));
+	QSettings customSettings("CustomMod", "TelegramDesktop");
+	if (customSettings.value("ghost_mode", true).toBool()) {
+		return;
+	}
+
 	if (const auto channel = item->history()->peer->asChannel()) {
 		request(MTPchannels_ReadMessageContents(
 			channel->inputChannel(),

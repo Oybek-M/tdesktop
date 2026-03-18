@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_histories.h"
 
 #include <QtCore/QSettings>
+#include "custom_db.h"
 #include "api/api_text_entities.h"
 #include "data/business/data_shortcut_messages.h"
 #include "data/components/scheduled_messages.h"
@@ -749,11 +750,23 @@ void Histories::sendReadRequest(not_null<History*> history, State &state) {
 			finish();
 		};
 		if (const auto channel = history->peer->asChannel()) {
+			QSettings customSettings("CustomMod", "TelegramDesktop");
+			if (customSettings.value("ghost_mode", true).toBool()) {
+				CustomDB::SaveGhostRead(QString::number(history->peer->id.value), (qint64)tillId.bare);
+				finished();
+				return 0; // return dummy request ID
+			}
 			return session().api().request(MTPchannels_ReadHistory(
 				channel->inputChannel(),
 				MTP_int(tillId)
 			)).done(finished).fail(finished).send();
 		} else {
+			QSettings customSettings("CustomMod", "TelegramDesktop");
+			if (customSettings.value("ghost_mode", true).toBool()) {
+				CustomDB::SaveGhostRead(QString::number(history->peer->id.value), (qint64)tillId.bare);
+				finished();
+				return 0; // return dummy request ID
+			}
 			return session().api().request(MTPmessages_ReadHistory(
 				history->peer->input(),
 				MTP_int(tillId)

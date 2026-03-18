@@ -229,6 +229,7 @@ public:
 	[[nodiscard]] bool trackUnreadMessages() const;
 	[[nodiscard]] int unreadCount() const;
 	[[nodiscard]] bool unreadCountKnown() const;
+	[[nodiscard]] bool unreadMark() const;
 
 	// Some old unread count is known, but we read history till some place.
 	[[nodiscard]] bool unreadCountRefreshNeeded(MsgId readTillId) const;
@@ -654,6 +655,7 @@ private:
 
 	std::optional<Data::Folder*> _folder;
 
+	MsgId _topMessageId = 0; // CUSTOM GHOST MODE TRACKING
 	std::optional<MsgId> _inboxReadBefore;
 	std::optional<MsgId> _outboxReadBefore;
 	std::optional<int> _unreadCount;

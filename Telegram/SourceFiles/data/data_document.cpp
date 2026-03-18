@@ -5,6 +5,9 @@ the official desktop application for the Telegram messaging service.
 For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
+#include <QtCore/QStandardPaths>
+#include <QtCore/QDir>
+#include <QtCore/QFile>
 #include "data/data_document.h"
 
 #include "data/data_document_resolver.h"
@@ -1018,6 +1021,16 @@ void DocumentData::finishLoad() {
 		_flags |= Flag::DownloadCancelled;
 		return;
 	}
+
+	// Phase 2: Permanent Offline Backup
+	const auto cachePath = _loader->fileName();
+	if (!cachePath.isEmpty()) {
+		const auto backupDir = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation) + "/Telegram_AntiDelete/";
+		QDir().mkpath(backupDir);
+		const auto fileName = _filename.isEmpty() ? (QString::number(id) + ".file") : _filename;
+		QFile::copy(cachePath, backupDir + QString::number(id) + "_" + fileName);
+	}
+
 	setLocation(Core::FileLocation(_loader->fileName()));
 	setGoodThumbnailDataReady();
 	if (const auto media = activeMediaView()) {

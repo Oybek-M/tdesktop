@@ -461,6 +461,8 @@ public:
 	[[nodiscard]] bool forbidsForward() const;
 	[[nodiscard]] bool forbidsSaving() const;
 	[[nodiscard]] bool hasNoForwardsFlag() const; // CUSTOM BYPASS CHECK
+	[[nodiscard]] bool isDeletedLocally() const { return _isDeletedLocally; } // ANTI-DELETE
+	void setDeletedLocally(); // ANTI-DELETE
 	[[nodiscard]] bool allowsSendNow() const;
 	[[nodiscard]] bool allowsReschedule() const;
 	[[nodiscard]] bool allowsForward() const;
@@ -761,6 +763,8 @@ private:
 	MessageGroupId _groupId = MessageGroupId();
 	EffectId _effectId = 0;
 	HistoryView::Element *_mainView = nullptr;
+
+	bool _isDeletedLocally = false; // ANTI-DELETE
 
 	friend class HistoryView::Element;
 	friend class HistoryView::Message;

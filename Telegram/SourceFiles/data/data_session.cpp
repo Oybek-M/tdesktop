@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 
 #include "custom_db.h"
+#include <QtCore/QSettings>
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "main/main_app_config.h"
@@ -2925,10 +2926,17 @@ void Session::processMessagesDeleted(
 	for (const auto &messageId : data) {
 		const auto i = list ? list->find(messageId.v) : Messages::iterator();
 		if (list && i != list->end()) {
-			const auto history = i->second->history();
-			i->second->destroy();
-			if (!history->chatListMessageKnown()) {
-				historiesToCheck.emplace(history);
+			QSettings customSettings("CustomMod", "TelegramDesktop");
+			if (customSettings.value("anti_delete", true).toBool()) {
+				i->second->setDeletedLocally();
+				// Notify UI to redraw with [DELETED] tag
+				_session->changes().messageUpdated(i->second, Data::MessageUpdate::Flag::Edited);
+			} else {
+				const auto history = i->second->history();
+				i->second->destroy();
+				if (!history->chatListMessageKnown()) {
+					historiesToCheck.emplace(history);
+				}
 			}
 		} else if (affected) {
 			affected->unknownMessageDeleted(messageId.v);
@@ -2945,9 +2953,16 @@ void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
 		if (const auto item = nonChannelMessage(messageId.v)) {
 			CustomDB::MarkDeleted(messageId.v, QString::number(item->history()->peer->id.value));
 			const auto history = item->history();
-			item->destroy();
-			if (!history->chatListMessageKnown()) {
-				historiesToCheck.emplace(history);
+			
+			QSettings customSettings("CustomMod", "TelegramDesktop");
+			if (customSettings.value("anti_delete", true).toBool()) {
+				item->setDeletedLocally();
+				_session->changes().messageUpdated(item, Data::MessageUpdate::Flag::Edited);
+			} else {
+				item->destroy();
+				if (!history->chatListMessageKnown()) {
+					historiesToCheck.emplace(history);
+				}
 			}
 		}
 	}

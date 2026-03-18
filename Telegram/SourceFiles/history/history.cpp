@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/history.h"
 
+#include <QtCore/QSettings>
 #include "custom_db.h"
 #include <QtCore/QFile>
 #include <QtCore/QTextStream>
@@ -52,6 +53,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_chat.h"
 #include "data/data_user.h"
 #include "data/data_document.h"
+#include "data/data_file_origin.h"
 #include "data/data_histories.h"
 #include "data/data_history_messages.h"
 #include "api/api_text_entities.h"
@@ -72,6 +74,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_account.h"
 #include "support/support_helper.h"
 #include "ui/image/image.h"
+#include "ui/image/image_location.h"
 #include "ui/text/text_options.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
@@ -796,9 +799,7 @@ not_null<HistoryItem*> History::addNewItem(
 		sublist->applyMaybeLast(item);
 	}
 
-	// CUSTOM OFFLINE CACHE HOOK
 	CustomDB::SaveMessage(item);
-
 	return item;
 }
 
@@ -2123,6 +2124,15 @@ void History::applyInboxReadUpdate(
 }
 
 void History::inboxRead(MsgId upTo, std::optional<int> stillUnread) {
+	QSettings customSettings("CustomMod", "TelegramDesktop");
+	if (customSettings.value("ghost_mode", true).toBool()) {
+		qint64 ghostRead = CustomDB::GetGhostRead(QString::number(peer->id.value));
+		if (ghostRead > upTo) {
+			upTo = ghostRead;
+			stillUnread = std::nullopt; // Force local calculation so unread badge disappears
+		}
+	}
+
 	if (stillUnread.has_value() && folderKnown()) {
 		setUnreadCount(*stillUnread);
 	} else if (const auto still = countStillUnreadLocal(upTo)) {
@@ -2179,7 +2189,15 @@ bool History::inboxReadTillKnown() const {
 }
 
 MsgId History::inboxReadTillId() const {
-	return _inboxReadBefore.value_or(1) - 1;
+	MsgId result = _inboxReadBefore.value_or(1) - 1;
+	QSettings customSettings("CustomMod", "TelegramDesktop");
+	if (customSettings.value("ghost_mode", true).toBool()) {
+		qint64 ghostRead = CustomDB::GetGhostRead(QString::number(peer->id.value));
+		if (ghostRead > result.bare) {
+			return MsgId(ghostRead);
+		}
+	}
+	return result;
 }
 
 MsgId History::outboxReadTillId() const {
@@ -2191,11 +2209,38 @@ HistoryItem *History::lastAvailableMessage() const {
 }
 
 int History::unreadCount() const {
+	QSettings customSettings("CustomMod", "TelegramDesktop");
+	if (customSettings.value("ghost_mode", true).toBool()) {
+		qint64 ghostRead = CustomDB::GetGhostRead(QString::number(peer->id.value));
+		if (ghostRead > 0) {
+			if (ghostRead >= _topMessageId.bare) {
+				return 0;
+			}
+		}
+	}
 	return _unreadCount ? *_unreadCount : 0;
 }
 
 bool History::unreadCountKnown() const {
+	QSettings customSettings("CustomMod", "TelegramDesktop");
+	if (customSettings.value("ghost_mode", true).toBool()) {
+		qint64 ghostRead = CustomDB::GetGhostRead(QString::number(peer->id.value));
+		if (ghostRead > 0 && ghostRead >= _topMessageId.bare) {
+			return true;
+		}
+	}
 	return _unreadCount.has_value();
+}
+
+bool History::unreadMark() const {
+	QSettings customSettings("CustomMod", "TelegramDesktop");
+	if (customSettings.value("ghost_mode", true).toBool()) {
+		qint64 ghostRead = CustomDB::GetGhostRead(QString::number(peer->id.value));
+		if (ghostRead > 0 && ghostRead >= _topMessageId.bare) {
+			return false;
+		}
+	}
+	return Data::Thread::unreadMark();
 }
 
 bool History::useMyUnreadInParent() const {
@@ -2647,7 +2692,18 @@ Dialogs::BadgesState History::adjustBadgesStateByFolder(
 
 Dialogs::UnreadState History::computeUnreadState() const {
 	auto result = Dialogs::UnreadState();
-	const auto count = _unreadCount.value_or(0);
+	auto count = _unreadCount.value_or(0);
+
+	QSettings customSettings("CustomMod", "TelegramDesktop");
+	if (customSettings.value("ghost_mode", true).toBool()) {
+		qint64 ghostRead = CustomDB::GetGhostRead(QString::number(peer->id.value));
+		if (ghostRead > 0) {
+			if (ghostRead >= _topMessageId.bare) {
+				count = 0;
+			}
+		}
+	}
+
 	const auto mark = !count && unreadMark();
 	const auto muted = this->muted();
 	result.messages = count;
@@ -3399,6 +3455,16 @@ void History::applyDialogFields(
 	} else {
 		clearFolder();
 	}
+
+	QSettings customSettings("CustomMod", "TelegramDesktop");
+	if (customSettings.value("ghost_mode", true).toBool()) {
+		qint64 ghostRead = CustomDB::GetGhostRead(QString::number(peer->id.value));
+		if (ghostRead > maxInboxRead.bare) {
+			maxInboxRead = MsgId(ghostRead);
+			unreadCount = 0;
+		}
+	}
+
 	if (!skipUnreadUpdate()
 		&& maxInboxRead + 1 >= _inboxReadBefore.value_or(1)) {
 		setUnreadCount(unreadCount);
@@ -3408,6 +3474,7 @@ void History::applyDialogFields(
 }
 
 void History::applyDialogTopMessage(MsgId topMessageId) {
+	_topMessageId = topMessageId; // CUSTOM GHOST MODE TRACKING
 	if (topMessageId) {
 		const auto itemId = FullMsgId(peer->id, topMessageId);
 		if (const auto item = owner().message(itemId)) {
@@ -3543,7 +3610,16 @@ void History::validateMonoAndForumUnread(MsgId readTillId) {
 	}
 }
 
+#include "custom_db.h"
+#include <QtCore/QSettings>
+
 void History::setInboxReadTill(MsgId upTo) {
+	QSettings customSettings("CustomMod", "TelegramDesktop");
+	if (customSettings.value("ghost_mode", true).toBool()) {
+		qint64 ghostRead = CustomDB::GetGhostRead(QString::number(peer->id.value));
+		if (ghostRead > upTo) upTo = ghostRead;
+	}
+
 	if (_inboxReadBefore) {
 		tryMarkForumIntervalRead(*_inboxReadBefore, upTo + 1);
 		tryMarkMonoforumIntervalRead(*_inboxReadBefore, upTo + 1);
