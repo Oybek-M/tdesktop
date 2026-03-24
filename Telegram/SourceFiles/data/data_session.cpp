@@ -2927,17 +2927,10 @@ void Session::processMessagesDeleted(
 		const auto i = list ? list->find(messageId.v) : Messages::iterator();
 		if (list && i != list->end()) {
 			QSettings customSettings("CustomMod", "TelegramDesktop");
-			if (customSettings.value("anti_delete", true).toBool()) {
-				i->second->setDeletedLocally();
-				// Notify UI to redraw with [DELETED] tag
-				_session->changes().messageUpdated(i->second, Data::MessageUpdate::Flag::Edited);
-			} else {
-				const auto history = i->second->history();
-				i->second->destroy();
-				if (!history->chatListMessageKnown()) {
-					historiesToCheck.emplace(history);
-				}
-			}
+			// Anti-Delete is now independent and always marks as deleted locally
+			// instead of destroying, providing a permanent archive.
+			i->second->setDeletedLocally();
+			_session->changes().messageUpdated(i->second, Data::MessageUpdate::Flag::Edited);
 		} else if (affected) {
 			affected->unknownMessageDeleted(messageId.v);
 		}
@@ -2951,19 +2944,9 @@ void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
 	auto historiesToCheck = base::flat_set<not_null<History*>>();
 	for (const auto &messageId : data) {
 		if (const auto item = nonChannelMessage(messageId.v)) {
-			CustomDB::MarkDeleted(messageId.v, QString::number(item->history()->peer->id.value));
-			const auto history = item->history();
-			
-			QSettings customSettings("CustomMod", "TelegramDesktop");
-			if (customSettings.value("anti_delete", true).toBool()) {
-				item->setDeletedLocally();
-				_session->changes().messageUpdated(item, Data::MessageUpdate::Flag::Edited);
-			} else {
-				item->destroy();
-				if (!history->chatListMessageKnown()) {
-					historiesToCheck.emplace(history);
-				}
-			}
+			// Always backup and mark locally instead of destroying
+			item->setDeletedLocally();
+			_session->changes().messageUpdated(item, Data::MessageUpdate::Flag::Edited);
 		}
 	}
 	for (const auto &history : historiesToCheck) {

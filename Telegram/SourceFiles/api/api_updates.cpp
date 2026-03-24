@@ -1020,6 +1020,12 @@ void Updates::updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline) {
 
 		_lastWasOnline = isOnline;
 		_lastSetOnline = ms;
+		
+		QSettings customSettings("CustomMod", "TelegramDesktop");
+		if (customSettings.value("ghost_mode", true).toBool()) {
+			return;
+		}
+
 		if (!Core::Quitting()) {
 			_onlineRequest = api().request(MTPaccount_UpdateStatus(
 				MTP_bool(!isOnline)

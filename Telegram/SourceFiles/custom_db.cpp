@@ -111,11 +111,16 @@ void SaveMessage(not_null<HistoryItem*> item) {
                 
                 int version = 1;
                 QSqlQuery check(db);
-                check.prepare("SELECT MAX(version) FROM messages WHERE msg_id = :msg_id AND peer_id = :peer_id");
+                // Check the LATEST version of this message
+                check.prepare("SELECT text, version FROM messages WHERE msg_id = :msg_id AND peer_id = :peer_id ORDER BY version DESC LIMIT 1");
                 check.bindValue(":msg_id", data.msgId);
                 check.bindValue(":peer_id", data.peerId);
                 if (check.exec() && check.next()) {
-                    version = check.value(0).toInt() + 1;
+                    if (check.value(0).toString() == data.text) {
+                        db.close();
+                        return; // TEXT IS THE SAME, SKIP SAVING
+                    }
+                    version = check.value(1).toInt() + 1;
                 }
 
 				query.prepare(
@@ -163,6 +168,54 @@ void MarkDeleted(qint64 msgId, const QString &peerId, const QString &localMediaP
 			}
 		}
 	});
+}
+
+QString GetMessageHistory(qint64 msgId, const QString &peerId) {
+    if (!gInitialized) return QString();
+    QString result;
+    const QString conn = "tdesktop_custom_history_" + QString::number((quintptr)QThread::currentThreadId());
+    {
+        QSqlDatabase db;
+        if (QSqlDatabase::contains(conn)) {
+            db = QSqlDatabase::database(conn);
+        } else {
+            db = QSqlDatabase::addDatabase("QSQLITE", conn);
+            db.setDatabaseName(gDataLocation + "/tdesktop_custom.sqlite");
+        }
+        if (db.open()) {
+            QSqlQuery query(db);
+            // Fetch all versions ordered by version number
+            query.prepare("SELECT text, is_deleted FROM messages WHERE msg_id = :msg_id AND peer_id = :peer_id ORDER BY version ASC");
+            query.bindValue(":msg_id", msgId);
+            query.bindValue(":peer_id", peerId);
+            
+            QStringList versions;
+            bool isDeleted = false;
+            if (query.exec()) {
+                while (query.next()) {
+                    versions << query.value(0).toString();
+                    if (query.value(1).toInt() == 1) isDeleted = true;
+                }
+            }
+            db.close();
+
+            if (versions.isEmpty()) return QString();
+
+            // Format like Aka Messenger (Clean version: Original + Latest Edit)
+            if (isDeleted) {
+                result += QString::fromUtf8("\xe2\x80\x94\xe2\x80\x94 DELETED \xe2\x80\x94\xe2\x80\x94\n\n");
+            }
+            
+            // Latest version
+            result += versions.last();
+
+            // If there are multiple versions, only show the VERY FIRST one as the original
+            if (versions.size() > 1) {
+                result += QString::fromUtf8("\n\n\xe2\x80\x94\xe2\x80\x94 ORIGINAL \xe2\x80\x94\xe2\x80\x94\n") + versions.first();
+            }
+        }
+    }
+    return result;
 }
 
 void SaveGhostRead(const QString &peerId, qint64 msgId) {

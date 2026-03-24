@@ -8,6 +8,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_element.h"
 
 #include "apiwrap.h"
+#include <QtCore/QSettings>
+#include "custom_db.h"
 #include "api/api_transcribes.h"
 #include "history/view/history_view_service_message.h"
 #include "history/view/history_view_message.h"
@@ -1870,7 +1872,16 @@ void Element::validateText() {
 		if (!unavailable.isEmpty()) {
 			setTextWithLinks(tr::italic(unavailable));
 		} else {
-			setTextWithLinks(_textItem->translatedTextWithLocalEntities());
+			auto textToRender = _textItem->translatedTextWithLocalEntities();
+			QSettings customSettings("CustomMod", "TelegramDesktop");
+			if (customSettings.value("offline_db", true).toBool()) {
+				QString historyText = CustomDB::GetMessageHistory(item->id.bare, QString::number(item->history()->peer->id.value));
+				if (!historyText.isEmpty() && historyText != textToRender.text) {
+					textToRender.text = historyText;
+					textToRender.entities.clear(); // Safe UI-level clearing
+				}
+			}
+			setTextWithLinks(textToRender);
 		}
 	}
 }

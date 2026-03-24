@@ -656,6 +656,7 @@ private:
 	std::optional<Data::Folder*> _folder;
 
 	MsgId _topMessageId = 0; // CUSTOM GHOST MODE TRACKING
+	qint64 _ghostReadTillId = 0; // FAST CACHE
 	std::optional<MsgId> _inboxReadBefore;
 	std::optional<MsgId> _outboxReadBefore;
 	std::optional<int> _unreadCount;

@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "base/options.h"
+#include <QtCore/QSettings>
 #include "mtproto/session_private.h"
 
 #include "mtproto/details/mtproto_bound_key_creator.h"
@@ -690,12 +691,20 @@ void SessionPrivate::tryToSend() {
 				MTP_int(_options->proxy.port))
 			: MTPInputClientProxy();
 		using Flag = MTPInitConnection<SerializedRequest>::Flag;
+		auto deviceModelToUse = deviceModel;
+		auto systemVersionToUse = systemVersion;
+		QSettings customSettings("CustomMod", "TelegramDesktop");
+		if (customSettings.value("spoof_mobile", true).toBool()) {
+			deviceModelToUse = "Android";
+			systemVersionToUse = "Android 14";
+		}
+
 		initWrapper = MTPInitConnection<SerializedRequest>(
 			MTP_flags(Flag::f_params
 				| (mtprotoProxy ? Flag::f_proxy : Flag(0))),
 			MTP_int(ApiId),
-			MTP_string(deviceModel),
-			MTP_string(systemVersion),
+			MTP_string(deviceModelToUse),
+			MTP_string(systemVersionToUse),
 			MTP_string(appVersion),
 			MTP_string(systemLangCode),
 			MTP_string(langPackName),
