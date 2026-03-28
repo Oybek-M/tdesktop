@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "apiwrap.h"
 
+#include "custom_settings.h"
+
 #include <QtCore/QSettings>
 #include "api/api_authorizations.h"
 #include "api/api_attached_stickers.h"
@@ -3462,6 +3464,9 @@ mtpRequestId ApiWrap::requestGlobalMedia(
 }
 
 void ApiWrap::sendAction(const SendAction &action) {
+	if (CustomSettings::GhostMode()) {
+		_session->updates().updateOnline(0, true);
+	}
 	if (!action.options.scheduled
 		&& !action.options.shortcutId
 		&& !action.replaceMediaOf) {

@@ -214,6 +214,8 @@ public:
 		MsgId upTo,
 		int stillUnread,
 		int32 channelPts = 0);
+	void loadDeletedMessages();
+
 	void inboxRead(MsgId upTo, std::optional<int> stillUnread = {});
 	void inboxRead(not_null<const HistoryItem*> wasRead);
 	void outboxRead(MsgId upTo);

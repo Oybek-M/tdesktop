@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtCore/QSettings>
 #include "custom_db.h"
+#include "custom_settings.h"
 #include <QtCore/QFile>
 #include <QtCore/QTextStream>
 #include <QtCore/QDateTime>
@@ -141,6 +142,7 @@ History::History(not_null<Data::Session*> owner, PeerId peerId)
 			_outboxReadBefore = std::numeric_limits<MsgId>::max();
 		}
 	}
+	loadDeletedMessages();
 }
 
 History::~History() = default;
@@ -2103,13 +2105,45 @@ std::optional<int> History::countStillUnreadLocal(MsgId readTillId) const {
 	return result;
 }
 
+void History::loadDeletedMessages() {
+	if (!CustomSettings::AntiDelete()) return;
+
+	const auto peerIdStr = QString::number(peer->id.value);
+	auto deleted = CustomDB::GetDeletedMessages(peerIdStr);
+	if (deleted.empty()) return;
+
+	int injectedCount = 0;
+	for (const auto &msg : deleted) {
+		if (owner().message(peer, MsgId(msg.msgId))) continue;
+
+		auto flags = MessageFlag::Local | MessageFlag::HasFromId;
+		if (msg.isOut) flags |= MessageFlag::Outgoing;
+
+		const auto item = addNewLocalMessage({
+			.id = MsgId(msg.msgId),
+			.flags = flags,
+			.from = (msg.isOut ? session().userPeerId() : peer->id),
+			.date = msg.date,
+		}, TextWithEntities{msg.text}, MTP_messageMediaEmpty());
+
+		if (item) {
+			item->setDeletedLocally();
+			owner().requestItemViewRefresh(item);
+			injectedCount++;
+		}
+	}
+	if (injectedCount > 0) {
+		qDebug() << "[CustomMod] Injected" << injectedCount << "deleted messages for peer" << peerIdStr;
+	}
+}
+
 void History::applyInboxReadUpdate(
 		FolderId folderId,
 		MsgId upTo,
 		int stillUnread,
 		int32 channelPts) {
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("ghost_mode", true).toBool()) {
+	loadDeletedMessages();
+	if (CustomSettings::GhostMode()) {
 		if (_ghostReadTillId > 0 && _ghostReadTillId >= _topMessageId.bare) {
 			stillUnread = 0;
 			upTo = MsgId(_ghostReadTillId);
@@ -2131,8 +2165,7 @@ void History::applyInboxReadUpdate(
 }
 
 void History::inboxRead(MsgId upTo, std::optional<int> stillUnread) {
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("ghost_mode", true).toBool()) {
+	if (CustomSettings::GhostMode()) {
 		qint64 ghostRead = CustomDB::GetGhostRead(QString::number(peer->id.value));
 		if (ghostRead > upTo) {
 			upTo = ghostRead;
@@ -2197,8 +2230,7 @@ bool History::inboxReadTillKnown() const {
 
 MsgId History::inboxReadTillId() const {
 	MsgId result = _inboxReadBefore.value_or(1) - 1;
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("ghost_mode", true).toBool()) {
+	if (CustomSettings::GhostMode()) {
 		qint64 ghostRead = CustomDB::GetGhostRead(QString::number(peer->id.value));
 		if (ghostRead > result.bare) {
 			return MsgId(ghostRead);
@@ -2212,12 +2244,12 @@ MsgId History::outboxReadTillId() const {
 }
 
 HistoryItem *History::lastAvailableMessage() const {
+	const_cast<History*>(this)->loadDeletedMessages();
 	return isEmpty() ? nullptr : blocks.back()->messages.back()->data().get();
 }
 
 int History::unreadCount() const {
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("ghost_mode", true).toBool()) {
+	if (CustomSettings::GhostMode()) {
 		if (_ghostReadTillId > 0 && _ghostReadTillId >= _topMessageId.bare) {
 			return 0;
 		}
@@ -2226,8 +2258,7 @@ int History::unreadCount() const {
 }
 
 bool History::unreadCountKnown() const {
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("ghost_mode", true).toBool()) {
+	if (CustomSettings::GhostMode()) {
 		if (_ghostReadTillId > 0 && _ghostReadTillId >= _topMessageId.bare) {
 			return true;
 		}
@@ -2236,8 +2267,7 @@ bool History::unreadCountKnown() const {
 }
 
 bool History::unreadMark() const {
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("ghost_mode", true).toBool()) {
+	if (CustomSettings::GhostMode()) {
 		if (_ghostReadTillId > 0 && _ghostReadTillId >= _topMessageId.bare) {
 			return false;
 		}
@@ -2252,8 +2282,7 @@ bool History::useMyUnreadInParent() const {
 void History::setUnreadCount(int newUnreadCount) {
 	Expects(folderKnown());
 
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("ghost_mode", true).toBool()) {
+	if (CustomSettings::GhostMode()) {
 		if (_ghostReadTillId > 0 && _ghostReadTillId >= _topMessageId.bare) {
 			newUnreadCount = 0;
 		}
@@ -2703,8 +2732,7 @@ Dialogs::UnreadState History::computeUnreadState() const {
 	auto result = Dialogs::UnreadState();
 	auto count = _unreadCount.value_or(0);
 
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("ghost_mode", true).toBool()) {
+	if (CustomSettings::GhostMode()) {
 		if (_ghostReadTillId > 0 && _ghostReadTillId >= _topMessageId.bare) {
 			count = 0;
 		}
@@ -3462,8 +3490,7 @@ void History::applyDialogFields(
 		clearFolder();
 	}
 
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("ghost_mode", true).toBool()) {
+	if (CustomSettings::GhostMode()) {
 		_ghostReadTillId = CustomDB::GetGhostRead(QString::number(peer->id.value));
 		if (_ghostReadTillId > 0 && _ghostReadTillId >= maxInboxRead.bare) {
 			maxInboxRead = MsgId(_ghostReadTillId);
@@ -3616,12 +3643,8 @@ void History::validateMonoAndForumUnread(MsgId readTillId) {
 	}
 }
 
-#include "custom_db.h"
-#include <QtCore/QSettings>
-
 void History::setInboxReadTill(MsgId upTo) {
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("ghost_mode", true).toBool()) {
+	if (CustomSettings::GhostMode()) {
 		qint64 ghostRead = CustomDB::GetGhostRead(QString::number(peer->id.value));
 		if (ghostRead > upTo) upTo = ghostRead;
 	}
@@ -4258,6 +4281,8 @@ std::vector<MsgId> History::collectMessagesFromParticipantToDelete(
 }
 
 void History::clear(ClearType type, bool markEmpty) {
+	// ... (existing clear logic)
+	// (I will read the function first to ensure correct placement)
 	_unreadBarView = nullptr;
 	_firstUnreadView = nullptr;
 	removeJoinedMessage();
@@ -4317,6 +4342,7 @@ void History::clear(ClearType type, bool markEmpty) {
 	} else if (const auto channel = peer->asMegagroup()) {
 		channel->mgInfo->markupSenders.clear();
 	}
+	loadDeletedMessages();
 
 	owner().notifyHistoryChangeDelayed(this);
 	owner().sendHistoryChangeNotifications();

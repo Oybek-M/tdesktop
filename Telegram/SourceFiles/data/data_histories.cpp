@@ -7,6 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_histories.h"
 
+#include "custom_settings.h"
+#include "custom_db.h"
+
 #include <QtCore/QSettings>
 #include "custom_db.h"
 #include "api/api_text_entities.h"
@@ -749,9 +752,9 @@ void Histories::sendReadRequest(not_null<History*> history, State &state) {
 			sendReadRequests();
 			finish();
 		};
+
 		if (const auto channel = history->peer->asChannel()) {
-			QSettings customSettings("CustomMod", "TelegramDesktop");
-			if (customSettings.value("ghost_mode", true).toBool()) {
+			if (CustomSettings::GhostMode()) {
 				CustomDB::SaveGhostRead(QString::number(history->peer->id.value), (qint64)tillId.bare);
 				finished();
 				return 0; // return dummy request ID
@@ -761,8 +764,7 @@ void Histories::sendReadRequest(not_null<History*> history, State &state) {
 				MTP_int(tillId)
 			)).done(finished).fail(finished).send();
 		} else {
-			QSettings customSettings("CustomMod", "TelegramDesktop");
-			if (customSettings.value("ghost_mode", true).toBool()) {
+			if (CustomSettings::GhostMode()) {
 				CustomDB::SaveGhostRead(QString::number(history->peer->id.value), (qint64)tillId.bare);
 				finished();
 				return 0; // return dummy request ID

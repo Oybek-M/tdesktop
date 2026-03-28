@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 
 #include "custom_db.h"
+#include "custom_settings.h"
 #include <QtCore/QSettings>
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
@@ -2926,11 +2927,14 @@ void Session::processMessagesDeleted(
 	for (const auto &messageId : data) {
 		const auto i = list ? list->find(messageId.v) : Messages::iterator();
 		if (list && i != list->end()) {
-			QSettings customSettings("CustomMod", "TelegramDesktop");
-			// Anti-Delete is now independent and always marks as deleted locally
-			// instead of destroying, providing a permanent archive.
-			i->second->setDeletedLocally();
-			_session->changes().messageUpdated(i->second, Data::MessageUpdate::Flag::Edited);
+			if (CustomSettings::AntiDelete()) {
+				// FORCE PERSISTENCE: Ignore server delete command, keep the item in memory
+				i->second->setDeletedLocally();
+				_session->changes().messageUpdated(i->second, Data::MessageUpdate::Flag::Edited);
+				continue; // DO NOT DESTROY
+			} else {
+				i->second->destroy();
+			}
 		} else if (affected) {
 			affected->unknownMessageDeleted(messageId.v);
 		}
@@ -2944,9 +2948,13 @@ void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
 	auto historiesToCheck = base::flat_set<not_null<History*>>();
 	for (const auto &messageId : data) {
 		if (const auto item = nonChannelMessage(messageId.v)) {
-			// Always backup and mark locally instead of destroying
-			item->setDeletedLocally();
-			_session->changes().messageUpdated(item, Data::MessageUpdate::Flag::Edited);
+			if (CustomSettings::AntiDelete()) {
+				// FORCE PERSISTENCE: Ignore server delete command
+				item->setDeletedLocally();
+				_session->changes().messageUpdated(item, Data::MessageUpdate::Flag::Edited);
+			} else {
+				item->destroy();
+			}
 		}
 	}
 	for (const auto &history : historiesToCheck) {

@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "core/application.h"
 #include "custom_db.h"
+#include "custom_settings.h"
 
 #include "data/data_abstract_structure.h"
 #include "data/data_channel.h"
@@ -263,6 +264,7 @@ Application::~Application() {
 
 void Application::run() {
 	CustomDB::Init();
+	CustomSettings::Init();
 	// Depends on OpenSSL on macOS, so on ThirdParty::start().
 	// Depends on notifications settings.
 	_notifications = std::make_unique<Window::Notifications::System>();

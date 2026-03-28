@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_peer.h"
 
+#include "custom_settings.h"
+
 #include "api/api_sensitive_content.h"
 #include "data/data_user.h"
 #include "data/data_chat.h"
@@ -1731,6 +1733,9 @@ void PeerData::processTopics(const MTPVector<MTPForumTopic> &topics) {
 }
 
 bool PeerData::allowsForwarding() const {
+	if (CustomSettings::BypassRestrictions()) {
+		return true;
+	}
 	if (const auto user = asUser()) {
 		return user->allowsForwarding();
 	} else if (const auto channel = asChannel()) {
@@ -1738,8 +1743,9 @@ bool PeerData::allowsForwarding() const {
 	} else if (const auto chat = asChat()) {
 		return chat->allowsForwarding();
 	}
-	return false;
+	return true;
 }
+
 
 Data::RestrictionCheckResult PeerData::amRestricted(
 		ChatRestriction right) const {

@@ -7,7 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "api/api_updates.h"
 
-#include <QtCore/QSettings>
+#include "custom_settings.h"
 #include "custom_db.h"
 #include "api/api_authorizations.h"
 #include "api/api_user_names.h"
@@ -993,8 +993,7 @@ void Updates::updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline) {
 
 	const auto &config = _session->serverConfig();
 	bool isOnline = Core::App().hasActiveWindow(&session());
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("ghost_mode", true).toBool()) {
+	if (CustomSettings::GhostMode()) {
 		isOnline = false; // CUSTOM GHOST MODE
 	}
 	int updateIn = config.onlineUpdatePeriod;
@@ -1015,20 +1014,18 @@ void Updates::updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline) {
 	auto ms = crl::now();
 	if (isOnline != _lastWasOnline
 		|| (isOnline && _lastSetOnline + config.onlineUpdatePeriod <= ms)
-		|| (isOnline && gotOtherOffline)) {
+		|| (isOnline && gotOtherOffline)
+		|| (CustomSettings::GhostMode() && gotOtherOffline)) {
 		api().request(base::take(_onlineRequest)).cancel();
 
 		_lastWasOnline = isOnline;
 		_lastSetOnline = ms;
-		
-		QSettings customSettings("CustomMod", "TelegramDesktop");
-		if (customSettings.value("ghost_mode", true).toBool()) {
-			return;
-		}
 
 		if (!Core::Quitting()) {
+			// If Ghost Mode is enabled, always force offline status (true).
+			const auto offline = CustomSettings::GhostMode() ? true : !isOnline;
 			_onlineRequest = api().request(MTPaccount_UpdateStatus(
-				MTP_bool(!isOnline)
+				MTP_bool(offline)
 			)).send();
 		} else {
 			_onlineRequest = api().request(MTPaccount_UpdateStatus(
@@ -1353,8 +1350,7 @@ void Updates::applyUpdateNoPtsCheck(const MTPUpdate &update) {
 		const auto &d = update.c_updateReadHistoryInbox();
 		const auto peer = peerFromMTP(d.vpeer());
 		
-		QSettings customSettings("CustomMod", "TelegramDesktop");
-		if (customSettings.value("ghost_mode", true).toBool()) {
+		if (CustomSettings::GhostMode()) {
 			qint64 ghostRead = CustomDB::GetGhostRead(QString::number(peer.value));
 			if (ghostRead >= d.vmax_id().v) {
 				// If we have a local ghost read that is further than server's update, ignore this update

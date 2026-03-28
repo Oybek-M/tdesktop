@@ -45,6 +45,7 @@ public:
 	[[nodiscard]] int32 pts() const;
 
 	void updateOnline(crl::time lastNonIdleTime = 0);
+	void updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline);
 	[[nodiscard]] bool isIdle() const;
 	[[nodiscard]] rpl::producer<bool> isIdleValue() const;
 	void checkIdleFinish(crl::time lastNonIdleTime = 0);
@@ -94,7 +95,6 @@ private:
 		MsgRange range,
 		const MTPupdates_ChannelDifference &result);
 
-	void updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline);
 	void sendPing();
 	void getDifferenceByPts();
 	void getDifferenceAfterFail();

@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "api/api_send_progress.h"
 
+#include "custom_settings.h"
+
 #include <QtCore/QSettings>
 #include "main/main_session.h"
 #include "history/history.h"
@@ -57,6 +59,9 @@ void SendProgressManager::update(
 		not_null<History*> history,
 		SendProgressType type,
 		int progress) {
+	if (CustomSettings::GhostMode()) {
+		return;
+	}
 	update(history, 0, type, progress);
 }
 
@@ -110,7 +115,7 @@ bool SendProgressManager::updated(const Key &key, bool doing) {
 }
 
 void SendProgressManager::send(const Key &key, int progress) {
-	if (skipRequest(key)) {
+	if (skipRequest(key) || CustomSettings::GhostMode()) {
 		return;
 	}
 	using Type = SendProgressType;

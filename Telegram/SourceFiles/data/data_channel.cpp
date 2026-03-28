@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_channel.h"
 
+#include "custom_settings.h"
+
 #include <QtCore/QSettings>
 #include "api/api_credits.h"
 #include "api/api_global_privacy.h"
@@ -708,8 +710,7 @@ bool ChannelData::canAddAdmins() const {
 }
 
 bool ChannelData::allowsForwarding() const {
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("bypass_restrictions", true).toBool()) {
+	if (CustomSettings::BypassRestrictions()) {
 		return true; // CUSTOM BYPASS
 	}
 	return !(flags() & Flag::NoForwards);

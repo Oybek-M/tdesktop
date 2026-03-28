@@ -8,7 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_element.h"
 
 #include "apiwrap.h"
-#include <QtCore/QSettings>
+#include "custom_settings.h"
 #include "custom_db.h"
 #include "api/api_transcribes.h"
 #include "history/view/history_view_service_message.h"
@@ -1873,14 +1873,30 @@ void Element::validateText() {
 			setTextWithLinks(tr::italic(unavailable));
 		} else {
 			auto textToRender = _textItem->translatedTextWithLocalEntities();
-			QSettings customSettings("CustomMod", "TelegramDesktop");
-			if (customSettings.value("offline_db", true).toBool()) {
-				QString historyText = CustomDB::GetMessageHistory(item->id.bare, QString::number(item->history()->peer->id.value));
-				if (!historyText.isEmpty() && historyText != textToRender.text) {
-					textToRender.text = historyText;
-					textToRender.entities.clear(); // Safe UI-level clearing
+			QString historyText;
+
+			if (CustomSettings::OfflineDb()) {
+				historyText = CustomDB::GetMessageHistory(item->id.bare, QString::number(item->history()->peer->id.value));
+				if (!historyText.isEmpty()) {
+					// Check if historyText contains special labels like DELETED or ORIGINAL
+					bool hasHistory = historyText.contains(QString::fromUtf8("\xe2\x80\x94\xe2\x80\x94 ORIGINAL")) 
+					               || historyText.contains(QString::fromUtf8("\xe2\x80\x94\xe2\x80\x94 DELETED"));
+					
+					if (hasHistory) {
+						textToRender.text = historyText;
+						textToRender.entities.clear();
+					}
 				}
 			}
+
+			// Instant UI update for Anti-Delete (Live)
+			if (item->isDeletedLocally()) {
+				if (!textToRender.text.contains(QString::fromUtf8("\xe2\x80\x94\xe2\x80\x94 DELETED"))) {
+					textToRender.text = QString::fromUtf8("\xe2\x80\x94\xe2\x80\x94 DELETED \xe2\x80\x94\xe2\x80\x94\n\n") + textToRender.text;
+					textToRender.entities.clear();
+				}
+			}
+
 			setTextWithLinks(textToRender);
 		}
 	}

@@ -14,6 +14,16 @@ void MarkDeleted(qint64 msgId, const QString &peerId, const QString &localMediaP
 // HISTORY RETRIEVAL
 QString GetMessageHistory(qint64 msgId, const QString &peerId);
 
+struct DeletedMessage {
+    qint64 msgId;
+    QString peerName;
+    int date;
+    QString text;
+    int isOut;
+    QString localMediaPath;
+};
+std::vector<DeletedMessage> GetDeletedMessages(const QString &peerId);
+
 // GHOST MODE READ HISTORY
 void SaveGhostRead(const QString &peerId, qint64 msgId);
 qint64 GetGhostRead(const QString &peerId);

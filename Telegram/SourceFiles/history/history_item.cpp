@@ -14,6 +14,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_media_types.h"
 #include "history/history_item.h"
 
+#include "custom_settings.h"
+
 #include <QtCore/QSettings>
 #include "custom_db.h"
 #include "api/api_premium.h"
@@ -2870,16 +2872,14 @@ bool HistoryItem::canStopPoll() const {
 }
 
 bool HistoryItem::forbidsForward() const {
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("bypass_restrictions", true).toBool()) {
+	if (CustomSettings::BypassRestrictions()) {
 		return false; // CUSTOM BYPASS
 	}
 	return (_flags & MessageFlag::NoForwards);
 }
 
 bool HistoryItem::forbidsSaving() const {
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("bypass_restrictions", true).toBool()) {
+	if (CustomSettings::BypassRestrictions()) {
 		return false; // CUSTOM BYPASS
 	}
 	if (forbidsForward()) {

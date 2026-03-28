@@ -89,36 +89,75 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtCore/QSettings>
 
+#include "custom_settings.h"
+
 namespace Settings {
 namespace {
 
 using namespace Builder;
 
 void CustomModBox(not_null<Ui::GenericBox*> box) {
-	box->setTitle(rpl::single(QString("Custom Mod Settings")));
+	box->setTitle(rpl::single(QString("Custom Mode Settings (By Saidjon)")));
 
-	auto addToggle = [&](const QString &id, const QString &text) {
-		auto settings = QSettings("CustomMod", "TelegramDesktop");
-		auto val = settings.value(id, true).toBool(); // Default to true
+	auto addSection = [&](const QString &title) {
+		box->addSkip(st::settingsThumbSkip);
+		auto label = object_ptr<Ui::FlatLabel>(
+			box.get(),
+			rpl::single(title),
+			st::defaultSubsectionTitle
+		);
+		box->addRow(std::move(label), st::defaultSubsectionTitlePadding);
+	};
+
+	auto addToggle = [&](const QString &id, const QString &text, const QString &description) {
+		auto val = CustomSettings::Get();
+		bool current = true;
+		if (id == "ghostMode") current = val.ghostMode;
+		else if (id == "bypassRestrictions") current = val.bypassRestrictions;
+		else if (id == "offlineDb") current = val.offlineDb;
+		else if (id == "antiDelete") current = val.antiDelete;
+		else if (id == "antiEdit") current = val.antiEdit;
+		else if (id == "spoofMobile") current = val.spoofMobile;
+
 		auto check = box->addRow(object_ptr<Ui::SettingsButton>(
 			box.get(),
 			rpl::single(text),
 			st::settingsButtonNoIcon
 		));
-		check->toggleOn(rpl::single(val));
+		check->toggleOn(rpl::single(current));
 		check->toggledValue() | rpl::on_next([=](bool on) {
-			QSettings s("CustomMod", "TelegramDesktop");
-			s.setValue(id, on);
+			CustomSettings::Set(id, on);
 		}, check->lifetime());
+
+		if (!description.isEmpty()) {
+			box->addRow(object_ptr<Ui::FlatLabel>(
+				box.get(),
+				rpl::single(description),
+				st::settingsScaleLabel
+			), st::defaultSubsectionTitlePadding);
+		}
 	};
 
-	addToggle("ghost_mode", "Ghost Mode (Hide Read/Typing/Online)");
-	addToggle("bypass_restrictions", "Bypass Forward/Copy Restrictions");
-	addToggle("offline_db", "Save Messages to Offline DB");
-	addToggle("anti_delete", "Anti-Delete (Keep deleted messages)");
-	addToggle("anti_edit", "Anti-Edit (Show edit history in chat)");
-	addToggle("spoof_mobile", "Enable View Once Support (Spoof Android)");
+	// --- PRIVACY SECTION ---
+	addSection("Privacy & Ghost Mode");
+	addToggle("ghostMode", "Ghost Mode", 
+		"Hide your online status, typing indicators, and read receipts.");
+	addToggle("antiDelete", "Anti-Delete Messages", 
+		"Prevent messages from being deleted for you.");
+	addToggle("antiEdit", "Anti-Edit History", 
+		"Keep track of original message content before it was edited.");
 
+	// --- BYPASS SECTION ---
+	box->addSkip(st::settingsThumbSkip);
+	addSection("Restrictions & Utilities");
+	addToggle("bypassRestrictions", "Bypass Chat Restrictions", 
+		"Enable forwarding and copying in restricted channels.");
+	addToggle("spoofMobile", "Spoof Android Device", 
+		"Pretend you're using an Android device.");
+	addToggle("offlineDb", "Offline Message Database", 
+		"Save a local copy of all messages for offline viewing.");
+
+	box->addSkip(st::settingsThumbSkip);
 	box->addButton(tr::lng_box_ok(), [=] { box->closeBox(); });
 }
 
@@ -416,6 +455,12 @@ void BuildSectionButtons(SectionBuilder &builder) {
 		.targetSection = PrivacySecurityId(),
 		.icon = { &st::menuIconLock },
 		.keywords = { u"security"_q, u"passcode"_q, u"password"_q, u"2fa"_q },
+	});
+
+	builder.addButton({
+		.title = rpl::single(QString("CustomMod Settings")),
+		.icon = { &st::menuIconSettings },
+		.onClick = [=] { controller->show(Box(CustomModBox)); },
 	});
 
 	builder.addSectionButton({
