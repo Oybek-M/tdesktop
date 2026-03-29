@@ -156,8 +156,7 @@ void EditLinkBox(
 		st::markdownLinkFieldPadding);
 	text->setInstantReplaces(Ui::InstantReplaces::Default());
 	text->setInstantReplacesEnabled(
-		Core::App().settings().replaceEmojiValue(),
-		Core::App().settings().systemTextReplaceValue());
+		Core::App().settings().replaceEmojiValue());
 	Ui::Emoji::SuggestionsController::Init(
 		box->getDelegate()->outerContainer(),
 		text,
@@ -516,8 +515,7 @@ auto InitMessageFieldHandlers(MessageFieldHandlersArgs &&args)
 	});
 	field->setInstantReplaces(Ui::InstantReplaces::Default());
 	field->setInstantReplacesEnabled(
-		Core::App().settings().replaceEmojiValue(),
-		Core::App().settings().systemTextReplaceValue());
+		Core::App().settings().replaceEmojiValue());
 	field->setMarkdownReplacesEnabled(rpl::single(Ui::MarkdownEnabledState{
 		Ui::MarkdownEnabled{ std::move(args.allowMarkdownTags) }
 	}));
@@ -608,8 +606,7 @@ Fn<void(not_null<Ui::InputField*>)> FactcheckFieldIniter(
 		});
 		field->setInstantReplaces(Ui::InstantReplaces::Default());
 		field->setInstantReplacesEnabled(
-			Core::App().settings().replaceEmojiValue(),
-			Core::App().settings().systemTextReplaceValue());
+			Core::App().settings().replaceEmojiValue());
 		field->setMarkdownReplacesEnabled(rpl::single(
 			Ui::MarkdownEnabledState{
 				Ui::MarkdownEnabled{

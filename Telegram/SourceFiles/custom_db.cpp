@@ -1,291 +1,177 @@
 #include "custom_db.h"
-#include <QtSql/QSqlDatabase>
-#include <QtSql/QSqlQuery>
-#include <QtSql/QSqlError>
 #include <QtCore/QStandardPaths>
 #include <QtCore/QDir>
-#include <QtCore/QDateTime>
+#include <QtCore/QFile>
 #include <QtCore/QDebug>
-#include <QtCore/QMutex>
-#include <QtCore/QMutexLocker>
-#include <QtConcurrent/QtConcurrent>
 #include "history/history_item.h"
 #include "history/history.h"
 #include "data/data_peer.h"
 
 namespace CustomDB {
 
-namespace {
-	QString gDataLocation;
-	bool gInitialized = false;
-	base::flat_map<QString, qint64> gGhostReadsCache;
-	QMutex gCacheMutex;
-}
+QSqlDatabase gDb;
 
 void Init() {
-    if (gInitialized) return;
+    if (gDb.isOpen()) return;
 
-    gDataLocation = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
-    QDir().mkpath(gDataLocation);
+    QString dbPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/CustomMod";
+    QDir().mkpath(dbPath);
+    
+    gDb = QSqlDatabase::addDatabase("QSQLITE");
+    gDb.setDatabaseName(dbPath + "/actioned_messages.db");
 
-    const QString initConn = "tdesktop_custom_init";
-    {
-        auto db = QSqlDatabase::addDatabase("QSQLITE", initConn);
-        db.setDatabaseName(gDataLocation + "/tdesktop_custom.sqlite");
-        if (db.open()) {
-            QSqlQuery query(db);
-            // Enable WAL mode for better concurrency
-            query.exec("PRAGMA journal_mode = WAL");
-            query.exec("PRAGMA synchronous = NORMAL");
+    if (!gDb.open()) {
+        qDebug() << "Error: connection with database failed" << gDb.lastError().text();
+        return;
+    }
 
-            query.exec(
-                "CREATE TABLE IF NOT EXISTS messages ("
-                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                "msg_id BIGINT, "
-                "peer_id TEXT, "
-                "peer_name TEXT, "
-                "date INTEGER, "
-                "text TEXT, "
-                "is_out INTEGER, "
-                "is_deleted INTEGER DEFAULT 0, "
-                "version INTEGER DEFAULT 1, "
-                "local_media_path TEXT"
-                ")"
-            );
+    QSqlQuery query;
+    // Table for Ghost Reads
+    query.exec("CREATE TABLE IF NOT EXISTS ghost_reads (peer_id TEXT PRIMARY KEY, msg_id INTEGER, timestamp DATETIME)");
+    
+    // Table for Edited/Deleted messages (Enhanced with is_out and msg_date)
+    query.exec("CREATE TABLE IF NOT EXISTS actioned_messages ("
+               "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+               "peer_id TEXT, "
+               "msg_id INTEGER, "
+               "type TEXT, "
+               "original_text TEXT, "
+               "new_text TEXT, "
+               "media_path TEXT, "
+               "is_out INTEGER DEFAULT 0, "
+               "msg_date INTEGER DEFAULT 0, "
+               "timestamp DATETIME)");
+}
 
-            // Safer way to add columns if they don't exist
-            QSqlQuery checkColumn(db);
-            checkColumn.exec("PRAGMA table_info(messages)");
-            bool hasMediaPath = false;
-            while (checkColumn.next()) {
-                if (checkColumn.value(1).toString() == "local_media_path") {
-                    hasMediaPath = true;
-                    break;
-                }
-            }
-            if (!hasMediaPath) {
-                query.exec("ALTER TABLE messages ADD COLUMN local_media_path TEXT");
-            }
+void SaveGhostRead(const QString &peerId, long long msgId) {
+    Init();
+    QSqlQuery query;
+    query.prepare("INSERT OR REPLACE INTO ghost_reads (peer_id, msg_id, timestamp) VALUES (?, ?, ?)");
+    query.addBindValue(peerId);
+    query.addBindValue(msgId);
+    query.addBindValue(QDateTime::currentDateTime());
+    query.exec();
+}
 
-            query.exec(
-                "CREATE TABLE IF NOT EXISTS ghost_reads ("
-                "peer_id TEXT PRIMARY KEY, "
-                "read_till_id BIGINT"
-                ")"
-            );
+long long GetGhostRead(const QString &peerId) {
+    Init();
+    QSqlQuery query;
+    query.prepare("SELECT msg_id FROM ghost_reads WHERE peer_id = ?");
+    query.addBindValue(peerId);
+    if (query.exec() && query.next()) {
+        return query.value(0).toLongLong();
+    }
+    return 0;
+}
 
-            QSqlQuery fetch(db);
-            if (fetch.exec("SELECT peer_id, read_till_id FROM ghost_reads")) {
-                QMutexLocker locker(&gCacheMutex);
-                while (fetch.next()) {
-                    gGhostReadsCache[fetch.value(0).toString()] = fetch.value(1).toLongLong();
-                }
-            }
-            db.close();
+void MarkDeleted(long long msgId, const QString &peerId, const QString &mediaPath) {
+    Init();
+    // We try to find existing info if possible, but for now we just record the action
+    ActionedMessage msg;
+    msg.peerId = peerId;
+    msg.msgId = msgId;
+    msg.type = "deleted";
+    msg.mediaPath = mediaPath;
+    msg.timestamp = QDateTime::currentDateTime();
+    SaveActionedMessage(msg);
+}
+
+QVector<DeletedMessage> GetDeletedMessages(const QString &peerId) {
+    Init();
+    QVector<DeletedMessage> result;
+    QSqlQuery query;
+    query.prepare("SELECT msg_id, media_path, is_out, msg_date, original_text FROM actioned_messages WHERE peer_id = ? AND type = 'deleted'");
+    query.addBindValue(peerId);
+    if (query.exec()) {
+        while (query.next()) {
+            DeletedMessage dm;
+            dm.msgId = query.value(0).toLongLong();
+            dm.mediaPath = query.value(1).toString();
+            dm.isOut = query.value(2).toBool();
+            dm.date = query.value(3).toUInt();
+            dm.text = query.value(4).toString();
+            result.push_back(dm);
         }
     }
-    QSqlDatabase::removeDatabase(initConn);
-    gInitialized = true;
-    qDebug() << "Custom SQLite DB initialized safely with WAL mode!";
-}
-
-void SaveMessage(not_null<HistoryItem*> item) {
-    if (!gInitialized) return;
-
-    const auto text = item->originalText().text;
-    if (text.isEmpty()) return;
-
-    struct MsgData {
-        qint64 msgId;
-        QString peerId;
-        QString peerName;
-        int date;
-        QString text;
-        int isOut;
-    };
-
-    MsgData data{
-        (qint64)item->id.bare,
-        QString::number(item->history()->peer->id.value),
-        item->history()->peer->name(),
-        (int)item->date(),
-        text,
-        item->out() ? 1 : 0
-    };
-
-    QtConcurrent::run([data = std::move(data)]() {
-        const QString connectionName = "tdesktop_custom_save_" + QString::number((quintptr)QThread::currentThreadId());
-        {
-            auto db = QSqlDatabase::addDatabase("QSQLITE", connectionName);
-            db.setDatabaseName(gDataLocation + "/tdesktop_custom.sqlite");
-
-            if (db.open()) {
-                int version = 1;
-                QSqlQuery check(db);
-                check.prepare("SELECT text, version FROM messages WHERE msg_id = :msg_id AND peer_id = :peer_id ORDER BY version DESC LIMIT 1");
-                check.bindValue(":msg_id", data.msgId);
-                check.bindValue(":peer_id", data.peerId);
-                if (check.exec() && check.next()) {
-                    if (check.value(0).toString() == data.text) {
-                        db.close();
-                        QSqlDatabase::removeDatabase(connectionName);
-                        return;
-                    }
-                    version = check.value(1).toInt() + 1;
-                }
-
-                QSqlQuery query(db);
-                query.prepare(
-                    "INSERT INTO messages (msg_id, peer_id, peer_name, date, text, is_out, version) "
-                    "VALUES (:msg_id, :peer_id, :peer_name, :date, :text, :is_out, :version)"
-                );
-                query.bindValue(":msg_id", data.msgId);
-                query.bindValue(":peer_id", data.peerId);
-                query.bindValue(":peer_name", data.peerName);
-                query.bindValue(":date", data.date);
-                query.bindValue(":text", data.text);
-                query.bindValue(":is_out", data.isOut);
-                query.bindValue(":version", version);
-                query.exec();
-                db.close();
-            }
-        }
-        QSqlDatabase::removeDatabase(connectionName);
-    });
-}
-
-void MarkDeleted(qint64 msgId, const QString &peerId, const QString &localMediaPath) {
-    if (!gInitialized) return;
-
-    QtConcurrent::run([msgId, peerId, localMediaPath]() {
-        const QString connectionName = "tdesktop_custom_del_" + QString::number((quintptr)QThread::currentThreadId());
-        {
-            auto db = QSqlDatabase::addDatabase("QSQLITE", connectionName);
-            db.setDatabaseName(gDataLocation + "/tdesktop_custom.sqlite");
-
-            if (db.open()) {
-                QSqlQuery query(db);
-                query.prepare(
-                    "UPDATE messages SET is_deleted = 1, local_media_path = :path WHERE msg_id = :msg_id AND peer_id = :peer_id"
-                );
-                query.bindValue(":msg_id", msgId);
-                query.bindValue(":peer_id", peerId);
-                query.bindValue(":path", localMediaPath);
-                query.exec();
-                db.close();
-            }
-        }
-        QSqlDatabase::removeDatabase(connectionName);
-    });
-}
-
-QString GetMessageHistory(qint64 msgId, const QString &peerId) {
-    if (!gInitialized) return QString();
-    QString result;
-    const QString connectionName = "tdesktop_custom_get_" + QString::number((quintptr)QThread::currentThreadId());
-    {
-        auto db = QSqlDatabase::addDatabase("QSQLITE", connectionName);
-        db.setDatabaseName(gDataLocation + "/tdesktop_custom.sqlite");
-        if (db.open()) {
-            QSqlQuery query(db);
-            query.prepare("SELECT text, is_deleted FROM messages WHERE msg_id = :msg_id AND peer_id = :peer_id ORDER BY version ASC");
-            query.bindValue(":msg_id", msgId);
-            query.bindValue(":peer_id", peerId);
-
-            QStringList versions;
-            bool isDeleted = false;
-            if (query.exec()) {
-                while (query.next()) {
-                    versions << query.value(0).toString();
-                    if (query.value(1).toInt() == 1) isDeleted = true;
-                }
-            }
-            db.close();
-
-            if (!versions.isEmpty()) {
-                if (isDeleted) {
-                    result += QString::fromUtf8("\xe2\x80\x94\xe2\x80\x94 DELETED \xe2\x80\x94\xe2\x80\x94\n\n");
-                }
-
-                if (versions.size() > 1) {
-                    result += versions.last();
-                    result += QString::fromUtf8("\n\n\xe2\x80\x94\xe2\x80\x94 ORIGINAL \xe2\x80\x94\xe2\x80\x94\n") + versions.first();
-                } else if (isDeleted) {
-                    result += versions.last();
-                }
-                if (!result.isEmpty()) {
-                    qDebug() << "[CustomDB] Loaded history for msgId:" << msgId << "versions:" << versions.size() << "deleted:" << isDeleted;
-                }
-            }
-        }
-    }
-    QSqlDatabase::removeDatabase(connectionName);
     return result;
 }
-std::vector<DeletedMessage> GetDeletedMessages(const QString &peerId) {
-    if (!gInitialized) return {};
-    std::vector<DeletedMessage> results;
-    const QString connectionName = "tdesktop_custom_list_" + QString::number((quintptr)QThread::currentThreadId());
-    {
-        auto db = QSqlDatabase::addDatabase("QSQLITE", connectionName);
-        db.setDatabaseName(gDataLocation + "/tdesktop_custom.sqlite");
-        if (db.open()) {
-            QSqlQuery query(db);
-            // Fetch only deleted messages, ordered by date
-            query.prepare(
-                "SELECT msg_id, peer_name, date, text, is_out, local_media_path "
-                "FROM messages WHERE peer_id = :peer_id AND is_deleted = 1 "
-                "GROUP BY msg_id ORDER BY date ASC"
-            );
-            query.bindValue(":peer_id", peerId);
-            
-            if (query.exec()) {
-                while (query.next()) {
-                    results.push_back({
-                        query.value(0).toLongLong(),
-                        query.value(1).toString(),
-                        query.value(2).toInt(),
-                        query.value(3).toString(),
-                        query.value(4).toInt(),
-                        query.value(5).toString()
-                    });
-                }
-            }
-            db.close();
-        }
+
+QString GetMessageHistory(long long msgId, const QString &peerId) {
+    Init();
+    QSqlQuery query;
+    query.prepare("SELECT original_text FROM actioned_messages WHERE msg_id = ? AND peer_id = ? AND type = 'edited' ORDER BY timestamp DESC LIMIT 1");
+    query.addBindValue(msgId);
+    query.addBindValue(peerId);
+    if (query.exec() && query.next()) {
+        return query.value(0).toString();
     }
-    QSqlDatabase::removeDatabase(connectionName);
-    return results;
+    return "";
 }
 
-void SaveGhostRead(const QString &peerId, qint64 msgId) {
-    if (!gInitialized) return;
-    {
-        QMutexLocker locker(&gCacheMutex);
-        gGhostReadsCache[peerId] = msgId;
-    }
-    QtConcurrent::run([peerId, msgId]() {
-        const QString connectionName = "tdesktop_custom_ghost_" + QString::number((quintptr)QThread::currentThreadId());
-        {
-            auto db = QSqlDatabase::addDatabase("QSQLITE", connectionName);
-            db.setDatabaseName(gDataLocation + "/tdesktop_custom.sqlite");
-            if (db.open()) {
-                QSqlQuery query(db);
-                query.prepare("INSERT OR REPLACE INTO ghost_reads (peer_id, read_till_id) VALUES (:peer_id, :read_till_id)");
-                query.bindValue(":peer_id", peerId);
-                query.bindValue(":read_till_id", msgId);
-                query.exec();
-                db.close();
-            }
-        }
-        QSqlDatabase::removeDatabase(connectionName);
-    });
+void SaveActionedMessage(const ActionedMessage &msg) {
+    Init();
+    QSqlQuery query;
+    query.prepare("INSERT INTO actioned_messages (peer_id, msg_id, type, original_text, new_text, media_path, is_out, msg_date, timestamp) "
+                  "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    query.addBindValue(msg.peerId);
+    query.addBindValue(msg.msgId);
+    query.addBindValue(msg.type);
+    query.addBindValue(msg.originalText);
+    query.addBindValue(msg.newText);
+    query.addBindValue(msg.mediaPath);
+    query.addBindValue(0); // is_out placeholder
+    query.addBindValue(0); // msg_date placeholder
+    query.addBindValue(msg.timestamp);
+    query.exec();
 }
-qint64 GetGhostRead(const QString &peerId) {
-    if (!gInitialized) return 0;
-	QMutexLocker locker(&gCacheMutex);
-	const auto i = gGhostReadsCache.find(peerId);
-	return (i != gGhostReadsCache.end()) ? i->second : 0;
+
+void SaveMessage(HistoryItem *item) {
+    if (!item) return;
+    Init();
+    QSqlQuery query;
+    query.prepare("INSERT INTO actioned_messages (peer_id, msg_id, type, original_text, is_out, msg_date, timestamp) "
+                  "VALUES (?, ?, ?, ?, ?, ?, ?)");
+    query.addBindValue(QString::number(item->history()->peer->id.value));
+    query.addBindValue((long long)item->id.bare);
+    query.addBindValue("backup");
+    query.addBindValue(item->originalText().text);
+    query.addBindValue(item->out() ? 1 : 0);
+    query.addBindValue((unsigned int)item->date());
+    query.addBindValue(QDateTime::currentDateTime());
+    query.exec();
+}
+
+void ExportDatabase(const QString &targetPath) {
+    Init();
+    QString currentDb = gDb.databaseName();
+    gDb.close();
+    QFile::copy(currentDb, targetPath);
+    gDb.open();
+}
+
+void ImportDatabase(const QString &sourcePath) {
+    Init();
+    QString currentDb = gDb.databaseName();
+    gDb.close();
+    QFile::remove(currentDb);
+    QFile::copy(sourcePath, currentDb);
+    gDb.open();
+}
+
+QString SaveMediaFile(const QString &sourcePath, const QString &type) {
+    if (sourcePath.isEmpty() || !QFile::exists(sourcePath)) return "";
+    QString baseDir = QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + "/customizationMainFolder";
+    QString subDir = "files";
+    if (type == "image") subDir = "medias/images";
+    else if (type == "video") subDir = "medias/videos";
+    else if (type == "voice") subDir = "mediaMessages";
+    QString fullPath = baseDir + "/" + subDir;
+    QDir().mkpath(fullPath);
+    QString fileName = QFileInfo(sourcePath).fileName();
+    QString targetPath = fullPath + "/" + fileName;
+    if (QFile::exists(targetPath)) return targetPath;
+    if (QFile::copy(sourcePath, targetPath)) return targetPath;
+    return "";
 }
 
 } // namespace CustomDB

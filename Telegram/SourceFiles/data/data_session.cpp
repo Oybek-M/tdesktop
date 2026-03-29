@@ -2927,7 +2927,7 @@ void Session::processMessagesDeleted(
 	for (const auto &messageId : data) {
 		const auto i = list ? list->find(messageId.v) : Messages::iterator();
 		if (list && i != list->end()) {
-			if (CustomSettings::AntiDelete()) {
+			if (::CustomSettings::AntiDelete()) {
 				// FORCE PERSISTENCE: Ignore server delete command, keep the item in memory
 				i->second->setDeletedLocally();
 				_session->changes().messageUpdated(i->second, Data::MessageUpdate::Flag::Edited);
@@ -2944,11 +2944,22 @@ void Session::processMessagesDeleted(
 	}
 }
 
+#include "custom_db.h"
+
 void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
 	auto historiesToCheck = base::flat_set<not_null<History*>>();
 	for (const auto &messageId : data) {
 		if (const auto item = nonChannelMessage(messageId.v)) {
-			if (CustomSettings::AntiDelete()) {
+			if (::CustomSettings::AntiDelete()) {
+				// SAVE TO PERSISTENT DB:
+				CustomDB::ActionedMessage msg;
+				msg.peerId = QString::number(item->history()->peer->id.value);
+				msg.msgId = item->id.bare;
+				msg.type = "deleted";
+				msg.originalText = item->originalText().text;
+				msg.timestamp = QDateTime::currentDateTime();
+				CustomDB::SaveActionedMessage(msg);
+
 				// FORCE PERSISTENCE: Ignore server delete command
 				item->setDeletedLocally();
 				_session->changes().messageUpdated(item, Data::MessageUpdate::Flag::Edited);

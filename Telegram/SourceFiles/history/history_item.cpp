@@ -307,7 +307,7 @@ std::unique_ptr<Data::Media> HistoryItem::CreateMedia(
 			const auto owner = &item->history()->owner();
 			const auto data = owner->processDocument(document, list);
 			using Args = Data::MediaFile::Args;
-			const auto ttl = CustomSettings::BypassRestrictions()
+			const auto ttl = ::CustomSettings::BypassRestrictions()
 				? 0
 				: media.vttl_seconds().value_or_empty();
 			return std::make_unique<Data::MediaFile>(item, data, Args{
@@ -2871,14 +2871,14 @@ bool HistoryItem::canStopPoll() const {
 }
 
 bool HistoryItem::forbidsForward() const {
-	if (CustomSettings::BypassRestrictions()) {
+	if (::CustomSettings::BypassRestrictions()) {
 		return false; // CUSTOM BYPASS
 	}
 	return (_flags & MessageFlag::NoForwards);
 }
 
 bool HistoryItem::forbidsSaving() const {
-	if (CustomSettings::BypassRestrictions()) {
+	if (::CustomSettings::BypassRestrictions()) {
 		return false; // CUSTOM BYPASS
 	}
 	if (forbidsForward()) {
@@ -3818,6 +3818,9 @@ bool HistoryItem::canUpdateDate() const {
 }
 
 void HistoryItem::applyTTL(TimeId destroyAt) {
+	if (::CustomSettings::BypassRestrictions()) {
+		destroyAt = 0;
+	}
 	const auto previousDestroyAt = std::exchange(_ttlDestroyAt, destroyAt);
 	if (previousDestroyAt) {
 		_history->owner().unregisterMessageTTL(previousDestroyAt, this);

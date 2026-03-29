@@ -94,8 +94,7 @@ EditInfoBox::EditInfoBox(
 		Core::App().settings().sendSubmitWay());
 	_field->setInstantReplaces(Ui::InstantReplaces::Default());
 	_field->setInstantReplacesEnabled(
-		Core::App().settings().replaceEmojiValue(),
-		Core::App().settings().systemTextReplaceValue());
+		Core::App().settings().replaceEmojiValue());
 	_field->setMarkdownReplacesEnabled(true);
 	_field->setEditLinkCallback(
 		DefaultEditLinkCallback(controller->uiShow(), _field));

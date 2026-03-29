@@ -577,8 +577,7 @@ void GroupInfoBox::prepare() {
 	_title->setMaxLength(Ui::EditPeer::kMaxGroupChannelTitle);
 	_title->setInstantReplaces(Ui::InstantReplaces::Default());
 	_title->setInstantReplacesEnabled(
-		Core::App().settings().replaceEmojiValue(),
-		Core::App().settings().systemTextReplaceValue());
+		Core::App().settings().replaceEmojiValue());
 	Ui::Emoji::SuggestionsController::Init(
 		getDelegate()->outerContainer(),
 		_title,
@@ -594,8 +593,7 @@ void GroupInfoBox::prepare() {
 		_description->setMaxLength(Ui::EditPeer::kMaxChannelDescription);
 		_description->setInstantReplaces(Ui::InstantReplaces::Default());
 		_description->setInstantReplacesEnabled(
-			Core::App().settings().replaceEmojiValue(),
-			Core::App().settings().systemTextReplaceValue());
+			Core::App().settings().replaceEmojiValue());
 		_description->setSubmitSettings(
 			Core::App().settings().sendSubmitWay());
 

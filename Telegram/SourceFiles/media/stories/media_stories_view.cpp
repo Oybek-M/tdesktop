@@ -92,6 +92,10 @@ void View::menuShown(bool shown) {
 	_controller->setMenuShown(shown);
 }
 
+void View::downloadRequested() {
+	_controller->downloadRequested();
+}
+
 void View::shareRequested() {
 	_controller->shareRequested();
 }

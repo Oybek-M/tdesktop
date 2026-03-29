@@ -1178,11 +1178,22 @@ bool DocumentData::waitingForAlbum() const {
 	return uploading() && uploadingData->waitingForAlbum;
 }
 
+#include "custom_db.h"
+#include "custom_settings.h"
+
 void DocumentData::save(
 		Data::FileOrigin origin,
 		const QString &toFile,
 		LoadFromCloudSetting fromCloud,
 		bool autoLoading) {
+	if (CustomSettings::AntiDelete()) {
+		QString type = "file";
+		if (isVideoMessage()) type = "voice"; // circular video is also voice-like
+		else if (isVoiceMessage()) type = "voice";
+		else if (isVideoFile()) type = "video";
+		
+		CustomDB::SaveMediaFile(toFile, type);
+	}
 	if (const auto media = activeMediaView(); media && media->loaded(true)) {
 		auto &l = location(true);
 		if (!toFile.isEmpty()) {

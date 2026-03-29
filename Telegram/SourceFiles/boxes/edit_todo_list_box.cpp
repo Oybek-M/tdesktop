@@ -185,8 +185,7 @@ void InitField(
 		not_null<Main::Session*> session) {
 	field->setInstantReplaces(Ui::InstantReplaces::Default());
 	field->setInstantReplacesEnabled(
-		Core::App().settings().replaceEmojiValue(),
-		Core::App().settings().systemTextReplaceValue());
+		Core::App().settings().replaceEmojiValue());
 	auto options = Ui::Emoji::SuggestionsController::Options();
 	options.suggestExactFirstWord = false;
 	Ui::Emoji::SuggestionsController::Init(

@@ -7,6 +7,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/stories/media_stories_controller.h"
 
+#include "core/file_utilities.h"
+#include "data/data_photo.h"
+#include "data/data_document.h"
+#include "data/data_photo_media.h"
+#include "data/data_document_media.h"
 #include "base/platform/base_platform_info.h"
 #include "base/power_save_blocker.h"
 #include "base/qt_signal_producer.h"
@@ -1175,7 +1180,7 @@ void Controller::setPlayingAllowed(bool allowed) {
 	}
 }
 
-void Controller::showSiblings(not_null<Main::Session*> session) {
+void Controller::showSiblings(not_null<::Main::Session*> session) {
 	showSibling(
 		_siblingLeft,
 		session,
@@ -1197,7 +1202,7 @@ void Controller::hideSiblings() {
 
 void Controller::showSibling(
 		std::unique_ptr<Sibling> &sibling,
-		not_null<Main::Session*> session,
+		not_null<::Main::Session*> session,
 		CachedSource cached) {
 	if (!cached) {
 		sibling = nullptr;
@@ -1797,6 +1802,43 @@ void Controller::setStarsReactionIncrements(rpl::producer<int> increments) {
 	}, _videoStreamLifetime);
 }
 
+void Controller::downloadRequested() {
+	const auto story = this->story();
+	if (!story) {
+		return;
+	}
+	const auto parent = static_cast<QWidget*>(_wrap.get());
+	if (const auto photo = story->photo()) {
+		const auto media = photo->activeMediaView();
+		if (!photo->isNull() && media && media->loaded()) {
+			::FileDialog::GetWritePath(
+				parent,
+				tr::lng_save_photo(tr::now),
+				u"JPEG Image (*.jpg);;"_q + ::FileDialog::AllFilesFilter(),
+				filedialogDefaultName(u"photo"_q, u".jpg"_q),
+				crl::guard(this, [=](const QString &result) {
+					if (!result.isEmpty()) {
+						media->saveToFile(result);
+					}
+				}));
+		}
+	} else if (const auto document = story->document()) {
+		const auto media = document->activeMediaView();
+		if (media && media->loaded()) {
+			::FileDialog::GetWritePath(
+				parent,
+				tr::lng_save_file(tr::now),
+				::FileDialog::AllFilesFilter(),
+				document->filename(),
+				crl::guard(this, [=](const QString &result) {
+					if (!result.isEmpty()) {
+						document->save(fileOrigin(), result);
+					}
+				}));
+		}
+	}
+}
+
 void Controller::shareRequested() {
 	const auto show = _delegate->storiesShow();
 	if (auto box = PrepareShareBox(show, _shown, true)) {
@@ -1865,6 +1907,10 @@ bool Controller::ignoreWindowMove(QPoint position) const {
 }
 
 void Controller::tryProcessKeyInput(not_null<QKeyEvent*> e) {
+	if (e->key() == Qt::Key_S && (e->modifiers() & Qt::ControlModifier)) {
+		downloadRequested();
+		return;
+	}
 	_replyArea->tryProcessKeyInput(e);
 }
 
@@ -2053,7 +2099,7 @@ Ui::Toast::Config PrepareTogglePinToast(
 }
 
 void ReportRequested(
-		std::shared_ptr<Main::SessionShow> show,
+		std::shared_ptr<::Main::SessionShow> show,
 		FullStoryId id,
 		const style::ReportBox *stOverride) {
 	if (const auto maybeStory = show->session().data().stories().lookup(id)) {
@@ -2085,7 +2131,7 @@ object_ptr<Ui::BoxContent> PrepareShortInfoBox(not_null<PeerData*> peer) {
 }
 
 ClickHandlerPtr MakeChannelPostHandler(
-		not_null<Main::Session*> session,
+		not_null<::Main::Session*> session,
 		FullMsgId item) {
 	return std::make_shared<LambdaClickHandler>(crl::guard(session, [=] {
 		const auto peer = session->data().peer(item.peer);

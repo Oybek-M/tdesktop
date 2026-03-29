@@ -1,8 +1,6 @@
 #pragma once
 
 #include <QtCore/QString>
-#include <QtCore/QSettings>
-#include <QtCore/QVariant>
 
 namespace CustomSettings {
 
@@ -19,7 +17,7 @@ void Init();
 const Values& Get();
 void Set(const QString &id, bool value);
 
-// Helpers for quick access
+// Helpers for quick access using explicit global namespace
 inline bool GhostMode() { return Get().ghostMode; }
 inline bool BypassRestrictions() { return Get().bypassRestrictions; }
 inline bool OfflineDb() { return Get().offlineDb; }

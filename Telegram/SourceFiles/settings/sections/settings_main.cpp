@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "settings/sections/settings_main.h"
 
+#include "custom_db.h"
 #include "settings/settings_common_session.h"
 
 #include "api/api_cloud_password.h"
@@ -142,20 +143,33 @@ void CustomModBox(not_null<Ui::GenericBox*> box) {
 	addSection("Privacy & Ghost Mode");
 	addToggle("ghostMode", "Ghost Mode", 
 		"Hide your online status, typing indicators, and read receipts.");
-	addToggle("antiDelete", "Anti-Delete Messages", 
-		"Prevent messages from being deleted for you.");
-	addToggle("antiEdit", "Anti-Edit History", 
-		"Keep track of original message content before it was edited.");
-
-	// --- BYPASS SECTION ---
+	// --- ACTIONS VIEWER SECTION ---
 	box->addSkip(st::settingsThumbSkip);
-	addSection("Restrictions & Utilities");
-	addToggle("bypassRestrictions", "Bypass Chat Restrictions", 
-		"Enable forwarding and copying in restricted channels.");
-	addToggle("spoofMobile", "Spoof Android Device", 
-		"Pretend you're using an Android device.");
-	addToggle("offlineDb", "Offline Message Database", 
-		"Save a local copy of all messages for offline viewing.");
+	addSection("Actions Viewer Mode");
+	addToggle("antiDelete", "Anti-Delete Messages", 
+		"Prevent messages from being deleted for you. Deleted messages will be stored in SQLite DB.");
+	addToggle("antiEdit", "Anti-Edit History", 
+		"Keep track of original message content before it was edited. Stored locally.");
+	addToggle("offlineDb", "Persistent Message Database", 
+		"Save a local copy of all messages and media versions for offline viewing.");
+
+	// --- DATABASE MANAGEMENT ---
+	box->addSkip(st::settingsThumbSkip);
+	addSection("Database Management");
+
+	box->addRow(object_ptr<Ui::FlatLabel>(
+		box.get(),
+		rpl::single(QString("Manage your persistent archive of deleted/edited messages.")),
+		st::settingsScaleLabel
+	), st::defaultSubsectionTitlePadding);
+
+	box->addButton(rpl::single(QString("Export Database Backup")), [=] {
+		CustomDB::ExportDatabase(QDir::homePath() + "/custom_mod_backup.db");
+	});
+
+	box->addButton(rpl::single(QString("Import Database Backup")), [=] {
+		CustomDB::ImportDatabase(QDir::homePath() + "/custom_mod_backup.db");
+	});
 
 	box->addSkip(st::settingsThumbSkip);
 	box->addButton(tr::lng_box_ok(), [=] { box->closeBox(); });

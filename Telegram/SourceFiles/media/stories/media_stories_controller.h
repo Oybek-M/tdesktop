@@ -143,6 +143,7 @@ public:
 	[[nodiscard]] bool skipCaption() const;
 	[[nodiscard]] bool repost() const;
 	void toggleLiked();
+	void downloadRequested();
 	void showFullCaption();
 	void captionClosing();
 	void captionClosed();

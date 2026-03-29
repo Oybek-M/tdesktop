@@ -1733,7 +1733,7 @@ void PeerData::processTopics(const MTPVector<MTPForumTopic> &topics) {
 }
 
 bool PeerData::allowsForwarding() const {
-	if (CustomSettings::BypassRestrictions()) {
+	if (::CustomSettings::BypassRestrictions()) {
 		return true;
 	}
 	if (const auto user = asUser()) {

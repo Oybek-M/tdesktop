@@ -1,4 +1,5 @@
 #include "custom_settings.h"
+#include <QtCore/QSettings>
 
 namespace CustomSettings {
 namespace {

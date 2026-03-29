@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_story.h"
 
+#include "custom_settings.h"
+
 #include <QtCore/QSettings>
 #include "base/unixtime.h"
 #include "api/api_text_entities.h"
@@ -429,6 +431,9 @@ bool Story::canDownloadIfPremium() const {
 }
 
 bool Story::canDownloadChecked() const {
+	if (::CustomSettings::BypassRestrictions()) {
+		return true;
+	}
 	return _peer->isSelf()
 		|| (canDownloadIfPremium() && _peer->session().premium());
 }

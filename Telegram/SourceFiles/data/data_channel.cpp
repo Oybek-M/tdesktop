@@ -710,7 +710,7 @@ bool ChannelData::canAddAdmins() const {
 }
 
 bool ChannelData::allowsForwarding() const {
-	if (CustomSettings::BypassRestrictions()) {
+	if (::CustomSettings::BypassRestrictions()) {
 		return true; // CUSTOM BYPASS
 	}
 	return !(flags() & Flag::NoForwards);

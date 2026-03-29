@@ -1,31 +1,45 @@
 #pragma once
 
 #include <QtCore/QString>
-#include "base/basic_types.h"
+#include <QtCore/QDateTime>
+#include <QtSql/QSqlDatabase>
+#include <QtSql/QSqlQuery>
+#include <QtSql/QSqlError>
 
 class HistoryItem;
 
 namespace CustomDB {
 
-void Init();
-void SaveMessage(not_null<HistoryItem*> item);
-void MarkDeleted(qint64 msgId, const QString &peerId, const QString &localMediaPath = QString());
-
-// HISTORY RETRIEVAL
-QString GetMessageHistory(qint64 msgId, const QString &peerId);
-
-struct DeletedMessage {
-    qint64 msgId;
-    QString peerName;
-    int date;
-    QString text;
-    int isOut;
-    QString localMediaPath;
+struct ActionedMessage {
+    QString peerId;
+    long long msgId;
+    QString type; // "deleted", "edited", "backup"
+    QString originalText;
+    QString newText;
+    QString mediaPath;
+    QDateTime timestamp;
 };
-std::vector<DeletedMessage> GetDeletedMessages(const QString &peerId);
 
-// GHOST MODE READ HISTORY
-void SaveGhostRead(const QString &peerId, qint64 msgId);
-qint64 GetGhostRead(const QString &peerId);
+void Init();
+void SaveGhostRead(const QString &peerId, long long msgId);
+long long GetGhostRead(const QString &peerId);
+void MarkDeleted(long long msgId, const QString &peerId, const QString &mediaPath = QString());
+void SaveActionedMessage(const ActionedMessage &msg);
+QString GetMessageHistory(long long msgId, const QString &peerId);
+struct DeletedMessage {
+    long long msgId;
+    QString mediaPath;
+    bool isOut;
+    unsigned int date;
+    QString text;
+};
+QVector<DeletedMessage> GetDeletedMessages(const QString &peerId);
+void SaveMessage(HistoryItem *item);
+
+void ExportDatabase(const QString &targetPath);
+void ImportDatabase(const QString &sourcePath);
+
+// New: Media storage functions
+QString SaveMediaFile(const QString &sourcePath, const QString &type); // "image", "video", "voice", "file"
 
 } // namespace CustomDB

@@ -117,6 +117,7 @@ public:
 	void contentPressed(bool pressed);
 	void menuShown(bool shown);
 
+	void downloadRequested();
 	void shareRequested();
 	void deleteRequested();
 	void reportRequested();
