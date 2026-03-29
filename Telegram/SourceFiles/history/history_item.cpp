@@ -307,8 +307,7 @@ std::unique_ptr<Data::Media> HistoryItem::CreateMedia(
 			const auto owner = &item->history()->owner();
 			const auto data = owner->processDocument(document, list);
 			using Args = Data::MediaFile::Args;
-			QSettings customSettings("CustomMod", "TelegramDesktop");
-			const auto ttl = customSettings.value("bypass_restrictions", true).toBool()
+			const auto ttl = CustomSettings::BypassRestrictions()
 				? 0
 				: media.vttl_seconds().value_or_empty();
 			return std::make_unique<Data::MediaFile>(item, data, Args{
