@@ -1879,8 +1879,9 @@ void Element::validateText() {
 				historyText = CustomDB::GetMessageHistory(item->id.bare, QString::number(item->history()->peer->id.value));
 				if (!historyText.isEmpty()) {
 					// Check if historyText contains special labels like DELETED or ORIGINAL
-					bool hasHistory = historyText.contains(QString::fromUtf8("\xe2\x80\x94\xe2\x80\x94 ORIGINAL")) 
-					               || historyText.contains(QString::fromUtf8("\xe2\x80\x94\xe2\x80\x94 DELETED"));
+					bool hasHistory = historyText.contains(QString::fromUtf8("\xe2\x80\x94\xe2\x80\x94 ORIGINAL"))
+					               || historyText.contains(QString::fromUtf8("\xe2\x80\x94\xe2\x80\x94 DELETED"))
+					               || historyText.contains(QString::fromUtf8("\xF0\x9F\x97\x91 [DELETED]"));
 					
 					if (hasHistory) {
 						textToRender.text = historyText;
@@ -1889,10 +1890,17 @@ void Element::validateText() {
 				}
 			}
 
-			// Instant UI update for Anti-Delete (Live)
+			// D16: Instant UI update for Anti-Delete — visually distinct marker.
 			if (item->isDeletedLocally()) {
-				if (!textToRender.text.contains(QString::fromUtf8("\xe2\x80\x94\xe2\x80\x94 DELETED"))) {
-					textToRender.text = QString::fromUtf8("\xe2\x80\x94\xe2\x80\x94 DELETED \xe2\x80\x94\xe2\x80\x94\n\n") + textToRender.text;
+				// Marker: "🗑 [DELETED]" using UTF-8 trash-can + box brackets.
+				// U+1F5D1 (🗑) = \xF0\x9F\x97\x91, em-dash = \xe2\x80\x94
+				static const QString kDeletedMarker = QString::fromUtf8(
+					"\xF0\x9F\x97\x91 [DELETED] \xe2\x80\x94 "
+					"saved by Anti-Delete\n"
+					"\xe2\x80\x94\xe2\x80\x94\xe2\x80\x94\xe2\x80\x94"
+					"\xe2\x80\x94\xe2\x80\x94\xe2\x80\x94\xe2\x80\x94\n");
+				if (!textToRender.text.startsWith(kDeletedMarker)) {
+					textToRender.text = kDeletedMarker + textToRender.text;
 					textToRender.entities.clear();
 				}
 			}

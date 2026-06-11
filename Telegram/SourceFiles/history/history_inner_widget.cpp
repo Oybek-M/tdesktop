@@ -8,7 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_inner_widget.h"
 
 #include "api/api_polls.h"
-#include <QtCore/QSettings>
+#include "custom_settings.h"
 #include "chat_helpers/stickers_emoji_pack.h"
 #include "core/application.h"
 #include "core/file_utilities.h"
@@ -3490,18 +3490,16 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 }
 
 bool HistoryInner::hasCopyRestriction(HistoryItem *item) const {
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("bypass_restrictions", true).toBool()) {
-		return false; // CUSTOM BYPASS
+	if (CustomSettings::BypassRestrictions()) {
+		return false;
 	}
 	return !_peer->allowsForwarding() || (item && item->forbidsForward());
 }
 
 bool HistoryInner::hasCopyMediaRestriction(
 		not_null<HistoryItem*> item) const {
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("bypass_restrictions", true).toBool()) {
-		return false; // CUSTOM BYPASS
+	if (CustomSettings::BypassRestrictions()) {
+		return false;
 	}
 	return hasCopyRestriction(item) || item->forbidsSaving();
 }

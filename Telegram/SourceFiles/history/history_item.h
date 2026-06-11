@@ -463,6 +463,9 @@ public:
 	[[nodiscard]] bool hasNoForwardsFlag() const; // CUSTOM BYPASS CHECK
 	[[nodiscard]] bool isDeletedLocally() const { return _isDeletedLocally; } // ANTI-DELETE
 	void setDeletedLocally(); // ANTI-DELETE
+	// Mark as deleted without re-saving to DB (used when restoring from DB on startup).
+	void markDeletedLocallyFromDB() { _isDeletedLocally = true; } // ANTI-DELETE
+	void restoreFromCustomDB(); // Called in MTPDmessage constructor to restore persisted state
 	[[nodiscard]] bool allowsSendNow() const;
 	[[nodiscard]] bool allowsReschedule() const;
 	[[nodiscard]] bool allowsForward() const;

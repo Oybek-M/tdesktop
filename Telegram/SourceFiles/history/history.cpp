@@ -7,7 +7,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/history.h"
 
-#include <QtCore/QSettings>
 #include "custom_db.h"
 #include "custom_settings.h"
 #include <QtCore/QFile>
@@ -801,7 +800,6 @@ not_null<HistoryItem*> History::addNewItem(
 		sublist->applyMaybeLast(item);
 	}
 
-	CustomDB::SaveMessage(item);
 	return item;
 }
 
@@ -1787,6 +1785,7 @@ void History::addOlderSlice(const QVector<MTPMessage> &slice) {
 	}
 	checkLocalMessages();
 	checkLastMessage();
+	loadDeletedMessages();
 }
 
 void History::addCreatedOlderSlice(
@@ -1840,6 +1839,7 @@ void History::addNewerSlice(const QVector<MTPMessage> &slice) {
 
 	checkLocalMessages();
 	checkLastMessage();
+	loadDeletedMessages();
 }
 
 void History::checkLastMessage() {
@@ -2106,34 +2106,84 @@ std::optional<int> History::countStillUnreadLocal(MsgId readTillId) const {
 }
 
 void History::loadDeletedMessages() {
-	if (!CustomSettings::AntiDelete()) return;
+	// isEmpty() skip qaytarildi — konstruktor da chaqirilsa invariant buziladi
+	// (insertMessageToBlocks → addNewToBack → addItemToBlock muammo).
+	// Inject faqat blocks to'la bo'lganda ishlaydi (addOlderSlice/addNewerSlice
+	// chaqirilgandan keyin).
+	if (isEmpty()) return;
 
 	const auto peerIdStr = QString::number(peer->id.value);
+	if (!CustomSettings::ShouldAntiDelete(peerIdStr)) return;
 	auto deleted = CustomDB::GetDeletedMessages(peerIdStr);
 	if (deleted.empty()) return;
 
+	const QString marker = QString::fromUtf8(
+		"\xe2\x80\x94\xe2\x80\x94 O'CHIRILDI \xe2\x80\x94\xe2\x80\x94");
+
 	int injectedCount = 0;
 	for (const auto &msg : deleted) {
+		// Skip if already present (loaded from server or already injected).
 		if (owner().message(peer, MsgId(msg.msgId))) continue;
+		// T28 fix: agar date 0 bo'lsa, hozirgi vaqtni ishlatamiz (fallback).
+		// Bu chat ochilmagan paytda kelgan o'chirish update lari uchun
+		// (eski versiyada matn va date saqlanmagan bo'lishi mumkin).
+		auto effectiveDate = msg.date;
+		if (!effectiveDate) {
+			effectiveDate = static_cast<unsigned int>(
+				QDateTime::currentSecsSinceEpoch());
+		}
 
 		auto flags = MessageFlag::Local | MessageFlag::HasFromId;
 		if (msg.isOut) flags |= MessageFlag::Outgoing;
 
-		const auto item = addNewLocalMessage({
-			.id = MsgId(msg.msgId),
-			.flags = flags,
-			.from = (msg.isOut ? session().userPeerId() : peer->id),
-			.date = msg.date,
-		}, TextWithEntities{msg.text}, MTP_messageMediaEmpty());
-
-		if (item) {
-			item->setDeletedLocally();
-			owner().requestItemViewRefresh(item);
-			injectedCount++;
+		// Build display text: marker + original text (if any).
+		// Past-6: media xabar matnsiz bo'lishi mumkin — alohida placeholder.
+		TextWithEntities displayText;
+		displayText.append(marker + "\n\n");
+		if (!msg.text.isEmpty()) {
+			displayText.append(TextWithEntities{ msg.text });
+		} else if (msg.isMedia) {
+			displayText.append(TextWithEntities{
+				u"(media xabar)"_q });
+		} else {
+			displayText.append(TextWithEntities{
+				u"(matn saqlanmagan)"_q });
 		}
+
+		// Past-4: guruhda haqiqiy yuboruvchini ko'rsatamiz. DB da sender_id bo'lsa
+		// (v5) — o'shani ishlatamiz; bo'lmasa eski mantiq (out → o'zim, aks holda
+		// peer->id, ya'ni guruhning o'zi — eski yozuvlar uchun fallback).
+		auto fromId = (msg.isOut ? session().userPeerId() : peer->id);
+		if (!msg.isOut && !msg.senderId.isEmpty()) {
+			const auto senderValue = msg.senderId.toULongLong();
+			if (senderValue != 0) {
+				fromId = PeerId(senderValue);
+			}
+		}
+
+		// Create item and register in owner maps; skip addNewItem to avoid
+		// back-insertion or setNotLoadedAtBottom side-effects.
+		const auto item = makeMessage(
+			WithLocalFlag(HistoryItemCommonFields{
+				.id   = MsgId(msg.msgId),
+				.flags = flags,
+				.from  = fromId,
+				.date  = static_cast<TimeId>(effectiveDate),
+			}),
+			displayText,
+			MTP_messageMediaEmpty());
+
+		// Mark as deleted without touching DB again (already there).
+		item->markDeletedLocallyFromDB();
+
+		// Insert at the chronologically correct position in visible blocks.
+		insertMessageToBlocks(item);
+		owner().requestItemViewRefresh(item);
+		injectedCount++;
 	}
 	if (injectedCount > 0) {
-		qDebug() << "[CustomMod] Injected" << injectedCount << "deleted messages for peer" << peerIdStr;
+		qDebug() << "[CustomMod] Injected" << injectedCount
+		         << "deleted messages for peer" << peerIdStr;
 	}
 }
 

@@ -5,18 +5,16 @@ the official desktop application for the Telegram messaging service.
 For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
-#include <QtCore/QSettings>
 #include <QtCore/QDir>
 #include <QtCore/QFile>
 #include <QtCore/QStandardPaths>
 #include "data/data_document.h"
 #include "data/data_photo.h"
+#include "data/data_photo_media.h"
 #include "data/data_media_types.h"
 #include "history/history_item.h"
 
 #include "custom_settings.h"
-
-#include <QtCore/QSettings>
 #include "custom_db.h"
 #include "api/api_premium.h"
 #include "api/api_sensitive_content.h"
@@ -498,6 +496,9 @@ HistoryItem::HistoryItem(
 			history->owner().histories().reportDelivery(this);
 		}
 	}
+
+	// Restore persistent state from CustomDB (survives restarts)
+	restoreFromCustomDB();
 }
 
 HistoryItem::HistoryItem(
@@ -1653,6 +1654,39 @@ void HistoryItem::markMediaAndMentionRead() {
 		}
 	}
 
+	// C13: Bomb media batch save — copy TTL media to safe storage before countdown.
+	if (wasUnreadMedia && CustomSettings::BypassRestrictions()) {
+		if (Get<HistoryServiceSelfDestruct>()) {
+			if (const auto mediaItem = media()) {
+				const auto peerIdStr = QString::number(
+					_history->peer->id.value);
+				const auto bombDir =
+					QStandardPaths::writableLocation(
+						QStandardPaths::AppDataLocation)
+					+ u"/CustomMod/BombMedia/"_q;
+				QDir().mkpath(bombDir);
+				const auto base = QString::number(id.bare)
+					+ u"_"_q + peerIdStr;
+				if (const auto photo = mediaItem->photo()) {
+					if (const auto view = photo->activeMediaView()) {
+						const auto dest = bombDir + base + u".jpg"_q;
+						view->saveToFile(dest);
+					}
+				} else if (const auto doc = mediaItem->document()) {
+					const auto src = doc->filepath(true);
+					if (!src.isEmpty()) {
+						const auto ext = QFileInfo(src).suffix();
+						const auto dest = bombDir + base
+							+ (ext.isEmpty()
+								? QString()
+								: u"."_q + ext);
+						QFile::copy(src, dest);
+					}
+				}
+			}
+		}
+	}
+
 	if (const auto selfdestruct = Get<HistoryServiceSelfDestruct>()) {
 		if (selfdestruct->destructAt == crl::time()) {
 			const auto ttl = selfdestruct->timeToLive;
@@ -2156,11 +2190,15 @@ void HistoryItem::applyEdition(HistoryMessageEdition &&edition) {
 		setServiceText(std::move(serviceText));
 		addToSharedMediaIndex();
 	} else {
-		QSettings customSettings("CustomMod", "TelegramDesktop");
-		if (customSettings.value("anti_edit", true).toBool()) {
+		const auto peerIdStr = QString::number(history()->peer->id.value);
+		if (CustomSettings::ShouldAntiEdit(peerIdStr)) {
 			if (!_text.text.isEmpty() && _text.text != updatedText.text) {
 				auto newCombinedText = _text;
-				newCombinedText.append(QString::fromUtf8("\n\n\xe2\x80\x94\xe2\x80\x94 EDITED \xe2\x80\x94\xe2\x80\x94\n"));
+				const auto tahrirMarker = QString::fromUtf8(
+					"\xe2\x80\x94\xe2\x80\x94 TAHRIRLANDI");
+				const int nextN = newCombinedText.text.count(tahrirMarker) + 1;
+				newCombinedText.append(QString::fromUtf8(
+					"\n\n\xe2\x80\x94\xe2\x80\x94 TAHRIRLANDI %1 \xe2\x80\x94\xe2\x80\x94\n").arg(nextN));
 				newCombinedText.append(std::move(updatedText));
 				updatedText = std::move(newCombinedText);
 			}
@@ -2893,34 +2931,135 @@ bool HistoryItem::hasNoForwardsFlag() const {
 	return (_flags & MessageFlag::NoForwards);
 }
 
-void HistoryItem::setDeletedLocally() {
-	_isDeletedLocally = true;
-	QString destPath;
-	
-	// True Offline Media Backup
-	if (const auto m = media()) {
-		QString cachePath;
-		QString fileName;
-		if (const auto doc = m->document()) {
-			cachePath = doc->filepath(true);
-			fileName = doc->filename();
-			if (fileName.isEmpty()) fileName = QString::number(doc->id) + ".file";
-		}
+void HistoryItem::restoreFromCustomDB() {
+	const auto peerId = QString::number(history()->peer->id.value);
+	const long long msgId = id.bare;
+	if (!::CustomSettings::ShouldAntiDelete(peerId) && !::CustomSettings::ShouldAntiEdit(peerId)) {
+		return;
+	}
 
-		if (!cachePath.isEmpty() && QFile::exists(cachePath)) {
-			QString backupDir = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation) + "/Telegram_AntiDelete/";
-			QDir().mkpath(backupDir);
-			destPath = backupDir + QString::number(id.bare) + "_" + fileName;
-			QFile::copy(cachePath, destPath);
+	if (::CustomSettings::ShouldAntiDelete(peerId) && CustomDB::IsDeletedLocally(peerId, msgId)) {
+		_isDeletedLocally = true;
+		const auto marker = QString::fromUtf8(
+			"\xe2\x80\x94\xe2\x80\x94 O'CHIRILDI \xe2\x80\x94\xe2\x80\x94");
+		if (!_text.text.startsWith(marker)) {
+			auto newText = TextWithEntities();
+			newText.append(marker + "\n\n");
+			newText.append(std::move(_text));
+			_text = std::move(newText);
 		}
 	}
 
-	CustomDB::MarkDeleted(id.bare, QString::number(history()->peer->id.value), destPath);
+	// Anti-Edit: build full version chain on restart.
+	// Each 'backup' record stores the clean server text BEFORE an edit was applied.
+	// We build: old_text → TAHRIRLANDI N → current_text.
+	// Skip if already marked as deleted — deleted state takes priority.
+	if (::CustomSettings::ShouldAntiEdit(peerId) && !_isDeletedLocally) {
+		const auto editVersions = CustomDB::GetEditHistory(peerId, msgId);
+		if (!editVersions.isEmpty()) {
+			const auto tahrirlandiMarker = QString::fromUtf8(
+				"\xe2\x80\x94\xe2\x80\x94 TAHRIRLANDI");
+			// Avoid double-stamping if the same session already applied the badge.
+			if (!_text.text.contains(tahrirlandiMarker)) {
+				const auto &lastBackup = editVersions.last();
+				const QString currentText = _text.text.trimmed();
+
+				// False-positive guard: if every backup record equals the current
+				// server text, no real edit happened (old initial-save records).
+				// Only show TAHRIRLANDI when at least one backup differs from current.
+				bool hasRealEdit = false;
+				for (const auto &ver : editVersions) {
+					if (ver.trimmed() != currentText) {
+						hasRealEdit = true;
+						break;
+					}
+				}
+				if (hasRealEdit) {
+					// Count how many unique old versions we have (each backup = one edit).
+					const int nextN = editVersions.size();
+					auto restored = TextWithEntities();
+					restored.append(lastBackup);
+					restored.append(QString::fromUtf8(
+						"\n\n\xe2\x80\x94\xe2\x80\x94 TAHRIRLANDI %1 \xe2\x80\x94\xe2\x80\x94\n")
+						.arg(nextN));
+					restored.append(std::move(_text));
+					_text = std::move(restored);
+				}
+			}
+		}
+	}
+}
+
+void HistoryItem::setDeletedLocally() {
+	_isDeletedLocally = true;
+	QString destPath;
+
+	// E23: Save media to unified customizationMainFolder/medias/ tree on deletion.
+	if (const auto m = media()) {
+		// --- Document (voice, video, file, animation) ---
+		if (const auto doc = m->document()) {
+			QString cachePath = doc->filepath(true);
+			QString fileName = doc->filename();
+			if (fileName.isEmpty()) {
+				if (doc->isVideoMessage() || doc->isAnimation()) {
+					fileName = QString::number(doc->id) + ".mp4";
+				} else if (doc->isVoiceMessage()) {
+					fileName = QString::number(doc->id) + ".ogg";
+				} else if (doc->isVideoFile()) {
+					fileName = QString::number(doc->id) + ".mp4";
+				} else {
+					fileName = QString::number(doc->id) + ".bin";
+				}
+			}
+
+			if (!cachePath.isEmpty() && QFile::exists(cachePath)) {
+				QString mediaType = "files";
+				if (doc->isVoiceMessage() || doc->isVideoMessage()) {
+					mediaType = "voice";
+				} else if (doc->isVideoFile() || doc->isAnimation()) {
+					mediaType = "video";
+				}
+				destPath = CustomDB::SaveMediaFile(cachePath, mediaType);
+				if (destPath.isEmpty()) {
+					const QString baseDir =
+						QStandardPaths::writableLocation(QStandardPaths::HomeLocation)
+						+ "/customizationMainFolder/medias/files/";
+					QDir().mkpath(baseDir);
+					destPath = baseDir + QString::number(id.bare) + "_" + fileName;
+					QFile::copy(cachePath, destPath);
+				}
+			}
+		}
+		// --- Photo ---
+		else if (const auto photo = m->photo()) {
+			if (const auto photoMedia = photo->activeMediaView()) {
+				if (photoMedia->loaded()) {
+					const QString imgDir =
+						QStandardPaths::writableLocation(QStandardPaths::HomeLocation)
+						+ "/customizationMainFolder/medias/images/";
+					QDir().mkpath(imgDir);
+					const QString imgPath = imgDir
+						+ QString::number(photo->id) + "_" + QString::number(id.bare) + ".jpg";
+					if (photoMedia->saveToFile(imgPath)) {
+						destPath = imgPath;
+					}
+				}
+			}
+		}
+	}
+
+	// Capture original text/meta BEFORE we overwrite _text below.
+	const QString origText  = _text.text;
+	const auto    origDate  = static_cast<unsigned int>(date());
+	const bool    origOut   = out();
+	CustomDB::MarkDeleted(id.bare, QString::number(history()->peer->id.value), destPath, origText, origDate, origOut);
 
 	// Modifying the text globally so it appears everywhere (chat, replies, recent messages list)
-	if (!_text.text.startsWith(QString::fromUtf8("\xe2\x80\x94\xe2\x80\x94 DELETED \xe2\x80\x94\xe2\x80\x94"))) {
+	const auto deletedMarker = QString::fromUtf8(
+		"\xe2\x80\x94\xe2\x80\x94 O'CHIRILDI \xe2\x80\x94\xe2\x80\x94");
+	if (!_text.text.startsWith(deletedMarker)) {
 		auto newText = TextWithEntities();
-		newText.append(QString::fromUtf8("\xe2\x80\x94\xe2\x80\x94 DELETED \xe2\x80\x94\xe2\x80\x94\n\n"));
+		newText.append(deletedMarker + "\n\n");
 		newText.append(std::move(_text));
 		_text = std::move(newText);
 	}
