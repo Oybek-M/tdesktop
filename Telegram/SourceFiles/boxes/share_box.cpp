@@ -32,6 +32,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "history/history_item_helpers.h"
 #include "history/view/history_view_element.h"
+#include "api/api_sending.h"
+#include "custom_settings.h"
+#include "data/data_chat.h"
+#include "data/data_file_origin.h"
 #include "history/view/history_view_context_menu.h" // CopyPostLink.
 #include "settings/sections/settings_premium.h"
 #include "window/window_session_controller.h"
@@ -1712,6 +1716,35 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 			return;
 		}
 
+		// Split items: protected ones go through bypass, rest through MTP.
+		const bool bypassOn = CustomSettings::BypassRestrictions();
+		std::vector<not_null<HistoryItem*>> protectedItems;
+		QVector<FullMsgId> normalIds;
+		for (const auto item : items) {
+			bool isProtected = item->hasNoForwardsFlag();
+			if (!isProtected) {
+				if (const auto ch = item->history()->peer->asChannel()) {
+					if (ch->flags() & ChannelDataFlag::NoForwards) {
+						isProtected = true;
+					}
+				} else if (const auto ct = item->history()->peer->asChat()) {
+					if (ct->flags() & ChatDataFlag::NoForwards) {
+						isProtected = true;
+					}
+				} else if (const auto us = item->history()->peer->asUser()) {
+					if ((us->flags() & UserDataFlag::NoForwardsMyEnabled)
+						|| (us->flags() & UserDataFlag::NoForwardsPeerEnabled)) {
+						isProtected = true;
+					}
+				}
+			}
+			if (bypassOn && isProtected) {
+				protectedItems.push_back(item);
+			} else {
+				normalIds.push_back(item->fullId());
+			}
+		}
+
 		using Flag = MTPmessages_ForwardMessages::Flag;
 		const auto commonSendFlags = Flag(0)
 			| Flag::f_with_my_score
@@ -1729,8 +1762,8 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 				? Flag::f_video_timestamp
 				: Flag(0));
 		auto mtpMsgIds = QVector<MTPint>();
-		mtpMsgIds.reserve(existingIds.size());
-		for (const auto &fullId : existingIds) {
+		mtpMsgIds.reserve(normalIds.size());
+		for (const auto &fullId : normalIds) {
 			mtpMsgIds.push_back(MTP_int(fullId.msg));
 		}
 		auto &api = history->session().api();
@@ -1766,12 +1799,51 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 				api.sendMessage(std::move(message));
 			}
 
+			// Bypass forward: send protected items as new messages.
+			if (bypassOn && !protectedItems.empty()) {
+				const auto action = Api::SendAction(effectiveThread, options);
+				for (const auto protItem : protectedItems) {
+					const auto sourceOrigin = Data::FileOriginMessage{
+						protItem->history()->peer->id, protItem->id };
+					auto msgToSend = Api::MessageToSend(action);
+					const auto original = protItem->originalText();
+					msgToSend.textWithTags = TextWithTags{
+						original.text,
+						TextUtilities::ConvertEntitiesToTextTags(
+							original.entities) };
+					if (const auto media = protItem->media()) {
+						if (const auto photo = media->photo()) {
+							Api::SendExistingPhoto(
+								std::move(msgToSend),
+								photo,
+								std::nullopt,
+								sourceOrigin);
+						} else if (const auto doc = media->document()) {
+							Api::SendExistingDocument(
+								std::move(msgToSend),
+								doc,
+								std::nullopt,
+								sourceOrigin);
+						} else {
+							api.sendMessage(std::move(msgToSend));
+						}
+					} else {
+						api.sendMessage(std::move(msgToSend));
+					}
+				}
+			}
+
+			// Nothing left to forward via MTP — skip the request.
+			if (mtpMsgIds.isEmpty()) {
+				continue;
+			}
+
 			const auto topicRootId = effectiveThread->topicRootId();
 			const auto sublistPeer = needNewTopic
 				? nullptr
 				: thread->maybeSublistPeer();
 			const auto fromPeer = history->peer;
-			const auto msgCount = int(existingIds.size());
+			const auto msgCount = int(normalIds.size());
 			const auto starsPaid = std::min(
 				peer->starsPerMessageChecked(),
 				options.starsApproved);

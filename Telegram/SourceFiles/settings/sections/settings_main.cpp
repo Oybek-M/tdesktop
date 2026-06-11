@@ -7,7 +7,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "settings/sections/settings_main.h"
 
-#include "custom_db.h"
 #include "settings/settings_common_session.h"
 
 #include "api/api_cloud_password.h"
@@ -77,6 +76,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/menu/menu_item_base.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/wrap/slide_wrap.h"
+#include "ui/wrap/vertical_layout.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
 #include "styles/style_info.h"
@@ -88,92 +88,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QWindow>
 
-#include <QtCore/QSettings>
-
-#include "custom_settings.h"
+#include "custom_mod_window.h"
 
 namespace Settings {
 namespace {
 
 using namespace Builder;
-
-void CustomModBox(not_null<Ui::GenericBox*> box) {
-	box->setTitle(rpl::single(QString("Custom Mode Settings (By Saidjon)")));
-
-	auto addSection = [&](const QString &title) {
-		box->addSkip(st::settingsThumbSkip);
-		auto label = object_ptr<Ui::FlatLabel>(
-			box.get(),
-			rpl::single(title),
-			st::defaultSubsectionTitle
-		);
-		box->addRow(std::move(label), st::defaultSubsectionTitlePadding);
-	};
-
-	auto addToggle = [&](const QString &id, const QString &text, const QString &description) {
-		auto val = CustomSettings::Get();
-		bool current = true;
-		if (id == "ghostMode") current = val.ghostMode;
-		else if (id == "bypassRestrictions") current = val.bypassRestrictions;
-		else if (id == "offlineDb") current = val.offlineDb;
-		else if (id == "antiDelete") current = val.antiDelete;
-		else if (id == "antiEdit") current = val.antiEdit;
-		else if (id == "spoofMobile") current = val.spoofMobile;
-
-		auto check = box->addRow(object_ptr<Ui::SettingsButton>(
-			box.get(),
-			rpl::single(text),
-			st::settingsButtonNoIcon
-		));
-		check->toggleOn(rpl::single(current));
-		check->toggledValue() | rpl::on_next([=](bool on) {
-			CustomSettings::Set(id, on);
-		}, check->lifetime());
-
-		if (!description.isEmpty()) {
-			box->addRow(object_ptr<Ui::FlatLabel>(
-				box.get(),
-				rpl::single(description),
-				st::settingsScaleLabel
-			), st::defaultSubsectionTitlePadding);
-		}
-	};
-
-	// --- PRIVACY SECTION ---
-	addSection("Privacy & Ghost Mode");
-	addToggle("ghostMode", "Ghost Mode", 
-		"Hide your online status, typing indicators, and read receipts.");
-	// --- ACTIONS VIEWER SECTION ---
-	box->addSkip(st::settingsThumbSkip);
-	addSection("Actions Viewer Mode");
-	addToggle("antiDelete", "Anti-Delete Messages", 
-		"Prevent messages from being deleted for you. Deleted messages will be stored in SQLite DB.");
-	addToggle("antiEdit", "Anti-Edit History", 
-		"Keep track of original message content before it was edited. Stored locally.");
-	addToggle("offlineDb", "Persistent Message Database", 
-		"Save a local copy of all messages and media versions for offline viewing.");
-
-	// --- DATABASE MANAGEMENT ---
-	box->addSkip(st::settingsThumbSkip);
-	addSection("Database Management");
-
-	box->addRow(object_ptr<Ui::FlatLabel>(
-		box.get(),
-		rpl::single(QString("Manage your persistent archive of deleted/edited messages.")),
-		st::settingsScaleLabel
-	), st::defaultSubsectionTitlePadding);
-
-	box->addButton(rpl::single(QString("Export Database Backup")), [=] {
-		CustomDB::ExportDatabase(QDir::homePath() + "/custom_mod_backup.db");
-	});
-
-	box->addButton(rpl::single(QString("Import Database Backup")), [=] {
-		CustomDB::ImportDatabase(QDir::homePath() + "/custom_mod_backup.db");
-	});
-
-	box->addSkip(st::settingsThumbSkip);
-	box->addButton(tr::lng_box_ok(), [=] { box->closeBox(); });
-}
 
 constexpr auto kSugValidatePhone = "VALIDATE_PHONE_NUMBER"_cs;
 
@@ -471,12 +391,6 @@ void BuildSectionButtons(SectionBuilder &builder) {
 		.keywords = { u"security"_q, u"passcode"_q, u"password"_q, u"2fa"_q },
 	});
 
-	builder.addButton({
-		.title = rpl::single(QString("CustomMod Settings")),
-		.icon = { &st::menuIconSettings },
-		.onClick = [=] { controller->show(Box(CustomModBox)); },
-	});
-
 	builder.addSectionButton({
 		.title = tr::lng_settings_section_chat_settings(),
 		.targetSection = ChatId(),
@@ -520,12 +434,14 @@ void BuildSectionButtons(SectionBuilder &builder) {
 
 	builder.addButton({
 		.id = u"main/custom_mod"_q,
-		.title = rpl::single(QString("Custom Mod Settings (By Saidjon)")),
-		.icon = { &st::menuIconManage }, // A cool icon for our mod
+		.title = rpl::single(QString("Customizations (By Oybek)")),
+		.icon = { &st::menuIconSettings },
 		.onClick = [=] {
-			controller->show(Box(CustomModBox));
+			CustomMod::OpenOrRaise(controller);
 		},
-		.keywords = { u"custom"_q, u"mod"_q, u"ghost"_q, u"bypass"_q },
+		.keywords = { u"ghost"_q, u"bypass"_q, u"antidelete"_q, u"oybek"_q, u"custom"_q,
+			u"story"_q, u"whitelist"_q, u"blacklist"_q, u"archive"_q, u"antiedit"_q,
+			u"privacy"_q, u"anonymous"_q, u"spoof"_q, u"offline"_q },
 	});
 
 	builder.addSectionButton({

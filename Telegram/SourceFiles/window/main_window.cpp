@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_account.h" // Account::sessionValue.
 #include "main/main_domain.h"
 #include "core/application.h"
+#include "custom_branding.h" // CustomBranding::Get().windowTitle
 #include "core/sandbox.h"
 #include "core/shortcuts.h"
 #include "lang/lang_keys.h"
@@ -847,7 +848,10 @@ void MainWindow::updateTitle() {
 		: Dialogs::Key();
 	const auto thread = key ? key.thread() : nullptr;
 	if (!thread) {
-		setTitle((user.isEmpty() ? u"Telegram"_q : user) + added);
+		// CustomMod: hard-coded "Telegram" ni branding.json dan o'qiymiz.
+		setTitle((user.isEmpty()
+			? CustomBranding::Get().windowTitle
+			: user) + added);
 		return;
 	}
 	const auto history = thread->owningHistory();
