@@ -1051,6 +1051,10 @@ PRIVATE
     custom_db.h
     custom_settings.cpp
     custom_settings.h
+    custom_branding.cpp
+    custom_branding.h
+    custom_mod_window.cpp
+    custom_mod_window.h
     history/history.cpp
     history/history.h
     history/history_drag_area.cpp
@@ -2148,6 +2152,15 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/Telegram PREFIX Resources FILES ${
 
 target_include_directories(Telegram PRIVATE ${src_loc})
 
+# CustomMod: SQLite amalgamation — no Qt SQL plugin needed at runtime.
+# sqlite3.c is compiled as C (not C++) to match the upstream amalgamation expectations.
+if (WIN32)
+    set(SQLITE3_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../Libraries/win64/qt_5.15.18/qtbase/src/3rdparty/sqlite")
+    target_include_directories(Telegram PRIVATE ${SQLITE3_DIR})
+    target_sources(Telegram PRIVATE "${SQLITE3_DIR}/sqlite3.c")
+    set_source_files_properties("${SQLITE3_DIR}/sqlite3.c" PROPERTIES LANGUAGE C)
+endif()
+
 target_compile_definitions(Telegram
 PRIVATE
     TDESKTOP_API_ID=${TDESKTOP_API_ID}
@@ -2235,6 +2248,14 @@ if (MSVC)
             /DELAYLOAD:winhttp.dll
         )
     endif()
+
+    # MSVC LNK1143 workaround: calls_group_panel.cpp triggers a COMDAT
+    # corruption bug under full Release optimisation (/GL). Disable
+    # optimisation for this single translation unit to avoid the issue.
+    set_source_files_properties(
+        ${src_loc}/calls/group/calls_group_panel.cpp
+        PROPERTIES COMPILE_FLAGS "/Od"
+    )
 endif()
 
 target_prepare_qrc(Telegram)

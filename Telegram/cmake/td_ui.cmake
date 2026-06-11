@@ -38,6 +38,7 @@ set(style_files
     payments/ui/payments.style
     profile/profile.style
     settings/settings.style
+    styles/custom_mod.style
     media/view/media_view.style
     overview/overview.style
     window/window.style

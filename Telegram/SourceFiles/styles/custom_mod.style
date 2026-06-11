@@ -1,0 +1,12 @@
+using "ui/basic.style";
+using "ui/widgets/widgets.style";
+
+customModTabBarVSkip: 8px;
+
+// settingsScaleLabel da minWidth:0px → _text(kQFixedMax) → text HECH QACHON wrap qilmaydi.
+// minWidth:1px qo'yilsa → _text(1) → countHeight(w) = max(w,1) = w → to'g'ri wrap.
+// windowActiveTextFg — ko'k rang saqlanadi, faqat wrapping yoqiladi.
+customModHintLabel: FlatLabel(defaultFlatLabel) {
+    minWidth: 1px;
+    textFg: windowActiveTextFg;
+}
