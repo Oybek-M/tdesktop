@@ -9,9 +9,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "custom_settings.h"
 #include "custom_db.h"
-
-#include <QtCore/QSettings>
-#include "custom_db.h"
 #include "api/api_text_entities.h"
 #include "data/business/data_shortcut_messages.h"
 #include "data/components/scheduled_messages.h"
@@ -150,6 +147,12 @@ Main::Session &Histories::session() const {
 History *Histories::find(PeerId peerId) {
 	const auto i = peerId ? _map.find(peerId) : end(_map);
 	return (i != end(_map)) ? i->second.get() : nullptr;
+}
+
+void Histories::forEachLoaded(Fn<void(not_null<History*>)> callback) const {
+	for (const auto &[peerId, history] : _map) {
+		callback(history.get());
+	}
 }
 
 not_null<History*> Histories::findOrCreate(PeerId peerId) {
@@ -709,9 +712,8 @@ void Histories::sendReadRequest(not_null<History*> history, State &state) {
 	DEBUG_LOG(("Reading: sending request now with till %1."
 		).arg(tillId.bare));
 
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("ghost_mode", true).toBool()) {
-		// CUSTOM GHOST MODE START: Pretend we sent it, but actually don't
+	const auto peerIdStr = QString::number(history->peer->id.value);
+	if (CustomSettings::ShouldGhost(peerIdStr)) {
 		const auto statePtr = lookup(history);
 		if (statePtr) {
 			if (statePtr->sentReadTill == tillId) {
@@ -728,7 +730,6 @@ void Histories::sendReadRequest(not_null<History*> history, State &state) {
 		history->validateMonoAndForumUnread(tillId);
 		sendReadRequests();
 		return;
-		// CUSTOM GHOST MODE END
 	}
 
 	sendRequest(history, RequestType::ReadInbox, [=](Fn<void()> finish) {
@@ -754,7 +755,7 @@ void Histories::sendReadRequest(not_null<History*> history, State &state) {
 		};
 
 		if (const auto channel = history->peer->asChannel()) {
-			if (CustomSettings::GhostMode()) {
+			if (CustomSettings::ShouldGhost(QString::number(history->peer->id.value))) {
 				CustomDB::SaveGhostRead(QString::number(history->peer->id.value), (qint64)tillId.bare);
 				finished();
 				return 0; // return dummy request ID
@@ -764,7 +765,7 @@ void Histories::sendReadRequest(not_null<History*> history, State &state) {
 				MTP_int(tillId)
 			)).done(finished).fail(finished).send();
 		} else {
-			if (CustomSettings::GhostMode()) {
+			if (CustomSettings::ShouldGhost(QString::number(history->peer->id.value))) {
 				CustomDB::SaveGhostRead(QString::number(history->peer->id.value), (qint64)tillId.bare);
 				finished();
 				return 0; // return dummy request ID
@@ -962,6 +963,35 @@ void Histories::deleteMessagesByDates(
 }
 
 void Histories::deleteMessages(const MessageIdsList &ids, bool revoke) {
+	// CustomMod: mark every message the user is explicitly deleting so that
+	// processMessagesDeleted() can skip re-saving them to the anti-delete DB
+	// and can truly destroy them instead of keeping them as "O'CHIRILDI".
+	for (const auto &itemId : ids) {
+		if (const auto item = _owner->message(itemId)) {
+			if (item->isRegular()) {
+				const auto peerId = QString::number(
+					item->history()->peer->id.value);
+				const auto msgId = item->id.bare;
+				// ScheduleUserDelete flags the message as user-initiated AND
+				// calls PermanentlyDeleteMessage internally, so the DB record
+				// is wiped here — before item->destroy() fires — regardless of
+				// whether the server ACK arrives before or after the item is gone.
+				CustomDB::ScheduleUserDelete(peerId, msgId);
+			} else if (item->isDeletedLocally()) {
+				// Locally-injected O'CHIRILDI item: created by loadDeletedMessages()
+				// with MessageFlag::Local, so isRegular()=false and no server delete
+				// will be sent for it. However the DB record must be wiped NOW,
+				// otherwise the next loadDeletedMessages() call (triggered by scroll,
+				// read-receipt, etc.) will find the record and re-inject the item,
+				// making it reappear after the user deleted it.
+				const auto peerId = QString::number(
+					item->history()->peer->id.value);
+				CustomDB::PermanentlyDeleteMessage(
+					peerId, static_cast<long long>(item->id.bare));
+			}
+		}
+	}
+
 	auto remove = std::vector<not_null<HistoryItem*>>();
 	remove.reserve(ids.size());
 	base::flat_map<not_null<History*>, QVector<MTPint>> idsByPeer;

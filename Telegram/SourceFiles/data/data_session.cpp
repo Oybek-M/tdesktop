@@ -1,4 +1,4 @@
-/*
+﻿/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -9,7 +9,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "custom_db.h"
 #include "custom_settings.h"
-#include <QtCore/QSettings>
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "main/main_app_config.h"
@@ -280,6 +279,15 @@ Session::Session(not_null<Main::Session*> session)
 	setupChannelLeavingViewer();
 	setupPeerNameViewer();
 	setupUserIsContactViewer();
+
+	// Register hot-reload callback: after ImportFullBackup(), refresh all open histories.
+	CustomDB::SetImportReloadCallback([this] {
+		_histories->forEachLoaded([this](not_null<History*> history) {
+			history->loadDeletedMessages();
+			notifyHistoryChangeDelayed(history);
+		});
+		sendHistoryChangeNotifications();
+	});
 
 	_chatsList.unreadStateChanges(
 	) | rpl::on_next([=] {
@@ -2721,6 +2729,28 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 		return message(peerFromMTP(data.vpeer_id()), data.vid().v);
 	});
 	if (!existing) {
+		// T27: Background AntiEdit — HistoryItem memory da yo'q (chat ochilmagan).
+		// Cache dan eski matnni o'qib, edit ni DB ga to'g'ridan-to'g'ri yozamiz.
+		data.match([](const MTPDmessageEmpty&) {
+		}, [&](const MTPDmessageService&) {
+			// Service messagelarda matn bo'lmaydi.
+		}, [&](const auto &d) {
+			const auto peerId = peerFromMTP(d.vpeer_id());
+			const auto peerIdStr = QString::number(peerId.value);
+			// O'RTA-3: cache shartini ShouldBackgroundCache bilan moslashtirdik
+			// (T32 bilan bir xil). Aks holda RecordBackgroundEdit cache bo'sh
+			// bo'lsa newText ni yana cache qilib, WhiteList bo'lmagan peerlarni
+			// ham cache ga qo'shib yuborardi.
+			if (!::CustomSettings::ShouldBackgroundCache(peerIdStr)) {
+				return;
+			}
+			const auto msgId = static_cast<long long>(d.vid().v);
+			const auto newText = qs(d.vmessage());
+			const auto isOut = d.is_out();
+			const auto msgDate = static_cast<unsigned int>(d.vdate().v);
+			CustomDB::RecordBackgroundEdit(
+				peerIdStr, msgId, newText, isOut, msgDate);
+		});
 		Reactions::CheckUnknownForUnread(this, data);
 		return;
 	}
@@ -2757,6 +2787,9 @@ void Session::processMessages(
 			data[index],
 			MessageFlags(),
 			type);
+		// T32+ (KRITIK-1): Background cache hook addNewMessage() ICHIGA ko'chirildi.
+		// Bu yerda takror cache qilish shart emas — addNewMessage barcha yo'llar
+		// uchun yagona markaz.
 	}
 }
 
@@ -2914,10 +2947,67 @@ void Session::checkFormattedDateUpdates() {
 void Session::processMessagesDeleted(
 		PeerId peerId,
 		const QVector<MTPint> &data) {
-	for (const auto &messageId : data) {
-		CustomDB::MarkDeleted(messageId.v, QString::number(peerId.value));
-	}
+	const auto peerIdStr = QString::number(peerId.value);
+	// T28: Memory dagi item lardan matn + date olish (chat ochiq bo'lsa).
+	// Bu MarkDeleted ga to'liq ma'lumotni o'tkazadi → restart da loadDeletedMessages()
+	// xabarni qayta tiklay oladi (date>0 bo'lsa).
 	const auto list = messagesList(peerId);
+	for (const auto &messageId : data) {
+		const bool userDelete = CustomDB::IsUserDeletePending(peerIdStr, messageId.v);
+		CustomDB::ClearUserDeletePending(peerIdStr, messageId.v);
+		if (userDelete) {
+			CustomDB::PermanentlyDeleteMessage(peerIdStr, messageId.v);
+		} else if (::CustomSettings::ShouldAntiDelete(peerIdStr)) {
+			// T28: matn/date/isOut ni olish — memory dan yoki cache dan (T27).
+			// v5: sender_id (guruhda haqiqiy yuboruvchi) va is_media ni ham olamiz.
+			QString originalText;
+			QString senderIdStr;
+			bool isOut = false;
+			bool isMedia = false;
+			unsigned int msgDate = 0;
+			if (list) {
+				const auto i = list->find(messageId.v);
+				if (i != list->end()) {
+					const auto item = i->second.get();
+					originalText = item->originalText().text;
+					isOut = item->out();
+					msgDate = static_cast<unsigned int>(item->date());
+					senderIdStr = QString::number(item->from()->id.value);
+					isMedia = (item->media() != nullptr);
+				}
+			}
+			// Memory da yo'q bo'lsa, T27 cache dan text + date + sender + media olamiz.
+			if (msgDate == 0) {
+				unsigned int cachedDate = 0;
+				QString cachedSender;
+				bool cachedMedia = false;
+				const QString cachedText = CustomDB::GetCachedTextAndDate(
+					peerIdStr, messageId.v, cachedDate, &cachedSender, &cachedMedia);
+				if (cachedDate > 0) {
+					// Cache da to'liq ma'lumot bor — xabar yetib kelgan edi,
+					// lekin chat ochiq emas edi.
+					if (originalText.isEmpty()) originalText = cachedText;
+					if (senderIdStr.isEmpty()) senderIdStr = cachedSender;
+					isMedia = isMedia || cachedMedia;
+					msgDate = cachedDate;
+				}
+			}
+			// msgDate == 0 bo'lsa — xabar hech qachon yetib kelmagan yoki
+			// cache da yo'q. Bunday holatda DB ga yozmaymiz.
+			if (msgDate > 0) {
+				CustomDB::MarkDeleted(
+					messageId.v,
+					peerIdStr,
+					QString(),
+					originalText,
+					msgDate,
+					isOut,
+					senderIdStr,
+					isMedia);
+			}
+		}
+	}
+	// T28: list allaqachon yuqorida olingan (re-declaration ni olib tashladik).
 	const auto affected = historyLoaded(peerId);
 	if (!list && !affected) {
 		return;
@@ -2927,10 +3017,14 @@ void Session::processMessagesDeleted(
 	for (const auto &messageId : data) {
 		const auto i = list ? list->find(messageId.v) : Messages::iterator();
 		if (list && i != list->end()) {
-			if (::CustomSettings::AntiDelete()) {
-				// FORCE PERSISTENCE: Ignore server delete command, keep the item in memory
+			// keepAlive is true only if MarkDeleted was called above (i.e. not a user delete).
+			const bool keepAlive = ::CustomSettings::ShouldAntiDelete(peerIdStr)
+				&& CustomDB::IsDeletedLocally(peerIdStr, messageId.v);
+			if (keepAlive) {
+				// FORCE PERSISTENCE: Ignore server delete, keep item in memory.
 				i->second->setDeletedLocally();
 				_session->changes().messageUpdated(i->second, Data::MessageUpdate::Flag::Edited);
+				historiesToCheck.emplace(i->second->history());
 				continue; // DO NOT DESTROY
 			} else {
 				i->second->destroy();
@@ -2944,28 +3038,46 @@ void Session::processMessagesDeleted(
 	}
 }
 
-#include "custom_db.h"
-
 void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
 	auto historiesToCheck = base::flat_set<not_null<History*>>();
 	for (const auto &messageId : data) {
-		if (const auto item = nonChannelMessage(messageId.v)) {
-			if (::CustomSettings::AntiDelete()) {
-				// SAVE TO PERSISTENT DB:
+		const auto item = nonChannelMessage(messageId.v);
+		if (item) {
+			const auto peerIdStr = QString::number(item->history()->peer->id.value);
+			const bool userDelete = CustomDB::IsUserDeletePending(peerIdStr, messageId.v);
+			CustomDB::ClearUserDeletePending(peerIdStr, messageId.v);
+			if (::CustomSettings::ShouldAntiDelete(peerIdStr) && !userDelete) {
+				// SAVE TO PERSISTENT DB (v5: sender_id + is_media bilan):
 				CustomDB::ActionedMessage msg;
-				msg.peerId = QString::number(item->history()->peer->id.value);
+				msg.peerId = peerIdStr;
 				msg.msgId = item->id.bare;
 				msg.type = "deleted";
 				msg.originalText = item->originalText().text;
+				msg.isOut = item->out();
+				msg.msgDate = static_cast<unsigned int>(item->date());
+				msg.senderId = QString::number(item->from()->id.value);
+				msg.isMedia = (item->media() != nullptr);
 				msg.timestamp = QDateTime::currentDateTime();
 				CustomDB::SaveActionedMessage(msg);
 
-				// FORCE PERSISTENCE: Ignore server delete command
+				// FORCE PERSISTENCE: Ignore server delete command.
 				item->setDeletedLocally();
 				_session->changes().messageUpdated(item, Data::MessageUpdate::Flag::Edited);
 			} else {
+				if (userDelete) {
+					// Wipe any pre-existing anti-delete record so restart
+					// won't resurrect a message the user explicitly removed.
+					CustomDB::PermanentlyDeleteMessage(peerIdStr, messageId.v);
+				}
 				item->destroy();
 			}
+		} else {
+			// T28: Item memory da YO'Q (chat ochilmagan, notification orqali keldi).
+			// T27 cache da matn bo'lsa — DB ga 'deleted' yozamiz.
+			// peerIdStr ni cache dan topish kerak — peer_id orqali iterate qilamiz.
+			// Bu yo'l yo'q chunki nonChannelMessage faqat msgId ni biladi.
+			// Cache jadvalini msg_id bo'yicha qidiramiz.
+			CustomDB::TryRecordBackgroundDelete(messageId.v);
 		}
 	}
 	for (const auto &history : historiesToCheck) {
@@ -3194,6 +3306,33 @@ HistoryItem *Session::addNewMessage(
 		type);
 	if (type == NewMessageType::Unread) {
 		CheckForSwitchInlineButton(result);
+	}
+	// T32+ (KRITIK-1): Background AntiEdit/AntiDelete cache MARKAZI.
+	// Avval bu hook processMessages() da edi, lekin ilova ONLINE turganda kelgan
+	// real-time xabarlar (updateNewMessage/updateShortMessage/...) processMessages
+	// dan o'tmaydi — ular to'g'ridan-to'g'ri shu addNewMessage() ga keladi. Shu
+	// sababli hookni barcha yo'llarning umumiy nuqtasiga (funnel) ko'chirdik.
+	// Faqat ShouldBackgroundCache true bo'lgan peerlar (WhiteList yoki Per-Chat
+	// override) cache ga tushadi — disk/CPU isrofini oldini olish uchun.
+	if (result && type == NewMessageType::Unread) {
+		const auto peerIdStr = QString::number(
+			result->history()->peer->id.value);
+		if (::CustomSettings::ShouldBackgroundCache(peerIdStr)) {
+			const auto textValue = result->originalText().text;
+			const bool hasMedia = (result->media() != nullptr);
+			if (!textValue.isEmpty() || hasMedia) {
+				const auto senderIdStr = QString::number(
+					result->from()->id.value);
+				CustomDB::CacheMessageText(
+					peerIdStr,
+					static_cast<long long>(result->id.bare),
+					textValue,
+					result->out(),
+					static_cast<unsigned int>(result->date()),
+					senderIdStr,
+					hasMedia);
+			}
+		}
 	}
 	return result;
 }

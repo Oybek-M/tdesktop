@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "base/timer.h"
+#include "base/basic_types.h"
 
 class History;
 class HistoryItem;
@@ -52,6 +53,9 @@ public:
 
 	[[nodiscard]] History *find(PeerId peerId);
 	[[nodiscard]] not_null<History*> findOrCreate(PeerId peerId);
+
+	// Iterate all currently loaded histories (used for hot-reload after import).
+	void forEachLoaded(Fn<void(not_null<History*>)> callback) const;
 
 	void applyPeerDialogs(const MTPmessages_PeerDialogs &dialogs);
 
