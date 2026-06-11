@@ -7,7 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_user.h"
 
-#include <QtCore/QSettings>
+#include "custom_settings.h"
 #include "api/api_credits.h"
 #include "api/api_global_privacy.h"
 #include "api/api_sensitive_content.h"
@@ -660,9 +660,8 @@ bool UserData::readDatesPrivate() const {
 }
 
 bool UserData::allowsForwarding() const {
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("bypass_restrictions", true).toBool()) {
-		return true; // CUSTOM BYPASS
+	if (CustomSettings::BypassRestrictions()) {
+		return true;
 	}
 	return !(flags() & Flag::NoForwardsMyEnabled)
 		&& !(flags() & Flag::NoForwardsPeerEnabled);

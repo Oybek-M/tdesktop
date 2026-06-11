@@ -7,7 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_chat.h"
 
-#include <QtCore/QSettings>
+#include "custom_settings.h"
 #include "core/application.h"
 #include "data/data_user.h"
 #include "data/data_channel.h"
@@ -65,9 +65,8 @@ ChatAdminRightsInfo ChatData::defaultAdminRights(not_null<UserData*> user) {
 }
 
 bool ChatData::allowsForwarding() const {
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("bypass_restrictions", true).toBool()) {
-		return true; // CUSTOM BYPASS
+	if (CustomSettings::BypassRestrictions()) {
+		return true;
 	}
 	return !(flags() & Flag::NoForwards);
 }

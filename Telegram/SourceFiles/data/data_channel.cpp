@@ -9,7 +9,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "custom_settings.h"
 
-#include <QtCore/QSettings>
 #include "api/api_credits.h"
 #include "api/api_global_privacy.h"
 #include "api/api_statistics.h"

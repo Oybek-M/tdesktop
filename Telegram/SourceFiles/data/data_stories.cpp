@@ -1236,7 +1236,12 @@ void Stories::markAsRead(FullStoryId id, bool viewed) {
 		return;
 	}
 	const auto story = *maybeStory;
-	if (story->expired() && story->inProfile()) {
+	// CustomMod: Story anonim ko'rish yoqilganda IncrementStoryViews
+	// queue ga ham qo'shilmasin — aks holda sendIncrementViewsRequests() keyinroq
+	// (timer yoki quitPrevent orqali) server ga yuborib qo'yadi.
+	const auto peerIdStr = QString::number(id.peer.value);
+	if (story->expired() && story->inProfile()
+		&& !CustomSettings::ShouldAnonymousStory(peerIdStr)) {
 		_incrementViewsPending[id.peer].emplace(id.story);
 		if (!_incrementViewsTimer.isActive()) {
 			_incrementViewsTimer.callOnce(kIncrementViewsDelay);
@@ -1389,7 +1394,9 @@ void Stories::toggleHidden(
 void Stories::sendMarkAsReadRequest(
 		not_null<PeerData*> peer,
 		StoryId tillId) {
-	if (CustomSettings::GhostMode()) {
+	// CustomMod: Story anonim ko'rish — markRead so'rovi yuborilmaydi.
+	const auto peerIdStr = QString::number(peer->id.value);
+	if (CustomSettings::ShouldAnonymousStory(peerIdStr)) {
 		return;
 	}
 	const auto peerId = peer->id;
@@ -1436,6 +1443,22 @@ void Stories::sendMarkAsReadRequests() {
 }
 
 void Stories::sendIncrementViewsRequests() {
+	if (_incrementViewsPending.empty()) {
+		return;
+	}
+	// CustomMod: Story anonim ko'rish yoqilgan peerlar uchun
+	// pending view so'rovlarini bekor qilish.
+	{
+		auto it = _incrementViewsPending.begin();
+		while (it != _incrementViewsPending.end()) {
+			const auto peerIdStr = QString::number(it->first.value);
+			if (CustomSettings::ShouldAnonymousStory(peerIdStr)) {
+				it = _incrementViewsPending.erase(it);
+			} else {
+				++it;
+			}
+		}
+	}
 	if (_incrementViewsPending.empty()) {
 		return;
 	}

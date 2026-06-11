@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/timer_rpl.h"
 #include "base/unixtime.h"
 #include "boxes/premium_preview_box.h"
+#include "custom_settings.h" // Ghost Mode: bypass stealth premium check
 #include "chat_helpers/compose/compose_show.h"
 #include "data/data_peer_values.h"
 #include "data/data_session.h"
@@ -332,7 +333,8 @@ struct State {
 			if (now.mode.enabledTill > now.now) {
 				show->showToast(ToastActivated());
 				box->closeBox();
-			} else if (!now.premium) {
+			} else if (!now.premium && !CustomSettings::GhostMode()) {
+				// Ghost Mode active → bypass Premium gate for stealth.
 				data->requested = false;
 				if (const auto window = show->resolveWindow()) {
 					ShowPremiumPreviewBox(window, PremiumFeature::Stories);
@@ -383,7 +385,12 @@ void AddStealthModeMenu(
 		const Ui::Menu::MenuCallback &add,
 		not_null<PeerData*> peer,
 		not_null<Window::SessionController*> controller) {
-	if (!peer->session().premiumPossible() || !peer->isUser()) {
+	// Ghost Mode bypass: show "View anonymously" even without Premium.
+	if (!CustomSettings::GhostMode()
+		&& (!peer->session().premiumPossible() || !peer->isUser())) {
+		return;
+	}
+	if (!CustomSettings::GhostMode() && !peer->isUser()) {
 		return;
 	}
 	const auto now = base::unixtime::now();

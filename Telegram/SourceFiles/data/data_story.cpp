@@ -9,7 +9,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "custom_settings.h"
 
-#include <QtCore/QSettings>
 #include "base/unixtime.h"
 #include "api/api_text_entities.h"
 #include "data/data_document.h"
@@ -411,9 +410,8 @@ StoryPrivacy Story::privacy() const {
 }
 
 bool Story::forbidsForward() const {
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("bypass_restrictions", true).toBool()) {
-		return false; // CUSTOM BYPASS
+	if (CustomSettings::BypassRestrictions()) {
+		return false;
 	}
 	return _noForwards;
 }
