@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "data/data_file_origin.h"
+
 class History;
 class PhotoData;
 class DocumentData;
@@ -28,12 +30,14 @@ struct SendAction;
 void SendExistingDocument(
 	MessageToSend &&message,
 	not_null<DocumentData*> document,
-	std::optional<MsgId> localMessageId = std::nullopt);
+	std::optional<MsgId> localMessageId = std::nullopt,
+	Data::FileOrigin overrideOrigin = {});
 
 void SendExistingPhoto(
 	MessageToSend &&message,
 	not_null<PhotoData*> photo,
-	std::optional<MsgId> localMessageId = std::nullopt);
+	std::optional<MsgId> localMessageId = std::nullopt,
+	Data::FileOrigin overrideOrigin = {});
 
 bool SendDice(MessageToSend &message);
 

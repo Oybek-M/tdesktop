@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "main/main_domain.h"
 #include "main/main_session_settings.h"
+#include "custom_settings.h"
 
 namespace Main {
 namespace {
@@ -417,8 +418,13 @@ void Account::startMtp(std::unique_ptr<MTP::Config> config) {
 
 	auto fields = base::take(_mtpFields);
 	fields.config = std::move(config);
-	fields.deviceModel = Platform::DeviceModelPretty();
-	fields.systemVersion = Platform::SystemVersionPretty();
+	if (CustomSettings::SpoofMobile()) {
+		fields.deviceModel = u"Samsung Galaxy S26 Ultra"_q;
+		fields.systemVersion = u"Android 14"_q;
+	} else {
+		fields.deviceModel = Platform::DeviceModelPretty();
+		fields.systemVersion = Platform::SystemVersionPretty();
+	}
 	_mtp = std::make_unique<MTP::Instance>(
 		MTP::Instance::Mode::Normal,
 		std::move(fields));
@@ -564,8 +570,13 @@ void Account::destroyMtpKeys(MTP::AuthKeysList &&keys) {
 	destroyFields.mainDcId = MTP::Instance::Fields::kNoneMainDc;
 	destroyFields.config = std::make_unique<MTP::Config>(_mtp->config());
 	destroyFields.keys = std::move(keys);
-	destroyFields.deviceModel = Platform::DeviceModelPretty();
-	destroyFields.systemVersion = Platform::SystemVersionPretty();
+	if (CustomSettings::SpoofMobile()) {
+		destroyFields.deviceModel = u"Samsung Galaxy S26 Ultra"_q;
+		destroyFields.systemVersion = u"Android 14"_q;
+	} else {
+		destroyFields.deviceModel = Platform::DeviceModelPretty();
+		destroyFields.systemVersion = Platform::SystemVersionPretty();
+	}
 	_mtpForKeysDestroy = std::make_unique<MTP::Instance>(
 		MTP::Instance::Mode::KeysDestroyer,
 		std::move(destroyFields));

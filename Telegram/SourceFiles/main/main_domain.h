@@ -31,8 +31,13 @@ public:
 		std::unique_ptr<Account> account;
 	};
 
-	static constexpr auto kMaxAccounts = 3;
-	static constexpr auto kPremiumMaxAccounts = 6;
+	// CustomMod: Plus Messenger uslubida hisob limitini olib tashlash.
+	// Asl Telegram: 3 / 6. Endi ikkalasi ham 100 — premium farqi yo'q.
+	// Amaliy maksimum: 100 (UI scroll ishlaydi, overflow xavfi yo'q).
+	// DIQQAT: 6+ account qo'shilsa, asl Telegram ga qaytsangiz qo'shimcha
+	// accountlar ko'rinmaydi (storage_domain.cpp validation: count > cap).
+	static constexpr auto kMaxAccounts = 100;
+	static constexpr auto kPremiumMaxAccounts = 100;
 
 	explicit Domain(const QString &dataName);
 	~Domain();

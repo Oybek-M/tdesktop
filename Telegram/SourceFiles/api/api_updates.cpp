@@ -1012,22 +1012,41 @@ void Updates::updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline) {
 		}
 	}
 	auto ms = crl::now();
-	if (isOnline != _lastWasOnline
-		|| (isOnline && _lastSetOnline + config.onlineUpdatePeriod <= ms)
-		|| (isOnline && gotOtherOffline)
-		|| (CustomSettings::GhostMode() && gotOtherOffline)) {
+	// Ghost Mode: suppress the gotOtherOffline trigger entirely.
+	// Without this, any other device going offline would cause us to send
+	// MTPaccount_UpdateStatus, leaking the current timestamp as "last seen".
+	//
+	// In ghost mode we send UpdateStatus(offline=true) on a periodic timer to
+	// counteract the Telegram server automatically marking us "Online" when we
+	// send a message.  Without this periodic offline ping, recipients would see
+	// "Online" for the duration of onlineUpdatePeriod after each sent message.
+	const bool shouldTrigger = CustomSettings::GhostMode()
+		? (_lastSetOnline + config.onlineUpdatePeriod <= ms)  // periodic offline ping
+		: (isOnline != _lastWasOnline
+			|| (isOnline && _lastSetOnline + config.onlineUpdatePeriod <= ms)
+			|| (isOnline && gotOtherOffline));
+	if (shouldTrigger) {
 		api().request(base::take(_onlineRequest)).cancel();
 
 		_lastWasOnline = isOnline;
 		_lastSetOnline = ms;
 
 		if (!Core::Quitting()) {
-			// If Ghost Mode is enabled, always force offline status (true).
-			const auto offline = CustomSettings::GhostMode() ? true : !isOnline;
-			_onlineRequest = api().request(MTPaccount_UpdateStatus(
-				MTP_bool(offline)
-			)).send();
+			if (CustomSettings::GhostMode()) {
+				// Ghost Mode: send offline=true periodically so others never see
+				// "Online" after we send a message (the server marks us online on
+				// each outgoing message; this ping immediately reverts that).
+				_onlineRequest = api().request(MTPaccount_UpdateStatus(
+					MTP_bool(true) // offline = true
+				)).send();
+			} else {
+				_onlineRequest = api().request(MTPaccount_UpdateStatus(
+					MTP_bool(!isOnline)
+				)).send();
+			}
 		} else {
+			// On quit, send offline regardless of Ghost Mode so the session
+			// terminates cleanly — this is a one-time call the user accepts.
 			_onlineRequest = api().request(MTPaccount_UpdateStatus(
 				MTP_bool(!isOnline)
 			)).done([=] {
@@ -1050,7 +1069,10 @@ void Updates::updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline) {
 		}
 
 		_lastSetOnline = ms;
-	} else if (isOnline) {
+	} else if (isOnline || CustomSettings::GhostMode()) {
+		// isOnline: schedule next status refresh.
+		// GhostMode: always offline locally, but still need the periodic offline
+		// ping timer so we counteract server-side "Online" after message sends.
 		updateIn = qMin(updateIn, int(_lastSetOnline + config.onlineUpdatePeriod - ms));
 		Assert(updateIn >= 0);
 	}

@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "core/application.h"
+#include "custom_branding.h"
 #include "custom_db.h"
 #include "custom_settings.h"
 
@@ -68,6 +69,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/player/media_player_float.h"
 #include "media/clip/media_clip_reader.h" // For Media::Clip::Finish().
 #include "media/system_media_controls_manager.h"
+#include "window/main_window.h" // Window::OverrideApplicationIcon (CustomMod)
 #include "window/notifications_manager.h"
 #include "window/themes/window_theme.h"
 #include "ui/widgets/tooltip.h"
@@ -219,6 +221,10 @@ void Application::closeAdditionalWindows() {
 }
 
 Application::~Application() {
+	// Flush any pending batched CustomDB writes so edit records are not lost
+	// if the app exits within the 100ms batch timer window.
+	CustomDB::FlushPendingWrites();
+
 	if (_saveSettingsTimer && _saveSettingsTimer->isActive()) {
 		Local::writeSettings();
 	}
@@ -265,6 +271,17 @@ Application::~Application() {
 void Application::run() {
 	CustomDB::Init();
 	CustomSettings::Init();
+	CustomBranding::Load();
+	// Branding icon (agar JSON da iconPath ko'rsatilgan bo'lsa) — startup vaqtida.
+	{
+		const auto &path = CustomBranding::Get().iconPath;
+		if (!path.isEmpty()) {
+			QImage img(path);
+			if (!img.isNull()) {
+				Window::OverrideApplicationIcon(std::move(img));
+			}
+		}
+	}
 	// Depends on OpenSSL on macOS, so on ThirdParty::start().
 	// Depends on notifications settings.
 	_notifications = std::make_unique<Window::Notifications::System>();

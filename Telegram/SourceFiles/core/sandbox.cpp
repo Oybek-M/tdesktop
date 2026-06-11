@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/qthelp_regex.h"
 #include "ui/ui_utility.h"
 #include "ui/effects/animations.h"
+#include "custom_db.h"
 
 #ifdef Q_OS_MAC
 #include "platform/mac/global_menu_mac.h"
@@ -604,6 +605,8 @@ void Sandbox::closeApplication() {
 		return;
 	}
 	SetLaunchState(LaunchState::QuitProcessed);
+
+	CustomDB::FlushPendingWrites(); // Barcha exit yo'llarida DB ga yozishni kafolatlaydi
 
 	_application = nullptr;
 

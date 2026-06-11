@@ -8,8 +8,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 
 #include "custom_settings.h"
+#include "custom_db.h"
+#include <QtCore/QFile>
+#include <QtCore/QDateTime>
 
-#include <QtCore/QSettings>
 #include "api/api_authorizations.h"
 #include "api/api_attached_stickers.h"
 #include "api/api_blocked_peers.h"
@@ -1371,37 +1373,40 @@ void ApiWrap::migrateFail(not_null<PeerData*> peer, const QString &error) {
 
 void ApiWrap::markContentsRead(
 		const base::flat_set<not_null<HistoryItem*>> &items) {
-	auto markedIds = QVector<MTPint>();
+	// Per-peer buckets so we can apply ShouldGhost per peer.
+	auto peerMarkedIds = base::flat_map<
+		not_null<PeerData*>,
+		QVector<MTPint>>();
 	auto channelMarkedIds = base::flat_map<
 		not_null<ChannelData*>,
 		QVector<MTPint>>();
-	markedIds.reserve(items.size());
 	for (const auto &item : items) {
 		if (!item->markContentsRead(true) || !item->isRegular()) {
 			continue;
 		}
-		if (const auto channel = item->history()->peer->asChannel()) {
+		const auto peer = item->history()->peer;
+		const auto peerIdStr = QString::number(peer->id.value);
+		if (CustomSettings::ShouldGhost(peerIdStr)) continue;
+		if (const auto channel = peer->asChannel()) {
 			channelMarkedIds[channel].push_back(MTP_int(item->id));
 		} else {
-			markedIds.push_back(MTP_int(item->id));
+			peerMarkedIds[peer].push_back(MTP_int(item->id));
 		}
 	}
-	if (!markedIds.isEmpty()) {
-		if (!CustomSettings::GhostMode()) {
+	for (const auto &peerIds : peerMarkedIds) {
+		if (!peerIds.second.isEmpty()) {
 			request(MTPmessages_ReadMessageContents(
-				MTP_vector<MTPint>(markedIds)
+				MTP_vector<MTPint>(peerIds.second)
 			)).done([=](const MTPmessages_AffectedMessages &result) {
 				applyAffectedMessages(result);
 			}).send();
 		}
 	}
 	for (const auto &channelIds : channelMarkedIds) {
-		if (!CustomSettings::GhostMode()) {
-			request(MTPchannels_ReadMessageContents(
-				channelIds.first->inputChannel(),
-				MTP_vector<MTPint>(channelIds.second)
-			)).send();
-		}
+		request(MTPchannels_ReadMessageContents(
+			channelIds.first->inputChannel(),
+			MTP_vector<MTPint>(channelIds.second)
+		)).send();
 	}
 }
 
@@ -1409,10 +1414,11 @@ void ApiWrap::markContentsRead(not_null<HistoryItem*> item) {
 	if (!item->markContentsRead(true) || !item->isRegular()) {
 		return;
 	}
-	const auto ids = MTP_vector<MTPint>(1, MTP_int(item->id));
-	if (CustomSettings::GhostMode()) {
+	const auto peerIdStr = QString::number(item->history()->peer->id.value);
+	if (CustomSettings::ShouldGhost(peerIdStr)) {
 		return;
 	}
+	const auto ids = MTP_vector<MTPint>(1, MTP_int(item->id));
 
 	if (const auto channel = item->history()->peer->asChannel()) {
 		request(MTPchannels_ReadMessageContents(
@@ -3461,9 +3467,10 @@ mtpRequestId ApiWrap::requestGlobalMedia(
 }
 
 void ApiWrap::sendAction(const SendAction &action) {
-	if (CustomSettings::GhostMode()) {
-		_session->updates().updateOnline(0, true);
-	}
+	// Ghost Mode: do NOT call updateOnline at all.
+	// Even updateOnline(offline=true) sends MTPaccount_UpdateStatus to the server,
+	// which causes Telegram to record "last seen: now" — leaking the timestamp.
+	// The periodic online timer already keeps us offline when Ghost Mode is on.
 	if (!action.options.scheduled
 		&& !action.options.shortcutId
 		&& !action.replaceMediaOf) {
@@ -3542,25 +3549,159 @@ void ApiWrap::forwardMessages(
 			SendExistingDocument(MessageToSend(action), item->media()->document());
 			i = draft.items.erase(i);
 		} else if (isProtected) {
-			QSettings customSettings("CustomMod", "TelegramDesktop");
-			if (customSettings.value("bypass_restrictions", true).toBool()) {
-				// CUSTOM BYPASS: Send as copy instead of forward!
-				auto msgToSend = MessageToSend(action);
+			if (CustomSettings::BypassRestrictions()) {
+				// CUSTOM BYPASS — fresh-upload cascade (Sprint 4 revised):
+				//
+				// SendExistingDocument/Photo use file references that can expire and
+				// trigger refreshFileReference. If the source message is inaccessible
+				// the refresh callback is never called → message stuck "sending" forever.
+				//
+				// Fix: always use FileLoadTask → SendConfirmedFile (fresh upload via
+				// inputMediaUploadedDocument/Photo). This path has no file reference and
+				// cannot get stuck.
+				//
+				//   Step 1: Find a local file (Telegram cache → anti-delete saved copy).
+				//   Step 2: If found → FileLoadTask fresh upload.
+				//   Step 3: If not found → send text + toast ("Media topilmadi").
+				//   Step 4: Text-only source messages → sendMessage directly.
+
+				const auto srcPeerIdStr = QString::number(
+					item->history()->peer->id.value);
+				const long long srcMsgId = item->id.bare;
+
 				const auto original = item->originalText();
-				msgToSend.textWithTags = TextWithTags{
+				const auto captionTags = TextWithTags{
 					original.text,
 					TextUtilities::ConvertEntitiesToTextTags(original.entities)
 				};
+
+				const auto showToastNoMedia = [&]() {
+					if (const auto show = ShowForPeer(action.history->peer)) {
+						show->showToast(u"Media topilmadi, faqat matn yuborildi"_q);
+					}
+				};
+
+				// Build "Forwarded from" metadata footer appended to every
+				// bypass-forwarded message so the recipient knows the source.
+				const auto buildForwardInfo = [&]() -> QString {
+					const auto srcPeer = item->history()->peer;
+					const QString peerName = srcPeer->name();
+
+					// Username (@handle) if available.
+					QString handle;
+					if (const auto ch = srcPeer->asChannel()) {
+						if (ch->hasUsername()) {
+							handle = u"@"_q + ch->username();
+						}
+					} else if (const auto usr = srcPeer->asUser()) {
+						if (!usr->username().isEmpty()) {
+							handle = u"@"_q + usr->username();
+						}
+					}
+
+					// Original timestamp.
+					const auto dateStr = QDateTime::fromSecsSinceEpoch(item->date())
+						.toString(u"dd.MM.yyyy HH:mm"_q);
+
+					// Direct message link (best-effort).
+					QString msgLink;
+					if (const auto ch = srcPeer->asChannel()) {
+						if (ch->hasUsername()) {
+							msgLink = u"https://t.me/%1/%2"_q
+								.arg(ch->username())
+								.arg(srcMsgId);
+						} else {
+							msgLink = u"https://t.me/c/%1/%2"_q
+								.arg(peerToChannel(srcPeer->id).bare)
+								.arg(srcMsgId);
+						}
+					}
+
+					QString info = u"\n\n\xF0\x9F\x93\x8C Manba: "_q + peerName;
+					if (!handle.isEmpty()) {
+						info += u" ("_q + handle + u")"_q;
+					}
+					info += u"\n\xF0\x9F\x95\x90 Vaqt: "_q + dateStr;
+					info += u"\n\xF0\x9F\x94\x91 Peer ID: "_q + srcPeerIdStr;
+					if (!msgLink.isEmpty()) {
+						info += u"\n\xF0\x9F\x94\x97 Link: "_q + msgLink;
+					}
+					return info;
+				};
+
+				// Caption / text with source metadata appended.
+				const auto forwardInfo = buildForwardInfo();
+				const auto captionTagsWithFooter = TextWithTags{
+					captionTags.text + forwardInfo,
+					captionTags.tags,
+				};
+
 				if (const auto media = item->media()) {
 					if (const auto photo = media->photo()) {
-						SendExistingPhoto(std::move(msgToSend), photo);
+						// Try photo local path: user-saved location first, then cache.
+						QString localPath = photo->location(true).name();
+						if (localPath.isEmpty()) {
+							localPath = CustomDB::GetSavedMediaPath(
+								srcPeerIdStr, srcMsgId);
+						}
+						if (!localPath.isEmpty() && QFile::exists(localPath)) {
+							// Fresh upload — never gets stuck.
+							_fileLoader->addTask(
+								std::make_unique<FileLoadTask>(
+									FileLoadTask::Args{
+										.session = &session(),
+										.filepath = localPath,
+										.type = SendMediaType::Photo,
+										.to = FileLoadTaskOptions(action),
+										.caption = captionTagsWithFooter,
+									}));
+						} else {
+							// No local photo → text + toast.
+							auto msgText = MessageToSend(action);
+							msgText.textWithTags = captionTagsWithFooter;
+							sendMessage(std::move(msgText));
+							showToastNoMedia();
+						}
 					} else if (const auto document = media->document()) {
-						SendExistingDocument(std::move(msgToSend), document);
+						// Prefer Telegram cache, then anti-delete saved copy.
+						QString localPath = document->filepath(true);
+						if (localPath.isEmpty()) {
+							const QString saved =
+								CustomDB::GetSavedMediaPath(srcPeerIdStr, srcMsgId);
+							if (!saved.isEmpty() && QFile::exists(saved)) {
+								localPath = saved;
+							}
+						}
+						if (!localPath.isEmpty()) {
+							// Fresh upload from local file — no file-reference issues.
+							_fileLoader->addTask(
+								std::make_unique<FileLoadTask>(
+									FileLoadTask::Args{
+										.session = &session(),
+										.filepath = localPath,
+										.type = SendMediaType::File,
+										.to = FileLoadTaskOptions(action),
+										.caption = captionTagsWithFooter,
+									}));
+						} else {
+							// No local file → text + toast.
+							auto msgText = MessageToSend(action);
+							msgText.textWithTags = captionTagsWithFooter;
+							sendMessage(std::move(msgText));
+							showToastNoMedia();
+						}
 					} else {
-						sendMessage(std::move(msgToSend));
+						// Other media types (sticker, geo, poll, contact, etc.)
+						// have no uploadable local file — send text content only.
+						auto msgText = MessageToSend(action);
+						msgText.textWithTags = captionTagsWithFooter;
+						sendMessage(std::move(msgText));
 					}
 				} else {
-					sendMessage(std::move(msgToSend));
+					// Pure text message — forward the text directly.
+					auto msgText = MessageToSend(action);
+					msgText.textWithTags = captionTagsWithFooter;
+					sendMessage(std::move(msgText));
 				}
 				i = draft.items.erase(i);
 			} else {

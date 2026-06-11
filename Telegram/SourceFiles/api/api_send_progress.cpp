@@ -9,7 +9,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "custom_settings.h"
 
-#include <QtCore/QSettings>
 #include "main/main_session.h"
 #include "history/history.h"
 #include "data/data_peer.h"
@@ -140,9 +139,8 @@ void SendProgressManager::send(const Key &key, int progress) {
 		}
 	}();
 
-	QSettings customSettings("CustomMod", "TelegramDesktop");
-	if (customSettings.value("ghost_mode", true).toBool()) {
-		return; // CUSTOM GHOST MODE: Disable sending any "Typing..." action to the server
+	if (CustomSettings::GhostMode()) {
+		return;
 	}
 
 	const auto requestId = _session->api().request(MTPmessages_SetTyping(

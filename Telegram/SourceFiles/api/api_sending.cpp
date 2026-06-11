@@ -301,7 +301,8 @@ void SendExistingMedia(
 void SendExistingDocument(
 		MessageToSend &&message,
 		not_null<DocumentData*> document,
-		std::optional<MsgId> localMessageId) {
+		std::optional<MsgId> localMessageId,
+		Data::FileOrigin overrideOrigin) {
 	const auto inputMedia = [=] {
 		return MTP_inputMediaDocument(
 			MTP_flags(message.action.options.mediaSpoiler
@@ -313,11 +314,16 @@ void SendExistingDocument(
 			MTPint(), // video_timestamp
 			MTPstring()); // query
 	};
+	// Use override origin if provided (e.g. for bypass-forwarding protected media),
+	// otherwise fall back to the document's own sticker/gif origin.
+	const auto origin = overrideOrigin
+		? overrideOrigin
+		: document->stickerOrGifOrigin();
 	SendExistingMedia(
 		std::move(message),
 		document,
 		inputMedia,
-		document->stickerOrGifOrigin(),
+		origin,
 		std::move(localMessageId));
 
 	if (document->sticker()) {
@@ -328,7 +334,8 @@ void SendExistingDocument(
 void SendExistingPhoto(
 		MessageToSend &&message,
 		not_null<PhotoData*> photo,
-		std::optional<MsgId> localMessageId) {
+		std::optional<MsgId> localMessageId,
+		Data::FileOrigin overrideOrigin) {
 	const auto inputMedia = [=] {
 		return MTP_inputMediaPhoto(
 			MTP_flags(0),
@@ -340,7 +347,7 @@ void SendExistingPhoto(
 		std::move(message),
 		photo,
 		inputMedia,
-		Data::FileOrigin(),
+		overrideOrigin,
 		std::move(localMessageId));
 }
 

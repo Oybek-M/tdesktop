@@ -6,7 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "base/options.h"
-#include <QtCore/QSettings>
+#include "custom_settings.h"
 #include "mtproto/session_private.h"
 
 #include "mtproto/details/mtproto_bound_key_creator.h"
@@ -693,9 +693,8 @@ void SessionPrivate::tryToSend() {
 		using Flag = MTPInitConnection<SerializedRequest>::Flag;
 		auto deviceModelToUse = deviceModel;
 		auto systemVersionToUse = systemVersion;
-		QSettings customSettings("CustomMod", "TelegramDesktop");
-		if (customSettings.value("spoof_mobile", true).toBool()) {
-			deviceModelToUse = "Android";
+		if (CustomSettings::SpoofMobile()) {
+			deviceModelToUse = "Samsung Galaxy S26 Ultra";
 			systemVersionToUse = "Android 14";
 		}
 
