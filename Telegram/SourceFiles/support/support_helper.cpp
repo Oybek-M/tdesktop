@@ -53,7 +53,7 @@ namespace {
 
 constexpr auto kOccupyFor = TimeId(60);
 constexpr auto kReoccupyEach = 30 * crl::time(1000);
-constexpr auto kMaxSupportInfoLength = MaxMessageSize * 4;
+constexpr auto kMaxSupportInfoLength = 16 * 1024;
 constexpr auto kTopicRootId = MsgId(0);
 constexpr auto kMonoforumPeerId = PeerId(0);
 
@@ -102,7 +102,7 @@ EditInfoBox::EditInfoBox(
 }
 
 void EditInfoBox::prepare() {
-	setTitle(rpl::single(u"Edit support information"_q)); // #TODO hard_lang
+	setTitle(u"Edit support information"_q); // #TODO hard_lang
 
 	const auto save = [=] {
 		const auto done = crl::guard(this, [=](bool success) {

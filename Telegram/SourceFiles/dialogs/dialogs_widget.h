@@ -213,7 +213,10 @@ private:
 	void setupShortcuts();
 	void setupStories();
 	void setupSwipeBack();
-	void setupTopBarSuggestions(not_null<Ui::VerticalLayout*> dialogs);
+	void setupTopBarSuggestions();
+#ifdef _DEBUG
+	void setupTopBarSuggestionTestHotkeys();
+#endif // _DEBUG
 	void storiesExplicitCollapse();
 	void collectStoriesUserpicsViews(Data::StorySourcesList list);
 	void storiesToggleExplicitExpand(bool expand);
@@ -288,6 +291,7 @@ private:
 	void updateSuggestions(anim::type animated);
 	void processSearchFocusChange();
 	void closeSuggestions();
+	[[nodiscard]] bool searchActive() const;
 
 	[[nodiscard]] bool redirectToSearchPossible() const;
 	[[nodiscard]] bool redirectKeyToSearch(QKeyEvent *e) const;
@@ -332,13 +336,16 @@ private:
 
 	base::unique_qptr<Ui::RpWidget> _chatFilters;
 
-	QPointer<Ui::SlideWrap<Ui::RpWidget>> _topBarSuggestion;
+	base::unique_qptr<Ui::SlideWrap<Ui::RpWidget>> _topBarSuggestion;
+	base::unique_qptr<Ui::RpWidget> _topBarSuggestionPlaceholder;
 	rpl::event_stream<int> _topBarSuggestionHeightChanged;
 	rpl::event_stream<bool> _searchStateForTopBarSuggestion;
+	rpl::event_stream<> _prepareTopBarSnapshot;
 	rpl::event_stream<bool> _openedFolderOrForumChanges;
 
 	object_ptr<Ui::ElasticScroll> _scroll;
-	QPointer<InnerWidget> _inner;
+	Ui::VerticalLayout *_innerList = nullptr;
+	InnerWidget *_inner = nullptr;
 	std::unique_ptr<Suggestions> _suggestions;
 	std::vector<std::unique_ptr<Suggestions>> _hidingSuggestions;
 	class BottomButton;
@@ -367,6 +374,7 @@ private:
 	QString _lastSearchText;
 	bool _searchSuggestionsLocked = false;
 	bool _searchHasFocus = false;
+	bool _searchEngaged = false;
 	bool _processingSearch = false;
 
 	rpl::event_stream<rpl::producer<Stories::Content>> _storiesContents;

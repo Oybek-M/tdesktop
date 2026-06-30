@@ -19,7 +19,8 @@ constexpr auto kReactionsCountEmojiProperty = 0x05;
 constexpr auto kDocumentFilenameTooltipProperty = 0x06;
 constexpr auto kPhoneNumberLinkProperty = 0x07;
 constexpr auto kTodoListItemIdProperty = 0x08;
-constexpr auto kFastShareProperty = 0x09;
+constexpr auto kPollOptionProperty = 0x09;
+constexpr auto kFastShareProperty = 0x0a;
 
 namespace Ui {
 class Show;
@@ -55,6 +56,7 @@ struct ClickHandlerContext {
 	bool skipBotAutoLogin = false;
 	bool botStartAutoSubmit = false;
 	bool ignoreIv = false;
+	bool forceExternalUrlConfirmation = false;
 	bool dark = false;
 	// Is filled from peer info.
 	PeerData *peer = nullptr;
@@ -75,7 +77,12 @@ public:
 	void onClick(ClickContext context) const override {
 		const auto button = context.button;
 		if (button == Qt::LeftButton || button == Qt::MiddleButton) {
-			Open(url(), context.other);
+			const auto original = originalUrl();
+			Open(
+				UrlClickHandler::ExternalUrlFromInternalUrl(original).isEmpty()
+					? url()
+					: original,
+				context.other);
 		}
 	}
 
