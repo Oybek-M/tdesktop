@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/platform/win/base_windows_shlobj_h.h"
 #include "base/platform/win/base_windows_winrt.h"
 #include "base/call_delayed.h"
+#include "core/version.h"
 #include "ui/boxes/confirm_box.h"
 #include "lang/lang_keys.h"
 #include "mainwindow.h"
@@ -681,19 +682,19 @@ void LaunchMaps(const Data::LocationPoint &point, Fn<void()> fail) {
 
 	auto handler = base::CoTaskMemString();
 	const auto result = aar->QueryCurrentDefault(
-		L"bingmaps",
+		L"geo",
 		AT_URLPROTOCOL,
 		AL_EFFECTIVE,
 		handler.put());
 	if (FAILED(result)
 		|| !handler
 		|| !handler.data()
-		|| std::wstring(handler.data()) == L"bingmaps") {
+		|| std::wstring(handler.data()) == L"geo") {
 		fail();
 		return;
 	}
 
-	const auto url = u"bingmaps:?lvl=16&collection=point.%1_%2_Point"_q;
+	const auto url = u"geo:%1,%2"_q;
 	if (!QDesktopServices::openUrl(
 		url.arg(point.latAsString(), point.lonAsString()))) {
 		fail();

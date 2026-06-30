@@ -145,7 +145,7 @@ public:
 	base::flat_map<UserId, QString> memberRanks;
 
 	UserData *creator = nullptr; // nullptr means unknown
-	int botStatus = 0; // -1 - no bots, 0 - unknown, 1 - one bot, that sees all history, 2 - other
+	Data::BotStatus botStatus = Data::BotStatus::Unknown;
 	bool joinedMessageFound = false;
 	bool adminsLoaded = false;
 	StickerSetIdentifier stickerSet;
@@ -351,6 +351,11 @@ public:
 	[[nodiscard]] bool requestToJoin() const {
 		return flags() & Flag::RequestToJoin;
 	}
+	[[nodiscard]] UserData *guardBot() const;
+	[[nodiscard]] UserId guardBotId() const {
+		return _guardBotId;
+	}
+	void setGuardBotId(UserId userId);
 	[[nodiscard]] bool antiSpamMode() const {
 		return flags() & Flag::AntiSpam;
 	}
@@ -615,6 +620,7 @@ private:
 	int _pendingRequestsCount = 0;
 	int _levelHint = 0;
 	int _starsPerMessage = 0;
+	UserId _guardBotId = 0;
 
 	Data::AllowedReactions _allowedReactions;
 
