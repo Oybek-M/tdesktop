@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_editing.h"
 #include "base/event_filter.h"
 #include "boxes/premium_preview_box.h"
+#include "chat_helpers/compose/compose_show.h"
 #include "chat_helpers/field_autocomplete.h"
 #include "chat_helpers/message_field.h"
 #include "chat_helpers/tabbed_panel.h"
@@ -29,11 +30,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/view/controls/history_view_characters_limit.h"
+#include "history/view/controls/history_view_compose_ai_button.h"
 #include "history/view/history_view_message.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "media/clip/media_clip_reader.h"
+#include "menu/menu_checked_action.h"
 #include "menu/menu_send.h"
+#include "ui/controls/compose_ai_button_factory.h"
 #include "ui/controls/emoji_button.h"
 #include "ui/controls/emoji_button_factory.h"
 #include "ui/effects/spoiler_mess.h"
@@ -257,10 +261,9 @@ struct State final {
 			const auto menu = Ui::CreateChild<Ui::PopupMenu>(
 				widget,
 				st::popupMenuWithIcons);
-			menu->addAction(
-				state->hasSpoiler
-					? tr::lng_context_disable_spoiler(tr::now)
-					: tr::lng_context_spoiler_effect(tr::now),
+			::Menu::AddCheckedAction(
+				menu,
+				tr::lng_context_spoiler_effect(tr::now),
 				[=] {
 					state->hasSpoiler = !state->hasSpoiler;
 					if (!state->hasSpoiler) {
@@ -273,9 +276,8 @@ struct State final {
 					}
 					widget->update();
 				},
-				state->hasSpoiler
-					? &st::menuIconSpoilerOff
-					: &st::menuIconSpoiler);
+				&st::menuIconSpoiler,
+				state->hasSpoiler);
 			menu->popup(QCursor::pos());
 			return base::EventFilterResult::Cancel;
 		}
@@ -318,7 +320,8 @@ void CaptionBox(
 		TextWithTags initialText,
 		not_null<PeerData*> peer,
 		const SendMenu::Details &details,
-		Fn<void(Api::SendOptions, TextWithTags)> done) {
+		Fn<void(Api::SendOptions, TextWithTags)> done,
+		Fn<void(TextWithTags)> cancelled = nullptr) {
 	const auto window = Core::App().findWindow(box);
 	const auto controller = window ? window->sessionController() : nullptr;
 	if (!controller) {
@@ -334,9 +337,25 @@ void CaptionBox(
 
 	input->setTextWithTags(std::move(initialText));
 	input->setSubmitSettings(Core::App().settings().sendSubmitWay());
-	InitMessageField(controller, input, [=](not_null<DocumentData*>) {
-		return true;
+	const auto chatStyle = InitMessageField(
+		controller,
+		input,
+		[=](not_null<DocumentData*>) { return true; });
+
+	const auto aiButton = Ui::SetupCaptionAiButton({
+		.parent = input->parentWidget(),
+		.field = input,
+		.session = &controller->session(),
+		.show = controller->uiShow(),
+		.chatStyle = chatStyle,
 	});
+	rpl::combine(
+		box->sizeValue(),
+		input->geometryValue()
+	) | rpl::on_next([=](QSize, QRect) {
+		Ui::UpdateCaptionAiButtonGeometry(aiButton, input);
+		aiButton->raise();
+	}, aiButton->lifetime());
 
 	const auto sendMenuDetails = [=] { return details; };
 	struct Autocomplete {
@@ -393,6 +412,7 @@ void CaptionBox(
 		}
 	}
 
+	const auto confirmed = box->lifetime().make_state<bool>(false);
 	const auto send = [=, show = controller->uiShow()](
 			Api::SendOptions options) {
 		const auto textWithTags = input->getTextWithTags();
@@ -403,8 +423,17 @@ void CaptionBox(
 				tr::lng_edit_limit_reached(tr::now, lt_count, remove));
 			return;
 		}
+		*confirmed = true;
 		done(std::move(options), textWithTags);
 	};
+	if (cancelled) {
+		box->boxClosing(
+		) | rpl::on_next([=] {
+			if (!*confirmed) {
+				cancelled(input->getTextWithTags());
+			}
+		}, box->lifetime());
+	}
 	const auto confirm = box->addButton(
 		std::move(confirmText),
 		[=] { send({}); });
@@ -434,7 +463,9 @@ void SendGifWithCaptionBox(
 		not_null<DocumentData*> document,
 		not_null<PeerData*> peer,
 		const SendMenu::Details &details,
-		Fn<void(Api::SendOptions, TextWithTags)> c) {
+		TextWithTags initialText,
+		Fn<void(Api::SendOptions, TextWithTags)> c,
+		Fn<void(TextWithTags)> cancelled) {
 	box->setTitle(tr::lng_send_gif_with_caption());
 	const auto state = AddGifWidget(
 		box->verticalLayout(),
@@ -446,7 +477,41 @@ void SendGifWithCaptionBox(
 		document->owner().stickers().notifyGifWithCaptionSent();
 		c(std::move(o), std::move(t));
 	};
-	CaptionBox(box, tr::lng_send_button(), {}, peer, details, std::move(d));
+	CaptionBox(
+		box,
+		tr::lng_send_button(),
+		std::move(initialText),
+		peer,
+		details,
+		std::move(d),
+		std::move(cancelled));
+}
+
+void SendGifWithCaption(
+		std::shared_ptr<ChatHelpers::Show> show,
+		not_null<Ui::InputField*> field,
+		not_null<DocumentData*> document,
+		not_null<PeerData*> peer,
+		const SendMenu::Details &details,
+		Fn<void(Api::SendOptions, TextWithTags)> send) {
+	show->show(Box(
+		SendGifWithCaptionBox,
+		document,
+		peer,
+		details,
+		field->getTextWithTags(),
+		crl::guard(field, [=](
+				Api::SendOptions options,
+				TextWithTags caption) {
+			field->setTextWithTags({});
+			show->hideLayer(anim::type::normal);
+			send(std::move(options), std::move(caption));
+		}),
+		crl::guard(field, [=](TextWithTags caption) {
+			if (!caption.text.isEmpty()) {
+				field->setTextWithTags(std::move(caption));
+			}
+		})));
 }
 
 void EditCaptionBox(

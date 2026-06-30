@@ -50,6 +50,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mainwidget.h"
 #include "lang/lang_keys.h"
 #include "lang/lang_numbers_animation.h"
+#include "menu/menu_send.h"
 #include "styles/style_chat.h" // popupMenuExpandedSeparator
 #include "styles/style_info.h"
 #include "styles/style_profile.h"
@@ -91,6 +92,7 @@ const style::InfoTopBar &TopBarStyle(Wrap wrap) {
 			case Type::Link: return tr::lng_media_selected_link;
 			case Type::RoundVoiceFile: return tr::lng_media_selected_audio;
 			case Type::PhotoVideo: return tr::lng_stories_row_count;
+			case Type::Poll: return tr::lng_media_selected_poll;
 			}
 			Unexpected("Type in TopBar::generateSelectedText()");
 		}()(tr::now, lt_count, count, Ui::StringWithNumbers::FromString);
@@ -899,6 +901,16 @@ std::shared_ptr<Window::SectionMemento> WrapWidget::createMemento() {
 	return std::make_shared<Memento>(std::move(stack));
 }
 
+SendMenu::Details WrapWidget::sendMenuDetails() const {
+	return _content ? _content->sendMenuDetails() : SendMenu::Details();
+}
+
+bool WrapWidget::processChosenSticker(ChatHelpers::FileChosen &&chosen) {
+	return _content
+		? _content->processChosenSticker(std::move(chosen))
+		: false;
+}
+
 rpl::producer<int> WrapWidget::desiredHeightValue() const {
 	return _desiredHeights.events_starting_with(desiredHeightForContent())
 		| rpl::flatten_latest();
@@ -1024,15 +1036,29 @@ void WrapWidget::resizeEvent(QResizeEvent *e) {
 }
 
 void WrapWidget::keyPressEvent(QKeyEvent *e) {
+	if (_content && _content->processZoomKey(e)) {
+		return;
+	}
 	if (e->key() == Qt::Key_Escape || e->key() == Qt::Key_Back) {
-		checkBeforeCloseByEscape((hasStackHistory() || wrap() != Wrap::Layer)
-			? Fn<void()>([=] { _controller->showBackFromStack(); })
-			: Fn<void()>([=] {
-				_controller->parentController()->hideSpecialLayer();
-			}));
+		if (!closeByBackButton()) {
+			checkBeforeCloseByEscape(
+				[=] { _controller->showBackFromStack(); });
+		}
 		return;
 	}
 	SectionWidget::keyPressEvent(e);
+}
+
+bool WrapWidget::closeByBackButton() {
+	if (!hasStackHistory() && wrap() != Wrap::Layer) {
+		return false;
+	}
+	checkBeforeCloseByEscape(hasStackHistory()
+		? Fn<void()>([=] { _controller->showBackFromStack(); })
+		: Fn<void()>([=] {
+			_controller->parentController()->hideSpecialLayer();
+		}));
+	return true;
 }
 
 void WrapWidget::updateContentGeometry() {

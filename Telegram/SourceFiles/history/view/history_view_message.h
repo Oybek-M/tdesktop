@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "history/view/history_view_element.h"
 #include "history/view/history_view_bottom_info.h"
+#include "iv/markdown/iv_markdown_article.h"
 #include "ui/effects/animations.h"
 
 class HistoryItem;
@@ -32,6 +33,7 @@ namespace HistoryView {
 class ViewButton;
 class WebPage;
 class TranscribeButton;
+class Message;
 
 namespace Reactions {
 class InlineList;
@@ -63,6 +65,51 @@ struct PsaTooltipState : RuntimeComponent<PsaTooltipState, Element> {
 	mutable bool buttonVisible = true;
 };
 
+struct HiddenSenderTooltip
+: RuntimeComponent<HiddenSenderTooltip, Element> {
+	mutable QRect linkRect;
+	mutable int cachedWidth = -1;
+};
+
+struct InstantViewMediaRuntime
+: RuntimeComponent<InstantViewMediaRuntime, Element> {
+	QString pageUrl;
+};
+
+struct HistoryMessageRichPage
+: RuntimeComponent<HistoryMessageRichPage, Element> {
+	HistoryMessageRichPage();
+
+	struct Host final : Iv::Markdown::MediaBlockHost {
+		base::weak_ptr<Message> owner;
+
+		void requestRepaint(QRect articleRect) override;
+		void requestRelayout(QRect articleRect) override;
+	};
+
+	std::shared_ptr<const Iv::RichPage> page;
+	std::shared_ptr<Iv::Markdown::MediaRuntime> mediaRuntime;
+
+	// The article and its media blocks keep a raw MediaBlockHost pointer,
+	// while components are moved on each composer mask change, so the
+	// host must live on the heap to have a stable address.
+	std::unique_ptr<Host> host;
+
+	Iv::Markdown::MarkdownArticle article;
+	Iv::Markdown::MarkdownArticleThinkingPaintCache thinkingPaintCache;
+	rpl::lifetime highlightReadyLifetime;
+	int paletteVersion = -1;
+	mutable ClickHandlerPtr handler;
+	mutable std::optional<Iv::Markdown::MarkdownArticleHorizontalScrollHit> handlerHorizontalScrollHit;
+	mutable QPoint handlerHorizontalScrollPoint;
+	mutable bool handlerHorizontalScrollActive = false;
+	mutable ClickHandlerPtr handlerHorizontalScrollPressed;
+	mutable std::optional<Iv::Markdown::PreparedLink> handlerPreparedLink;
+	mutable Iv::Markdown::MediaActivation handlerMediaActivation;
+	mutable Iv::Markdown::PreparedPlaceholderBlockId handlerPlaceholderId;
+	mutable QPoint handlerPlaceholderPoint;
+};
+
 enum class BadgeRole : uchar {
 	User,
 	Admin,
@@ -82,10 +129,33 @@ struct RightBadge : RuntimeComponent<RightBadge, Element> {
 	mutable QPoint lastPoint;
 };
 
+struct TextAppearing : RuntimeComponent<TextAppearing, Element> {
+	std::vector<Ui::Text::LineLayoutInfo> lines;
+	int textWidth = 0;
+	int shownLine = 0;
+	int revealedLineWidth = 0;
+	int startLineWidth = 0;
+	int targetLineWidth = 0;
+	int shownWidth = 0;
+	int shownHeight = 0;
+	int targetHeight = 0;
+	crl::time widthDuration = 0;
+	Ui::Animations::Simple widthAnimation;
+	Ui::Animations::Simple heightAnimation;
+	bool geometryValid = false;
+	bool startedForText = false;
+	bool finalizing = false;
+	bool use = false;
+	mutable QImage lineCache;
+	mutable QImage gradientMask;
+};
+
 struct BottomRippleMask {
 	QImage image;
 	int shift = 0;
 };
+
+extern const char kOptionUnlimitedMessageWidth[];
 
 class Message final : public Element {
 public:
@@ -112,6 +182,10 @@ public:
 		QPoint point,
 		StateRequest request) const override;
 	void updatePressed(QPoint point) override;
+	bool consumeHorizontalScroll(QPoint position, int delta) override;
+	[[nodiscard]] bool canConsumeHorizontalScroll(
+		QPoint position,
+		int delta) const override;
 	void drawInfo(
 		Painter &p,
 		const PaintContext &context,
@@ -124,13 +198,29 @@ public:
 		int bottom,
 		QPoint point,
 		InfoDisplayType type) const override;
+	MessageSelection selectionFromStates(
+		const TextState &anchor,
+		const TextState &current,
+		TextSelectType type) const override;
 	TextForMimeData selectedText(TextSelection selection) const override;
+	TextForMimeData selectedText(
+		const MessageSelection &selection) const override;
 	SelectedQuote selectedQuote(TextSelection selection) const override;
+	SelectedQuote selectedQuote(
+		const MessageSelection &selection) const override;
 	TextSelection selectionFromQuote(
 		const SelectedQuote &quote) const override;
 	TextSelection adjustSelection(
 		TextSelection selection,
 		TextSelectType type) const override;
+	MessageSelection adjustSelection(
+		const MessageSelection &selection,
+		TextSelectType type) const override;
+	TextSelection selectionForEdit(
+		const MessageSelection &selection) const override;
+	bool selectionContains(
+		const MessageSelection &selection,
+		const TextState &state) const override;
 
 	Reactions::ButtonParameters reactionButtonParameters(
 		QPoint position,
@@ -189,7 +279,13 @@ public:
 
 	QRect effectIconGeometry() const override;
 	QRect innerGeometry() const override;
+	QPoint mediaTopLeft() const override;
 	[[nodiscard]] BottomRippleMask bottomRippleMask(int buttonHeight) const;
+
+	void setInstantViewMediaRuntime(QString pageUrl);
+	[[nodiscard]] bool hasRichPage() const;
+	void requestRichPageRepaint(QRect articleRect) const;
+	void requestRichPageRelayout(QRect articleRect);
 
 private:
 	struct CommentsButton;
@@ -283,6 +379,11 @@ private:
 		Painter &p,
 		QRect &trect,
 		const PaintContext &context) const;
+	void paintRichText(
+		Painter &p,
+		not_null<HistoryMessageRichPage*> rich,
+		QRect rect,
+		const PaintContext &context) const;
 
 	bool getStateCommentsButton(
 		QPoint point,
@@ -363,6 +464,17 @@ private:
 
 	void updateViewButtonExistence();
 	[[nodiscard]] int viewButtonHeight() const;
+	[[nodiscard]] bool prepareRichPageTextRect(QRect &trect) const;
+	[[nodiscard]] QRect richPageRect(QRect trect) const;
+	[[nodiscard]] QPoint prepareRichPageStateRect(
+		QPoint point,
+		QRect &trect) const;
+	void activateRichPagePreparedLink(
+		const Iv::Markdown::PreparedLink &link,
+		ClickContext context) const;
+	void activateRichPageMedia(
+		const Iv::Markdown::MediaActivation &activation,
+		ClickContext context) const;
 
 	[[nodiscard]] WebPage *logEntryOriginal() const;
 	[[nodiscard]] WebPage *factcheckBlock() const;
@@ -371,6 +483,17 @@ private:
 	[[nodiscard]] ClickHandlerPtr psaTooltipLink() const;
 	void psaTooltipToggled(bool shown) const;
 	void invalidateTextDependentCache() override;
+
+	bool textAppearValidate(not_null<TextAppearing*> appearing);
+	bool textAppearCheckLine(not_null<TextAppearing*> appearing);
+	void textAppearStartWidthAnimation(not_null<TextAppearing*> appearing);
+	void textAppearStartHeightAnimation(
+		not_null<TextAppearing*> appearing,
+		int targetHeight);
+	void textAppearWidthCallback();
+	void textAppearHeightCallback();
+	[[nodiscard]] int textAppearTargetHeight(
+		not_null<TextAppearing*> appearing) const;
 
 	void refreshRightBadge();
 	[[nodiscard]] int rightBadgeWidth() const;
@@ -389,15 +512,18 @@ private:
 	mutable Ui::Text::String _fromName;
 	mutable std::unique_ptr<FromNameStatus> _fromNameStatus;
 	mutable std::unique_ptr<Ui::RoundCheckbox> _selectionRoundCheckbox;
-	mutable int _fromNameVersion = 0;
+	mutable uint32 _fromNameVersion : 16 = 0;
+	uint32 _nonTextMaxWidth : 16 = 0;
 	mutable int _bubbleTextualWidthMinimum : 16 = -1;
 	mutable int _bubbleTextualWidthCache : 16 = 0;
-	uint32 _bubbleWidthLimit : 27 = 0;
+	uint32 _bubbleWidthLimit : 26 = 0;
 	uint32 _invertMedia : 1 = 0;
 	uint32 _hideReply : 1 = 0;
 	uint32 _postShowingAuthor : 1 = 0;
+	mutable uint32 _fromLinkRipplePointSet : 1 = 0;
 
 	BottomInfo _bottomInfo;
+	mutable QPoint _lastMediaPosition;
 
 };
 

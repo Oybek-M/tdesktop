@@ -70,6 +70,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_menu_icons.h"
 #include "styles/style_premium.h"
 #include "styles/style_settings.h"
+#include "styles/style_widgets.h"
 
 #include <QtWidgets/QApplication>
 #include <QtGui/QClipboard>
@@ -308,7 +309,11 @@ Fn<void(not_null<Ui::PopupMenu*>)> MakeAuctionFillMenuCallback(
 
 		menu->addAction(tr::lng_auction_menu_copy_link(tr::now), [=] {
 			QApplication::clipboard()->setText(url);
-			show->showToast(tr::lng_username_copied(tr::now));
+			show->showToast({
+				.text = { tr::lng_username_copied(tr::now) },
+				.iconLottie = u"toast/voip_invite"_q,
+				.iconLottieSize = st::toastLottieIconSize,
+			});
 		}, &st::menuIconLink);
 
 		menu->addAction(tr::lng_auction_menu_share(tr::now), [=] {
@@ -892,6 +897,8 @@ void AuctionBidBox(not_null<GenericBox*> box, AuctionBidBoxArgs &&args) {
 						lt_count,
 						perRound,
 						tr::rich),
+					.icon = &st::auctionBidToastIcon,
+					.iconPadding = st::auctionBidToast.padding,
 					.st = &st::auctionBidToast,
 					.attach = RectPart::Top,
 					.duration = kBidPlacedToastDuration,
@@ -1982,7 +1989,6 @@ object_ptr<Ui::RpWidget> MakeActiveAuctionRow(
 			rpl::single(QString()),
 			st::auctionListRaise),
 		st::auctionListRaisePadding);
-	button->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
 
 	auto secondsLeft = rpl::duplicate(
 		value
