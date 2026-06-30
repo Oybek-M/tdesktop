@@ -24,6 +24,8 @@ namespace Core {
 namespace {
 
 constexpr auto kInitialVideoQuality = 480; // Start with SD.
+constexpr auto kMinIvZoom = 25;
+constexpr auto kMaxIvZoom = 400;
 
 [[nodiscard]] int DefaultIvZoom() {
 	const auto exact = cScale() * 100 / cScreenScale();
@@ -35,7 +37,10 @@ constexpr auto kInitialVideoQuality = 480; // Start with SD.
 }
 
 [[nodiscard]] int ResolveIvZoom(int value) {
-	return (value > 0) ? value : DefaultIvZoom();
+	return std::clamp(
+		(value > 0) ? value : DefaultIvZoom(),
+		kMinIvZoom,
+		kMaxIvZoom);
 }
 
 [[nodiscard]] WindowPosition Deserialize(const QByteArray &data) {
@@ -265,7 +270,8 @@ QByteArray Settings::serialize() const {
 		size += Serialize::bytearraySize(key)
 			+ Serialize::bytearraySize(value);
 	}
-	size += sizeof(qint32); // _audioPlaybackSpeed
+	size += sizeof(qint32) // _audioPlaybackSpeed
+		+ sizeof(qint32); // _mediaGridZoomStep
 
 	auto result = QByteArray();
 	result.reserve(size);
@@ -440,6 +446,7 @@ QByteArray Settings::serialize() const {
 			stream << key << value;
 		}
 		stream << qint32(SerializePlaybackSpeed(_audioPlaybackSpeed.current()));
+		stream << qint32(_mediaGridZoomStep);
 	}
 
 	Ensures(result.size() == size);
@@ -952,6 +959,13 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 		stream >> speed;
 		if (stream.status() == QDataStream::Ok) {
 			audioPlaybackSpeed = speed;
+		}
+	}
+	if (!stream.atEnd()) {
+		auto step = qint32();
+		stream >> step;
+		if (stream.status() == QDataStream::Ok) {
+			_mediaGridZoomStep = step;
 		}
 	}
 	if (stream.status() != QDataStream::Ok) {
@@ -1798,24 +1812,25 @@ rpl::producer<int> Settings::ivZoomValue() const {
 }
 
 void Settings::setIvZoom(int value) {
-	if (!value || value == DefaultIvZoom()) {
+	const auto resolved = ResolveIvZoom(value);
+	if (!value || resolved == ResolveIvZoom(0)) {
 		_ivZoom = 0;
 		return;
 	}
-#ifdef Q_OS_WIN
-	constexpr auto kMin = 25;
-	constexpr auto kMax = 500;
-#else
-	constexpr auto kMin = 30;
-	constexpr auto kMax = 200;
-#endif
-	_ivZoom = std::clamp(value, kMin, kMax);
+	_ivZoom = resolved;
 }
 
 bool Settings::normalizeIvZoom() {
 	const auto value = _ivZoom.current();
-	if (value && value == DefaultIvZoom()) {
+	if (!value) {
+		return false;
+	}
+	const auto resolved = ResolveIvZoom(value);
+	if (resolved == ResolveIvZoom(0)) {
 		_ivZoom = 0;
+		return true;
+	} else if (resolved != value) {
+		_ivZoom = resolved;
 		return true;
 	}
 	return false;

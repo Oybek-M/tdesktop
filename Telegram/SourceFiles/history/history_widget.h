@@ -114,6 +114,7 @@ class PinnedTracker;
 class TranslateBar;
 class ComposeSearch;
 class SubsectionTabs;
+class PullToNextChannel;
 struct SelectedQuote;
 class SuggestOptionsBar;
 enum class SuggestMode;
@@ -309,6 +310,9 @@ public:
 	void showInfoTooltip(
 		const TextWithEntities &text,
 		Fn<void()> hiddenCallback);
+	void showHiddenSenderTooltip(
+		QRect globalArea,
+		const TextWithEntities &text);
 	void showPremiumStickerTooltip(
 		not_null<const HistoryView::Element*> view);
 	void showPremiumToast(not_null<DocumentData*> document);
@@ -337,6 +341,9 @@ protected:
 	void leaveEventHook(QEvent *e) override;
 	void mouseReleaseEvent(QMouseEvent *e) override;
 	void mouseMoveEvent(QMouseEvent *e) override;
+
+public:
+	void synteticScrollToY(int y);
 
 private:
 	using TabbedPanel = ChatHelpers::TabbedPanel;
@@ -482,6 +489,7 @@ private:
 
 	void showFinished();
 	void updateOverStates(QPoint pos);
+	void clearOverStates();
 	void chooseAttach(std::optional<bool> overrideSendImagesAsPhotos = {});
 	void sendButtonClicked();
 	void newItemAdded(not_null<HistoryItem*> item);
@@ -531,6 +539,7 @@ private:
 	void updateAiButtonVisibility();
 	void updateAiButtonGeometry();
 	void showAiComposeBox();
+	void triggerAiApplyInPlace();
 	void initSendAsFileButton();
 	void sendTextAsFile(
 		const QString &fileText,
@@ -650,11 +659,6 @@ private:
 	int itemTopForHighlight(not_null<HistoryView::Element*> view) const;
 	void scrollToCurrentVoiceMessage(FullMsgId fromId, FullMsgId toId);
 
-	// Scroll to current y without updating the _lastUserScrolled time.
-	// Used to distinguish between user scrolls and syntetic scrolls.
-	// This one is syntetic.
-	void synteticScrollToY(int y);
-
 	void writeDrafts();
 	void writeDraftTexts();
 	void writeDraftCursors();
@@ -673,6 +677,7 @@ private:
 	void setHistory(History *history);
 	void setEditMsgId(MsgId msgId);
 
+	friend class HistoryInner;
 	HistoryItem *getItemFromHistoryOrMigrated(MsgId genericMsgId) const;
 	void animatedScrollToItem(MsgId msgId);
 	void animatedScrollToY(int scrollTo, HistoryItem *attachTo = nullptr);
@@ -765,6 +770,7 @@ private:
 	int _pinnedBarHeight = 0;
 	FullMsgId _pinnedClickedId;
 	std::optional<FullMsgId> _minPinnedId;
+	bool _pinnedBarHasCustomButton = false;
 
 	std::unique_ptr<Ui::GroupCallBar> _groupCallBar;
 	int _groupCallBarHeight = 0;
@@ -827,6 +833,7 @@ private:
 	Ui::Animations::Simple _scrollToAnimation;
 
 	HistoryView::CornerButtons _cornerButtons;
+	std::unique_ptr<HistoryView::PullToNextChannel> _pullToNext;
 
 	std::unique_ptr<ChatHelpers::FieldAutocomplete> _autocomplete;
 	std::unique_ptr<Ui::Emoji::SuggestionsController> _emojiSuggestions;
@@ -929,6 +936,7 @@ private:
 	base::Timer _saveCloudDraftTimer;
 
 	HistoryView::InfoTooltip _topToast;
+	HistoryView::AnchoredTooltip _hiddenSenderTooltip;
 	std::unique_ptr<HistoryView::StickerToast> _stickerToast;
 	std::unique_ptr<HistoryView::SelfForwardsTagger> _selfForwardsTagger;
 	std::unique_ptr<ChooseMessagesForReport> _chooseForReport;
@@ -940,6 +948,7 @@ private:
 		not_null<HistoryItem*>,
 		ItemRevealAnimation> _itemRevealAnimations;
 	int _itemsRevealHeight = 0;
+
 
 	bool _sponsoredMessagesStateKnown = false;
 	bool _justMarkingAsRead = false;

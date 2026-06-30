@@ -150,6 +150,7 @@ private:
 		not_null<Window::SessionController*> controller,
 		const Ui::Menu::MenuCallback &addAction);
 	void setupUserpicButton(not_null<Window::SessionController*> controller);
+	void setupBirthdayEffect();
 	void startUploadOverlay();
 	void setupActions(not_null<Window::SessionController*> controller);
 	void setupButtons(
@@ -268,6 +269,7 @@ private:
 	Ui::RpWidget *_actionMore = nullptr;
 
 	base::unique_qptr<Ui::HorizontalFitContainer> _actions;
+	base::unique_qptr<Ui::RpWidget> _actionsShadow;
 
 	std::unique_ptr<Lottie::MultiPlayer> _lottiePlayer;
 	bool _lottieSingleLoop = false;

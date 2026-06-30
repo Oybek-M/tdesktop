@@ -208,6 +208,7 @@ public:
 		Ui::ChatPaintContextArgs &&args) override;
 	base::unique_qptr<Ui::PopupMenu> listFillSenderUserpicMenu(
 		PeerId userpicPeerId) override;
+	Ui::ScrollArea *listScrollArea() const override;
 
 	// CornerButtonsDelegate delegate.
 	void cornerButtonsShowAtPosition(
@@ -434,6 +435,7 @@ private:
 	int _pinnedBarHeight = 0;
 	FullMsgId _pinnedClickedId;
 	std::optional<FullMsgId> _minPinnedId;
+	bool _pinnedBarHasCustomButton = false;
 	HistoryItem *_shownPinnedItem = nullptr;
 
 	std::unique_ptr<Ui::PinnedBar> _repliesRootView;

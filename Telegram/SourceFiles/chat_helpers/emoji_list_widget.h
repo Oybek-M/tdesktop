@@ -85,6 +85,7 @@ enum class EmojiListMode {
 	BackgroundEmoji,
 	PeerTitle,
 	MessageEffects,
+	CustomOnly,
 };
 
 [[nodiscard]] std::vector<EmojiStatusId> DocumentListToRecent(
@@ -104,6 +105,7 @@ struct EmojiListDescriptor {
 	ComposeFeatures features;
 	QWidget *mediaPreviewParent = nullptr;
 	QMargins mediaPreviewMargins;
+	bool mediaPreviewPanelStyle = true;
 };
 
 class EmojiListWidget final
@@ -374,6 +376,8 @@ private:
 		not_null<Ui::PopupMenu*> menu,
 		int section,
 		int index);
+	[[nodiscard]] base::unique_qptr<Ui::PopupMenu> fillSetContextMenu(
+		const CustomSet &set);
 
 	[[nodiscard]] EmojiPtr lookupOverEmoji(const OverEmoji *over) const;
 	[[nodiscard]] ResolvedCustom lookupCustomEmoji(
@@ -475,7 +479,7 @@ private:
 		uint64 setId);
 
 	void showPreview();
-	void showPreviewFor(not_null<DocumentData*> document);
+	bool showPreviewFor(not_null<DocumentData*> document);
 	void ensureMediaPreview();
 
 	void applyNextSearchQuery();
@@ -486,6 +490,7 @@ private:
 	Mode _mode = Mode::Full;
 	QWidget *_mediaPreviewParent = nullptr;
 	QMargins _mediaPreviewMargins;
+	bool _mediaPreviewPanelStyle = true;
 	std::unique_ptr<Ui::TabbedSearch> _search;
 	MTP::Sender _api;
 	const int _staticCount = 0;
