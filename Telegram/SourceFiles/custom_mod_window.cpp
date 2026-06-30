@@ -672,6 +672,41 @@ void fillPeerSection(
 		}, sectionDesc->lifetime());
 	}
 
+	// ── T42: Kategoriya bo'yicha tanlash ────────────────────────────
+	Ui::AddSkip(content, 8);
+	{
+		const auto addCategoryToggle = [&](
+				const QString &label,
+				CustomSettings::PeerType type) {
+			const auto btn = content->add(
+				object_ptr<Ui::SettingsButton>(
+					content,
+					rpl::single(label),
+					st::settingsButtonNoIcon),
+				style::margins(0, 0, 0, 0));
+			const bool initial = isWhitelist
+				? CustomSettings::IsWhitelistCategoryEnabled(type)
+				: CustomSettings::IsBlocklistCategoryEnabled(type);
+			btn->toggleOn(rpl::single(initial));
+			btn->toggledValue() | rpl::skip(1) | rpl::on_next([=](bool on) {
+				if (isWhitelist) {
+					CustomSettings::SetWhitelistCategory(type, on);
+				} else {
+					CustomSettings::SetBlocklistCategory(type, on);
+				}
+			}, btn->lifetime());
+		};
+		addCategoryToggle(
+			u"Barcha shaxsiy chatlar (Users)"_q,
+			CustomSettings::PeerType::User);
+		addCategoryToggle(
+			u"Barcha guruhlar (Groups)"_q,
+			CustomSettings::PeerType::Group);
+		addCategoryToggle(
+			u"Barcha kanallar / superguruhlar (Channels)"_q,
+			CustomSettings::PeerType::Channel);
+	}
+
 	// ── Chat tanlash (primary) ───────────────────────────────────
 	Ui::AddSkip(content, 12);
 	content->add(
@@ -988,6 +1023,7 @@ void fillPerChatSection(
 		Ui::SlideWrap<Ui::FlatLabel> *emptyWrap = nullptr;
 		Ui::FlatLabel *countLabel = nullptr;
 		int visibleCount = 0;
+		QVector<Ui::SlideWrap<Ui::VerticalLayout>*> entryWraps;
 		Fn<void(const CustomSettings::PerPeerEntry &)> addEntry;
 	};
 	const auto state = content->lifetime().make_state<State>();
@@ -1073,6 +1109,27 @@ void fillPerChatSection(
 			animated ? anim::type::normal : anim::type::instant);
 	};
 
+	// ── Barchasini tozalash (NEXT-9) ──────────────────────────────
+	content->add(
+		object_ptr<Ui::RoundButton>(
+			content,
+			rpl::single(u"Barchasini tozalash"_q),
+			st::attentionBoxButton),
+		st::boxRowPadding)
+	->addClickHandler([=] {
+		if (state->visibleCount == 0) {
+			Ui::Toast::Show(u"Roʻyxat allaqachon boʻsh."_q);
+			return;
+		}
+		CustomSettings::ClearAllPerPeerOverrides();
+		for (auto *wrap : state->entryWraps) {
+			wrap->toggle(false, anim::type::normal);
+		}
+		state->visibleCount = 0;
+		updateHeader(true);
+		Ui::Toast::Show(u"Per-Chat roʻyxati tozalandi."_q);
+	});
+
 	state->entriesLayout = content->add(
 		object_ptr<Ui::VerticalLayout>(content),
 		{0, 0, 0, 0});
@@ -1111,6 +1168,7 @@ void fillPerChatSection(
 				object_ptr<Ui::VerticalLayout>(state->entriesLayout)),
 			style::margins(),
 			style::al_justify);
+		state->entryWraps.append(entryWrap);
 		const auto container = entryWrap->entity();
 
 		// ── Header row (avatar + name + ID + delete) ──────────

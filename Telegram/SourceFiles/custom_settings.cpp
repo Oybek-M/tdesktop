@@ -30,6 +30,10 @@ QHash<QString, QString> gWhitelist;
 // Unified blocklist: always OFF for these peers (highest priority).
 QHash<QString, QString> gBlocklist;
 
+// T42: Category-based whitelist/blocklist. Key=static_cast<int>(PeerType), Value=enabled.
+QHash<int, bool> gWhitelistCategories;
+QHash<int, bool> gBlocklistCategories;
+
 // ── JSON peer lists ────────────────────────────────────────────────────────
 // Fayl manzili: <AppData>/CustomMod/peer_lists.json
 // Format:
@@ -60,9 +64,19 @@ void SavePeerLists() {
         o[QStringLiteral("name")] = it.value();
         bl.append(o);
     }
+    QJsonObject wlCats, blCats;
+    for (auto it = gWhitelistCategories.constBegin(); it != gWhitelistCategories.constEnd(); ++it) {
+        wlCats[QString::number(it.key())] = it.value();
+    }
+    for (auto it = gBlocklistCategories.constBegin(); it != gBlocklistCategories.constEnd(); ++it) {
+        blCats[QString::number(it.key())] = it.value();
+    }
+
     QJsonObject root;
     root[QStringLiteral("whitelist")] = wl;
     root[QStringLiteral("blacklist")] = bl;
+    root[QStringLiteral("wl_categories")] = wlCats;
+    root[QStringLiteral("bl_categories")] = blCats;
 
     QFile f(PeerListsFilePath());
     if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
@@ -89,6 +103,22 @@ void LoadPeerLists() {
         const auto o  = v.toObject();
         const auto id = o[QStringLiteral("id")].toString();
         if (!id.isEmpty()) gBlocklist[id] = o[QStringLiteral("name")].toString();
+    }
+
+    gWhitelistCategories.clear();
+    const auto wlCats = root[QStringLiteral("wl_categories")].toObject();
+    for (auto it = wlCats.constBegin(); it != wlCats.constEnd(); ++it) {
+        bool ok = false;
+        const int key = it.key().toInt(&ok);
+        if (ok) gWhitelistCategories[key] = it.value().toBool();
+    }
+
+    gBlocklistCategories.clear();
+    const auto blCats = root[QStringLiteral("bl_categories")].toObject();
+    for (auto it = blCats.constBegin(); it != blCats.constEnd(); ++it) {
+        bool ok = false;
+        const int key = it.key().toInt(&ok);
+        if (ok) gBlocklistCategories[key] = it.value().toBool();
     }
 }
 
@@ -253,7 +283,13 @@ QVector<QPair<QString, QString>> GetWhitelist() {
 
 bool IsInWhitelist(const QString &peerId) {
     if (!gInitialized) Init();
-    return gWhitelist.contains(peerId);
+    if (gWhitelist.contains(peerId)) return true;
+    const auto type = GetPeerType(peerId);
+    if (type != PeerType::Unknown) {
+        const auto it = gWhitelistCategories.constFind(static_cast<int>(type));
+        if (it != gWhitelistCategories.constEnd() && it.value()) return true;
+    }
+    return false;
 }
 
 // ── Blocklist ─────────────────────────────────────────────────────────────
@@ -283,7 +319,13 @@ QVector<QPair<QString, QString>> GetBlocklist() {
 
 bool IsInBlocklist(const QString &peerId) {
     if (!gInitialized) Init();
-    return gBlocklist.contains(peerId);
+    if (gBlocklist.contains(peerId)) return true;
+    const auto type = GetPeerType(peerId);
+    if (type != PeerType::Unknown) {
+        const auto it = gBlocklistCategories.constFind(static_cast<int>(type));
+        if (it != gBlocklistCategories.constEnd() && it.value()) return true;
+    }
+    return false;
 }
 
 void ClearWhitelist() {
@@ -298,53 +340,83 @@ void ClearBlocklist() {
     SavePeerLists();
 }
 
+// ── T42: Peer type detection ──────────────────────────────────────────────
+
+PeerType GetPeerType(const QString &peerId) {
+    bool ok = false;
+    const qint64 value = peerId.toLongLong(&ok);
+    if (!ok) return PeerType::Unknown;
+    switch (static_cast<int>((value >> 48) & 0xFF)) {
+        case 0: return PeerType::User;
+        case 1: return PeerType::Group;
+        case 2: return PeerType::Channel;
+        default: return PeerType::Unknown;
+    }
+}
+
+bool IsWhitelistCategoryEnabled(PeerType type) {
+    if (!gInitialized) Init();
+    const auto it = gWhitelistCategories.constFind(static_cast<int>(type));
+    return it != gWhitelistCategories.constEnd() && it.value();
+}
+
+void SetWhitelistCategory(PeerType type, bool enabled) {
+    if (!gInitialized) Init();
+    gWhitelistCategories[static_cast<int>(type)] = enabled;
+    SavePeerLists();
+}
+
+bool IsBlocklistCategoryEnabled(PeerType type) {
+    if (!gInitialized) Init();
+    const auto it = gBlocklistCategories.constFind(static_cast<int>(type));
+    return it != gBlocklistCategories.constEnd() && it.value();
+}
+
+void SetBlocklistCategory(PeerType type, bool enabled) {
+    if (!gInitialized) Init();
+    gBlocklistCategories[static_cast<int>(type)] = enabled;
+    SavePeerLists();
+}
+
 // ── Unified "should track" helpers ────────────────────────────────────────
 // Priority: Blocklist (false) > Whitelist (true) > Global flag
 
 bool ShouldAntiDelete(const QString &peerId) {
     if (!gInitialized) Init();
-    if (!peerId.isEmpty() && gBlocklist.contains(peerId)) return false;
-    if (!peerId.isEmpty() && gWhitelist.contains(peerId)) return true;
-    // Per-peer override (NEXT-6): Blocklist/Whitelist dan keyin tekshiriladi.
+    if (!peerId.isEmpty() && IsInBlocklist(peerId)) return false;
+    if (!peerId.isEmpty() && IsInWhitelist(peerId)) return true;
     return AntiDeleteForPeer(peerId);
 }
 
 bool ShouldAntiEdit(const QString &peerId) {
     if (!gInitialized) Init();
-    if (!peerId.isEmpty() && gBlocklist.contains(peerId)) return false;
-    if (!peerId.isEmpty() && gWhitelist.contains(peerId)) return true;
-    // Per-peer override (NEXT-6): Blocklist/Whitelist dan keyin tekshiriladi.
+    if (!peerId.isEmpty() && IsInBlocklist(peerId)) return false;
+    if (!peerId.isEmpty() && IsInWhitelist(peerId)) return true;
     return AntiEditForPeer(peerId);
 }
 
 bool ShouldGhost(const QString &peerId) {
     if (!gInitialized) Init();
-    if (!peerId.isEmpty() && gBlocklist.contains(peerId)) return false;
-    if (!peerId.isEmpty() && gWhitelist.contains(peerId)) return true;
+    if (!peerId.isEmpty() && IsInBlocklist(peerId)) return false;
+    if (!peerId.isEmpty() && IsInWhitelist(peerId)) return true;
     return GhostModeForPeer(peerId);
 }
 
 bool ShouldBackgroundCache(const QString &peerId) {
     if (!gInitialized) Init();
     if (peerId.isEmpty()) return false;
-    // BlackList — hech qachon cache qilmaymiz.
-    if (gBlocklist.contains(peerId)) return false;
-    // WhiteList — har doim cache qilamiz.
-    if (gWhitelist.contains(peerId)) return true;
-    // Per-Chat override: foydalanuvchi shu chat uchun AntiDelete yoki AntiEdit
-    // ni aniq yoqgan bo'lsa — cache qilamiz. Ro'yxat baribir cheklangan
-    // (faqat qo'lda qo'shilgan chatlar), shuning uchun performance saqlanadi.
+    if (IsInBlocklist(peerId)) return false;
+    if (IsInWhitelist(peerId)) return true;
     if (HasPerPeerOverride(peerId)) {
         return AntiDeleteForPeer(peerId) || AntiEditForPeer(peerId);
     }
-    // Global flag ON bo'lsa ham — qolgan barcha chatlarni cache qilmaymiz.
     return false;
 }
 
 bool ShouldAnonymousStory(const QString &peerId) {
     if (!gInitialized) Init();
-    if (!peerId.isEmpty() && gBlocklist.contains(peerId)) return false;
-    if (!peerId.isEmpty() && gWhitelist.contains(peerId)) return true;
+    if (!peerId.isEmpty() && IsInBlocklist(peerId)) return false;
+    if (!peerId.isEmpty() && IsInWhitelist(peerId)) return true;
     return gValues.storyAnonymousView;
 }
 
@@ -422,6 +494,24 @@ void RemovePerPeerOverride(const QString &peerId) {
 
     // Ghost reset: DB ham tozalansin.
     CustomDB::ResetGhostRead(peerId);
+}
+
+void ClearAllPerPeerOverrides() {
+    if (!gInitialized) Init();
+    // Ghost DB reset — har bir peer uchun
+    for (const QString &peerId : gPerPeerNames.keys()) {
+        CustomDB::ResetGhostRead(peerId);
+    }
+    gPerPeerNames.clear();
+    gGhostPerPeer.clear();
+    gAntiDeletePerPeer.clear();
+    gAntiEditPerPeer.clear();
+
+    QSettings settings("CustomMod", "TelegramDesktop");
+    settings.remove("PerPeerNames");
+    settings.remove("GhostModePerPeer");
+    settings.remove("AntiDeletePerPeer");
+    settings.remove("AntiEditPerPeer");
 }
 
 bool HasPerPeerOverride(const QString &peerId) {

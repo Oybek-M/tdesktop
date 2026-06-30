@@ -57,6 +57,7 @@ void ResetAntiEditForPeer(const QString &peerId);
 // per-peer override sifatida yozadi (keyin alohida o'zgartiriladi).
 void AddPerPeerOverride(const QString &peerId, const QString &displayName);
 void RemovePerPeerOverride(const QString &peerId);
+void ClearAllPerPeerOverrides();
 [[nodiscard]] bool HasPerPeerOverride(const QString &peerId);
 [[nodiscard]] QVector<PerPeerEntry> GetPerPeerOverrides();
 
@@ -80,6 +81,21 @@ void ClearBlocklist();
 [[nodiscard]] bool IsInBlocklist(const QString &peerId);
 
 void ClearWhitelist();
+
+// ── Peer type detection ───────────────────────────────────────────────────
+// peerId — QString::number(peer->id.value) formatidagi raqamli ID.
+// Telegram PeerId encoding: (value>>48)&0xFF → 0=User, 1=Group, 2=Channel
+enum class PeerType { User = 0, Group = 1, Channel = 2, Unknown = 3 };
+[[nodiscard]] PeerType GetPeerType(const QString &peerId);
+
+// ── Kategoriya (Category) bo'yicha whitelist/blocklist ───────────────────
+// PeerType ga mos kategoriya yoqilgan bo'lsa, IsInWhitelist/IsInBlocklist
+// shu turdagi barcha peerlar uchun true qaytaradi.
+// Saqlash: peer_lists.json — "wl_categories" / "bl_categories".
+[[nodiscard]] bool IsWhitelistCategoryEnabled(PeerType type);
+void SetWhitelistCategory(PeerType type, bool enabled);
+[[nodiscard]] bool IsBlocklistCategoryEnabled(PeerType type);
+void SetBlocklistCategory(PeerType type, bool enabled);
 
 // ── Unified "should track" helpers ───────────────────────────────────────
 // Priority order (highest → lowest):

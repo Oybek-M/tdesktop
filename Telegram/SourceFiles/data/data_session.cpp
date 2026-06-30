@@ -2992,8 +2992,14 @@ void Session::processMessagesDeleted(
 					msgDate = cachedDate;
 				}
 			}
-			// msgDate == 0 bo'lsa — xabar hech qachon yetib kelmagan yoki
-			// cache da yo'q. Bunday holatda DB ga yozmaymiz.
+			// NEXT-10: WhiteList peerlar uchun date yo'q bo'lsa — joriy vaqtni
+			// taxminiy sana sifatida ishlatamiz. Global ON bo'lsa ham skip.
+			if (msgDate == 0 && ::CustomSettings::IsInWhitelist(peerIdStr)) {
+				msgDate = static_cast<unsigned int>(QDateTime::currentSecsSinceEpoch());
+				if (originalText.isEmpty() && !isMedia) {
+					originalText = u"(matn saqlanmagan)"_q;
+				}
+			}
 			if (msgDate > 0) {
 				CustomDB::MarkDeleted(
 					messageId.v,

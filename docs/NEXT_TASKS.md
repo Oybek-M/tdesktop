@@ -1,6 +1,6 @@
 # CustomMod — Keyingi Tasklar Ro'yxati
 
-**Oxirgi yangilanish:** 2026-06-11 (T33–T40 tugallandi, commit/push tayyorlandi)
+**Oxirgi yangilanish:** 2026-06-28 (NEXT-9 + NEXT-10 + T42 tugallandi)
 
 ---
 
@@ -48,6 +48,10 @@
 | T38 | **Feature: media xabar background delete** — caption­siz media ham cache ga tushadi (`is_media` ustun, schema v5). O'chirilsa "(media xabar)" placeholder | `custom_db.h/.cpp`, `data/data_session.cpp`, `history/history.cpp` |
 | T39 | **Bug fix: Archive tab media placeholder** — `GetAllDeletedMessages` + `DeletedMessageWithPeer` ga `is_media`/`sender_id`; Archive tab da fayl saqlanmagan media "(media xabar)" ko'rsatadi ("(empty)" emas) | `custom_db.h/.cpp`, `custom_mod_window.cpp` |
 | T40 | **Bug fix: RecordBackgroundEdit sender/media yo'qotardi** — re-cache (`INSERT OR REPLACE`) avvalgi `sender_id`/`is_media` ni o'chirib, T36 ni edit→delete da buzardi. Endi `GetCachedTextAndDate` orqali o'qib, saqlab qoladi | `custom_db.cpp` |
+| T41 | **Bug fix: timestamp overlap o'chirilgan xabarda** — `validateText()` guard'idagi `!isDeletedLocally()` har safar `setTextWithLinks` ni qayta chaqirib skip block ni o'chirardi → `10:22 PM` matn ustiga tushardi. Yangi `Flag::DeletedMarkerApplied (0x4000)`: marker bir marta qo'llanadi, keyin guard no-op → skip block saqlanadi | `history/view/history_view_element.h/.cpp` |
+| T42 | **Feature: Category-based White/Black List** — Peer type bo'yicha guruh tanlash (Users/Groups/Channels). `PeerType` enum, `GetPeerType()`, `Is/SetWhitelistCategory()`, `Is/SetBlocklistCategory()`. `IsInWhitelist/IsInBlocklist` endi kategoriya ham tekshiradi. Storage: `peer_lists.json` — `wl_categories`/`bl_categories`. UI: `fillPeerSection` da 3 ta toggle. | `custom_settings.h/.cpp`, `custom_mod_window.cpp` |
+| T43 | **NEXT-9: Per-Chat "Barchasini tozalash"** — Per-Chat State ga `entryWraps` qo'shildi. "Barchasini tozalash" tugmasi `ClearAllPerPeerOverrides()` chaqiradi. | `custom_settings.h/.cpp`, `custom_mod_window.cpp` |
+| T44 | **NEXT-10: Background AntiDelete — msgDate==0 WhiteList fallback** — WhiteList peerda date yo'q bo'lsa joriy vaqt + "(matn saqlanmagan)" placeholder. Faqat WhiteList peerlar uchun (Global ON bo'lsa skip). | `data/data_session.cpp` |
 
 ---
 
@@ -66,19 +70,13 @@
 - Branding UI: title + icon saqlash/yuklash ishlayaptimi? (T24)
 - Import/Export: laptop ko'chirish ssenariysini to'liq test (T25)
 - Restart dan keyin per-peer settings saqlanadimi? (T19)
+- **Timestamp overlap (T41)** — o'chirilgan xabarda `10:22 PM` endi matn ustiga tushmayaptimiw?
 
 ### ~~NEXT-8: Real peer avatar~~ ✅ T20 da tugadi
 
-### NEXT-9: Per-Chat "Barchasini tozalash" tugmasi (OPTIONAL)
-- White/Black list da bor, Per-Chat da yo'q
-- Foydalanuvchi 10+ chat qo'shsa, har birini alohida o'chirish noqulay
+### ~~NEXT-9: Per-Chat "Barchasini tozalash"~~ ✅ T43 da tugadi
 
-### NEXT-10: Background AntiDelete — cache da date yo'q xabarlar (OPTIONAL)
-- Hozir: `msgDate==0` bo'lsa skip (T30 fix)
-- Media qismi T38 da hal bo'ldi (captionsiz media endi `is_media` bilan cache ga tushadi)
-- Qolgan: xabar umuman cache ga tushmagan (ilova o'chiq edi) holat — date yo'q
-- Yaxshilash: date yo'q bo'lsa ham o'chirilganini qayd qilish (alohida jadval)
-- Cheklov: faqat SelectedList peerlar
+### ~~NEXT-10: Background AntiDelete — msgDate==0 fallback~~ ✅ T44 da tugadi
 
 ---
 

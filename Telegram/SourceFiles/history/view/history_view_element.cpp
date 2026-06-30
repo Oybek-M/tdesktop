@@ -1838,7 +1838,9 @@ void Element::validateText() {
 		return;
 	}
 	const auto &text = _textItem->_text;
-	if (!summaryShownChanged && _text.isEmpty() == text.empty() && !item->isDeletedLocally()) {
+	const auto deletedLocally = item->isDeletedLocally();
+	const auto deletedMarkerApplied = ((_flags & Flag::DeletedMarkerApplied) != 0);
+	if (!summaryShownChanged && _text.isEmpty() == text.empty() && (deletedLocally == deletedMarkerApplied)) {
 	} else if (_flags & Flag::ServiceMessage) {
 		const auto contextDependentText = contextDependentServiceText();
 		const auto &markedText = contextDependentText.text.empty()
@@ -1903,6 +1905,9 @@ void Element::validateText() {
 					textToRender.text = kDeletedMarker + textToRender.text;
 					textToRender.entities.clear();
 				}
+				_flags |= Flag::DeletedMarkerApplied;
+			} else {
+				_flags &= ~Flag::DeletedMarkerApplied;
 			}
 
 			setTextWithLinks(textToRender);

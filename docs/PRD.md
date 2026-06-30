@@ -2,7 +2,7 @@
 
 **Loyiha:** Telegram Desktop uchun maxsus modifikatsiya  
 **Muallif:** Oybek  
-**Oxirgi yangilanish:** 2026-06-10 (T33–T38, schema v5)
+**Oxirgi yangilanish:** 2026-06-15 (T41 — timestamp overlap fix)
 
 ---
 

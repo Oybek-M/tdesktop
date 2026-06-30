@@ -1,6 +1,6 @@
 # CustomMod — Session Memory (Agent uchun)
 
-**Oxirgi yangilanish:** 2026-06-10 (T33–T40, schema v5)  
+**Oxirgi yangilanish:** 2026-06-15 (T41 — timestamp overlap fix, `Flag::DeletedMarkerApplied`)  
 **Loyiha:** Telegram Desktop custom mod
 
 ---
@@ -394,6 +394,7 @@ void PaintPeerAvatar(QPainter &p, const QRect &rect,
 | T38 | Captionsiz media o'chirilsa butunlay yo'qolardi (bo'sh matn skip) | Schema v5 `is_media`; `CacheMessageText` media'da bo'sh matnni ham yozadi; "(media xabar)" placeholder |
 | T39 | Archive tab da background media "(empty)" ko'rinardi | `GetAllDeletedMessages` + struct ga `is_media`/`sender_id`; UI "(media xabar)" |
 | T40 | `RecordBackgroundEdit` re-cache da sender/media o'chirardi (T36 regressi) | `GetCachedTextAndDate` bilan o'qib, `CacheMessageText` ga qaytadan uzatish |
+| T41 | O'chirilgan xabarda vaqt (timestamp) matn ustiga tushardi (overlap) | `validateText` guard'idagi `!isDeletedLocally()` har safar `setTextWithLinks` ni qayta chaqirib **skip block** ni o'chirardi. Yangi `Flag::DeletedMarkerApplied` bayrog'i: marker bir marta qo'llanib, keyin `validateText` no-op bo'ladi → skip block saqlanadi |
 
 ---
 
