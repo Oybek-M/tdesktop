@@ -2,6 +2,7 @@
 Debug/
 Release/
 /ThirdParty/
+/Telegram/ThirdParty/dispatch/
 /Telegram/build/target
 /Telegram/tests/
 /Telegram/gyp/tests/*.test
