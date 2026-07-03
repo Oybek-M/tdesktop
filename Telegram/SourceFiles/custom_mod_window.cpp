@@ -484,6 +484,88 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 		u"Mobil qurilma koʻrinishi"_q,
 		u"Telegram mobil ilovadan ishlatilayotgandek koʻrinadi."_q);
 
+	Ui::AddSkip(content, 8);
+
+	// C22: Dynamic device spoof — qurilma nomi va versiya
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(u"Qurilma nomi:"_q),
+			st::defaultSubsectionTitle),
+		st::defaultSubsectionTitlePadding);
+	const auto spoofModelInput = content->add(
+		object_ptr<Ui::InputField>(
+			content,
+			st::defaultInputField,
+			rpl::single(u"Qurilma nomi"_q),
+			CustomSettings::SpoofDeviceModel()),
+		st::boxRowPadding);
+
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(u"Tizim versiyasi:"_q),
+			st::defaultSubsectionTitle),
+		st::defaultSubsectionTitlePadding);
+	const auto spoofVersionInput = content->add(
+		object_ptr<Ui::InputField>(
+			content,
+			st::defaultInputField,
+			rpl::single(u"Tizim versiyasi"_q),
+			CustomSettings::SpoofSystemVersion()),
+		st::boxRowPadding);
+
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(u"Qurilma turi (icon):"_q),
+			st::defaultSubsectionTitle),
+		st::defaultSubsectionTitlePadding);
+
+	{
+		struct Preset { QString label, model, version; };
+		const Preset kPresets[4] = {
+			{ u"Android"_q,  u"Samsung Galaxy S26 Ultra"_q, u"Android 15"_q },
+			{ u"iOS"_q,      u"iPhone 17 Pro Max"_q,        u"iOS 18"_q     },
+			{ u"Windows"_q,  u"PC"_q,                       u"Windows 11"_q },
+			{ u"Linux"_q,    u"PC"_q,                       u"Linux"_q      },
+		};
+		for (int i = 0; i < 4; ++i) {
+			const auto idx = i;
+			const auto model = kPresets[i].model;
+			const auto version = kPresets[i].version;
+			content->add(
+				object_ptr<Ui::RoundButton>(
+					content,
+					rpl::single(kPresets[i].label),
+					st::defaultBoxButton),
+				st::boxRowPadding)
+			->addClickHandler([=] {
+				CustomSettings::SetInt(u"spoofDeviceType"_q, idx);
+				spoofModelInput->setText(model);
+				spoofVersionInput->setText(version);
+			});
+		}
+	}
+
+	Ui::AddSkip(content, 8);
+	content->add(
+		object_ptr<Ui::RoundButton>(
+			content,
+			rpl::single(u"Saqlash (qurilma sozlamalari)"_q),
+			st::defaultBoxButton),
+		st::boxRowPadding)
+	->addClickHandler([=] {
+		CustomSettings::SetString(
+			u"spoofDeviceModel"_q,
+			spoofModelInput->getLastText().trimmed());
+		CustomSettings::SetString(
+			u"spoofSystemVersion"_q,
+			spoofVersionInput->getLastText().trimmed());
+		Ui::Toast::Show(
+			u"Saqlandi! O'zgartirishlar uchun ilovani qayta ulaning."_q);
+	});
+
 	Ui::AddDivider(content);
 	Ui::AddSkip(content, st::settingsThumbSkip);
 	addSection(u"Cheklovlar"_q);
@@ -877,9 +959,9 @@ void fillPeerSection(
 	state->addEntry = [=](const QString &peerId, const QString &name) {
 		constexpr int kRowH    = 56;
 		constexpr int kAvSize  = 38;
-		constexpr int kPadL    = 14;
-		constexpr int kPadR    = 12;
-		constexpr int kGap     = 12;
+		[[maybe_unused]] constexpr int kPadL = 14;
+		[[maybe_unused]] constexpr int kPadR = 12;
+		[[maybe_unused]] constexpr int kGap  = 12;
 		constexpr int kDelBtnW = 76;
 
 		const auto entryWrap = state->entriesLayout->add(
@@ -1153,9 +1235,9 @@ void fillPerChatSection(
 	state->addEntry = [=](const CustomSettings::PerPeerEntry &entry) {
 		constexpr int kHeaderH = 56;
 		constexpr int kAvSize  = 38;
-		constexpr int kPadL    = 14;
-		constexpr int kPadR    = 12;
-		constexpr int kGap     = 12;
+		[[maybe_unused]] constexpr int kPadL = 14;
+		[[maybe_unused]] constexpr int kPadR = 12;
+		[[maybe_unused]] constexpr int kGap  = 12;
 		constexpr int kDelBtnW = 76;
 
 		const auto peerId = entry.peerId;

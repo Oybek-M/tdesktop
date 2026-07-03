@@ -22,11 +22,17 @@ struct Values {
     bool antiEdit = true;
     bool spoofMobile = true;
     bool storyAnonymousView = true;
+    // C22: Dynamic device spoof
+    int  spoofDeviceType = 0; // 0=Android, 1=iOS, 2=Windows, 3=Linux
+    QString spoofDeviceModel = u"Samsung Galaxy S26 Ultra"_q;
+    QString spoofSystemVersion = u"Android 15"_q;
 };
 
 void Init();
 const Values& Get();
 void Set(const QString &id, bool value);
+void SetString(const QString &id, const QString &value);
+void SetInt(const QString &id, int value);
 
 // Global helpers
 inline bool GhostMode() { return Get().ghostMode; }
@@ -36,6 +42,10 @@ inline bool AntiDelete() { return Get().antiDelete; }
 inline bool AntiEdit() { return Get().antiEdit; }
 inline bool SpoofMobile() { return Get().spoofMobile; }
 inline bool StoryAnonymousView() { return Get().storyAnonymousView; }
+inline int     SpoofDeviceType()    { return Get().spoofDeviceType; }
+inline QString SpoofDeviceModel()   { return Get().spoofDeviceModel; }
+inline QString SpoofSystemVersion() { return Get().spoofSystemVersion; }
+[[nodiscard]] QString SpoofLangPack();
 
 // Per-chat Ghost Mode override (legacy C12).
 [[nodiscard]] bool GhostModeForPeer(const QString &peerId);

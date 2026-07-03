@@ -132,6 +132,15 @@ void UpdateValue(const QString &id, bool value) {
     else if (id == "storyAnonymousView") gValues.storyAnonymousView = value;
 }
 
+void UpdateString(const QString &id, const QString &value) {
+    if (id == "spoofDeviceModel") gValues.spoofDeviceModel = value;
+    else if (id == "spoofSystemVersion") gValues.spoofSystemVersion = value;
+}
+
+void UpdateInt(const QString &id, int value) {
+    if (id == "spoofDeviceType") gValues.spoofDeviceType = value;
+}
+
 } // namespace
 
 void Init() {
@@ -145,6 +154,11 @@ void Init() {
     gValues.antiEdit = settings.value("antiEdit", true).toBool();
     gValues.spoofMobile = settings.value("spoofMobile", true).toBool();
     gValues.storyAnonymousView = settings.value("storyAnonymousView", true).toBool();
+    gValues.spoofDeviceType    = settings.value("spoofDeviceType", 0).toInt();
+    gValues.spoofDeviceModel   = settings.value("spoofDeviceModel",
+        u"Samsung Galaxy S26 Ultra"_q).toString();
+    gValues.spoofSystemVersion = settings.value("spoofSystemVersion",
+        u"Android 15"_q).toString();
 
     // Per-peer ghost overrides
     settings.beginGroup("GhostModePerPeer");
@@ -198,6 +212,26 @@ void Set(const QString &id, bool value) {
     UpdateValue(id, value);
     QSettings settings("CustomMod", "TelegramDesktop");
     settings.setValue(id, value);
+}
+
+void SetString(const QString &id, const QString &value) {
+    UpdateString(id, value);
+    QSettings settings("CustomMod", "TelegramDesktop");
+    settings.setValue(id, value);
+}
+
+void SetInt(const QString &id, int value) {
+    UpdateInt(id, value);
+    QSettings settings("CustomMod", "TelegramDesktop");
+    settings.setValue(id, value);
+}
+
+QString SpoofLangPack() {
+    switch (Get().spoofDeviceType) {
+    case 0: return u"android"_q;
+    case 1: return u"ios"_q;
+    default: return u"tdesktop"_q;
+    }
 }
 
 // ── Legacy per-peer Ghost Mode (C12) ─────────────────────────────────────

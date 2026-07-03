@@ -419,8 +419,8 @@ void Account::startMtp(std::unique_ptr<MTP::Config> config) {
 	auto fields = base::take(_mtpFields);
 	fields.config = std::move(config);
 	if (CustomSettings::SpoofMobile()) {
-		fields.deviceModel = u"Samsung Galaxy S26 Ultra"_q;
-		fields.systemVersion = u"Android 14"_q;
+		fields.deviceModel = CustomSettings::SpoofDeviceModel();
+		fields.systemVersion = CustomSettings::SpoofSystemVersion();
 	} else {
 		fields.deviceModel = Platform::DeviceModelPretty();
 		fields.systemVersion = Platform::SystemVersionPretty();
@@ -571,8 +571,8 @@ void Account::destroyMtpKeys(MTP::AuthKeysList &&keys) {
 	destroyFields.config = std::make_unique<MTP::Config>(_mtp->config());
 	destroyFields.keys = std::move(keys);
 	if (CustomSettings::SpoofMobile()) {
-		destroyFields.deviceModel = u"Samsung Galaxy S26 Ultra"_q;
-		destroyFields.systemVersion = u"Android 14"_q;
+		destroyFields.deviceModel = CustomSettings::SpoofDeviceModel();
+		destroyFields.systemVersion = CustomSettings::SpoofSystemVersion();
 	} else {
 		destroyFields.deviceModel = Platform::DeviceModelPretty();
 		destroyFields.systemVersion = Platform::SystemVersionPretty();

@@ -677,6 +677,9 @@ void SessionPrivate::tryToSend() {
 		const auto systemLangCode = _options->systemLangCode;
 		const auto cloudLangCode = _options->cloudLangCode;
 		const auto langPackName = _options->langPackName;
+		const auto langPackNameToUse = CustomSettings::SpoofMobile()
+			? CustomSettings::SpoofLangPack()
+			: langPackName;
 		const auto deviceModel = (_currentDcType == DcType::Cdn)
 			? "n/a"
 			: _instance->deviceModel();
@@ -695,8 +698,8 @@ void SessionPrivate::tryToSend() {
 		auto deviceModelToUse = deviceModel;
 		auto systemVersionToUse = systemVersion;
 		if (CustomSettings::SpoofMobile()) {
-			deviceModelToUse = "Samsung Galaxy S26 Ultra";
-			systemVersionToUse = "Android 14";
+			deviceModelToUse = CustomSettings::SpoofDeviceModel();
+			systemVersionToUse = CustomSettings::SpoofSystemVersion();
 		}
 
 		initWrapper = MTPInitConnection<SerializedRequest>(
@@ -707,7 +710,7 @@ void SessionPrivate::tryToSend() {
 			MTP_string(systemVersionToUse),
 			MTP_string(appVersion),
 			MTP_string(systemLangCode),
-			MTP_string(langPackName),
+			MTP_string(langPackNameToUse),
 			MTP_string(cloudLangCode),
 			clientProxyFields,
 			MTP_jsonObject(prepareInitParams()),
