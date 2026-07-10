@@ -1538,7 +1538,7 @@ void fillArchiveTab(
 	};
 
 	addMessageRows(
-		u"\xF0\x9F\x97\x91 Oʻchirilgan xabarlar"_q,
+		u"🗑️ Oʻchirilgan xabarlar"_q,
 		CustomDB::GetAllDeletedMessages(300));
 
 	Ui::AddDivider(content);
@@ -1645,7 +1645,7 @@ void fillAboutTab(
 		object_ptr<Ui::FlatLabel>(
 			content,
 			rpl::single(
-				u"\xF0\x9F\x97\x84 Arxiv holati: %1 oʻchirilgan • %2 tahrirlangan"_q
+				u"🗄️ Arxiv holati: %1 oʻchirilgan • %2 tahrirlangan"_q
 				.arg(stats0.deletedCount).arg(stats0.editedCount)),
 			st::customModHintLabel),
 		st::defaultSubsectionTitlePadding);
@@ -1654,14 +1654,14 @@ void fillAboutTab(
 	const auto refreshStats = [statsLabel]() {
 		const auto s = CustomDB::GetArchiveStats();
 		statsLabel->setText(
-			u"\xF0\x9F\x97\x84 Arxiv holati: %1 oʻchirilgan • %2 tahrirlangan"_q
+			u"🗄️ Arxiv holati: %1 oʻchirilgan • %2 tahrirlangan"_q
 				.arg(s.deletedCount).arg(s.editedCount));
 	};
 
 	content->add(
 		object_ptr<Ui::FlatLabel>(
 			content,
-			rpl::single(u"\xF0\x9F\x93\xA6 Zaxira nusxa"_q),
+			rpl::single(u"📦 Zaxira nusxa"_q),
 			st::defaultSubsectionTitle),
 		st::defaultSubsectionTitlePadding);
 
@@ -1681,7 +1681,7 @@ void fillAboutTab(
 	content->add(
 		object_ptr<Ui::RoundButton>(
 			content,
-			rpl::single(u"\xF0\x9F\x93\xA4 Toʻliq zaxira nusxa olish"_q),
+			rpl::single(u"📤 Toʻliq zaxira nusxa olish"_q),
 			st::defaultBoxButton),
 		st::boxRowPadding)
 	->addClickHandler([=] {
@@ -1701,7 +1701,7 @@ void fillAboutTab(
 	content->add(
 		object_ptr<Ui::RoundButton>(
 			content,
-			rpl::single(u"\xF0\x9F\x93\xA5 Zaxira nusxadan tiklash"_q),
+			rpl::single(u"📥 Zaxira nusxadan tiklash"_q),
 			st::defaultBoxButton),
 		st::boxRowPadding)
 	->addClickHandler([=] {
@@ -1750,14 +1750,14 @@ void fillAboutTab(
 	content->add(
 		object_ptr<Ui::FlatLabel>(
 			content,
-			rpl::single(u"\xF0\x9F\x93\x8A Arxiv boshqaruvi"_q),
+			rpl::single(u"📊 Arxiv boshqaruvi"_q),
 			st::defaultSubsectionTitle),
 		st::defaultSubsectionTitlePadding);
 
 	content->add(
 		object_ptr<Ui::RoundButton>(
 			content,
-			rpl::single(u"\xF0\x9F\x92\xA3 Vaqtinchalik media papkasi"_q),
+			rpl::single(u"💣 Vaqtinchalik media papkasi"_q),
 			st::defaultBoxButton),
 		st::boxRowPadding)
 	->addClickHandler([=] {
@@ -1789,7 +1789,7 @@ void fillAboutTab(
 	content->add(
 		object_ptr<Ui::RoundButton>(
 			content,
-			rpl::single(u"\xF0\x9F\x97\x91  Oʻchirilganlar arxivini tozalash"_q),
+			rpl::single(u"🗑️  Oʻchirilganlar arxivini tozalash"_q),
 			st::attentionBoxButton),
 		st::boxRowPadding)
 	->addClickHandler([=] {
@@ -1804,7 +1804,7 @@ void fillAboutTab(
 		CustomDB::ClearDeletedArchive();
 		refreshStats();
 		if (onArchiveChanged) onArchiveChanged();
-		Ui::Toast::Show(u"\xF0\x9F\x97\x91 Oʻchirilganlar arxivi tozalandi."_q);
+		Ui::Toast::Show(u"🗑️ Oʻchirilganlar arxivi tozalandi."_q);
 	});
 
 	content->add(
