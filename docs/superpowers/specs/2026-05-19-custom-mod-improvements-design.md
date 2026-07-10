@@ -1,6 +1,18 @@
 # Custom Mod Improvements — Design Spec
 Date: 2026-05-19
 
+## Holat (2026-07-10 yangilanish)
+
+Bajarilgan: #1 (Unified peer tracking), #2 (Whitelist UI — `custom_mod_window.cpp`da
+standalone oynada), #5 (Story anonim ko'rish), #6 (Last seen), #8 (mutex,
+`gPendingWrites` guard, atomik yozish — transaction bilan).
+
+Hali bajarilmagan (davom ettirilmoqda): #3 (Forward Bypass kaskadi),
+#4 (Media saqlash — foto hook yo'q, joylar unifikatsiya qilinmagan).
+Bu ikkalasi, shuningdek yangi topilgan muammolar (backup/restore freeze,
+multi-device merge, startup freeze, UI/UX) uchun to'liq implementation
+reja: [2026-07-10-custom-mod-v2-improvements.md](../plans/2026-07-10-custom-mod-v2-improvements.md).
+
 ## Scope
 
 8 ta funksionallikni to'liq va muammosiz implement qilish. Hozirgi ishlaydigan featurelarga salbiy ta'sir qilmagan holda.
