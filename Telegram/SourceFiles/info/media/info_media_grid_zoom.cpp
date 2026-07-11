@@ -185,11 +185,7 @@ bool ListZoom::handleNativeGesture(not_null<QNativeGestureEvent*> e) {
 	} else if (!isZoomable()) {
 		return false;
 	}
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-	const auto anchor = e->position().toPoint();
-#else // Qt >= 6.0.0
-	const auto anchor = e->localPos().toPoint();
-#endif // Qt < 6.0.0
+	const auto anchor = e->pos();
 	_pinchAccumulated += e->value();
 	while (_pinchAccumulated >= kPinchStep) {
 		_pinchAccumulated -= kPinchStep;
