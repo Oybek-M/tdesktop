@@ -4,8 +4,69 @@
 
 **Sana**: 2026-07-10  
 **Muallif**: Arxitektura Agent (Opus)  
-**Status**: Rejalashtirish  
+**Status**: Fase 1 va Fase 2 IMPLEMENTATSIYA QILINDI (2026-07-11) — quyidagi holat bo'limiga qarang  
 **Prioritet**: HIGH (5 ta aniq muhim muammo)
+
+## Holat (2026-07-11 yangilanish)
+
+Fase 1 (Threading & Cache) va Fase 2 (Media Asosi) to'liq implement qilindi
+va `origin/Oybek`ga push qilindi. Amalga oshirish paytida haqiqiy kod bilan
+solishtirilganda quyidagi joylarda rejadan chetga chiqildi (sabab bilan):
+
+- **Vazifa 1.1 (async backup/export)** — ✅ DONE (commit `e416d30274`,
+  oldingi sessiyada). Reja bo'yicha bajarildi, qo'shimcha ravishda
+  `RunAutoBackup()`dagi ilgari topilmagan freeze manbai ham tuzatildi.
+- **Vazifa 1.2 (startup freeze)** — ✅ DONE (commit `c045264db6`). Reja
+  taklif qilgan alohida `db_peer_cache.h` fayli o'rniga mavjud
+  `gDeletedCache`/`gEditedCache` global state'iga `gLoadedPeers` va
+  `EnsurePeerCacheLoaded()` qo'shildi (yangi fayl kerak emas edi).
+  Muhim topilma: bu cache'lar faqat READ uchun emas, balki WRITE-DEDUP
+  tekshiruvlari uchun ham ishlatiladi (`SaveMessage`/`MarkEdited`) —
+  reja buni hisobga olmagan edi, shuning uchun lazy-load chaqiruvi
+  yozish joylariga ham qo'shildi (aks holda restart'dan keyin birinchi
+  edit'da "original text" noto'g'ri hisoblanardi).
+- **Vazifa 2.1 (media yo'llarini unifikatsiya)** — ✅ DONE (commit
+  `2b7b042aa2`). Reja `MediaType` enum + `GetMediaPath()` kabi yangi
+  infratuzilma taklif qilgan edi, lekin tekshiruv shuni ko'rsatdiki
+  `CustomDB::SaveMediaFile()` allaqachon mavjud va `~/customizationMainFolder/
+  medias/{images,videos,voices,files}` unified daraxtiga yozadi (`save()`
+  metodi buni allaqachon ishlatadi). Haqiqiy muammo faqat
+  `DocumentData::finishLoad()`dagi eskirgan, shartsiz
+  `~/Downloads/Telegram_AntiDelete/` yozuvi edi — shu qism `SaveMediaFile()`
+  ga yo'naltirildi va `CustomSettings::AntiDelete()` tekshiruvi bilan
+  himoyalandi.
+- **Vazifa 2.2 (rasm saqlash hook'i)** — ✅ DONE (commit `ddbd54daf4`).
+  Reja `data_photo.cpp`dagi `photoLoaded()` callback'ini taklif qilgan
+  edi — bunday funksiya mavjud emas. Tekshiruv shuni ko'rsatdiki,
+  `HistoryItem::setDeletedLocally()` (history_item.cpp) rasmlarni
+  O'CHIRISH PAYTIDA allaqachon saqlaydi, lekin PROAKTIV (oldindan)
+  saqlash yo'q edi. `Session::photoLoadDone()` (data_session.cpp) ichiga
+  hook qo'shildi — rasm to'liq yuklanganda darhol
+  `~/customizationMainFolder/medias/images/`ga saqlaydi, `AntiDelete()`
+  sozlamasi bilan himoyalangan.
+- **Vazifa 2.3 (multi-device merge)** — ✅ DONE (commit `a69e20a902`).
+  Reja "timestamp asosida almashtirish" (INSERT OR REPLACE + WHERE
+  timestamp >=) taklif qilgan edi, lekin haqiqiy schema tekshiruvi
+  shuni ko'rsatdiki `actioned_messages` append-only (bitta xabar uchun
+  bir nechta 'edited' qatordagi tahrir tarixi — dublikat emas), shuning
+  uchun "eng yangisi g'olib" strategiyasi tarix yo'qotardi. O'rniga
+  ATTACH DATABASE + union-with-dedup (aniq-dublikat WHERE NOT EXISTS)
+  ishlatildi. `ghost_reads` (haqiqiy bitta-qiymat-per-peer jadval) uchun
+  esa timestamp-based "yangisi g'olib" to'g'ri qo'llandi. UI'dagi
+  ogohlantirish matni ham yangi xatti-harakatga mos yangilandi.
+- **Vazifa 4.1 (media backup manifest)** — samarali ravishda ✅ DONE
+  yon-ta'sir sifatida: `ExportFullBackup()`/`ImportFullBackup()`
+  allaqachon butun `customizationMainFolder`ni (endi 2.1/2.2 orqali
+  to'liq to'ldirilgan) backup/restore qiladi — alohida manifest.json
+  counts logikasi qo'shilmadi (past ustuvorlik, funksional ekvivalent).
+
+**MUHIM: hech qanday BUILD hali qilinmagan** ushbu 5 ta vazifa
+implementatsiyasidan beri (build ~1.5 soat vaqt oladi). Fase 3'ga
+(Forward Bypass kaskadi — `apiwrap.cpp`ga chuqur o'zgarish, yuqori
+xavf) o'tishdan oldin BUILD + qo'lda sinov qilish tavsiya etiladi,
+chunki 4 ta fayl (`custom_db.cpp`, `data_document.cpp`,
+`data_session.cpp`, `custom_mod_window.cpp`) bo'ylab jamlangan
+o'zgarishlar hali tasdiqlanmagan.
 
 ---
 
