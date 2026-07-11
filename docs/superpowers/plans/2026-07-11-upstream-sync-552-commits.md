@@ -3,7 +3,7 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Sana**: 2026-07-11
-**Status**: MERGE BAJARILDI (0/1/2-bosqich) — BUILD kutilmoqda (3-bosqich, user uyda qiladi)
+**Status**: MERGE `Oybek`GA QO'SHILDI VA PUSH QILINDI, worktree tozalandi — BUILD kutilmoqda (user uyda qiladi)
 **Prioritet**: O'RTA — shoshilinch emas, lekin qanchalik kech qolsak shunchalik og'irlashadi
 
 ---
@@ -45,11 +45,48 @@ kutilganidan ancha kam chiqdi:
   shuning uchun qolgan tekshiruv to'g'ridan-to'g'ri BUILD orqali
   qilinadi.
 
-**Qolgan qadamlar**: `.worktrees/upstream-sync-wip`da
-`git submodule update --init --recursive`, so'ng Visual Studio'da BUILD
-(user buni uyda qiladi). Build muvaffaqiyatli bo'lgach — to'liq
-CustomMod funksional sinovi, so'ng `upstream-sync-wip`ni `Oybek`ga
-merge va `origin`ga push.
+**Qolgan qadamlar**: `Oybek` branch'ida (asosiy papkada) submodule'lar
+to'liq init qilingan, `configure.bat` ishga tushirib, Visual Studio'da
+BUILD qilish kerak (user buni uyda qiladi). Build muvaffaqiyatli
+bo'lgach — to'liq CustomMod funksional sinovi.
+
+## Yakunlanish (2026-07-11, kechqurun — uyda)
+
+`upstream-sync-wip` branch to'g'ridan-to'g'ri `Oybek`ga merge qilindi
+(konfliktsiz, commit `fd398caf43`) va `origin`ga push qilindi. Worktree
+(`.worktrees/upstream-sync-wip`) va `upstream-sync-wip` branch
+o'chirildi — user "yana alohida 0 dan build qilish kerak bo'lgani
+uchun worktree'da alohida tekshirish shart emas" dedi va to'g'ridan-
+to'g'ri asosiy branch'ga qo'shishni so'radi.
+
+**Xato va tuzatish**: `git worktree remove --force` ishlatilganda,
+`lib_ui` submodule'ining worktree ichida yaratilgan mahalliy
+Qt5-moslik patch commit'i (`72fb332`) YO'QOLDI — uning submodule
+git-katalogi asosiy `.git/modules` bilan ulashilmagan, alohida ekan.
+Bu `Oybek`ga push qilingan merge commit'ni bir muddat mavjud bo'lmagan
+submodule commit'ga ishora qiladigan holga keltirdi. Tuzatildi: saqlab
+qolingan patch diff fayldan (`lib_ui_qt5_patch.diff`) foydalanib, xuddi
+shu patch asosiy worktree'ning (worktree emas, haqiqiy asosiy repo)
+`lib_ui` checkout'ida qayta qo'llandi (yangi commit `70e6f7f`, asosiy
+`.git/modules`da doimiy saqlanadi) va gitlink tuzatib, alohida fix
+commit (`8cb4494e47`) bilan push qilindi.
+
+**Saboq keyingi safar uchun**: worktree'lar ichida submodule'larga
+mahalliy patch/commit yaratilsa, worktree'ni o'chirishdan OLDIN o'sha
+patch'ning diff'ini alohida faylga saqlab qo'yish kerak (yoki
+patch commit'ni asosiy repo'ning submodule checkout'iga ko'chirib olish
+kerak) — worktree submodule'lari asosiy repo bilan git-katalogini
+har doim ham ulashmaydi.
+
+Barcha submodule'lar tekshirildi — toza, sinxron holatda. Faqat
+bitta zararsiz istisno qoldi: `range-v3/doc/gh-pages` (Doxygen
+hujjatlari, C++ build'ga ta'siri yo'q) Windows fayl-nomi uzunligi
+cheklovi tufayli to'liq yuklanmagan — bu build'ni bloklamaydi.
+
+**Yakuniy holat**: `Oybek` branch = upstream/dev (552 commit) + bizning
+49+ commit, to'liq sinxron, `origin`ga push qilingan (`8cb4494e47`).
+Worktree/branch tozalandi. Faqat BUILD (user uyda, Visual Studio'da)
+qolgan.
 
 ---
 
