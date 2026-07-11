@@ -1731,8 +1731,9 @@ void fillAboutTab(
 		const auto reply = QMessageBox::warning(
 			dialogParent,
 			u"Zaxiradan tiklash"_q,
-			u"Bu amal JORIY arxiv maʻlumotlarini OʻCHIRADI.\n"
-			"Barcha oʻchirilgan/tahrirlangan xabarlar almashtiriladi.\n\n"
+			u"Tanlangan zaxiradagi maʻlumotlar JORIY arxivga QOʻSHILADI\n"
+			"(birlashtiriladi) — hozirgi qurilmadagi oʻchirilgan/tahrirlangan\n"
+			"xabarlar va media saqlanib qoladi, oʻchirilmaydi.\n\n"
 			"Davom etasizmi?"_q,
 			QMessageBox::Yes | QMessageBox::Cancel,
 			QMessageBox::Cancel);

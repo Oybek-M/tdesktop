@@ -15,6 +15,7 @@
 #include <QtCore/QDateTime>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
+#include <QtCore/QJsonArray>
 #include <QtCore/QSysInfo>
 #include "history/history_item.h"
 #include "history/history.h"
@@ -1089,6 +1090,73 @@ static bool CopyDirRecursive(const QString &src, const QString &dst) {
     return true;
 }
 
+// Like CopyDirRecursive, but for merging a restored backup's media into the
+// current device's media folder: files that already exist locally are left
+// untouched instead of being overwritten. Media filenames are
+// content-addressed (peerId_msgId or documentId based, see SaveMediaFile()/
+// setDeletedLocally()), so a name collision means it's the same file —
+// skipping is both safe and avoids needless I/O.
+static bool MergeDirRecursive(const QString &src, const QString &dst) {
+    QDir srcDir(src);
+    if (!srcDir.exists()) return true;
+    QDir().mkpath(dst);
+    for (const QFileInfo &info : srcDir.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot)) {
+        const QString targetPath = dst + "/" + info.fileName();
+        if (info.isDir()) {
+            if (!MergeDirRecursive(info.filePath(), targetPath)) return false;
+        } else if (!QFile::exists(targetPath)) {
+            if (!QFile::copy(info.filePath(), targetPath)) return false;
+        }
+    }
+    return true;
+}
+
+// Unions whitelist/blacklist entries (by "id") from an imported
+// peer_lists.json into the current device's copy, instead of overwriting it
+// — otherwise per-peer AntiDelete overrides configured only on this device
+// would be lost on restore. Safe no-op if either file is missing/invalid.
+static void MergePeerListsJson(const QString &srcPath, const QString &dstPath) {
+    QFile srcFile(srcPath);
+    if (!srcFile.open(QIODevice::ReadOnly)) return;
+    const auto srcRoot = QJsonDocument::fromJson(srcFile.readAll()).object();
+    srcFile.close();
+
+    QJsonObject dstRoot;
+    QFile dstFile(dstPath);
+    if (dstFile.open(QIODevice::ReadOnly)) {
+        dstRoot = QJsonDocument::fromJson(dstFile.readAll()).object();
+        dstFile.close();
+    }
+
+    const auto mergeArray = [](const QJsonArray &a, const QJsonArray &b) {
+        QJsonArray result = a;
+        QSet<QString> seenIds;
+        for (const auto &v : a) {
+            seenIds.insert(v.toObject().value(QStringLiteral("id")).toString());
+        }
+        for (const auto &v : b) {
+            const auto id = v.toObject().value(QStringLiteral("id")).toString();
+            if (!seenIds.contains(id)) {
+                result.append(v);
+                seenIds.insert(id);
+            }
+        }
+        return result;
+    };
+
+    QJsonObject merged;
+    merged[QStringLiteral("whitelist")] = mergeArray(
+        dstRoot.value(QStringLiteral("whitelist")).toArray(),
+        srcRoot.value(QStringLiteral("whitelist")).toArray());
+    merged[QStringLiteral("blacklist")] = mergeArray(
+        dstRoot.value(QStringLiteral("blacklist")).toArray(),
+        srcRoot.value(QStringLiteral("blacklist")).toArray());
+
+    if (dstFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        dstFile.write(QJsonDocument(merged).toJson(QJsonDocument::Indented));
+    }
+}
+
 QString ExportFullBackup(const QString &targetDir) {
     Init();
     if (!gDb) return {};
@@ -1267,49 +1335,87 @@ bool ImportFullBackup(const QString &sourcePath) {
         }
     }
 
-    // Replace database: close live connection, overwrite, reopen.
-    const QString currentDb = dbFilePath();
-    sqlite3_close(gDb);
-    gDb = nullptr;
-    gInitialized = false;
-
-    QFile::remove(currentDb);
-    if (!QFile::copy(srcDb, currentDb)) {
-        Init(); // try to reopen old DB (may fail but at least resets state)
-        if (!tempExtractDir.isEmpty()) QDir(tempExtractDir).removeRecursively();
-        return false;
-    }
-
-    Init(); // reopen with pragmas + migrations
-    if (!gDb) {
-        qDebug() << "ImportFullBackup: failed to reopen DB after import.";
-        if (!tempExtractDir.isEmpty()) QDir(tempExtractDir).removeRecursively();
-        return false;
-    }
-
-    // Replace media folder.
-    const QString srcMedia = sourceDir + "/customizationMainFolder";
-    if (QDir(srcMedia).exists()) {
-        const QString dstMedia = QDir::homePath() + "/customizationMainFolder";
-        QDir(dstMedia).removeRecursively();
-        if (!CopyDirRecursive(srcMedia, dstMedia)) {
-            qDebug() << "ImportFullBackup: media copy failed (non-fatal)";
+    // E28/Vazifa 2.3: MERGE the imported archive into the live DB instead of
+    // replacing it outright. A straight replace loses whatever accumulated
+    // on THIS device since its own last backup — e.g. restoring a laptop
+    // backup onto a home-pc used to wipe out the home-pc's own history. See
+    // docs/superpowers/plans/2026-07-10-custom-mod-v2-improvements.md.
+    //
+    // actioned_messages is append-only by design — multiple 'edited' rows
+    // per message are meaningful edit history, not duplicates to collapse —
+    // so "merge" here means append rows from the import that don't already
+    // have an identical counterpart, not a timestamp/"newest wins" replace
+    // (which would silently drop genuine history unique to either device).
+    bool mergeOk = true;
+    {
+        sqlite3_stmt *attachStmt = nullptr;
+        if (sqlite3_prepare_v2(gDb, "ATTACH DATABASE ? AS import_db", -1, &attachStmt, nullptr) == SQLITE_OK) {
+            bindText(attachStmt, 1, srcDb);
+            if (sqlite3_step(attachStmt) != SQLITE_DONE) mergeOk = false;
+            sqlite3_finalize(attachStmt);
+        } else {
+            mergeOk = false;
         }
     }
 
-    // Replace JSON config files (mavjud bo'lsa).
+    if (mergeOk) {
+        execSql("BEGIN");
+        execSql(
+            "INSERT INTO main.actioned_messages "
+            "(peer_id, msg_id, type, original_text, new_text, media_path, is_out, msg_date, timestamp, notes, sender_id, is_media) "
+            "SELECT imp.peer_id, imp.msg_id, imp.type, imp.original_text, imp.new_text, imp.media_path, "
+            "       imp.is_out, imp.msg_date, imp.timestamp, imp.notes, imp.sender_id, imp.is_media "
+            "FROM import_db.actioned_messages imp "
+            "WHERE NOT EXISTS ("
+            "  SELECT 1 FROM main.actioned_messages cur "
+            "  WHERE cur.peer_id = imp.peer_id AND cur.msg_id = imp.msg_id AND cur.type = imp.type "
+            "    AND cur.original_text = imp.original_text "
+            "    AND IFNULL(cur.media_path,'') = IFNULL(imp.media_path,'')"
+            ")");
+        // ghost_reads is a genuine single-value-per-peer table (unlike
+        // actioned_messages), so "newest timestamp wins" is the correct
+        // merge rule here, not append.
+        execSql(
+            "INSERT OR REPLACE INTO main.ghost_reads (peer_id, msg_id, timestamp) "
+            "SELECT imp.peer_id, imp.msg_id, imp.timestamp FROM import_db.ghost_reads imp "
+            "WHERE NOT EXISTS ("
+            "  SELECT 1 FROM main.ghost_reads cur "
+            "  WHERE cur.peer_id = imp.peer_id AND cur.timestamp >= imp.timestamp"
+            ")");
+        execSql("COMMIT");
+
+        sqlite3_stmt *detachStmt = nullptr;
+        if (sqlite3_prepare_v2(gDb, "DETACH DATABASE import_db", -1, &detachStmt, nullptr) == SQLITE_OK) {
+            sqlite3_step(detachStmt);
+            sqlite3_finalize(detachStmt);
+        }
+    } else {
+        qDebug() << "ImportFullBackup: ATTACH DATABASE failed — DB merge skipped:" << srcDb;
+        if (!tempExtractDir.isEmpty()) QDir(tempExtractDir).removeRecursively();
+        return false;
+    }
+
+    // Merge media folder: copy files that don't already exist locally
+    // (see MergeDirRecursive doc comment) instead of wiping the local tree.
+    const QString srcMedia = sourceDir + "/customizationMainFolder";
+    if (QDir(srcMedia).exists()) {
+        const QString dstMedia = QDir::homePath() + "/customizationMainFolder";
+        if (!MergeDirRecursive(srcMedia, dstMedia)) {
+            qDebug() << "ImportFullBackup: media merge failed (non-fatal)";
+        }
+    }
+
+    // Merge peer_lists.json (union whitelist/blacklist) instead of
+    // overwriting — otherwise per-peer AntiDelete overrides configured only
+    // on this device would be lost. branding.json (device name/icon spoof)
+    // is a single-device display preference, not accumulated data, so it's
+    // intentionally left as this device's own value rather than imported.
     const QString appDataCustom = QStandardPaths::writableLocation(
         QStandardPaths::AppDataLocation) + "/CustomMod";
     QDir().mkpath(appDataCustom);
     const QString srcPeerLists = sourceDir + "/peer_lists.json";
-    const QString srcBranding = sourceDir + "/branding.json";
     if (QFile::exists(srcPeerLists)) {
-        QFile::remove(appDataCustom + "/peer_lists.json");
-        QFile::copy(srcPeerLists, appDataCustom + "/peer_lists.json");
-    }
-    if (QFile::exists(srcBranding)) {
-        QFile::remove(appDataCustom + "/branding.json");
-        QFile::copy(srcBranding, appDataCustom + "/branding.json");
+        MergePeerListsJson(srcPeerLists, appDataCustom + "/peer_lists.json");
     }
 
     // Registry import (Windows-specific).
