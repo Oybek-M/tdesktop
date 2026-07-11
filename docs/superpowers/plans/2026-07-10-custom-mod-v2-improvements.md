@@ -1141,7 +1141,37 @@ content->add(std::move(statsLayout), st::boxRowPadding);
 
 **Vaqt**: ~4 soat
 
----
+**Holat (2026-07-11)**: Qayta ko'rib chiqildi — bu bo'limdagi pseudocode
+haqiqiy kodga mos kelmaydi (`Ui::RoundButton` Qt QPushButton emas, u
+tdesktop'ning o'z custom-paint widget'i — `setStyleSheet()` unda ishlamaydi;
+`st::labelBold`/`Ui::GridLayout` kabi nomlar loyihada mavjud emas).
+`custom_mod_window.cpp`ni to'liq o'qib chiqib haqiqiy holatni tekshirdim:
+
+- **Mojibake** (skrinshotdagi asosiy shikoyat, "g'alati belgilar") — ✅
+  allaqachon oldingi sessiyada tuzatilgan (commit `57ee8b766d`).
+- **"XAVFLI HUDUD" vizual ogohlantirish** — ✅ ALLAQACHON MAVJUD: Arxivni
+  tozalash tugmalari (`custom_mod_window.cpp:1809-1856`) allaqachon
+  `st::attentionBoxButton` (qizil/ogohlantiruvchi style) va aniq
+  "⚠️ XAVFLI HUDUD ⚠️" sarlavha bilan ajratilgan. Import/restore tugmasi
+  ataylab `st::defaultBoxButton`da qoldirildi — Vazifa 2.3'dan keyin u
+  endi destruktiv emas (merge qiladi), shuning uchun "xavfli" deb
+  belgilash noto'g'ri bo'lardi.
+- **Spacing/tortlik** — About va Archive tab'lari allaqachon izchil
+  `st::settingsThumbSkip` ishlatadi bo'limlar orasida; ro'yxat
+  qatorlari orasidagi kichikroq `AddSkip(6)` esa ataylab (zich ro'yxat
+  uchun to'g'ri, xato emas).
+
+**Xulosa**: Foydalanuvchi skrinshotida ko'rsatilgan aniq, tasdiqlangan
+muammo (mojibake) allaqachon hal qilingan. Boshqa "audit" da'volari
+(grid layout, custom qizil tugma CSS) haqiqiy koddagi holatga mos
+kelmadi va ko'rilgan real muammo topilmadi — style tokenlari (
+`st::defaultSubsectionTitle`, `st::customModHintLabel`,
+`st::attentionBoxButton`, `st::settingsThumbSkip`) butun faylda izchil
+qo'llanilgan. Yangi custom style qo'shish (masalan
+`Telegram/SourceFiles/styles/custom_mod.style`ga bold/katta raqam
+label'i) buildsiz/vizual tekshiruvsiz xavfli bo'lardi — shuning uchun
+amalga oshirilmadi. Agar userda hali ham aniq noqulaylik bo'lsa (yangi
+skrinshot bilan), keyingi sessiyada shu asosda davom ettirish kerak.
 
 ### Fase 4: Integratsiya va Tekshirish (11–14 kun)
 
