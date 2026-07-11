@@ -1226,7 +1226,25 @@ QString ExportFullBackup(const QString &targetDir) {
         manifest["hasRegistry"] = QFile::exists(stageDir + "/settings.reg");
         manifest["hasPeerLists"] = QFile::exists(stageDir + "/peer_lists.json");
         manifest["hasBranding"] = QFile::exists(stageDir + "/branding.json");
-        manifest["hasMedia"] = QDir(stageDir + "/customizationMainFolder").exists();
+        const QString mediaStageDir = stageDir + "/customizationMainFolder";
+        manifest["hasMedia"] = QDir(mediaStageDir).exists();
+
+        // Vazifa 4.1: media/archive counts — surfaced to the user in the
+        // restore success toast (see ImportFullBackup callers) instead of
+        // a generic "success" message.
+        const auto countFiles = [](const QString &dir) {
+            return QDir(dir).entryList(QDir::Files).count();
+        };
+        QJsonObject counts;
+        const auto stats = GetArchiveStats();
+        counts["deleted"] = stats.deletedCount;
+        counts["edited"] = stats.editedCount;
+        counts["images"] = countFiles(mediaStageDir + "/medias/images");
+        counts["videos"] = countFiles(mediaStageDir + "/medias/videos");
+        counts["voices"] = countFiles(mediaStageDir + "/medias/voices");
+        counts["files"] = countFiles(mediaStageDir + "/medias/files");
+        manifest["counts"] = counts;
+
         QFile mf(stageDir + "/manifest.json");
         if (mf.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
             mf.write(QJsonDocument(manifest).toJson(QJsonDocument::Indented));
