@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/object_ptr.h"
 #include "info/info_controller.h" // Key
 #include "info/profile/info_profile_badge.h"
+#include "ui/controls/swipe_handler_data.h"
 #include "ui/rp_widget.h"
 #include "ui/userpic_view.h"
 
@@ -80,6 +81,7 @@ namespace Info::Profile {
 
 class Badge;
 class StatusLabel;
+class TopBarActionButton;
 
 struct TopBarActionButtonStyle;
 
@@ -89,6 +91,7 @@ public:
 		Profile,
 		Stories,
 		Preview,
+		Community,
 	};
 
 	struct Descriptor {
@@ -99,6 +102,7 @@ public:
 		PeerData *peer = nullptr;
 		rpl::producer<bool> backToggles;
 		rpl::producer<> showFinished;
+		rpl::producer<TextWithEntities> customStatus;
 	};
 
 	struct AnimatedPatternPoint {
@@ -153,9 +157,13 @@ private:
 	void setupBirthdayEffect();
 	void startUploadOverlay();
 	void setupActions(not_null<Window::SessionController*> controller);
+	void searchInCommunity(not_null<Window::SessionController*> controller);
+	void finalizeActions(
+		const std::vector<not_null<TopBarActionButton*>> &buttons);
 	void setupButtons(
 		not_null<Window::SessionController*> controller,
 		Source source);
+	void setupSwipeBack(not_null<Window::SessionController*> controller);
 	void setupShowLastSeen(not_null<Window::SessionController*> controller);
 	void setupUniqueBadgeTooltip();
 	void hideBadgeTooltip();
@@ -186,6 +194,7 @@ private:
 	[[nodiscard]] int calculateRightButtonsWidth() const;
 	[[nodiscard]] const style::FlatLabel &statusStyle() const;
 	void setupStatusWithRating();
+	void bindStatus();
 	[[nodiscard]] TopBarActionButtonStyle mapActionStyle(
 		std::optional<QColor> c) const;
 
@@ -222,6 +231,7 @@ private:
 	object_ptr<Ui::FlatLabel> _status;
 	std::unique_ptr<StatusLabel> _statusLabel;
 	rpl::variable<int> _statusShift = 0;
+	rpl::producer<TextWithEntities> _customStatus;
 	object_ptr<Ui::FadeWrap<Ui::RoundButton>> _showLastSeen = { nullptr };
 	object_ptr<Ui::RoundButton> _forumButton = { nullptr };
 
@@ -249,6 +259,8 @@ private:
 	Ui::PeerUserpicView _userpicView;
 	InMemoryKey _userpicUniqueKey;
 	QImage _cachedUserpic;
+	Ui::CommunityUserpicEffect _communityUserpicEffect;
+	bool _communityEffect = false;
 	QImage _monoforumMask;
 	std::unique_ptr<Ui::VideoUserpicPlayer> _videoUserpicPlayer;
 	std::unique_ptr<TopicIconView> _topicIconView;
@@ -262,6 +274,7 @@ private:
 	rpl::variable<bool> _backToggles;
 
 	rpl::event_stream<> _backClicks;
+	Ui::Controls::SwipeBackResult _swipeBackData;
 
 	base::unique_qptr<Ui::IconButton> _topBarButton;
 	base::unique_qptr<Ui::PopupMenu> _peerMenu;
