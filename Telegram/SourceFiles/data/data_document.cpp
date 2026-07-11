@@ -43,6 +43,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "lottie/lottie_animation.h"
 #include "boxes/abstract_box.h" // Ui::hideLayer().
+#include "custom_db.h"
+#include "custom_settings.h"
 
 #include <QtCore/QBuffer>
 #include <QtCore/QMimeType>
@@ -1051,13 +1053,17 @@ void DocumentData::finishLoad() {
 		return;
 	}
 
-	// Phase 2: Permanent Offline Backup
+	// Eager permanent backup so the file survives even if Telegram's own
+	// cache is purged before a delete/edit event fires (setDeletedLocally()
+	// in history_item.cpp re-copies from the *live* cache path, which may
+	// already be gone by then). Uses the same unified
+	// ~/customizationMainFolder/medias/ tree as SaveMediaFile() /
+	// setDeletedLocally() instead of the old standalone Downloads folder,
+	// and respects the global AntiDelete toggle (no per-peer id available
+	// here — this is a document-level hook, not tied to a specific message).
 	const auto cachePath = _loader->fileName();
-	if (!cachePath.isEmpty()) {
-		const auto backupDir = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation) + "/Telegram_AntiDelete/";
-		QDir().mkpath(backupDir);
-		const auto fileName = _filename.isEmpty() ? (QString::number(id) + ".file") : _filename;
-		QFile::copy(cachePath, backupDir + QString::number(id) + "_" + fileName);
+	if (!cachePath.isEmpty() && CustomSettings::AntiDelete()) {
+		CustomDB::SaveMediaFile(cachePath, "file");
 	}
 
 	setLocation(Core::FileLocation(_loader->fileName()));
@@ -1206,9 +1212,6 @@ void DocumentData::setWaitingForAlbum() {
 bool DocumentData::waitingForAlbum() const {
 	return uploading() && uploadingData->waitingForAlbum;
 }
-
-#include "custom_db.h"
-#include "custom_settings.h"
 
 void DocumentData::save(
 		Data::FileOrigin origin,
