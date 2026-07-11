@@ -29,12 +29,20 @@ namespace CustomDB {
 
 static sqlite3 *gDb = nullptr;
 
-// In-memory caches populated at startup for O(1) constructor lookups.
+// In-memory caches for O(1) lookups, populated lazily per-peer (see
+// EnsurePeerCacheLoaded()) rather than in bulk for the whole archive at
+// startup — with 200k+ rows a full-table load blocked the UI for seconds.
 // gCacheMutex guards both caches against concurrent reads/writes from
 // background threads (e.g. MTProto callbacks vs. UI thread).
 static QMutex gCacheMutex;
 static QHash<QString, QSet<long long>> gDeletedCache;
 static QHash<QString, QHash<long long, QString>> gEditedCache;
+// Which peers have already had their entries loaded from the DB into the
+// caches above (via EnsurePeerCacheLoaded()). A peer can also be "loaded"
+// implicitly by live writes (SaveMessage()/MarkEdited()) before it's ever
+// explicitly loaded; EnsurePeerCacheLoaded() merges rather than overwrites,
+// so that's safe either way.
+static QSet<QString> gLoadedPeers;
 
 // Batch write queue: SaveMessage() enqueues here; FlushPendingWrites() commits all at once.
 static QVector<ActionedMessage> gPendingWrites;
@@ -256,57 +264,64 @@ void RunMigrations() {
 
 void LoadRestoreCache() {
     Init();
+    QMutexLocker locker(&gCacheMutex);
+    gDeletedCache.clear();
+    gEditedCache.clear();
+    gLoadedPeers.clear();
+}
+
+// Loads one peer's deleted/edited records from DB into the caches, unless
+// already loaded. Called lazily from the read/write sites below instead of
+// eagerly for the whole archive at startup (see LoadRestoreCache()).
+static void EnsurePeerCacheLoaded(const QString &peerId) {
     {
         QMutexLocker locker(&gCacheMutex);
-        gDeletedCache.clear();
-        gEditedCache.clear();
+        if (gLoadedPeers.contains(peerId)) return;
     }
+    Init();
     if (!gDb) return;
 
-    // Build local copies outside the lock (SQLite calls must NOT hold the mutex
-    // since they can block), then swap atomically.
-    QHash<QString, QSet<long long>> newDeleted;
-    QHash<QString, QHash<long long, QString>> newEdited;
+    QSet<long long> deletedIds;
+    QHash<long long, QString> editedTexts;
 
-    // Pass 1: deleted messages.
     {
         sqlite3_stmt *stmt = nullptr;
         if (sqlite3_prepare_v2(gDb,
-                "SELECT peer_id, msg_id FROM actioned_messages WHERE type = 'deleted'",
+                "SELECT msg_id FROM actioned_messages WHERE peer_id = ? AND type = 'deleted'",
                 -1, &stmt, nullptr) == SQLITE_OK) {
+            bindText(stmt, 1, peerId);
             while (sqlite3_step(stmt) == SQLITE_ROW) {
-                const QString peerId = colText(stmt, 0);
-                const long long msgId = sqlite3_column_int64(stmt, 1);
-                newDeleted[peerId].insert(msgId);
+                deletedIds.insert(sqlite3_column_int64(stmt, 0));
             }
             sqlite3_finalize(stmt);
         }
     }
-
-    // Pass 2: earliest backup/edited record per message (original text before first edit).
     {
         sqlite3_stmt *stmt = nullptr;
         if (sqlite3_prepare_v2(gDb,
-                "SELECT peer_id, msg_id, original_text FROM actioned_messages "
-                "WHERE type IN ('backup', 'edited') ORDER BY rowid ASC",
+                "SELECT msg_id, original_text FROM actioned_messages "
+                "WHERE peer_id = ? AND type IN ('backup', 'edited') ORDER BY rowid ASC",
                 -1, &stmt, nullptr) == SQLITE_OK) {
+            bindText(stmt, 1, peerId);
             while (sqlite3_step(stmt) == SQLITE_ROW) {
-                const QString peerId = colText(stmt, 0);
-                const long long msgId = sqlite3_column_int64(stmt, 1);
-                if (!newEdited[peerId].contains(msgId)) {
-                    newEdited[peerId][msgId] = colText(stmt, 2);
+                const long long msgId = sqlite3_column_int64(stmt, 0);
+                if (!editedTexts.contains(msgId)) {
+                    editedTexts[msgId] = colText(stmt, 1);
                 }
             }
             sqlite3_finalize(stmt);
         }
     }
 
-    // Swap under lock.
-    {
-        QMutexLocker locker(&gCacheMutex);
-        gDeletedCache = std::move(newDeleted);
-        gEditedCache  = std::move(newEdited);
+    QMutexLocker locker(&gCacheMutex);
+    if (gLoadedPeers.contains(peerId)) return; // race guard
+    gDeletedCache[peerId].unite(deletedIds);
+    for (auto it = editedTexts.constBegin(); it != editedTexts.constEnd(); ++it) {
+        if (!gEditedCache[peerId].contains(it.key())) {
+            gEditedCache[peerId][it.key()] = it.value();
+        }
     }
+    gLoadedPeers.insert(peerId);
 }
 
 // ---------------------------------------------------------------------------
@@ -314,12 +329,14 @@ void LoadRestoreCache() {
 // ---------------------------------------------------------------------------
 
 bool IsDeletedLocally(const QString &peerId, long long msgId) {
+    EnsurePeerCacheLoaded(peerId);
     QMutexLocker locker(&gCacheMutex);
     const auto it = gDeletedCache.constFind(peerId);
     return it != gDeletedCache.constEnd() && it->contains(msgId);
 }
 
 QString GetOriginalTextBeforeEdit(const QString &peerId, long long msgId) {
+    EnsurePeerCacheLoaded(peerId);
     QMutexLocker locker(&gCacheMutex);
     const auto it = gEditedCache.constFind(peerId);
     if (it == gEditedCache.constEnd()) return {};
@@ -732,6 +749,7 @@ void SaveMessage(HistoryItem *item) {
     // HistoryItem is ever re-created in the same session (e.g. after unload).
     // Only store the FIRST original (before any subsequent edits), matching
     // the LoadRestoreCache() strategy.
+    EnsurePeerCacheLoaded(msg.peerId);
     {
         QMutexLocker locker(&gCacheMutex);
         if (!gEditedCache[msg.peerId].contains(msg.msgId)) {
@@ -905,6 +923,7 @@ bool RecordBackgroundEdit(
     SaveActionedMessage(msg);
 
     // In-memory cache ham yangilash — restoreFromCustomDB() uchun.
+    EnsurePeerCacheLoaded(peerId);
     {
         QMutexLocker locker(&gCacheMutex);
         if (!gEditedCache[peerId].contains(msgId)) {
