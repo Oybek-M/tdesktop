@@ -1,6 +1,7 @@
 /out/
 Debug/
 Release/
+/.worktrees/
 /ThirdParty/
 /Telegram/ThirdParty/dispatch/
 /Telegram/build/target
