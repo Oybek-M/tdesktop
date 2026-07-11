@@ -3,8 +3,53 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Sana**: 2026-07-11
-**Status**: REJALASHTIRISH — implementatsiya HALI BOSHLANMAGAN (user aniq so'radi: avval reja, keyin implement)
+**Status**: MERGE BAJARILDI (0/1/2-bosqich) — BUILD kutilmoqda (3-bosqich, user uyda qiladi)
 **Prioritet**: O'RTA — shoshilinch emas, lekin qanchalik kech qolsak shunchalik og'irlashadi
+
+---
+
+## Holat (2026-07-11, kechqurun yangilanish)
+
+Merge bitta yo'lda (A varianti) muvaffaqiyatli bajarildi — bosqichma-
+bosqich (B varianti) kerak bo'lmadi, chunki haqiqiy konflikt
+kutilganidan ancha kam chiqdi:
+
+- **Worktree**: `.worktrees/upstream-sync-wip` (branch `upstream-sync-wip`), asosiy `Oybek` branch tegilmagan.
+- **Backup tag**: `pre-upstream-sync-2026-07-11` (`origin`ga push qilingan).
+- **Merge commit**: `c19741a864`.
+- **Natija**: 24 ta "ikkalasi ham o'zgargan" fayldan atigi **6 tasida**
+  haqiqiy konflikt (3 kod + 2 submodule), qolgan 21 tasi avtomatik
+  birlashdi:
+  - `history.cpp` — bizning `loadDeletedMessages()` va upstream'ning
+    `updateCommunityRegistration()` ikkalasi ham saqlandi (bog'liq emas
+    edi).
+  - `history_view_element.cpp` — bizning AntiDelete matn/marker overlay
+    saqlandi, upstream'ning `richPage()`→`translatedRichPage()`
+    rename'iga moslashtirildi.
+  - `info_media_grid_zoom.cpp` — bizning Qt5/Qt6 `QT_VERSION` guard
+    upstream'ning soddaroq, ikkala Qt versiyasida ishlaydigan `e->pos()`
+    yechimi bilan almashtirildi (ular xuddi shu muammoni mustaqil
+    ravishda, yaxshiroq hal qilishgan).
+  - `ThirdParty/tgcalls` — upstream pointer'iga o'tkazildi (lokal patch
+    yo'q edi).
+  - `lib_ui` — upstream pointer'iga (`a5580bb`) o'tkazildi, bizning
+    Qt6.5+-only accessibility interface guard patch (asli `4ef4b13`
+    ustida, endi `a5580bb` ustida) qayta qo'llandi — fayl ikkala
+    tomonda o'zgarmagani tasdiqlangani uchun bir xil holda tushdi.
+- **Build'dan oldingi tekshiruv**: grep-based tekshiruvda barcha asosiy
+  CustomMod hook nuqtalari (AntiDelete, photo-hook, forward bypass,
+  media save, `custom_mod_window.cpp`ning style token'lari) sog'lom
+  topildi. Qaror: qolgan 21 ta auto-merge fayl uchun qatorma-qator
+  qo'lda review SHART EMAS deb topildi — C++ compile-error'lari har
+  qanday API mos kelmasligini grep'dan aniqroq va ishonchli topadi,
+  shuning uchun qolgan tekshiruv to'g'ridan-to'g'ri BUILD orqali
+  qilinadi.
+
+**Qolgan qadamlar**: `.worktrees/upstream-sync-wip`da
+`git submodule update --init --recursive`, so'ng Visual Studio'da BUILD
+(user buni uyda qiladi). Build muvaffaqiyatli bo'lgach — to'liq
+CustomMod funksional sinovi, so'ng `upstream-sync-wip`ni `Oybek`ga
+merge va `origin`ga push.
 
 ---
 
