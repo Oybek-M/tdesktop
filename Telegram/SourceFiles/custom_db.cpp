@@ -19,6 +19,7 @@
 #include "history/history_item.h"
 #include "history/history.h"
 #include "data/data_peer.h"
+#include "crl/crl.h"
 
 namespace CustomDB {
 
@@ -1319,12 +1320,44 @@ bool ImportFullBackup(const QString &sourcePath) {
     // Refresh in-memory caches.
     LoadRestoreCache();
 
-    // Notify open history views to reload without a restart.
-    if (gReloadCallback) {
-        QTimer::singleShot(0, []() { gReloadCallback(); });
-    }
+    // Note: the reload callback (refreshing open history views) is NOT
+    // invoked here. It used to fire via QTimer::singleShot(0, ...), which
+    // only works when called from a thread with a running Qt event loop.
+    // ImportFullBackup() is also called from a background thread by
+    // ImportFullBackupAsync(), where that assumption doesn't hold — so the
+    // callback is triggered from there instead, on the main thread.
 
     return true;
+}
+
+// ---------------------------------------------------------------------------
+// Async export/import — run the synchronous work on a background thread and
+// deliver results on the main thread, so callers never block the UI.
+// ---------------------------------------------------------------------------
+
+void ExportFullBackupAsync(
+        const QString &targetDir,
+        ExportResultCallback callback) {
+    crl::async([targetDir, callback] {
+        const QString result = ExportFullBackup(targetDir);
+        crl::on_main([result, callback] {
+            if (callback) callback(result);
+        });
+    });
+}
+
+void ImportFullBackupAsync(
+        const QString &sourcePath,
+        ImportResultCallback callback) {
+    crl::async([sourcePath, callback] {
+        const bool ok = ImportFullBackup(sourcePath);
+        crl::on_main([ok, callback] {
+            if (ok && gReloadCallback) {
+                gReloadCallback();
+            }
+            if (callback) callback(ok);
+        });
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -1440,21 +1473,25 @@ static void RunAutoBackup() {
         QStandardPaths::AppDataLocation) + "/CustomMod/AutoBackups";
     QDir().mkpath(backupRoot);
 
-    const QString result = ExportFullBackup(backupRoot);
-    if (result.isEmpty()) {
-        qDebug() << "AutoBackup: export failed";
-        return;
-    }
-    qDebug() << "AutoBackup: saved to" << result;
+    // Async: this runs 5s after startup and then every 24h, and used to
+    // block the UI thread for as long as ExportFullBackup() took (the same
+    // freeze users hit on manual backup, just less predictably timed).
+    ExportFullBackupAsync(backupRoot, [backupRoot](const QString &result) {
+        if (result.isEmpty()) {
+            qDebug() << "AutoBackup: export failed";
+            return;
+        }
+        qDebug() << "AutoBackup: saved to" << result;
 
-    // Keep only the 3 most recent backups.
-    QDir dir(backupRoot);
-    QFileInfoList entries = dir.entryInfoList(
-        {"CustomModBackup_*.zip"}, QDir::Files, QDir::Time);
-    while (entries.size() > 3) {
-        QFile::remove(entries.last().filePath());
-        entries.removeLast();
-    }
+        // Keep only the 3 most recent backups.
+        QDir dir(backupRoot);
+        QFileInfoList entries = dir.entryInfoList(
+            {"CustomModBackup_*.zip"}, QDir::Files, QDir::Time);
+        while (entries.size() > 3) {
+            QFile::remove(entries.last().filePath());
+            entries.removeLast();
+        }
+    });
 }
 
 void SetImportReloadCallback(ReloadCallback cb) {

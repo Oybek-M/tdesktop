@@ -1,5 +1,6 @@
 #include "custom_mod_window.h"
 
+#include "base/weak_ptr.h"
 #include "core/application.h" // Core::Restart() (Import dan keyin)
 #include "custom_branding.h"
 #include "custom_db.h"
@@ -1678,33 +1679,42 @@ void fillAboutTab(
 			st::customModHintLabel),
 		st::defaultSubsectionTitlePadding);
 
-	content->add(
+	const auto exportBtn = content->add(
 		object_ptr<Ui::RoundButton>(
 			content,
 			rpl::single(u"📤 Toʻliq zaxira nusxa olish"_q),
 			st::defaultBoxButton),
-		st::boxRowPadding)
-	->addClickHandler([=] {
+		st::boxRowPadding);
+	exportBtn->addClickHandler([=] {
 		const auto dir = QFileDialog::getExistingDirectory(
 			dialogParent,
 			u"Saqlash papkasini tanlang"_q,
 			QDir::homePath());
 		if (dir.isEmpty()) return;
-		const auto result = CustomDB::ExportFullBackup(dir);
-		if (result.isEmpty()) {
-			Ui::Toast::Show(u"Eksport amalga oshmadi."_q);
-		} else {
-			Ui::Toast::Show(u"Eksport saqlandi: "_q + result);
-		}
+
+		// Eksport fon (background) thread'da ishlaydi — UI qotib qolmaydi.
+		exportBtn->setDisabled(true);
+		Ui::Toast::Show(u"Zaxira nusxa olinmoqda, biroz kuting..."_q);
+
+		const auto weak = base::make_weak(content);
+		CustomDB::ExportFullBackupAsync(dir, [=](const QString &result) {
+			if (!weak) return; // Oyna yopilgan bo'lishi mumkin.
+			exportBtn->setDisabled(false);
+			if (result.isEmpty()) {
+				Ui::Toast::Show(u"Eksport amalga oshmadi."_q);
+			} else {
+				Ui::Toast::Show(u"Eksport saqlandi: "_q + result);
+			}
+		});
 	});
 
-	content->add(
+	const auto importBtn = content->add(
 		object_ptr<Ui::RoundButton>(
 			content,
 			rpl::single(u"📥 Zaxira nusxadan tiklash"_q),
 			st::defaultBoxButton),
-		st::boxRowPadding)
-	->addClickHandler([=] {
+		st::boxRowPadding);
+	importBtn->addClickHandler([=] {
 		const auto path = QFileDialog::getOpenFileName(
 			dialogParent,
 			u"Zaxira faylini tanlang (.zip)"_q,
@@ -1728,21 +1738,30 @@ void fillAboutTab(
 			QMessageBox::Cancel);
 		if (reply != QMessageBox::Yes) return;
 
-		const auto ok = CustomDB::ImportFullBackup(source);
-		if (ok) {
-			refreshStats();
-			if (onArchiveChanged) onArchiveChanged();
-			const auto s = CustomDB::GetArchiveStats();
-			Ui::Toast::Show(
-				u"Tiklash muvaffaqiyatli! %1 oʻchirilgan, %2 tahrirlangan. "
-				"Dastur 3 soniya ichida qayta yuklanadi..."_q
-					.arg(s.deletedCount).arg(s.editedCount));
-			// Registry va JSON sozlamalar yangi qiymatlar bilan to'liq qo'llanishi
-			// uchun avtomatik restart. 3 soniya — foydalanuvchi toast o'qisin uchun.
-			QTimer::singleShot(3000, [] { Core::Restart(); });
-		} else {
-			Ui::Toast::Show(u"Tiklash amalga oshmadi. Fayl/papkani tekshiring."_q);
-		}
+		// Tiklash fon (background) thread'da ishlaydi — UI qotib qolmaydi.
+		importBtn->setDisabled(true);
+		Ui::Toast::Show(u"Zaxiradan tiklanmoqda, biroz kuting..."_q);
+
+		const auto weak = base::make_weak(content);
+		CustomDB::ImportFullBackupAsync(source, [=](bool ok) {
+			if (!weak) return; // Oyna yopilgan bo'lishi mumkin.
+			importBtn->setDisabled(false);
+			if (ok) {
+				refreshStats();
+				if (onArchiveChanged) onArchiveChanged();
+				const auto s = CustomDB::GetArchiveStats();
+				Ui::Toast::Show(
+					u"Tiklash muvaffaqiyatli! %1 oʻchirilgan, %2 tahrirlangan. "
+					"Dastur 3 soniya ichida qayta yuklanadi..."_q
+						.arg(s.deletedCount).arg(s.editedCount));
+				// Registry va JSON sozlamalar yangi qiymatlar bilan to'liq
+				// qo'llanishi uchun avtomatik restart. 3 soniya — foydalanuvchi
+				// toast o'qisin uchun.
+				QTimer::singleShot(3000, [] { Core::Restart(); });
+			} else {
+				Ui::Toast::Show(u"Tiklash amalga oshmadi. Fayl/papkani tekshiring."_q);
+			}
+		});
 	});
 
 	Ui::AddSkip(content, st::settingsThumbSkip);
