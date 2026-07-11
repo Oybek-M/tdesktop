@@ -7,6 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_session.h"
 
+#include <QtCore/QStandardPaths>
+#include <QtCore/QDir>
+#include <QtCore/QFile>
+#include <QtCore/QFileInfo>
 #include "custom_db.h"
 #include "custom_settings.h"
 #include "main/main_session.h"
@@ -1858,6 +1862,27 @@ void Session::photoLoadProgress(not_null<PhotoData*> photo) {
 void Session::photoLoadDone(not_null<PhotoData*> photo) {
 	notifyPhotoLayoutChanged(photo);
 	_photoLoadProgress.fire_copy(photo);
+
+	// Eager permanent backup, mirroring DocumentData::finishLoad()'s hook:
+	// save into the unified ~/customizationMainFolder/medias/images/ tree as
+	// soon as the full-size image is available, instead of relying solely on
+	// HistoryItem::setDeletedLocally() to grab it later (which can miss the
+	// photo if it's already been evicted from Telegram's own image cache by
+	// the time the message is deleted). No peerId/msgId here — PhotoData
+	// isn't tied to one message — so it's keyed by photo id, same as the
+	// document-level hook.
+	if (CustomSettings::AntiDelete()) {
+		if (const auto media = photo->activeMediaView()) {
+			const QString path =
+				QStandardPaths::writableLocation(QStandardPaths::HomeLocation)
+				+ "/customizationMainFolder/medias/images/"
+				+ QString::number(photo->id) + ".jpg";
+			if (!QFile::exists(path)) {
+				QDir().mkpath(QFileInfo(path).absolutePath());
+				media->saveToFile(path);
+			}
+		}
+	}
 }
 
 void Session::photoLoadFail(
