@@ -4,7 +4,7 @@
 
 **Sana**: 2026-07-10  
 **Muallif**: Arxitektura Agent (Opus)  
-**Status**: Fase 1 va Fase 2 IMPLEMENTATSIYA QILINDI (2026-07-11) — quyidagi holat bo'limiga qarang  
+**Status**: BARCHA FAZALAR (1-4) IMPLEMENTATSIYA QILINDI (2026-07-11) — faqat Vazifa 4.2 (qo'lda build+sinov) foydalanuvchi tomonidan bajarilishi kerak, quyidagi holat bo'limiga qarang  
 **Prioritet**: HIGH (5 ta aniq muhim muammo)
 
 ## Holat (2026-07-11 yangilanish)
@@ -1254,6 +1254,37 @@ if (QDir(mediaSrc).exists()) {
 - [ ] Dokumentatsiya: talablar → realizatsiya mapping
 
 **Vaqt**: ~3 soat
+
+**Holat (2026-07-11)**: Bu vazifa kod yozish orqali "bajarilmaydi" — build
+qilingan .exe'ni ishga tushirib qo'lda sinash kerak, buni agent
+o'zi qila olmaydi. Foydali bo'lishi uchun yuqoridagi jadval o'rniga
+haqiqiy kodga bog'langan qisqa qo'lda tekshirish ro'yxati:
+
+1. **Build** — Release yoki Debug, xatosiz.
+2. **Startup** — ilova ochilishi sezilarli sekinlashmasligi kerak
+   (Vazifa 1.2: `LoadRestoreCache()` endi bo'sh, `EnsurePeerCacheLoaded()`
+   birinchi chat ochilganda ishlaydi).
+3. **Backup export** — CustomMod → About → "Toʻliq zaxira nusxa olish":
+   UI qotib qolmasligi kerak (fon threadda), "Eksport saqlandi" toast
+   chiqishi, natijadagi ZIP ichida `manifest.json`da `counts` maydoni
+   bo'lishi kerak (Vazifa 4.1).
+4. **Backup restore (asosiy tekshiruv)** — ikkinchi qurilma/profil bilan
+   simulyatsiya: A qurilmada backup olib, B qurilmada (o'z ma'lumotlari
+   bilan) import qiling — B'ning oldingi arxivi SAQLANIB qolishi kerak,
+   A'nikilar bilan birlashgan holda (Vazifa 2.3 — asosiy user-reported bug).
+5. **Media** — chatda rasm/fayl yuklab (AntiDelete yoqiq holda)
+   `~/customizationMainFolder/medias/{images,files,...}` da fayl paydo
+   bo'lishini tekshirish (Vazifa 2.1/2.2).
+6. **Forward bypass** — cheklangan (no-forward) kanaldan xabar forward
+   qilib, `BypassRestrictions` yoqiq bo'lsa yetkazilishini tekshirish
+   (Vazifa 3.1 — allaqachon mavjud, faqat regressiya yo'qligini
+   tasdiqlash kerak).
+7. **UI** — CustomMod oynasi ochilib, mojibake/g'alati belgi
+   yo'qligini va "XAVFLI HUDUD" tugmalarining qizil ko'rinishini
+   tasdiqlash.
+
+Ushbu ro'yxat foydalanuvchi keyingi build+sinov bosqichida ishlatishi
+uchun saqlanmoqda.
 
 ---
 
