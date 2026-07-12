@@ -664,6 +664,130 @@ client-side pre-check) va sxema jadval nomlarini tasdiqlamagan —
 implementatsiyadan oldin har doim kalit faktlarni (xato matni manbai,
 funksiya joylashuvi, jadval sxemasi) qo'lda qayta tekshirish kerak.
 
+## Holat (2026-07-12, kechqurun — BUG 1 haqiqiy sabab topildi, avvalgi nazariya BEKOR qilindi)
+
+Foydalanuvchi avvalgi "server faqat yangi login'da qabul qiladi" nazariyasini
+QATʻIY rad etdi — laptopida bu funksiya oddiy restart orqali doim ishlagan,
+hattoki boshqa qurilmalarda ham ko'ringan, va hech qachon to'xtab qolmagan
+edi. Bu haqiqiy regressiya ekanligini bildiradi va `-debug` orqali
+`session_private.cpp`/`main_account.cpp`ga vaqtinchalik `SPOOFDEBUG`
+diagnostika qo'shib real log tahlil qilindi.
+
+**Muhim texnik topilma (log dalili):**
+- `DEBUG_LOG()` orqali yozilgan qatorlar asosiy `log.txt`ga EMAS, balki
+  `out/Release/DebugLogs/log_HH_MM.txt` fayliga yoziladi
+  (`logs.cpp:56`: `LogDataDebug` → `"DebugLogs/log" + postfix + ".txt"`).
+  Bu birinchi tekshiruvda 0 natija chiqishiga sabab bo'lgan — noto'g'ri
+  fayldan qidirilgan edi.
+- To'g'ri fayldan tekshirilganda: `CustomSettings::SpoofDeviceModel()` va
+  `SpoofSystemVersion()` restart'dan keyin to'g'ri o'qilgan, va
+  `session_private.cpp`dagi `tryToSend()` HAR safar yangi ulanishda
+  (`needsLayer=true`) `initConnection`ni to'g'ri, yangilangan qiymat bilan
+  serverga jo'natgan (1213 marta tasdiqlangan). Ya'ni client-side kod
+  hech qachon buzilmagan edi.
+- Shu tekshiruv jarayonida yana bir muhim narsa topildi: upstream sync
+  (552 commit) orqali Telegram'ning O'ZINING rasmiy "Rename device"
+  funksiyasi kelgan (`settings_active_sessions.cpp`'dagi `RenameBox`,
+  `core_settings.cpp`'dagi `customDeviceModel`). Bu funksiya ham xuddi
+  bizniki kabi faqat `initConnection`ni qayta yuborish orqali ishlaydi
+  (`mtp_instance.cpp`dagi `reInitConnection()`), demak bizning
+  yondashuvimiz arxitektura jihatidan Telegram'ning o'z usuliga mos edi.
+
+**Haqiqiy sabab (foydalanuvchi o'zi topdi):** Kod hech qachon buzilmagan —
+muammo custom_mod_window.cpp'dagi device spoof "Saqlash" tugmasi boshqa
+saqlash tugmalaridan farqli o'laroq oddiy matn edi (💾 ikonkasiz), va
+foydalanuvchi buni "Saqlash" tugmasi deb bilmay, bosmasdan darcha
+yopgan bo'lishi mumkin edi. Tugma bosilganda funksiya har doim
+mukammal ishlagan (restart yetarli, qayta login shart emas).
+
+**Qo'llangan tuzatish** (`custom_mod_window.cpp`):
+1. Device spoof saqlash tugmasi matni `"Saqlash (qurilma sozlamalari)"` dan
+   `"💾 Saqlash (qurilma sozlamalari)"` ga o'zgartirildi — boshqa
+   saqlash tugmalari (masalan branding bo'limidagi `"💾 Saqlash"`) bilan
+   vizual jihatdan bir xil qilindi.
+2. Eski, noto'g'ri nazariyaga asoslangan toast xabari ("Telegram serveri
+   qurilma nomini FAQAT yangi kirish uchun qabul qiladi...") olib
+   tashlandi, o'rniga to'g'ri xabar qo'yildi: "Yangi nom keyingi
+   restart'dan boshlab qo'llanadi (qayta login shart emas)."
+
+**Saboq:** Foydalanuvchi tomonidan qat'iy rad etilgan nazariyani ("bu
+hech qachon ishlagan emas" kabi) qayta-qayta tekshirmasdan qabul qilish
+xato edi. Kuchli tajribaviy dalil (foydalanuvchi xotirasi) nazariyadan
+ustun turishi kerak edi — muammoni "tuzatish" o'rniga avval "nima
+o'zgargan" so'rog'iga chuqurroq javob izlash kerak edi. Bu safar
+muammo umuman kodda emas, UI ergonomikasida ekan.
+
+## Two-Finger Swipe-to-Reply Regression (QISMAN tuzatildi, davom etmoqda)
+
+Trackpad'da ikki barmoq bilan o'ngdan-chapga surish orqali xabarga
+tezkor reply qilish funksiyasi upstream sync'dan keyin ishlamay qoldi.
+Dalillar:
+- Rasmiy tdesktop v6.9.3 — ishlaydi.
+- Bizning fork v6.9.3 (sync'dan OLDIN) — ishlagan.
+- Bizning fork v6.9.4 (552-commit sync'dan KEYIN, hozirgi holat) —
+  ishlamayapti / qisman ishlayapti.
+
+### Root Cause (log-diagnostika orqali 100% tasdiqlangan)
+
+`ui/controls/swipe_handler.cpp`dagi `SetupSwipeHandler()` holat
+mashinasi (`updateWith()`) gesture yo'nalishini (`state->orientation =
+Horizontal`) faqat **ikkinchi** chaqiruvda qulflaydi — birinchi
+chaqiruv faqat reply-callback'ni "armed" qiladi. Windows trackpad'i
+esa ko'p hollarda butun swipe'ni bitta `ScrollBegin` + darhol
+`ScrollEnd` juftligi sifatida yetkazadi (oraliqda `ScrollUpdate`
+yo'q) — ikkinchi chaqiruv kelmaydi, `orientation` doim `none` bo'lib
+qoladi, va `processEnd()`dagi trigger-tekshiruv (`if (orientation ==
+Horizontal)`) ishga tushmaydi.
+
+**Qo'llangan qisman tuzatish** (`swipe_handler.cpp`, `updateWith()`):
+orientation-hal qilish logikasi (`tryLockOrientation()`) umumiy
+funksiyaga chiqarilib, endi wheel/mouse (touch bo'lmagan) BIRINCHI
+event'ning o'ziyoq — ikkinchisini kutmasdan — yo'nalishni qulflaydi.
+
+**Natija (foydalanuvchi test qildi):** Qisman ishlayapti — ba'zi
+hollarda gesture boshlanadi (vizual feedback ko'rinadi), lekin
+oxirigacha yetmasdan yana bekor bo'lib qolmoqda. Bu shuni ko'rsatadiki,
+tuzatish TO'G'RI YO'NALISHDA (orientation endi qulflanmoqda), lekin
+`kThresholdWidth=50` (yuqori DPI/UI scale'da ko'paygan) va
+`kSwipeSlow=0.2` damping koeffitsienti bitta wheel-paketining kichik
+delta'siga nisbatan hali ham juda talabchan — va ko'p-paketli (uzoqroq)
+swipe'larda `ScrollMomentum` fazasi `processEnd()`ni ratio 1.0'ga
+yetishidan OLDIN chaqirib yuborishi mumkin.
+
+**Keyingi qadam:** To'liq root-cause darajasidagi yechim uchun
+alohida Implementation Plan tuzildi — pastga qarang.
+
+### ⚠️ Muhim ogohlantirish: kelajakdagi upstream sync bilan konflikt xavfi
+
+`swipe_handler.cpp` — bu CustomMod'ga tegishli fayl EMAS, balki
+upstream tdesktop'ning umumiy (shared) kodi, va u 5+ turli
+funksiyalarda ishlatiladi (reply-swipe, swipe-back navigatsiya, media
+viewer swipe, dialogs pull-to-next-channel, IV content swipe). Bu
+fayl upstream tomonidan FAOL rivojlantirilmoqda (oxirgi oyda 10+
+commit — `a492ffc7f7`, `a74ee601c1`, `6ab3a8edc6` va boshqalar).
+
+Ikkita muhim ehtimollik bor:
+1. **Bu xato Telegram rasmiy tomonidan ham aniqlanishi va tuzatilishi
+   mumkin** — chunki bu Windows trackpad foydalanuvchilariga umumiy
+   ta'sir qiladigan xato, faqat bizning CustomMod'ga xos emas. Agar
+   shunday bo'lsa, keyingi upstream sync'da bizning qo'lda qilgan
+   tuzatishimiz ORTIQCHA (yoki hatto ziddiyatli) bo'lib qolishi mumkin.
+2. **Keyingi `git pull upstream dev` / merge paytida shu aniq
+   funksiyada (`updateWith()`) merge conflict chiqish ehtimoli
+   YUQORI** — chunki biz upstream faol o'zgartirayotgan funksiyaning
+   ichki mantig'ini qayta tuzdik (nafaqat qo'shimcha qator qo'shish,
+   balki mavjud if/else zanjirini qayta tashkil qilish). Keyingi
+   sync paytida bu joyda diqqat bilan qo'lda hal qilish (manual
+   conflict resolution) kerak bo'ladi — avtomatik merge ishonchli
+   bo'lmasligi mumkin.
+
+**Tavsiya:** Keyingi upstream sync'dan oldin, avval upstream'da shu
+muammo (`kThresholdWidth`/`updateWith` orientation-lock) uchun biror
+fix bor-yo'qligini tekshirish kerak (`git log upstream/dev --
+Telegram/SourceFiles/ui/controls/swipe_handler.cpp`). Agar bor bo'lsa,
+bizning qo'lda qilingan patch'ni olib tashlab, upstream'ning rasmiy
+fix'iga o'tish kerak.
+
 ## Risk Assessment
 
 - **BUG 1:** Low risk (UI messaging only); advanced logout feature is optional

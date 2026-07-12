@@ -554,7 +554,7 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 	content->add(
 		object_ptr<Ui::RoundButton>(
 			content,
-			rpl::single(u"Saqlash (qurilma sozlamalari)"_q),
+			rpl::single(u"💾 Saqlash (qurilma sozlamalari)"_q),
 			st::defaultBoxButton),
 		st::boxRowPadding)
 	->addClickHandler([=] {
@@ -565,11 +565,8 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 			u"spoofSystemVersion"_q,
 			spoofVersionInput->getLastText().trimmed());
 		Ui::Toast::Show(
-			u"Saqlandi! Telegram serveri qurilma nomini FAQAT yangi "
-			"kirish (login) uchun qabul qiladi — joriy ochiq sessiyada "
-			"eski nom ko'rinishda qoladi. Settings > Devices dan joriy "
-			"sessiyani tugating va qayta kiring, shunda yangi nom bilan "
-			"ko'rinadi."_q);
+			u"Saqlandi! Yangi nom keyingi restart'dan boshlab "
+			"qo'llanadi (qayta login shart emas)."_q);
 	});
 
 	Ui::AddDivider(content);
