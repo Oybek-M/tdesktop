@@ -787,12 +787,78 @@ qaytaradi), shuning uchun boshqa swipe-consumer'lar (swipe-back,
 media viewer, dialogs next-channel, IV) umuman ta'sirlanmaydi —
 ularning `init`/`generateFinish` callback'lari o'zgarishsiz qoladi.
 
-**Test kerak:** Foydalanuvchi qayta build qilib, trackpad orqali
-reply-swipe'ni qayta sinab ko'rishi kerak. Agar hali ham yetarli
-bo'lmasa (masalan uzoqroq/sekinroq swipe'larda hamon bekor bo'lsa),
-keyingi qadam — `ScrollMomentum` diagnostikasini kengaytirib, haqiqatan
-ham bu faza yuz berayotganini tasdiqlash, so'ng shunga qarab maqsadli
-fix qilish.
+**Test natijasi**: Qadam 1 (`speedRatio=0.4`)dan keyin "biroz
+yaxshilandi, lekin yetarli emas" — ba'zi hollarda gesture boshlanib
+(vizual feedback ko'rinadi — bu multi-packet swipe borligini va
+ratio o'sib borayotganini bildiradi), keyin oxirigacha yetmasdan
+yana bekor bo'lib qolgan. Bu naqsh aynan `ScrollMomentum`ning erta
+cancel qilib yuborishi bilan mos keladi (faqat bitta paketli, tez
+flick'lar uchun emas).
+
+### Upstream tekshiruvi (2026-07-12, kechqurun)
+
+Foydalanuvchi so'rovi bilan upstream/dev tekshirildi:
+`git fetch upstream dev` → Oybek branch'dan atigi **52 ta** yangi
+commit topildi (Oybek allaqachon yaqinda sync qilingani uchun;
+local `dev`/`SafeWall` branchlari esa 2026-05-12'dan beri
+**1391 commit eskirgan** — bular Oybek bilan sinxronlanmagan,
+alohida "muzlatilgan" holatda).
+
+O'sha 52 ta yangi commit orasida **BITTASI HAM** `swipe_handler.cpp`ga
+tegmagan — ya'ni upstream'da bu aniq bug uchun tayyor fix yo'q.
+Katta merge (52 yoki 1391 commit) bu bug'ni avtomatik tuzatmaydi va
+qo'shimcha xavf (merge conflict, build buzilishi) olib keladi —
+shuning uchun katta merge QILINMADI.
+
+**Foydali topilma**: Upstream'ning yangi `history_view_pull_to_next_channel.cpp`
+komponenti (allaqachon bizda bor, boshqa feature — "pull to next
+channel") xuddi shu turdagi Windows-trackpad muammosini (keraksiz/erta
+momentum eventlari) allaqachon hal qilgan (commit `8f89a48e1a`,
+2026-07-04): "A sharp release can mislabel the first inertial event
+as ScrollBegin; swallow it..." — lekin bu yechim FAQAT o'sha alohida
+komponentda, `swipe_handler.cpp`da emas (ikkovi bir-biridan mustaqil
+kod).
+
+### Qadam 2 implementatsiyasi (upstream texnikasidan ilhomlanib)
+
+**Fayl:** `ui/controls/swipe_handler.cpp`, `SetupSwipeHandler()`ning
+Wheel-event handler'i:
+
+Avval `Qt::ScrollMomentum` fazasi HAR DOIM `processEnd()`ni chaqirib
+gesture'ni bekor qilardi — hatto agar foydalanuvchi horizontal
+yo'nalishni allaqachon "commit" qilgan (orientation qulflangan) va
+inertial harakat davom etayotgan bo'lsa ham. Endi:
+
+```cpp
+const auto momentumContinues = (phase == Qt::ScrollMomentum)
+    && (state->orientation == Qt::Horizontal);
+const auto cancel = w->buttons()
+    || (phase == Qt::ScrollEnd)
+    || (phase == Qt::ScrollMomentum && !momentumContinues);
+```
+
+Ya'ni: agar gesture ALLAQACHON horizontal deb aniqlangan bo'lsa,
+momentum tiklari endi uni bekor qilmaydi — balki oddiy update
+sifatida `updateWith()`ga uzatiladi, `state->delta` to'planishda
+davom etadi, va ratio inertsiya orqali ham 1.0'ga yetishi mumkin.
+Orientation hali aniqlanmagan holatda (foydalanuvchi hali gesture
+boshlamagan, faqat tasodifiy inertial "dum" kelgan) momentum hamon
+bekor qilinadi — bu yangi, foydalanuvchi boshlamagan gesture'ni
+tasodifan ishga tushirib yubormaslik uchun xavfsizlik chorasi.
+
+**Boshqa consumer'larga ta'siri**: Bu o'zgarish `swipe_handler.cpp`ning
+umumiy Wheel-handler'ida, shuning uchun barcha wheel-asosidagi
+swipe-consumer'larga (swipe-back, media viewer, IV) ta'sir qiladi —
+lekin faqat ULARNING FOYDASIGA (allaqachon boshlangan gesture endi
+inersiya orqali ham tugallanishi mumkin, avvalgidek to'satdan
+kesilib qolmaydi). `PullToNextChannel` (dialogs next-channel) bu
+o'zgarishdan ta'sirlanmaydi — u butunlay boshqa, mustaqil komponent.
+
+**Keyingi qadam:** Foydalanuvchi `-debug` bilan qayta build+test
+qilishi, va `log.txt`dan yangi `"SWIPEDEBUG: ScrollMomentum tick,
+continues=..."` qatorlarini tekshirishi kerak — bu ScrollMomentum
+haqiqatan sodir bo'layotganini va endi to'g'ri boshqarilayotganini
+tasdiqlaydi.
 
 ### ⚠️ Muhim ogohlantirish: kelajakdagi upstream sync bilan konflikt xavfi
 

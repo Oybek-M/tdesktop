@@ -390,9 +390,22 @@ void SetupSwipeHandler(SwipeHandlerArgs &&args) {
 				// Reset state in case we lost some TouchEnd.
 				processEnd();
 			}
+			// Once a horizontal swipe is already committed, trailing
+			// inertia (ScrollMomentum) should keep feeding it rather than
+			// abort it outright - some platforms (e.g. Windows precision
+			// touchpad) deliver most of a swipe's distance as momentum
+			// ticks after the fingers already lifted. Before orientation
+			// is locked, momentum is still treated as a cancel so a stray
+			// inertial tail can't start a gesture on its own.
+			const auto momentumContinues = (phase == Qt::ScrollMomentum)
+				&& (state->orientation == Qt::Horizontal);
 			const auto cancel = w->buttons()
 				|| (phase == Qt::ScrollEnd)
-				|| (phase == Qt::ScrollMomentum);
+				|| (phase == Qt::ScrollMomentum && !momentumContinues);
+			if (phase == Qt::ScrollMomentum) {
+				qDebug() << "SWIPEDEBUG: ScrollMomentum tick, continues="
+					<< momentumContinues;
+			}
 			if (cancel) {
 				qDebug() << "SWIPEDEBUG: swipe cancelled (buttons/end/momentum)";
 				processEnd();
