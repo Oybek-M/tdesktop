@@ -1745,15 +1745,22 @@ void fillAboutTab(
 		modeBox.setText(u"Tiklash rejimini tanlang:"_q);
 		const auto mergeBtn = modeBox.addButton(
 			u"🔗 Birlashtirish"_q, QMessageBox::AcceptRole);
-		const auto replaceBtn = modeBox.addButton(
+		modeBox.addButton(
 			u"🔄 Toʻliq almashtirish"_q, QMessageBox::DestructiveRole);
 		modeBox.addButton(QMessageBox::Cancel);
 		modeBox.setDefaultButton(mergeBtn);
 		modeBox.exec();
 
-		const auto clicked = modeBox.clickedButton();
-		if (clicked != mergeBtn && clicked != replaceBtn) return; // Cancel.
-		const bool fullReplace = (clicked == replaceBtn);
+		// buttonRole() orqali solishtirish — QPushButton*/QAbstractButton*
+		// pointer taqqoslashdan ko'ra ishonchliroq (MSVC ba'zan bu ikki tur
+		// orasidagi standart yuqoriga cast'ni comparison operatorида
+		// tan olmaydi, garchi QPushButton QAbstractButton'dan meros bo'lsa ham).
+		const auto role = modeBox.buttonRole(modeBox.clickedButton());
+		if (role != QMessageBox::AcceptRole
+				&& role != QMessageBox::DestructiveRole) {
+			return; // Cancel yoki oyna yopildi.
+		}
+		const bool fullReplace = (role == QMessageBox::DestructiveRole);
 
 		const auto reply = QMessageBox::warning(
 			dialogParent,
