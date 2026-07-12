@@ -769,6 +769,11 @@ void HistoryInner::setupSwipeReplyAndBack() {
 			const auto viewItemId = view->data()->fullId();
 			const auto itemId = item->fullId();
 			result.msgBareId = viewItemId.msg.bare;
+			// Trackpad wheel gestures often deliver a whole swipe as a
+			// single event with no follow-up ticks (see swipe_handler.cpp
+			// orientation-lock fix), so the default threshold is rarely
+			// reachable in one packet. Lower it just for reply-swipe.
+			result.speedRatio = 0.4;
 			qDebug() << "SWIPEDEBUG: reply callback ARMED for item"
 				<< itemId.msg.bare;
 			result.callback = [=] {

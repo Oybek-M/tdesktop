@@ -755,7 +755,44 @@ swipe'larda `ScrollMomentum` fazasi `processEnd()`ni ratio 1.0'ga
 yetishidan OLDIN chaqirib yuborishi mumkin.
 
 **Keyingi qadam:** To'liq root-cause darajasidagi yechim uchun
-alohida Implementation Plan tuzildi — pastga qarang.
+`rejalashtiruvchi` (Opus) agent orqali Implementation Plan tuzildi.
+Reja 2 asosiy qadamni taklif qildi:
+1. Reply-swipe uchun maxsus, pastroq `speedRatio` berish (global
+   `kThresholdWidth`/`kSwipeSlow` konstantalarini o'zgartirmasdan) —
+   **QO'LLANDI**.
+2. `Qt::ScrollMomentum` fazasini "cancel" sifatida emas, alohida
+   ishlov berish — **QO'LLANMADI**, chunki bizning haqiqiy
+   debug-loglarimizda (6+ test) `ScrollMomentum` fazasi HECH QACHON
+   ko'rinmagan (faqat `ScrollBegin`+`ScrollEnd`) — bu tasdiqlanmagan
+   gipoteza, va shared kodga (5+ boshqa swipe-consumer'ga ta'sir
+   qiladigan) qo'shimcha xavf qo'shmaslik uchun hozircha o'tkazib
+   yuborildi. Agar Qadam 1 yetarli bo'lmasa, keyingi bosqichda
+   ko'rib chiqiladi (avval yangi log-dalili yig'ilgandan keyin).
+
+### Qadam 1 implementatsiyasi
+
+**Fayl:** `history/history_inner_widget.cpp`,
+`HistoryInner::setupSwipeReplyAndBack()`'ning `init` lambda'si,
+reply-lookup (`LeftToRight`) branch'i ichida:
+
+```cpp
+result.msgBareId = viewItemId.msg.bare;
+result.speedRatio = 0.4;  // global threshold'ni 60% ga pasaytiradi,
+                          // faqat reply-swipe uchun
+```
+
+Bu o'zgarish **faqat** reply-swipe use-case'iga xos (`SwipeHandlerFinishData`
+har bir `SetupSwipeHandler()` chaqiruvchisi o'z alohida qiymatini
+qaytaradi), shuning uchun boshqa swipe-consumer'lar (swipe-back,
+media viewer, dialogs next-channel, IV) umuman ta'sirlanmaydi —
+ularning `init`/`generateFinish` callback'lari o'zgarishsiz qoladi.
+
+**Test kerak:** Foydalanuvchi qayta build qilib, trackpad orqali
+reply-swipe'ni qayta sinab ko'rishi kerak. Agar hali ham yetarli
+bo'lmasa (masalan uzoqroq/sekinroq swipe'larda hamon bekor bo'lsa),
+keyingi qadam — `ScrollMomentum` diagnostikasini kengaytirib, haqiqatan
+ham bu faza yuz berayotganini tasdiqlash, so'ng shunga qarab maqsadli
+fix qilish.
 
 ### ⚠️ Muhim ogohlantirish: kelajakdagi upstream sync bilan konflikt xavfi
 
