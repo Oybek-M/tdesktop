@@ -426,6 +426,10 @@ void Account::startMtp(std::unique_ptr<MTP::Config> config) {
 		fields.deviceModel = Platform::DeviceModelPretty();
 		fields.systemVersion = Platform::SystemVersionPretty();
 	}
+	qDebug() << "SPOOFDEBUG: startMtp() spoofMobile="
+		<< CustomSettings::SpoofMobile()
+		<< "deviceModel=" << fields.deviceModel
+		<< "systemVersion=" << fields.systemVersion;
 	_mtp = std::make_unique<MTP::Instance>(
 		MTP::Instance::Mode::Normal,
 		std::move(fields));

@@ -707,12 +707,17 @@ void HistoryInner::setupSwipeReplyAndBack() {
 		const auto horizontalScrollDelta = (data.direction == Qt::LeftToRight)
 			? 1
 			: -1;
+		qDebug() << "SWIPEDEBUG: init called, direction="
+			<< (data.direction == Qt::RightToLeft ? "RightToLeft" : "LeftToRight")
+			<< "cursorPos=" << data.cursorPosition;
 		if (canConsumeHorizontalScroll(
 				data.cursorPosition,
 				horizontalScrollDelta)) {
+			qDebug() << "SWIPEDEBUG: blocked by canConsumeHorizontalScroll";
 			return result;
 		}
 		if (data.direction == Qt::RightToLeft) {
+			qDebug() << "SWIPEDEBUG: entering RightToLeft (swipe-back) branch";
 			auto good = true;
 			enumerateItems<EnumItemsDirection::BottomToTop>([&](
 					not_null<Element*> view,
@@ -733,8 +738,10 @@ void HistoryInner::setupSwipeReplyAndBack() {
 			}
 		}
 		if (inSelectionMode().inSelectionMode) {
+			qDebug() << "SWIPEDEBUG: blocked by inSelectionMode";
 			return result;
 		}
+		qDebug() << "SWIPEDEBUG: entering reply-lookup branch (LeftToRight)";
 		enumerateItems<EnumItemsDirection::BottomToTop>([&](
 				not_null<Element*> view,
 				int itemtop,
@@ -751,6 +758,8 @@ void HistoryInner::setupSwipeReplyAndBack() {
 				view);
 			const auto canSendReply = CanSendReply(item);
 			const auto canReply = (canSendReply || item->allowsForward());
+			qDebug() << "SWIPEDEBUG: item found, canSendReply=" << canSendReply
+				<< "allowsForward=" << item->allowsForward();
 			if (!canReply) {
 				return true;
 			}
@@ -760,6 +769,8 @@ void HistoryInner::setupSwipeReplyAndBack() {
 			const auto viewItemId = view->data()->fullId();
 			const auto itemId = item->fullId();
 			result.msgBareId = viewItemId.msg.bare;
+			qDebug() << "SWIPEDEBUG: reply callback ARMED for item"
+				<< itemId.msg.bare;
 			result.callback = [=] {
 				const auto still = show->session().data().message(viewItemId);
 				const auto selected = still
@@ -795,16 +806,27 @@ void HistoryInner::setupSwipeReplyAndBack() {
 			_touchMaybeSelecting.value(),
 			_scroll->positionValue()
 		) | rpl::map([](bool selecting, Ui::ElasticScrollPosition position) {
-			return selecting || (position.overscroll > 0);
+			const auto blocked = selecting || (position.overscroll > 0);
+			if (blocked) {
+				qDebug() << "SWIPEDEBUG: dontStart=true selecting="
+					<< selecting << "overscroll=" << position.overscroll;
+			}
+			return blocked;
 		}),
 		.skipWheelEvent = [=](not_null<QWheelEvent*> event) {
 			const auto delta = Ui::ScrollDelta(event);
+			qDebug() << "SWIPEDEBUG: wheel event delta=" << delta
+				<< "phase=" << event->phase();
 			if (std::abs(delta.x()) <= std::abs(delta.y())) {
 				return false;
 			}
-			return canConsumeHorizontalScroll(
+			const auto skip = canConsumeHorizontalScroll(
 				mapFromGlobal(event->globalPosition().toPoint()),
 				delta.x());
+			if (skip) {
+				qDebug() << "SWIPEDEBUG: skipWheelEvent=true (consumed elsewhere)";
+			}
+			return skip;
 		},
 	});
 }

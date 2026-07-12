@@ -582,6 +582,8 @@ void SessionPrivate::tryToSend() {
 	}
 
 	const auto needsLayer = !_sessionData->connectionInited();
+	DEBUG_LOG(("SPOOFDEBUG: tryToSend needsLayer=%1 dc=%2"
+		).arg(Logs::b(needsLayer)).arg(_shiftedDcId));
 	const auto state = getState();
 	const auto sendOnlyFirstPing = (state != ConnectedState);
 	const auto sendAll = !sendOnlyFirstPing && !_keyCreator;
@@ -701,6 +703,11 @@ void SessionPrivate::tryToSend() {
 			deviceModelToUse = CustomSettings::SpoofDeviceModel();
 			systemVersionToUse = CustomSettings::SpoofSystemVersion();
 		}
+		DEBUG_LOG(("SPOOFDEBUG: sending initConnection deviceModel=%1 "
+			"systemVersion=%2 dcType=%3"
+			).arg(deviceModelToUse
+			).arg(systemVersionToUse
+			).arg(_currentDcType == DcType::Cdn ? "Cdn" : "Regular"));
 
 		initWrapper = MTPInitConnection<SerializedRequest>(
 			MTP_flags(Flag::f_params

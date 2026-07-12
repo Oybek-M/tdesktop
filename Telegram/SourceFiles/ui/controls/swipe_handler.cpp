@@ -343,11 +343,18 @@ void SetupSwipeHandler(SwipeHandlerArgs &&args) {
 		case QEvent::Wheel: {
 			const auto w = static_cast<QWheelEvent*>(e.get());
 			if (skipWheelEvent && skipWheelEvent(w)) {
+				qDebug() << "SWIPEDEBUG: swipe_handler skipWheelEvent=true, aborting";
 				processEnd();
 				break;
 			}
 			const auto phase = w->phase();
+			qDebug() << "SWIPEDEBUG: swipe_handler wheel phase=" << phase
+				<< "buttons=" << w->buttons()
+				<< "orientation=" << (state->orientation
+					? (*state->orientation == Qt::Horizontal ? "H" : "V")
+					: "none");
 			if (phase == Qt::NoScrollPhase) {
+				qDebug() << "SWIPEDEBUG: NoScrollPhase, ignoring event entirely";
 				break;
 			} else if (phase == Qt::ScrollBegin) {
 				// Reset state in case we lost some TouchEnd.
@@ -357,6 +364,7 @@ void SetupSwipeHandler(SwipeHandlerArgs &&args) {
 				|| (phase == Qt::ScrollEnd)
 				|| (phase == Qt::ScrollMomentum);
 			if (cancel) {
+				qDebug() << "SWIPEDEBUG: swipe cancelled (buttons/end/momentum)";
 				processEnd();
 			} else {
 				const auto invert = (w->inverted() ? -1 : 1);
