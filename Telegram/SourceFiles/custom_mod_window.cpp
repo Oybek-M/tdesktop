@@ -40,6 +40,7 @@
 #include <QtCore/QOperatingSystemVersion>
 #include <QtGui/QGuiApplication>
 #include <QtGui/QScreen>
+#include <QtWidgets/QAbstractButton>
 #include <QtWidgets/QFileDialog>
 #include <QtWidgets/QMessageBox>
 
