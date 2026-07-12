@@ -134,30 +134,52 @@ void SetImportReloadCallback(ReloadCallback cb);
 void ExportDatabase(const QString &targetPath);
 void ImportDatabase(const QString &sourcePath);
 
+// Reports export progress as a human-readable stage label + percent (0-100).
+// May be called from a background thread (see ExportFullBackupAsync) — the
+// async wrapper marshals it to the main thread before invoking it, but
+// direct ExportFullBackup() callers are responsible for their own thread
+// safety if they pass one.
+using ExportProgressCallback = std::function<void(const QString &stage, int percent)>;
+
 // Full backup: copies DB + entire media folder into targetDir.
 // Returns the path of the exported directory on success, empty string on failure.
 // Synchronous — does real disk I/O and shells out to PowerShell to zip the
 // result, which can take seconds to tens of seconds for large archives.
 // Prefer ExportFullBackupAsync() from UI code; this is kept for callers
 // that already run off the main thread (e.g. the async wrapper itself).
-QString ExportFullBackup(const QString &targetDir);
+QString ExportFullBackup(
+	const QString &targetDir,
+	const ExportProgressCallback &onProgress = nullptr);
 
 // Full restore: imports DB + media from a previously exported backup.
 // sourcePath may be a .zip file produced by ExportFullBackup(), or a plain folder.
+// fullReplace=false (default): MERGE into the existing archive (see the
+//   E28/Vazifa 2.3 comment at the top of ImportFullBackup()'s definition) —
+//   nothing already on this device is deleted.
+// fullReplace=true: clears ALL existing CustomMod archive data first (via
+//   ClearAllArchive()), then imports — the backup becomes the sole source
+//   of truth. Destructive; callers must confirm with the user first.
 // Calls LoadRestoreCache() after restoring so in-memory caches are refreshed.
 // Returns true on success.
 // Synchronous, same caveat as ExportFullBackup() above — prefer
 // ImportFullBackupAsync() from UI code.
-bool ImportFullBackup(const QString &sourcePath);
+bool ImportFullBackup(const QString &sourcePath, bool fullReplace = false);
 
 // Async wrappers: run the synchronous export/import on a background thread
 // (crl::async) and deliver the result back on the main thread (crl::on_main),
 // so callers never block the UI thread. Safe to call from the UI thread.
+// onProgress (export only) is marshaled to the main thread automatically.
 using ExportResultCallback = std::function<void(const QString &resultPathOrEmpty)>;
-void ExportFullBackupAsync(const QString &targetDir, ExportResultCallback callback);
+void ExportFullBackupAsync(
+	const QString &targetDir,
+	ExportResultCallback callback,
+	const ExportProgressCallback &onProgress = nullptr);
 
 using ImportResultCallback = std::function<void(bool success)>;
-void ImportFullBackupAsync(const QString &sourcePath, ImportResultCallback callback);
+void ImportFullBackupAsync(
+	const QString &sourcePath,
+	bool fullReplace,
+	ImportResultCallback callback);
 
 QString SaveMediaFile(const QString &sourcePath, const QString &type); // "image", "video", "voice", "file"
 

@@ -1157,10 +1157,17 @@ static void MergePeerListsJson(const QString &srcPath, const QString &dstPath) {
     }
 }
 
-QString ExportFullBackup(const QString &targetDir) {
+QString ExportFullBackup(
+        const QString &targetDir,
+        const ExportProgressCallback &onProgress) {
     Init();
     if (!gDb) return {};
     FlushPendingWrites();
+
+    const auto reportProgress = [&](const QString &stage, int percent) {
+        if (onProgress) onProgress(stage, percent);
+    };
+    reportProgress(u"Tayyorlanmoqda"_q, 0);
 
     const QString stamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
     const QString zipPath = targetDir + "/CustomModBackup_" + stamp + ".zip";
@@ -1171,12 +1178,14 @@ QString ExportFullBackup(const QString &targetDir) {
     sqlite3_wal_checkpoint_v2(gDb, nullptr, SQLITE_CHECKPOINT_TRUNCATE, nullptr, nullptr);
 
     // 1) DB (asosiy arxiv).
+    reportProgress(u"Baza nusxalanmoqda"_q, 10);
     if (!QFile::copy(dbFilePath(), stageDir + "/actioned_messages.db")) {
         QDir(stageDir).removeRecursively();
         return {};
     }
 
     // 2) Media papkasi.
+    reportProgress(u"Media fayllar nusxalanmoqda"_q, 25);
     const QString mediaSrc = QDir::homePath() + "/customizationMainFolder";
     if (QDir(mediaSrc).exists()) {
         if (!CopyDirRecursive(mediaSrc, stageDir + "/customizationMainFolder")) {
@@ -1186,6 +1195,7 @@ QString ExportFullBackup(const QString &targetDir) {
     }
 
     // 3) JSON sozlamalar fayllari (mavjud bo'lsa).
+    reportProgress(u"Sozlamalar saqlanmoqda"_q, 60);
     const QString appDataCustom = QStandardPaths::writableLocation(
         QStandardPaths::AppDataLocation) + "/CustomMod";
     const QString peerListsSrc = appDataCustom + "/peer_lists.json";
@@ -1199,6 +1209,7 @@ QString ExportFullBackup(const QString &targetDir) {
 
     // 4) Registry export (Ghost/AntiDelete/AntiEdit togglelar + per-peer overrides).
     //    Windows-specific — boshqa platformalarda o'tkazib yuboriladi.
+    reportProgress(u"Registry eksport qilinmoqda"_q, 70);
     #ifdef Q_OS_WIN
     {
         const QString regPath = stageDir + "/settings.reg";
@@ -1217,6 +1228,7 @@ QString ExportFullBackup(const QString &targetDir) {
     #endif
 
     // 5) Manifest fayli — backup metadata.
+    reportProgress(u"Manifest yaratilmoqda"_q, 80);
     {
         QJsonObject manifest;
         manifest["version"] = 2;
@@ -1252,6 +1264,7 @@ QString ExportFullBackup(const QString &targetDir) {
     }
 
     // 6) ZIP qilish.
+    reportProgress(u"ZIP arxiv yaratilmoqda"_q, 90);
     const QString psCmd = QString(
         "Compress-Archive -Path '%1\\*' -DestinationPath '%2' -Force"
     ).arg(QDir::toNativeSeparators(stageDir), QDir::toNativeSeparators(zipPath));
@@ -1267,12 +1280,22 @@ QString ExportFullBackup(const QString &targetDir) {
         return {};
     }
 
+    reportProgress(u"Tayyor"_q, 100);
     return zipPath;
 }
 
-bool ImportFullBackup(const QString &sourcePath) {
+bool ImportFullBackup(const QString &sourcePath, bool fullReplace) {
     Init();
     if (!gDb) return false;
+
+    // Full-replace mode: wipe the existing archive BEFORE the merge step
+    // below runs. The merge logic (INSERT ... WHERE NOT EXISTS) then simply
+    // inserts everything from the backup, since nothing pre-exists to
+    // collide with — no separate "replace" code path needed.
+    if (fullReplace) {
+        ClearAllArchive();
+        execSql("DELETE FROM ghost_reads");
+    }
 
     QString sourceDir = sourcePath;
     QString tempExtractDir;
@@ -1480,9 +1503,17 @@ bool ImportFullBackup(const QString &sourcePath) {
 
 void ExportFullBackupAsync(
         const QString &targetDir,
-        ExportResultCallback callback) {
-    crl::async([targetDir, callback] {
-        const QString result = ExportFullBackup(targetDir);
+        ExportResultCallback callback,
+        const ExportProgressCallback &onProgress) {
+    crl::async([targetDir, callback, onProgress] {
+        const QString result = ExportFullBackup(
+            targetDir,
+            [onProgress](const QString &stage, int percent) {
+                if (!onProgress) return;
+                crl::on_main([onProgress, stage, percent] {
+                    onProgress(stage, percent);
+                });
+            });
         crl::on_main([result, callback] {
             if (callback) callback(result);
         });
@@ -1491,9 +1522,10 @@ void ExportFullBackupAsync(
 
 void ImportFullBackupAsync(
         const QString &sourcePath,
+        bool fullReplace,
         ImportResultCallback callback) {
-    crl::async([sourcePath, callback] {
-        const bool ok = ImportFullBackup(sourcePath);
+    crl::async([sourcePath, fullReplace, callback] {
+        const bool ok = ImportFullBackup(sourcePath, fullReplace);
         crl::on_main([ok, callback] {
             if (ok && gReloadCallback) {
                 gReloadCallback();

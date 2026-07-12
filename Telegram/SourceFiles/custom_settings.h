@@ -22,7 +22,12 @@ struct Values {
     bool antiEdit = true;
     bool spoofMobile = true;
     bool storyAnonymousView = true;
-    // C22: Dynamic device spoof
+    // C22: Dynamic device spoof.
+    // NOTE: spoofDeviceType itself is NOT sent to Telegram's MTProto layer —
+    // the server infers the device icon from the spoofDeviceModel/
+    // spoofSystemVersion strings, not a separate type code. This field only
+    // drives the preset buttons in custom_mod_window.cpp (which pre-fill
+    // those two strings); it has no other effect.
     int  spoofDeviceType = 0; // 0=Android, 1=iOS, 2=Windows, 3=Linux
     QString spoofDeviceModel = u"Samsung Galaxy S26 Ultra"_q;
     QString spoofSystemVersion = u"Android 15"_q;

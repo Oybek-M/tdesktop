@@ -3790,6 +3790,164 @@ void ApiWrap::finishForwarding(const SendAction &action) {
 	}
 }
 
+void ApiWrap::bypassForwardItem(
+		not_null<HistoryItem*> item,
+		const SendAction &action) {
+	// CUSTOM BYPASS — fresh-upload cascade (Sprint 4 revised):
+	//
+	// SendExistingDocument/Photo use file references that can expire and
+	// trigger refreshFileReference. If the source message is inaccessible
+	// the refresh callback is never called → message stuck "sending" forever.
+	//
+	// Fix: always use FileLoadTask → SendConfirmedFile (fresh upload via
+	// inputMediaUploadedDocument/Photo). This path has no file reference and
+	// cannot get stuck.
+	//
+	//   Step 1: Find a local file (Telegram cache → anti-delete saved copy).
+	//   Step 2: If found → FileLoadTask fresh upload.
+	//   Step 3: If not found → send text + toast ("Media topilmadi").
+	//   Step 4: Text-only source messages → sendMessage directly.
+
+	const auto srcPeerIdStr = QString::number(
+		item->history()->peer->id.value);
+	const long long srcMsgId = item->id.bare;
+
+	const auto original = item->originalText();
+	const auto captionTags = TextWithTags{
+		original.text,
+		TextUtilities::ConvertEntitiesToTextTags(original.entities)
+	};
+
+	const auto showToastNoMedia = [&]() {
+		if (const auto show = ShowForPeer(action.history->peer)) {
+			show->showToast(u"Media topilmadi, faqat matn yuborildi"_q);
+		}
+	};
+
+	// Build "Forwarded from" metadata footer appended to every
+	// bypass-forwarded message so the recipient knows the source.
+	const auto buildForwardInfo = [&]() -> QString {
+		const auto srcPeer = item->history()->peer;
+		const QString peerName = srcPeer->name();
+
+		// Username (@handle) if available.
+		QString handle;
+		if (const auto ch = srcPeer->asChannel()) {
+			if (ch->hasUsername()) {
+				handle = u"@"_q + ch->username();
+			}
+		} else if (const auto usr = srcPeer->asUser()) {
+			if (!usr->username().isEmpty()) {
+				handle = u"@"_q + usr->username();
+			}
+		}
+
+		// Original timestamp.
+		const auto dateStr = QDateTime::fromSecsSinceEpoch(item->date())
+			.toString(u"dd.MM.yyyy HH:mm"_q);
+
+		// Direct message link (best-effort).
+		QString msgLink;
+		if (const auto ch = srcPeer->asChannel()) {
+			if (ch->hasUsername()) {
+				msgLink = u"https://t.me/%1/%2"_q
+					.arg(ch->username())
+					.arg(srcMsgId);
+			} else {
+				msgLink = u"https://t.me/c/%1/%2"_q
+					.arg(peerToChannel(srcPeer->id).bare)
+					.arg(srcMsgId);
+			}
+		}
+
+		QString info = u"\n\n\xF0\x9F\x93\x8C Manba: "_q + peerName;
+		if (!handle.isEmpty()) {
+			info += u" ("_q + handle + u")"_q;
+		}
+		info += u"\n\xF0\x9F\x95\x90 Vaqt: "_q + dateStr;
+		info += u"\n\xF0\x9F\x94\x91 Peer ID: "_q + srcPeerIdStr;
+		if (!msgLink.isEmpty()) {
+			info += u"\n\xF0\x9F\x94\x97 Link: "_q + msgLink;
+		}
+		return info;
+	};
+
+	// Caption / text with source metadata appended.
+	const auto forwardInfo = buildForwardInfo();
+	const auto captionTagsWithFooter = TextWithTags{
+		captionTags.text + forwardInfo,
+		captionTags.tags,
+	};
+
+	if (const auto media = item->media()) {
+		if (const auto photo = media->photo()) {
+			// Try photo local path: user-saved location first, then cache.
+			QString localPath = photo->location(true).name();
+			if (localPath.isEmpty()) {
+				localPath = CustomDB::GetSavedMediaPath(
+					srcPeerIdStr, srcMsgId);
+			}
+			if (!localPath.isEmpty() && QFile::exists(localPath)) {
+				// Fresh upload — never gets stuck.
+				_fileLoader->addTask(
+					std::make_unique<FileLoadTask>(
+						FileLoadTask::Args{
+							.session = &session(),
+							.filepath = localPath,
+							.type = SendMediaType::Photo,
+							.to = FileLoadTaskOptions(action),
+							.caption = captionTagsWithFooter,
+						}));
+			} else {
+				// No local photo → text + toast.
+				auto msgText = MessageToSend(action);
+				msgText.textWithTags = captionTagsWithFooter;
+				sendMessage(std::move(msgText));
+				showToastNoMedia();
+			}
+		} else if (const auto document = media->document()) {
+			// Prefer Telegram cache, then anti-delete saved copy.
+			QString localPath = document->filepath(true);
+			if (localPath.isEmpty()) {
+				const QString saved =
+					CustomDB::GetSavedMediaPath(srcPeerIdStr, srcMsgId);
+				if (!saved.isEmpty() && QFile::exists(saved)) {
+					localPath = saved;
+				}
+			}
+			if (!localPath.isEmpty()) {
+				// Fresh upload from local file — no file-reference issues.
+				_fileLoader->addTask(
+					std::make_unique<FileLoadTask>(
+						FileLoadTask::Args{
+							.session = &session(),
+							.filepath = localPath,
+							.type = SendMediaType::File,
+							.to = FileLoadTaskOptions(action),
+							.caption = captionTagsWithFooter,
+						}));
+			} else {
+				// No local file → text + toast.
+				auto msgText = MessageToSend(action);
+				msgText.textWithTags = captionTagsWithFooter;
+				sendMessage(std::move(msgText));
+				showToastNoMedia();
+			}
+		} else {
+			// Other media types (sticker, geo, poll, contact, etc.)
+			// have no uploadable local file — send text content only.
+			auto msgText = MessageToSend(action);
+			msgText.textWithTags = captionTagsWithFooter;
+			sendMessage(std::move(msgText));
+		}
+	} else {
+		// Pure text message — forward the text directly.
+		auto msgText = MessageToSend(action);
+		msgText.textWithTags = captionTagsWithFooter;
+		sendMessage(std::move(msgText));
+	}
+}
+
 void ApiWrap::forwardMessages(
 		Data::ResolvedForwardDraft &&draft,
 		SendAction action,
@@ -3814,159 +3972,7 @@ void ApiWrap::forwardMessages(
 			i = draft.items.erase(i);
 		} else if (isProtected) {
 			if (CustomSettings::BypassRestrictions()) {
-				// CUSTOM BYPASS — fresh-upload cascade (Sprint 4 revised):
-				//
-				// SendExistingDocument/Photo use file references that can expire and
-				// trigger refreshFileReference. If the source message is inaccessible
-				// the refresh callback is never called → message stuck "sending" forever.
-				//
-				// Fix: always use FileLoadTask → SendConfirmedFile (fresh upload via
-				// inputMediaUploadedDocument/Photo). This path has no file reference and
-				// cannot get stuck.
-				//
-				//   Step 1: Find a local file (Telegram cache → anti-delete saved copy).
-				//   Step 2: If found → FileLoadTask fresh upload.
-				//   Step 3: If not found → send text + toast ("Media topilmadi").
-				//   Step 4: Text-only source messages → sendMessage directly.
-
-				const auto srcPeerIdStr = QString::number(
-					item->history()->peer->id.value);
-				const long long srcMsgId = item->id.bare;
-
-				const auto original = item->originalText();
-				const auto captionTags = TextWithTags{
-					original.text,
-					TextUtilities::ConvertEntitiesToTextTags(original.entities)
-				};
-
-				const auto showToastNoMedia = [&]() {
-					if (const auto show = ShowForPeer(action.history->peer)) {
-						show->showToast(u"Media topilmadi, faqat matn yuborildi"_q);
-					}
-				};
-
-				// Build "Forwarded from" metadata footer appended to every
-				// bypass-forwarded message so the recipient knows the source.
-				const auto buildForwardInfo = [&]() -> QString {
-					const auto srcPeer = item->history()->peer;
-					const QString peerName = srcPeer->name();
-
-					// Username (@handle) if available.
-					QString handle;
-					if (const auto ch = srcPeer->asChannel()) {
-						if (ch->hasUsername()) {
-							handle = u"@"_q + ch->username();
-						}
-					} else if (const auto usr = srcPeer->asUser()) {
-						if (!usr->username().isEmpty()) {
-							handle = u"@"_q + usr->username();
-						}
-					}
-
-					// Original timestamp.
-					const auto dateStr = QDateTime::fromSecsSinceEpoch(item->date())
-						.toString(u"dd.MM.yyyy HH:mm"_q);
-
-					// Direct message link (best-effort).
-					QString msgLink;
-					if (const auto ch = srcPeer->asChannel()) {
-						if (ch->hasUsername()) {
-							msgLink = u"https://t.me/%1/%2"_q
-								.arg(ch->username())
-								.arg(srcMsgId);
-						} else {
-							msgLink = u"https://t.me/c/%1/%2"_q
-								.arg(peerToChannel(srcPeer->id).bare)
-								.arg(srcMsgId);
-						}
-					}
-
-					QString info = u"\n\n\xF0\x9F\x93\x8C Manba: "_q + peerName;
-					if (!handle.isEmpty()) {
-						info += u" ("_q + handle + u")"_q;
-					}
-					info += u"\n\xF0\x9F\x95\x90 Vaqt: "_q + dateStr;
-					info += u"\n\xF0\x9F\x94\x91 Peer ID: "_q + srcPeerIdStr;
-					if (!msgLink.isEmpty()) {
-						info += u"\n\xF0\x9F\x94\x97 Link: "_q + msgLink;
-					}
-					return info;
-				};
-
-				// Caption / text with source metadata appended.
-				const auto forwardInfo = buildForwardInfo();
-				const auto captionTagsWithFooter = TextWithTags{
-					captionTags.text + forwardInfo,
-					captionTags.tags,
-				};
-
-				if (const auto media = item->media()) {
-					if (const auto photo = media->photo()) {
-						// Try photo local path: user-saved location first, then cache.
-						QString localPath = photo->location(true).name();
-						if (localPath.isEmpty()) {
-							localPath = CustomDB::GetSavedMediaPath(
-								srcPeerIdStr, srcMsgId);
-						}
-						if (!localPath.isEmpty() && QFile::exists(localPath)) {
-							// Fresh upload — never gets stuck.
-							_fileLoader->addTask(
-								std::make_unique<FileLoadTask>(
-									FileLoadTask::Args{
-										.session = &session(),
-										.filepath = localPath,
-										.type = SendMediaType::Photo,
-										.to = FileLoadTaskOptions(action),
-										.caption = captionTagsWithFooter,
-									}));
-						} else {
-							// No local photo → text + toast.
-							auto msgText = MessageToSend(action);
-							msgText.textWithTags = captionTagsWithFooter;
-							sendMessage(std::move(msgText));
-							showToastNoMedia();
-						}
-					} else if (const auto document = media->document()) {
-						// Prefer Telegram cache, then anti-delete saved copy.
-						QString localPath = document->filepath(true);
-						if (localPath.isEmpty()) {
-							const QString saved =
-								CustomDB::GetSavedMediaPath(srcPeerIdStr, srcMsgId);
-							if (!saved.isEmpty() && QFile::exists(saved)) {
-								localPath = saved;
-							}
-						}
-						if (!localPath.isEmpty()) {
-							// Fresh upload from local file — no file-reference issues.
-							_fileLoader->addTask(
-								std::make_unique<FileLoadTask>(
-									FileLoadTask::Args{
-										.session = &session(),
-										.filepath = localPath,
-										.type = SendMediaType::File,
-										.to = FileLoadTaskOptions(action),
-										.caption = captionTagsWithFooter,
-									}));
-						} else {
-							// No local file → text + toast.
-							auto msgText = MessageToSend(action);
-							msgText.textWithTags = captionTagsWithFooter;
-							sendMessage(std::move(msgText));
-							showToastNoMedia();
-						}
-					} else {
-						// Other media types (sticker, geo, poll, contact, etc.)
-						// have no uploadable local file — send text content only.
-						auto msgText = MessageToSend(action);
-						msgText.textWithTags = captionTagsWithFooter;
-						sendMessage(std::move(msgText));
-					}
-				} else {
-					// Pure text message — forward the text directly.
-					auto msgText = MessageToSend(action);
-					msgText.textWithTags = captionTagsWithFooter;
-					sendMessage(std::move(msgText));
-				}
+				bypassForwardItem(item, action);
 				i = draft.items.erase(i);
 			} else {
 				++i;
@@ -4063,12 +4069,20 @@ void ApiWrap::forwardMessages(
 	auto ids = QVector<MTPint>();
 	auto randomIds = QVector<MTPlong>();
 	auto localIds = std::shared_ptr<base::flat_map<uint64, FullMsgId>>();
+	// CustomMod: randomId -> ORIGINAL source item (the one being forwarded),
+	// kept so a server-side CHAT_FORWARDS_RESTRICTED rejection can retry via
+	// bypassForwardItem() even when the client-side isProtected pre-check in
+	// the loop above missed it (see bypassForwardItem's declaration comment
+	// in apiwrap.h). Stored as FullMsgId, not a raw HistoryItem*, since the
+	// item can be destroyed before the async server response arrives.
+	auto sourceIds = std::shared_ptr<base::flat_map<uint64, FullMsgId>>();
 
 	const auto sendAccumulated = [&] {
 		if (shared) {
 			++shared->requestsLeft;
 		}
 		const auto idsCopy = localIds;
+		const auto sourceIdsCopy = sourceIds;
 		const auto scheduled = action.options.scheduled;
 		const auto starsPaid = std::min(
 			action.options.starsApproved,
@@ -4140,6 +4154,20 @@ void ApiWrap::forwardMessages(
 				}
 			},
 			[=](const MTP::Error &error, const MTP::Response &) {
+				// CustomMod: server rejected the native forward as
+				// protected content the client didn't catch up front —
+				// bypass is on, so retry each item via the fresh-upload
+				// cascade instead of just showing the "restricted" toast.
+				if (error.type() == u"CHAT_FORWARDS_RESTRICTED"_q
+						&& CustomSettings::BypassRestrictions()
+						&& sourceIdsCopy) {
+					for (const auto &[randomId, srcId] : *sourceIdsCopy) {
+						if (const auto srcItem = _session->data().message(srcId)) {
+							_session->api().bypassForwardItem(srcItem, action);
+						}
+					}
+					return;
+				}
 				if (idsCopy) {
 					for (const auto &[randomId, itemId] : *idsCopy) {
 						_session->api().sendMessageFail(
@@ -4156,12 +4184,17 @@ void ApiWrap::forwardMessages(
 		ids.resize(0);
 		randomIds.resize(0);
 		localIds = nullptr;
+		sourceIds = nullptr;
 	};
 
 	ids.reserve(count);
 	randomIds.reserve(count);
 	for (const auto &item : draft.items) {
 		const auto randomId = base::RandomValue<uint64>();
+		if (!sourceIds) {
+			sourceIds = std::make_shared<base::flat_map<uint64, FullMsgId>>();
+		}
+		sourceIds->emplace(randomId, item->fullId());
 		if (genClientSideMessage) {
 			const auto newId = FullMsgId(
 				peer->id,

@@ -564,7 +564,11 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 			u"spoofSystemVersion"_q,
 			spoofVersionInput->getLastText().trimmed());
 		Ui::Toast::Show(
-			u"Saqlandi! O'zgartirishlar uchun ilovani qayta ulaning."_q);
+			u"Saqlandi! Telegram serveri qurilma nomini FAQAT yangi "
+			"kirish (login) uchun qabul qiladi — joriy ochiq sessiyada "
+			"eski nom ko'rinishda qoladi. Settings > Devices dan joriy "
+			"sessiyani tugating va qayta kiring, shunda yangi nom bilan "
+			"ko'rinadi."_q);
 	});
 
 	Ui::AddDivider(content);
@@ -1697,15 +1701,21 @@ void fillAboutTab(
 		Ui::Toast::Show(u"Zaxira nusxa olinmoqda, biroz kuting..."_q);
 
 		const auto weak = base::make_weak(content);
-		CustomDB::ExportFullBackupAsync(dir, [=](const QString &result) {
-			if (!weak) return; // Oyna yopilgan bo'lishi mumkin.
-			exportBtn->setDisabled(false);
-			if (result.isEmpty()) {
-				Ui::Toast::Show(u"Eksport amalga oshmadi."_q);
-			} else {
-				Ui::Toast::Show(u"Eksport saqlandi: "_q + result);
-			}
-		});
+		CustomDB::ExportFullBackupAsync(
+			dir,
+			[=](const QString &result) {
+				if (!weak) return; // Oyna yopilgan bo'lishi mumkin.
+				exportBtn->setDisabled(false);
+				if (result.isEmpty()) {
+					Ui::Toast::Show(u"Eksport amalga oshmadi."_q);
+				} else {
+					Ui::Toast::Show(u"Eksport saqlandi: "_q + result);
+				}
+			},
+			[=](const QString &stage, int percent) {
+				if (!weak) return;
+				Ui::Toast::Show(u"%1... (%2%)"_q.arg(stage).arg(percent));
+			});
 	});
 
 	const auto importBtn = content->add(
@@ -1728,13 +1738,34 @@ void fillAboutTab(
 			: path;
 		if (source.isEmpty()) return;
 
+		// Rejim tanlash: Merge (birlashtirish) yoki To'liq almashtirish.
+		QMessageBox modeBox(dialogParent);
+		modeBox.setWindowTitle(u"Zaxiradan tiklash rejimi"_q);
+		modeBox.setText(u"Tiklash rejimini tanlang:"_q);
+		const auto mergeBtn = modeBox.addButton(
+			u"🔗 Birlashtirish"_q, QMessageBox::AcceptRole);
+		const auto replaceBtn = modeBox.addButton(
+			u"🔄 Toʻliq almashtirish"_q, QMessageBox::DestructiveRole);
+		modeBox.addButton(QMessageBox::Cancel);
+		modeBox.setDefaultButton(mergeBtn);
+		modeBox.exec();
+
+		const auto clicked = modeBox.clickedButton();
+		if (clicked != mergeBtn && clicked != replaceBtn) return; // Cancel.
+		const bool fullReplace = (clicked == replaceBtn);
+
 		const auto reply = QMessageBox::warning(
 			dialogParent,
 			u"Zaxiradan tiklash"_q,
-			u"Tanlangan zaxiradagi maʻlumotlar JORIY arxivga QOʻSHILADI\n"
-			"(birlashtiriladi) — hozirgi qurilmadagi oʻchirilgan/tahrirlangan\n"
-			"xabarlar va media saqlanib qoladi, oʻchirilmaydi.\n\n"
-			"Davom etasizmi?"_q,
+			fullReplace
+				? u"DIQQAT! Joriy arxivdagi BARCHA maʻlumotlar\n"
+				  "(oʻchirilgan/tahrirlangan xabarlar, media) OʻCHIRILADI\n"
+				  "va tanlangan zaxira bilan toʻliq almashtiriladi.\n\n"
+				  "Bu amalni ortga qaytarib boʻlmaydi. Davom etasizmi?"_q
+				: u"Tanlangan zaxiradagi maʻlumotlar JORIY arxivga QOʻSHILADI\n"
+				  "(birlashtiriladi) — hozirgi qurilmadagi oʻchirilgan/tahrirlangan\n"
+				  "xabarlar va media saqlanib qoladi, oʻchirilmaydi.\n\n"
+				  "Davom etasizmi?"_q,
 			QMessageBox::Yes | QMessageBox::Cancel,
 			QMessageBox::Cancel);
 		if (reply != QMessageBox::Yes) return;
@@ -1744,7 +1775,7 @@ void fillAboutTab(
 		Ui::Toast::Show(u"Zaxiradan tiklanmoqda, biroz kuting..."_q);
 
 		const auto weak = base::make_weak(content);
-		CustomDB::ImportFullBackupAsync(source, [=](bool ok) {
+		CustomDB::ImportFullBackupAsync(source, fullReplace, [=](bool ok) {
 			if (!weak) return; // Oyna yopilgan bo'lishi mumkin.
 			importBtn->setDisabled(false);
 			if (ok) {
@@ -1752,8 +1783,11 @@ void fillAboutTab(
 				if (onArchiveChanged) onArchiveChanged();
 				const auto s = CustomDB::GetArchiveStats();
 				Ui::Toast::Show(
-					u"Tiklash muvaffaqiyatli! %1 oʻchirilgan, %2 tahrirlangan. "
-					"Dastur 3 soniya ichida qayta yuklanadi..."_q
+					(fullReplace
+						? u"Toʻliq almashtirish muvaffaqiyatli! "_q
+						: u"Tiklash muvaffaqiyatli! "_q)
+					+ u"%1 oʻchirilgan, %2 tahrirlangan. "
+					  "Dastur 3 soniya ichida qayta yuklanadi..."_q
 						.arg(s.deletedCount).arg(s.editedCount));
 				// Registry va JSON sozlamalar yangi qiymatlar bilan to'liq
 				// qo'llanishi uchun avtomatik restart. 3 soniya — foydalanuvchi

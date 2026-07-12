@@ -340,6 +340,17 @@ public:
 		Data::ResolvedForwardDraft &&draft,
 		SendAction action,
 		FnMut<void()> &&successCallback = nullptr);
+	// CustomMod: re-uploads a single noforwards-protected item as a fresh
+	// message instead of using messages.forwardMessages (server rejects
+	// that call for protected content with CHAT_FORWARDS_RESTRICTED).
+	// Called both as a pre-check inside forwardMessages() and as a retry
+	// fallback when the server rejects a forward the client didn't detect
+	// as protected up front (e.g. a message re-forwarded a second time out
+	// of Saved Messages, where the noforwards flag isn't always visible
+	// client-side but is still enforced server-side).
+	void bypassForwardItem(
+		not_null<HistoryItem*> item,
+		const SendAction &action);
 	void shareContact(
 		const QString &phone,
 		const QString &firstName,
