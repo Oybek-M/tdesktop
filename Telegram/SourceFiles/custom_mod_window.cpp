@@ -469,6 +469,8 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 				}
 			}, descLabel->lifetime());
 		}
+
+		return btn;
 	};
 
 	Ui::AddSkip(content, st::settingsThumbSkip);
