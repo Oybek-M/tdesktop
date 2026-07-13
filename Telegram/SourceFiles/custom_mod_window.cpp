@@ -219,7 +219,8 @@ private:
 void fillGeneralTab(not_null<Ui::VerticalLayout*> content);
 void fillPeersTab(
 	not_null<Ui::VerticalLayout*> content,
-	not_null<Window::SessionController*> controller);
+	not_null<Window::SessionController*> controller,
+	Fn<void()> onRebuild);
 void fillPerChatSection(
 	not_null<Ui::VerticalLayout*> content,
 	not_null<Window::SessionController*> controller);
@@ -313,7 +314,20 @@ void CustomModWindow::setupContent(
 	};
 
 	fillGeneralTab(makeInner(0));
-	fillPeersTab(makeInner(1), controller);
+
+	// Peers tab — White/Black List konflikti hal qilinganda to'liq qayta quriladi.
+	const auto panel1 = _panels[1];
+	const auto rebuildPeers = std::make_shared<Fn<void()>>();
+	*rebuildPeers = [=]() {
+		const auto inner = panel1->setOwnedWidget(
+			object_ptr<Ui::VerticalLayout>(panel1));
+		_inners[1] = inner;
+		panel1->widthValue() | rpl::on_next([=](int w) {
+			inner->resizeToWidth(w);
+		}, inner->lifetime());
+		fillPeersTab(inner, controller, *rebuildPeers);
+	};
+	(*rebuildPeers)();
 
 	// Archive tab — yangilash tugmasi bosilganda to'liq qayta quriladi.
 	const auto panel2 = _panels[2];
@@ -731,7 +745,8 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 void fillPeerSection(
 		not_null<Ui::VerticalLayout*> content,
 		not_null<Window::SessionController*> controller,
-		bool isWhitelist) {
+		bool isWhitelist,
+		Fn<void()> onRebuild) {
 	struct State {
 		int visibleCount = 0;
 		Ui::VerticalLayout *entriesLayout = nullptr;
@@ -788,21 +803,30 @@ void fillPeerSection(
 				: CustomSettings::IsBlocklistCategoryEnabled(type);
 			btn->toggleOn(rpl::single(initial));
 			btn->toggledValue() | rpl::skip(1) | rpl::on_next([=](bool on) {
+				const bool hadConflict = on && (isWhitelist
+					? CustomSettings::IsBlocklistCategoryEnabled(type)
+					: CustomSettings::IsWhitelistCategoryEnabled(type));
 				if (isWhitelist) {
 					CustomSettings::SetWhitelistCategory(type, on);
 				} else {
 					CustomSettings::SetBlocklistCategory(type, on);
 				}
+				if (hadConflict) {
+					Ui::Toast::Show(
+						u"Qarama-qarshi roʻyxatdagi mos kategoriya "
+						"avtomatik oʻchirildi."_q);
+					if (onRebuild) onRebuild();
+				}
 			}, btn->lifetime());
 		};
 		addCategoryToggle(
-			u"Barcha shaxsiy chatlar (Users)"_q,
+			u"Shaxsiy chatlar"_q,
 			CustomSettings::PeerType::User);
 		addCategoryToggle(
-			u"Barcha guruhlar (Groups)"_q,
+			u"Guruhlar"_q,
 			CustomSettings::PeerType::Group);
 		addCategoryToggle(
-			u"Barcha kanallar / superguruhlar (Channels)"_q,
+			u"Kanallar / superguruhlar"_q,
 			CustomSettings::PeerType::Channel);
 	}
 
@@ -1397,7 +1421,8 @@ void fillPerChatSection(
 
 void fillPeersTab(
 		not_null<Ui::VerticalLayout*> content,
-		not_null<Window::SessionController*> controller) {
+		not_null<Window::SessionController*> controller,
+		Fn<void()> onRebuild) {
 	Ui::AddSkip(content, st::settingsThumbSkip);
 	{
 		const auto lbl = content->add(
@@ -1443,12 +1468,12 @@ void fillPeersTab(
 	Ui::AddDivider(content);
 	Ui::AddSkip(content, st::settingsThumbSkip);
 
-	fillPeerSection(content, controller, true);
+	fillPeerSection(content, controller, true, onRebuild);
 
 	Ui::AddDivider(content);
 	Ui::AddSkip(content, st::settingsThumbSkip);
 
-	fillPeerSection(content, controller, false);
+	fillPeerSection(content, controller, false, onRebuild);
 
 	Ui::AddDivider(content);
 	Ui::AddSkip(content, st::settingsThumbSkip);
