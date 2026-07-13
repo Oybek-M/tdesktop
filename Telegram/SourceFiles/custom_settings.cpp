@@ -397,6 +397,9 @@ bool IsWhitelistCategoryEnabled(PeerType type) {
 void SetWhitelistCategory(PeerType type, bool enabled) {
     if (!gInitialized) Init();
     gWhitelistCategories[static_cast<int>(type)] = enabled;
+    if (enabled) {
+        gBlocklistCategories[static_cast<int>(type)] = false; // mutual exclusion
+    }
     SavePeerLists();
 }
 
@@ -409,6 +412,9 @@ bool IsBlocklistCategoryEnabled(PeerType type) {
 void SetBlocklistCategory(PeerType type, bool enabled) {
     if (!gInitialized) Init();
     gBlocklistCategories[static_cast<int>(type)] = enabled;
+    if (enabled) {
+        gWhitelistCategories[static_cast<int>(type)] = false; // mutual exclusion
+    }
     SavePeerLists();
 }
 
