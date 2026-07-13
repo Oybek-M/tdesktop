@@ -854,11 +854,44 @@ inersiya orqali ham tugallanishi mumkin, avvalgidek to'satdan
 kesilib qolmaydi). `PullToNextChannel` (dialogs next-channel) bu
 o'zgarishdan ta'sirlanmaydi — u butunlay boshqa, mustaqil komponent.
 
-**Keyingi qadam:** Foydalanuvchi `-debug` bilan qayta build+test
-qilishi, va `log.txt`dan yangi `"SWIPEDEBUG: ScrollMomentum tick,
-continues=..."` qatorlarini tekshirishi kerak — bu ScrollMomentum
-haqiqatan sodir bo'layotganini va endi to'g'ri boshqarilayotganini
-tasdiqlaydi.
+### Yakuniy diagnostika natijasi (2026-07-13) — MASALA TO'XTATILDI (PAUSED)
+
+20+ marta test qilingan, faqat 1 marta muvaffaqiyatli (`-debug` bilan
+to'liq log tahlil qilindi). Aniq raqamli xulosa:
+
+- `Qt::ScrollMomentum` — **butun log bo'yicha 0 marta sodir bo'lgan**.
+  Oldingi "momentum" gipotezasi NOTO'G'RI edi (fix zararsiz, lekin
+  kerak emas edi — o'chirilmadi, chunki hech qachon ishga tushmaydi).
+- 78 marta gesture `orientation=Horizontal`ga yetib, `processEnd()`
+  ratio hisoblagan. Shundan faqat **2 tasi** (`willTrigger=true`).
+- `usedDelta` (to'plangan, damping'dan keyingi masofa) taqsimoti:
+  **min=1.2, median=6.8, mean=7.67, p75=8.4, p90=10, max=75**
+  (threshold=20, joriy `speedRatio=0.4` bilan).
+
+**Xulosa**: Bu endi sof matematik/kalibrlash masalasi — foydalanuvchi
+trackpad'i Windows orqali juda kichik "delta" qiymatlarini yuboradi
+(OS/driver xususiyati), va hatto eng yaxshi 90% urinish (p90=10) ham
+joriy chegaraga (20) yetmaydi. Threshold'ni yanada pasaytirish
+(`speedRatio`ni ~0.1–0.16 oralig'iga tushirish) muvaffaqiyat
+darajasini sezilarli oshirishi kerak (taxminiy 25–65%, aniq qiymatga
+bog'liq), lekin bu tasodifiy vertikal scroll'ni xato swipe deb
+aniqlash xavfini ham oshiradi (kichik, chunki `skipWheelEvent`
+allaqachon `|dx| > |dy|` talab qiladi, lekin nolga teng emas).
+
+**Foydalanuvchi qarori**: Hozircha bu nozik sozlashga vaqt
+sarflanmaydi — official upstream'da tabiiy fix chiqishini kutish
+va boshqa ustuvor vazifalarga o'tish tanlandi. Masala **PAUSED**,
+kod hozirgi (qisman ishlaydigan, ~2.5% muvaffaqiyat) holatda
+qoldirilgan — SWIPEDEBUG diagnostika kodda saqlanmoqda.
+
+**Qaytilganda keyingi qadam** (agar vaqt topilsa): Yuqoridagi
+statistikaga asosan `history_inner_widget.cpp:776`dagi
+`result.speedRatio = 0.4;` qiymatini kamaytirish (masalan `0.16`
+yoki `0.1` — foydalanuvchi bilan trade-off muhokama qilingandan
+keyin), qayta build+test, va shu bo'limni yangilash. Doimiy
+diagnostika kodini (`SWIPEDEBUG` qatorlari) olib tashlash — faqat
+masala TO'LIQ hal qilingandan keyin, alohida yakuniy tozalash
+commit'ida.
 
 ### ⚠️ Muhim ogohlantirish: kelajakdagi upstream sync bilan konflikt xavfi
 
