@@ -1183,7 +1183,7 @@ void fillPerChatSection(
 	content->add(
 		object_ptr<Ui::FlatLabel>(
 			content,
-			rpl::single(u"Per-Chat Sozlamalar"_q),
+			rpl::single(u"⚙️ Individual sozlamalar (istisnolar)"_q),
 			st::defaultSubsectionTitle),
 		st::defaultSubsectionTitlePadding);
 
@@ -1191,8 +1191,10 @@ void fillPerChatSection(
 		const auto desc = content->add(
 			object_ptr<Ui::FlatLabel>(
 				content,
-				rpl::single(u"Bu yerdagi chatlar uchun Ghost, Anti-Delete va Anti-Edit "
-					"alohida sozlanadi. White/Black list dan past prioritet."_q),
+				rpl::single(u"Agar biror chat uchun faqat bitta funksiyani (masalan "
+					"faqat Ghost Mode) alohida sozlamoqchi bo'lsangiz — shu yerdan "
+					"qo'shing. Bu ro'yxat White/Black List'dan KEYIN tekshiriladi "
+					"(ular ustunroq)."_q),
 				st::customModHintLabel),
 			st::boxRowPadding,
 			style::al_justify);
