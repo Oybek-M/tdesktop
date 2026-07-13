@@ -1,6 +1,7 @@
 /out/
 Debug/
 Release/
+/.superpowers/
 /.worktrees/
 /ThirdParty/
 /Telegram/ThirdParty/dispatch/
