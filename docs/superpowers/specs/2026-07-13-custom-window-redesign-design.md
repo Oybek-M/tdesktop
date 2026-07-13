@@ -35,7 +35,14 @@ Joriy 3 ta alohida sarlavha ("Privacy & Ghost Mode" qolgan 2 toggle, "Cheklovlar
 
 - Sarlavha: `"🛡️ Privacy & Custom Mods"`
 - Toggle'lar tartibi (barchasi mavjud, faqat guruhlanish o'zgaradi):
-  1. `ghostMode` — Ghost Mode
+  1. `ghostMode` — Ghost Mode. **Qo'shimcha izoh** (yangi, mavjud tavsif ostiga
+     kichik matn sifatida): *"Yoqilgach, to'liq kuchga kirishi uchun 1-2
+     daqiqa ketishi mumkin."* — sabab: `api/api_updates.cpp`dagi
+     `updateOnline()` online-holat yangilanishini serverga ataylab
+     throttling bilan (server config `onlineUpdatePeriod`, standart ~2
+     daqiqa) jo'natadi, spam-so'rovlarni oldini olish uchun. Ghost Mode
+     O'CHIRILGANDA bu kechikish yo'q (deyarli darhol qayta "online"
+     bo'ladi) — izoh faqat YOQISH holatiga tegishli.
   2. `storyAnonymousView` — Hikoyalarni anonim ko'rish
   3. `bypassRestrictions` — Cheklangan chatda nusxalash va yuborish
   4. `antiDelete` — Anti-Delete
