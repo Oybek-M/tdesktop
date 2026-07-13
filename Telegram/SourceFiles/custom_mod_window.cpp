@@ -856,13 +856,23 @@ void fillPeerSection(
 					Ui::Toast::Show(u"Bu chat allaqachon roʻyxatda."_q);
 					return true;
 				}
+				const auto wasInOpposite = isWhitelist
+					? CustomSettings::IsInBlocklist(peerId)
+					: CustomSettings::IsInWhitelist(peerId);
 				if (isWhitelist) {
 					CustomSettings::AddToWhitelist(peerId, name);
 				} else {
 					CustomSettings::AddToBlocklist(peerId, name);
 				}
-				state->addEntry(peerId, name);
-				Ui::Toast::Show(name + u" qoʻshildi."_q);
+				if (wasInOpposite) {
+					Ui::Toast::Show(name + (isWhitelist
+						? u" Black List'dan olib tashlandi va White List'ga qoʻshildi."_q
+						: u" White List'dan olib tashlandi va Black List'ga qoʻshildi."_q));
+					if (onRebuild) onRebuild();
+				} else {
+					state->addEntry(peerId, name);
+					Ui::Toast::Show(name + u" qoʻshildi."_q);
+				}
 				// raise()/activateWindow() shart emas — dialog window ichida ochiladi.
 				return true;
 			},
@@ -917,16 +927,26 @@ void fillPeerSection(
 			Ui::Toast::Show(u"Bu chat allaqachon roʻyxatda."_q);
 			return;
 		}
+		const auto wasInOpposite = isWhitelist
+			? CustomSettings::IsInBlocklist(peerId)
+			: CustomSettings::IsInWhitelist(peerId);
 		const auto name = nameInput->getLastText().trimmed();
 		if (isWhitelist) {
 			CustomSettings::AddToWhitelist(peerId, name);
 		} else {
 			CustomSettings::AddToBlocklist(peerId, name);
 		}
-		state->addEntry(peerId, name);
 		peerIdInput->setText(QString());
 		nameInput->setText(QString());
-		Ui::Toast::Show(u"Qoʻshildi: "_q + peerId);
+		if (wasInOpposite) {
+			Ui::Toast::Show(u"Qarama-qarshi roʻyxatdan olib tashlandi va "_q
+				+ (isWhitelist ? u"White List"_q : u"Black List"_q)
+				+ u"'ga qoʻshildi: "_q + peerId);
+			if (onRebuild) onRebuild();
+		} else {
+			state->addEntry(peerId, name);
+			Ui::Toast::Show(u"Qoʻshildi: "_q + peerId);
+		}
 	});
 
 	// ── Ro'yxat: header + bo'sh holat + entries ─────────────────
