@@ -856,6 +856,10 @@ void fillPeerSection(
 					Ui::Toast::Show(u"Bu chat allaqachon roʻyxatda."_q);
 					return true;
 				}
+				// wasInOpposite AddToWhitelist/AddToBlocklist dan OLDIN hisoblanishi shart —
+				// bu funksiyalar chaqirilgach, peer avtomatik ravishda qarama-qarshi
+				// roʻyxatdan olib tashlanadi (mutual exclusion), shuning uchun keyin
+				// tekshirsak har doim false qaytadi.
 				const auto wasInOpposite = isWhitelist
 					? CustomSettings::IsInBlocklist(peerId)
 					: CustomSettings::IsInWhitelist(peerId);
@@ -927,6 +931,10 @@ void fillPeerSection(
 			Ui::Toast::Show(u"Bu chat allaqachon roʻyxatda."_q);
 			return;
 		}
+		// wasInOpposite AddToWhitelist/AddToBlocklist dan OLDIN hisoblanishi shart —
+		// bu funksiyalar chaqirilgach, peer avtomatik ravishda qarama-qarshi
+		// roʻyxatdan olib tashlanadi (mutual exclusion), shuning uchun keyin
+		// tekshirsak har doim false qaytadi.
 		const auto wasInOpposite = isWhitelist
 			? CustomSettings::IsInBlocklist(peerId)
 			: CustomSettings::IsInWhitelist(peerId);
