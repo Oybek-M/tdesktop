@@ -473,54 +473,53 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 	};
 
 	Ui::AddSkip(content, st::settingsThumbSkip);
-	addSection(u"Privacy & Ghost Mode"_q);
-	addToggle(
-		u"ghostMode"_q,
-		u"Ghost Mode"_q,
-		u"Online holatini, yozmoqda belgisini va xabar oʻqildi bildirishnomasini yashiradi."_q);
-	addToggle(
-		u"storyAnonymousView"_q,
-		u"Hikoyalarni anonim koʻrish"_q,
-		u"Hikoyani koʻrganingiz haqida egasiga bildirish yuborilmaydi."_q);
-	addToggle(
+	addSection(u"📱 Qurilma ko'rinishini almashtirish"_q);
+	const auto spoofToggleBtn = addToggle(
 		u"spoofMobile"_q,
 		u"Mobil qurilma koʻrinishi"_q,
 		u"Telegram mobil ilovadan ishlatilayotgandek koʻrinadi."_q);
 
 	Ui::AddSkip(content, 8);
 
-	// C22: Dynamic device spoof — qurilma nomi va versiya
-	content->add(
-		object_ptr<Ui::FlatLabel>(
+	// C22: Dynamic device spoof — spoofMobile OFF bo'lganda forma yashirinadi.
+	const auto spoofFormWrap = content->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 			content,
+			object_ptr<Ui::VerticalLayout>(content)),
+		style::margins(0, 0, 0, 0));
+	const auto spoofForm = spoofFormWrap->entity();
+
+	spoofForm->add(
+		object_ptr<Ui::FlatLabel>(
+			spoofForm,
 			rpl::single(u"Qurilma nomi:"_q),
 			st::defaultSubsectionTitle),
 		st::defaultSubsectionTitlePadding);
-	const auto spoofModelInput = content->add(
+	const auto spoofModelInput = spoofForm->add(
 		object_ptr<Ui::InputField>(
-			content,
+			spoofForm,
 			st::defaultInputField,
 			rpl::single(u"Qurilma nomi"_q),
 			CustomSettings::SpoofDeviceModel()),
 		st::boxRowPadding);
 
-	content->add(
+	spoofForm->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
+			spoofForm,
 			rpl::single(u"Tizim versiyasi:"_q),
 			st::defaultSubsectionTitle),
 		st::defaultSubsectionTitlePadding);
-	const auto spoofVersionInput = content->add(
+	const auto spoofVersionInput = spoofForm->add(
 		object_ptr<Ui::InputField>(
-			content,
+			spoofForm,
 			st::defaultInputField,
 			rpl::single(u"Tizim versiyasi"_q),
 			CustomSettings::SpoofSystemVersion()),
 		st::boxRowPadding);
 
-	content->add(
+	spoofForm->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
+			spoofForm,
 			rpl::single(u"Qurilma turi (icon):"_q),
 			st::defaultSubsectionTitle),
 		st::defaultSubsectionTitlePadding);
@@ -537,9 +536,9 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 			const auto idx = i;
 			const auto model = kPresets[i].model;
 			const auto version = kPresets[i].version;
-			content->add(
+			spoofForm->add(
 				object_ptr<Ui::RoundButton>(
-					content,
+					spoofForm,
 					rpl::single(kPresets[i].label),
 					st::defaultBoxButton),
 				st::boxRowPadding)
@@ -551,10 +550,10 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 		}
 	}
 
-	Ui::AddSkip(content, 8);
-	content->add(
+	Ui::AddSkip(spoofForm, 8);
+	spoofForm->add(
 		object_ptr<Ui::RoundButton>(
-			content,
+			spoofForm,
 			rpl::single(u"💾 Saqlash (qurilma sozlamalari)"_q),
 			st::defaultBoxButton),
 		st::boxRowPadding)
@@ -569,18 +568,32 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 			u"Saqlandi! Yangi nom keyingi restart'dan boshlab "
 			"qo'llanadi (qayta login shart emas)."_q);
 	});
+	Ui::AddSkip(spoofForm, 8);
+
+	spoofFormWrap->toggle(
+		CustomSettings::Get().spoofMobile,
+		anim::type::instant);
+	spoofToggleBtn->toggledValue()
+		| rpl::skip(1)
+		| rpl::on_next([=](bool on) {
+			spoofFormWrap->toggle(on, anim::type::normal);
+		}, spoofFormWrap->lifetime());
 
 	Ui::AddDivider(content);
 	Ui::AddSkip(content, st::settingsThumbSkip);
-	addSection(u"Cheklovlar"_q);
+	addSection(u"🛡️ Privacy & Custom Mods"_q);
+	addToggle(
+		u"ghostMode"_q,
+		u"Ghost Mode"_q,
+		u"Online holatini, yozmoqda belgisini va xabar oʻqildi bildirishnomasini yashiradi.\n\nYoqilgach, to'liq kuchga kirishi uchun 1-2 daqiqa ketishi mumkin."_q);
+	addToggle(
+		u"storyAnonymousView"_q,
+		u"Hikoyalarni anonim koʻrish"_q,
+		u"Hikoyani koʻrganingiz haqida egasiga bildirish yuborilmaydi."_q);
 	addToggle(
 		u"bypassRestrictions"_q,
 		u"Cheklangan chatda nusxalash va yuborish"_q,
 		u"Cheklov qoʻyilgan chatlardagi xabarlarni boshqaga yuborish yoki nusxa olishga ruxsat beradi."_q);
-
-	Ui::AddDivider(content);
-	Ui::AddSkip(content, st::settingsThumbSkip);
-	addSection(u"Xabarlar tarixi"_q);
 	addToggle(
 		u"antiDelete"_q,
 		u"Anti-Delete"_q,
