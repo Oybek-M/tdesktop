@@ -27,6 +27,8 @@ All edits are in two files:
 
 **Why:** Task 2 needs a handle to the `spoofMobile` toggle's `Ui::SettingsButton` so it can drive the Device Spoof form's collapse/expand animation. Currently `addToggle` returns `void`.
 
+**Status:** ✅ Implemented, spec-reviewed, and code-quality-reviewed via subagent-driven-development. Commits `bd802e1184`, `5f4f8461ae` (blank-line fixup).
+
 - [ ] **Step 1: Add a `return btn;` at the end of the `addToggle` lambda**
 
 Find this exact block (lines 420-472 today):
@@ -136,6 +138,8 @@ git commit -m "custom_mod: addToggle endi Ui::SettingsButton* qaytaradi"
 - Modify: `Telegram/SourceFiles/custom_mod_window.cpp:474-594` (inside `fillGeneralTab`, between the `addToggle` lambda from Task 1 and the unchanged Branding section that already starts at line 596)
 
 **Why:** Per the approved spec (`docs/superpowers/specs/2026-07-13-custom-window-redesign-design.md`, section 2), Device Spoof becomes the first block and collapses when off; the three separate toggle groups ("Privacy & Ghost Mode" minus Device Spoof, "Cheklovlar", "Xabarlar tarixi") merge into one "🛡️ Privacy & Custom Mods" block. The Branding section (current lines 596-715) is untouched — it already sits last, so no code needs to move for it.
+
+**Status:** ✅ Implemented, spec-reviewed, and code-quality-reviewed via subagent-driven-development. Commit `862bc94eec`.
 
 - [ ] **Step 1: Replace lines 474-594 with the new block order**
 
@@ -437,6 +441,8 @@ git commit -m "custom_mod: General tab qayta tashkil qilindi (Device Spoof yuqor
 
 **Why:** Per spec section 3.1 item 1 — turning a category (Users/Groups/Channels) ON in one list must automatically turn the same category OFF in the other list. This mirrors the mutual exclusion already implemented for individual peers in `AddToWhitelist`/`AddToBlocklist` (lines 295-300, 331-336 of the same file), which directly manipulate the sibling `QMap` rather than calling the sibling's public setter — this plan follows that exact existing style.
 
+**Status:** ✅ Implemented, spec-reviewed, and code-quality-reviewed via subagent-driven-development. Commit `3a79c68b47`.
+
 - [ ] **Step 1: Add mutual exclusion to `SetWhitelistCategory` and `SetBlocklistCategory`**
 
 Find (lines 397-413 today):
@@ -512,6 +518,8 @@ git commit -m "custom_settings: kategoriya darajasida White/Black List mutual ex
 - Modify: `Telegram/SourceFiles/custom_mod_window.cpp:1384-1443` (`fillPeersTab`)
 
 **Why:** Per spec section 3.1 item 1, when a category conflict happens the *other* list's toggle must visually flip off. The simplest, lowest-risk way to refresh that toggle's visual state — without introducing new `rpl::variable` cross-wiring — is to rebuild the whole Peers tab panel, exactly like the Archive tab's existing `rebuildArchive` mechanism (`setupContent`, lines 318-330 today) already does for its own refresh button.
+
+**Status:** ✅ Implemented, spec-reviewed, and code-quality-reviewed via subagent-driven-development (including a verified analysis confirming no use-after-free risk from rebuilding the panel mid-callback — `_layerManager` and `_panels[1]` are sibling members of `CustomModWindow`, not parent/child). Commit `ca7e4fd276`.
 
 - [ ] **Step 1: Update the forward declarations**
 
@@ -896,6 +904,8 @@ git commit -m "custom_mod: Peers tab endi to'liq qayta quriladi, kategoriya konf
 
 **Why:** Per spec section 3.1 item 2 — adding a peer to one list that's already in the other list must show `"«Ism» BlackList'dan olib tashlandi va WhiteList'ga qo'shildi."` (or the mirror message) and the other list's on-screen entry must disappear. The data-layer removal already happens automatically today (`AddToWhitelist`/`AddToBlocklist` in `custom_settings.cpp` already call `gBlocklist.remove(peerId)` / `gWhitelist.remove(peerId)`) — this task only adds the UI-facing detection, toast, and rebuild call.
 
+**Status:** ✅ Implemented, spec-reviewed, and code-quality-reviewed via subagent-driven-development. Commits `b565ce0fcb`, `ba8a17b7f0` (clarifying comment added per review feedback).
+
 - [ ] **Step 1: Update the "Chat tanlash" handler**
 
 Find (lines 805-834):
@@ -1080,6 +1090,8 @@ git commit -m "custom_mod: individual chat qo'shishda White/Black List konflikti
 
 **Why:** Per spec section 3.2 — rename from "Per-Chat Sozlamalar" to "⚙️ Individual sozlamalar (istisnolar)" with an updated, friendlier description that also clarifies priority order relative to White/Black List.
 
+**Status:** ✅ Implemented, spec-reviewed, and code-quality-reviewed via subagent-driven-development. Commit `f95eb9530c`.
+
 - [ ] **Step 1: Replace the header and description**
 
 Find (lines 1116-1142):
@@ -1170,6 +1182,8 @@ git commit -m "custom_mod: Per-Chat bo'limi 'Individual sozlamalar (istisnolar)'
 **Files:** none (verification only)
 
 **Why:** Tasks 1-6 touch shared state (`fillPeerSection`'s `state->addEntry`, the Peers tab rebuild lambda, `addToggle`'s new return value) — a full pass through both tabs catches integration issues that per-task verification might miss.
+
+**Status:** ⏳ Pending — all 6 code tasks above are implemented, spec-reviewed, and code-quality-reviewed, but this manual build+run verification pass has not happened yet. The human partner's local machine hit two unrelated environment issues while attempting to build: (1) the disk ran out of space during a Debug build (`out/Telegram/Telegram.dir/Debug`, ~17.6 GB of intermediate `.obj` files, was cleared — freed 17.59 GB), and (2) a subsequent Release build failed with `LNK1102` (linker out of memory — machine has 15.4 GB total RAM, ~6 GB free; `PreferredToolArchitecture=x64` is already correctly set in the generated `.vcxproj` files, so this is genuine RAM pressure, not a 32-bit-toolset misconfiguration). Recommended before retrying: close other memory-heavy applications and reduce Visual Studio's "maximum number of parallel project builds" to 1 (Tools → Options → Projects and Solutions → Build and Run) to lower peak memory during compilation/linking. Once a build succeeds, resume this task's Step 1 manual walkthrough.
 
 - [ ] **Step 1: Full manual walkthrough**
 
