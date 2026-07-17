@@ -31,6 +31,14 @@ struct Values {
     int  spoofDeviceType = 0; // 0=Android, 1=iOS, 2=Windows, 3=Linux
     QString spoofDeviceModel = u"Samsung Galaxy S26 Ultra"_q;
     QString spoofSystemVersion = u"Android 15"_q;
+    // Mutual-Contact Indikatori: mutual_contact bo'lgan peerlar ismi yoniga
+    // emoji qo'shish, 3 mustaqil joy uchun mustaqil toggle+emoji.
+    bool mutualContactShowInChatList = true;
+    QString mutualContactChatListEmoji = u"🤝"_q;
+    bool mutualContactShowInContactsList = true;
+    QString mutualContactContactsListEmoji = u"🤝"_q;
+    bool mutualContactShowInProfile = true;
+    QString mutualContactProfileEmoji = u"🤝"_q;
 };
 
 void Init();
@@ -51,6 +59,13 @@ inline int     SpoofDeviceType()    { return Get().spoofDeviceType; }
 inline QString SpoofDeviceModel()   { return Get().spoofDeviceModel; }
 inline QString SpoofSystemVersion() { return Get().spoofSystemVersion; }
 [[nodiscard]] QString SpoofLangPack();
+
+inline bool    MutualContactShowInChatList()     { return Get().mutualContactShowInChatList; }
+inline QString MutualContactChatListEmoji()      { return Get().mutualContactChatListEmoji; }
+inline bool    MutualContactShowInContactsList() { return Get().mutualContactShowInContactsList; }
+inline QString MutualContactContactsListEmoji()  { return Get().mutualContactContactsListEmoji; }
+inline bool    MutualContactShowInProfile()      { return Get().mutualContactShowInProfile; }
+inline QString MutualContactProfileEmoji()       { return Get().mutualContactProfileEmoji; }
 
 // Per-chat Ghost Mode override (legacy C12).
 [[nodiscard]] bool GhostModeForPeer(const QString &peerId);

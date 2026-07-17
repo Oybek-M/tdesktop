@@ -130,11 +130,17 @@ void UpdateValue(const QString &id, bool value) {
     else if (id == "antiEdit") gValues.antiEdit = value;
     else if (id == "spoofMobile") gValues.spoofMobile = value;
     else if (id == "storyAnonymousView") gValues.storyAnonymousView = value;
+    else if (id == "mutualContactShowInChatList") gValues.mutualContactShowInChatList = value;
+    else if (id == "mutualContactShowInContactsList") gValues.mutualContactShowInContactsList = value;
+    else if (id == "mutualContactShowInProfile") gValues.mutualContactShowInProfile = value;
 }
 
 void UpdateString(const QString &id, const QString &value) {
     if (id == "spoofDeviceModel") gValues.spoofDeviceModel = value;
     else if (id == "spoofSystemVersion") gValues.spoofSystemVersion = value;
+    else if (id == "mutualContactChatListEmoji") gValues.mutualContactChatListEmoji = value;
+    else if (id == "mutualContactContactsListEmoji") gValues.mutualContactContactsListEmoji = value;
+    else if (id == "mutualContactProfileEmoji") gValues.mutualContactProfileEmoji = value;
 }
 
 void UpdateInt(const QString &id, int value) {
@@ -159,6 +165,18 @@ void Init() {
         u"Samsung Galaxy S26 Ultra"_q).toString();
     gValues.spoofSystemVersion = settings.value("spoofSystemVersion",
         u"Android 15"_q).toString();
+    gValues.mutualContactShowInChatList = settings.value(
+        "mutualContactShowInChatList", true).toBool();
+    gValues.mutualContactChatListEmoji = settings.value(
+        "mutualContactChatListEmoji", u"🤝"_q).toString();
+    gValues.mutualContactShowInContactsList = settings.value(
+        "mutualContactShowInContactsList", true).toBool();
+    gValues.mutualContactContactsListEmoji = settings.value(
+        "mutualContactContactsListEmoji", u"🤝"_q).toString();
+    gValues.mutualContactShowInProfile = settings.value(
+        "mutualContactShowInProfile", true).toBool();
+    gValues.mutualContactProfileEmoji = settings.value(
+        "mutualContactProfileEmoji", u"🤝"_q).toString();
 
     // Per-peer ghost overrides
     settings.beginGroup("GhostModePerPeer");
