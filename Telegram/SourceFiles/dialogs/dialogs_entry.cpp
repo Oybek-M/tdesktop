@@ -11,8 +11,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "dialogs/dialogs_indexed_list.h"
 #include "base/options.h"
 #include "base/unixtime.h"
+#include "custom_settings.h"
 #include "data/data_changes.h"
 #include "data/data_session.h"
+#include "data/data_user.h"
 #include "data/data_folder.h"
 #include "data/data_forum_topic.h"
 #include "data/data_chat_filters.h"
@@ -336,9 +338,19 @@ const Ui::Text::String &Entry::chatListNameText() const {
 	const auto version = chatListNameVersion();
 	if (_chatListNameVersion < version) {
 		_chatListNameVersion = version;
+		auto name = chatListName();
+		if (const auto history = asHistory()) {
+			if (const auto user = history->peer()->asUser()) {
+				if (CustomSettings::MutualContactShowInChatList()
+						&& user->isContact()
+						&& (user->flags() & UserDataFlag::MutualContact)) {
+					name += u" "_q + CustomSettings::MutualContactChatListEmoji();
+				}
+			}
+		}
 		_chatListNameText.setText(
 			st::semiboldTextStyle,
-			chatListName(),
+			name,
 			Ui::NameTextOptions());
 	}
 	return _chatListNameText;
