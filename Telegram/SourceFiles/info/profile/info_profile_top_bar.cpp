@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "chat_helpers/stickers_lottie.h"
 #include "core/application.h"
 #include "core/shortcuts.h"
+#include "custom_settings.h"
 #include "data/components/recent_shared_media_gifts.h"
 #include "data/data_birthday.h"
 #include "data/data_changes.h"
@@ -3068,7 +3069,17 @@ rpl::producer<QString> TopBar::nameValue() const {
 	if (const auto topic = _key.topic()) {
 		return Info::Profile::TitleValue(topic);
 	}
-	return Info::Profile::NameValue(_peer);
+	const auto peer = _peer;
+	return Info::Profile::NameValue(peer) | rpl::map([=](QString name) {
+		if (const auto user = peer->asUser()) {
+			if (CustomSettings::MutualContactShowInProfile()
+					&& user->isContact()
+					&& (user->flags() & UserDataFlag::MutualContact)) {
+				name += u" "_q + CustomSettings::MutualContactProfileEmoji();
+			}
+		}
+		return name;
+	});
 }
 
 TopBarActionButtonStyle TopBar::mapActionStyle(
