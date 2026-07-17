@@ -444,6 +444,9 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 		else if (id == u"antiEdit"_q) current = val.antiEdit;
 		else if (id == u"spoofMobile"_q) current = val.spoofMobile;
 		else if (id == u"storyAnonymousView"_q) current = val.storyAnonymousView;
+		else if (id == u"mutualContactShowInChatList"_q) current = val.mutualContactShowInChatList;
+		else if (id == u"mutualContactShowInContactsList"_q) current = val.mutualContactShowInContactsList;
+		else if (id == u"mutualContactShowInProfile"_q) current = val.mutualContactShowInProfile;
 
 		const auto btn = content->add(
 			object_ptr<Ui::SettingsButton>(
@@ -620,6 +623,108 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 		u"offlineDb"_q,
 		u"Offline xabar bazasi"_q,
 		u"Xabarlar va medialarni internet boʻlmaganda ham koʻrish uchun qurilmada saqlaydi."_q);
+
+	// ── Mutual-Contact Indikatori ─────────────────────────────────────
+	Ui::AddDivider(content);
+	Ui::AddSkip(content, st::settingsThumbSkip);
+	addSection(u"🤝 Mutual-Contact Indikatori"_q);
+	{
+		const auto desc = content->add(
+			object_ptr<Ui::FlatLabel>(
+				content,
+				rpl::single(u"Sizni ham qaytarib contact'ga qoʻshgan odamlar ismi "
+					"yoniga belgi qoʻyadi. Har bir joy uchun mustaqil yoqish va "
+					"mustaqil belgi (emoji) tanlash mumkin."_q),
+				st::customModHintLabel),
+			st::boxRowPadding,
+			style::al_justify);
+		content->widthValue() | rpl::on_next([=](int w) {
+			const auto lw = w
+				- st::boxRowPadding.left()
+				- st::boxRowPadding.right();
+			if (lw > 0) {
+				desc->resizeToWidth(lw);
+				desc->update();
+			}
+		}, desc->lifetime());
+	}
+
+	Ui::AddSkip(content, 8);
+	addToggle(
+		u"mutualContactShowInChatList"_q,
+		u"Chat roʻyxatida koʻrsatish"_q,
+		QString());
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(u"Belgi (chat roʻyxati uchun):"_q),
+			st::defaultSubsectionTitle),
+		st::defaultSubsectionTitlePadding);
+	const auto chatListEmojiInput = content->add(
+		object_ptr<Ui::InputField>(
+			content,
+			st::defaultInputField,
+			rpl::single(u"Emoji"_q),
+			CustomSettings::MutualContactChatListEmoji()),
+		st::boxRowPadding);
+
+	Ui::AddSkip(content, 8);
+	addToggle(
+		u"mutualContactShowInContactsList"_q,
+		u"Contacts roʻyxatida koʻrsatish"_q,
+		QString());
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(u"Belgi (Contacts roʻyxati uchun):"_q),
+			st::defaultSubsectionTitle),
+		st::defaultSubsectionTitlePadding);
+	const auto contactsListEmojiInput = content->add(
+		object_ptr<Ui::InputField>(
+			content,
+			st::defaultInputField,
+			rpl::single(u"Emoji"_q),
+			CustomSettings::MutualContactContactsListEmoji()),
+		st::boxRowPadding);
+
+	Ui::AddSkip(content, 8);
+	addToggle(
+		u"mutualContactShowInProfile"_q,
+		u"Profil sarlavhasida koʻrsatish"_q,
+		QString());
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(u"Belgi (Profil uchun):"_q),
+			st::defaultSubsectionTitle),
+		st::defaultSubsectionTitlePadding);
+	const auto profileEmojiInput = content->add(
+		object_ptr<Ui::InputField>(
+			content,
+			st::defaultInputField,
+			rpl::single(u"Emoji"_q),
+			CustomSettings::MutualContactProfileEmoji()),
+		st::boxRowPadding);
+
+	Ui::AddSkip(content, 8);
+	content->add(
+		object_ptr<Ui::RoundButton>(
+			content,
+			rpl::single(u"💾 Saqlash (belgilar)"_q),
+			st::defaultBoxButton),
+		st::boxRowPadding)
+	->addClickHandler([=] {
+		CustomSettings::SetString(
+			u"mutualContactChatListEmoji"_q,
+			chatListEmojiInput->getLastText().trimmed());
+		CustomSettings::SetString(
+			u"mutualContactContactsListEmoji"_q,
+			contactsListEmojiInput->getLastText().trimmed());
+		CustomSettings::SetString(
+			u"mutualContactProfileEmoji"_q,
+			profileEmojiInput->getLastText().trimmed());
+		Ui::Toast::Show(u"Saqlandi!"_q);
+	});
 
 	// ── Branding sektsiyasi ──────────────────────────────────────────
 	Ui::AddDivider(content);
