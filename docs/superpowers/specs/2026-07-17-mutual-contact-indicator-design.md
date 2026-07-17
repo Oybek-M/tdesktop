@@ -57,7 +57,7 @@ QString mutualContactProfileEmoji = u"🤝"_q;
 
 - `UpdateValue()`/`UpdateString()`/`Init()` ga mos `id` satrlari qo'shiladi (masalan `"mutualContactShowInChatList"`, `"mutualContactChatListEmoji"` va h.k.), xuddi `spoofMobile`/`spoofDeviceModel` kabi.
 - Global helper funksiyalar: `MutualContactShowInChatList()`, `MutualContactChatListEmoji()` va h.k. (6 ta, `SpoofDeviceModel()` patterniga o'xshash `inline` funksiyalar).
-- Yangi helper: `ShouldShowMutualContactBadge(not_null<UserData*> user)` — `user->isContact() && user->isMutualContact()` tekshiradi, umumiy joyda ishlatish uchun (3 joyning barchasi shu helper'ni chaqiradi, faqat qaysi toggle/emoji ishlatilishi farq qiladi).
+- **Rejalashtirish bosqichida qaror o'zgartirildi:** umumiy `ShouldShowMutualContactBadge()` helper `custom_settings.cpp`ga QO'SHILMAYDI — bu modul hozircha `UserData`/`data/data_user.h`ga bog'liq emas, va shu bog'liqlikni kiritish keraksiz layering-buzilish bo'lar edi (`isMutualContact()` degan alohida getter ham `UserData`da yo'q, faqat xom `flags() & UserDataFlag::MutualContact` bor). Buning o'rniga ikki qatorli shart (`user->isContact() && (user->flags() & UserDataFlag::MutualContact)`) har 3 joyning o'zida to'g'ridan-to'g'ri yoziladi — bu YAGNI'ga mos, chunki shart juda qisqa va faqat 3 marta takrorlanadi. Batafsil: implementatsiya rejasi `docs/superpowers/plans/2026-07-17-mutual-contact-indicator-plan.md`.
 
 ---
 
