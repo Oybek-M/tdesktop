@@ -31,6 +31,8 @@ All edits are in five files:
 
 **Why:** Follows the exact existing pattern used by `spoofDeviceModel`/`spoofSystemVersion` (bool + QString pairs, loaded in `Init()`, dispatched via `UpdateValue`/`UpdateString`, exposed via `inline` global getters) — this task only adds data, no UI, no behavior.
 
+**Status:** ✅ Implemented, combined-reviewed via subagent-driven-development. Commit `75aec8d5aa`.
+
 - [ ] **Step 1: Add 6 fields to `Values` struct**
 
 Find (`custom_settings.h`, inside `struct Values { ... };`):
@@ -225,6 +227,8 @@ git commit -m "custom_settings: Mutual-Contact Indikator uchun 6 ta yangi sozlam
 
 **Why:** Exposes the 3 toggles + 3 emoji inputs added in Task 1, using the exact same `addToggle` helper (for the toggles) and the exact same manual `Ui::InputField` + save-button pattern already used for the Device Spoof form (for the emoji text fields, since `addToggle` only builds boolean toggle rows, not text inputs).
 
+**Status:** ✅ Implemented, combined-reviewed via subagent-driven-development. Commit `6ed727e63c`.
+
 - [ ] **Step 1: Add the 3 new bool ids to `addToggle`'s id-matching chain**
 
 Find (inside `fillGeneralTab`, the `addToggle` lambda body):
@@ -411,6 +415,8 @@ git commit -m "custom_mod: General tab ga Mutual-Contact Indikatori sozlamalari 
 
 **Why:** Per the spec, only the display-text builder changes — not `chatListName()` itself, which is also used for sorting/search and must stay unmodified.
 
+**Status:** ✅ Implemented, combined-reviewed via subagent-driven-development. Commit `d0669da6ab`.
+
 - [ ] **Step 1: Add the two needed includes**
 
 Find (`dialogs_entry.cpp`, near the top):
@@ -506,6 +512,8 @@ git commit -m "dialogs: chat ro'yxatida Mutual-Contact Indikatori"
 
 **Why:** `ContactsBoxController::createRow` currently returns a plain `PeerListRow`. A small local subclass overriding the existing `virtual QString generateName()` hook is the narrowest possible change — it affects ONLY the Contacts list, not other `PeerListRow`-based boxes (add participants, forward picker, etc.), since those use different controller classes with their own `createRow` overrides.
 
+**Status:** ✅ Implemented, combined-reviewed via subagent-driven-development (reviewer explicitly confirmed `ChooseRecipientBoxController`/`ChooseTopicBoxController`/`ChooseSublistBoxController`'s own `createRow` overrides were untouched). Commit `7de07a923b`.
+
 - [ ] **Step 1: Add the include**
 
 Find (`peer_list_controllers.cpp`, near the top):
@@ -600,6 +608,8 @@ git commit -m "boxes: Contacts ro'yxatida Mutual-Contact Indikatori"
 
 **Why:** `TopBar::nameValue()` is a narrowly-scoped member function used only by the profile header's title label (`_title(this, nameValue(), _st.title)`) — wrapping it here, rather than the shared free function `Info::Profile::NameValue()` (used by many other UI elements across the app), keeps the change confined to exactly the "Profil sarlavhasi" location from the spec.
 
+**Status:** ✅ Implemented, combined-reviewed via subagent-driven-development (reviewer confirmed the shared `Info::Profile::NameValue()` in `info_profile_values.cpp` was not touched — 0 changes to that file in the commit). Commit `79917f461f`.
+
 - [ ] **Step 1: Add the include**
 
 Find (`info_profile_top_bar.cpp`, near the top, alongside the existing `data/data_peer.h`/`data/data_user.h` includes):
@@ -673,6 +683,8 @@ git commit -m "info/profile: Profil sarlavhasida Mutual-Contact Indikatori"
 **Files:** none (verification only)
 
 **Why:** Tasks 3-5 each touch a different, otherwise-unrelated part of the codebase (dialogs, peer-list boxes, profile info) that share only the Task 1/2 settings — a full pass confirms all three respect their independent toggles/emoji correctly and that nothing outside the 3 intended locations was affected.
+
+**Status:** ⏳ Pending — all 5 code tasks above are implemented and combined-reviewed (spec compliance + code quality, in one pass per task, per the cost-conscious mode this run used), but **none of this code has been built or run yet**. Same environment as the prior Custom Window redesign work — requires a successful Visual Studio build first. Until this manual walkthrough is actually performed, treat the feature as unverified at runtime.
 
 - [ ] **Step 1: Full manual walkthrough**
 
