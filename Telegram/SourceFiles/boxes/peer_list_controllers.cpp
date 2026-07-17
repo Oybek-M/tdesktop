@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_chat_participants.h"
 #include "api/api_premium.h" // MessageMoneyRestriction.
 #include "base/random.h"
+#include "custom_settings.h"
 #include "boxes/filters/edit_filter_chats_list.h"
 #include "settings/settings_common.h"
 #include "settings/sections/settings_premium.h"
@@ -812,9 +813,33 @@ bool ContactsBoxController::appendRow(not_null<UserData*> user) {
 	return false;
 }
 
+namespace {
+
+class MutualContactPeerListRow final : public PeerListRow {
+public:
+	explicit MutualContactPeerListRow(not_null<UserData*> user)
+	: PeerListRow(user) {
+	}
+
+	QString generateName() override {
+		auto name = PeerListRow::generateName();
+		if (const auto user = peer()->asUser()) {
+			if (CustomSettings::MutualContactShowInContactsList()
+					&& user->isContact()
+					&& (user->flags() & UserDataFlag::MutualContact)) {
+				name += u" "_q
+					+ CustomSettings::MutualContactContactsListEmoji();
+			}
+		}
+		return name;
+	}
+};
+
+} // namespace
+
 std::unique_ptr<PeerListRow> ContactsBoxController::createRow(
 		not_null<UserData*> user) {
-	return std::make_unique<PeerListRow>(user);
+	return std::make_unique<MutualContactPeerListRow>(user);
 }
 
 RecipientMoneyRestrictionError WriteMoneyRestrictionError(
