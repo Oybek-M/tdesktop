@@ -12,6 +12,24 @@
 
 ---
 
+## Implementation Status (2026-07-20)
+
+All 6 code tasks implemented via subagent-driven-development (fresh implementer subagent per task + spec-compliance review + code-quality review, with follow-up fix rounds where reviewers found issues), plus a final cross-cutting review across the whole feature. All approved. **No build has been attempted** — this environment has known disk/RAM constraints that have blocked every build attempt in this project so far (see [[project_custom_window_redesign]] memory). Task 7 (manual regression) remains blocked until a build succeeds.
+
+| Task | Commit(s) | Status |
+|---|---|---|
+| 1. DB layer | `90d010a93b` | ✅ Implemented, spec-reviewed, code-reviewed |
+| 2. Settings layer | `7755eb58b5` | ✅ Implemented, spec-reviewed, code-reviewed |
+| 3. Capture module + session hook | `445013b6b9`, fix `f5087bd13a` (DecodeStatusLabel timestamp validation) | ✅ Implemented, spec-reviewed, code-reviewed (2 rounds) |
+| 4. Peers tab UI section | `7915a04a12` | ✅ Implemented, spec-reviewed, code-reviewed |
+| 6. Shared History Viewer Box | `2567e2b501`, fix `ac463a8f0b` (clarifying comments) | ✅ Implemented, spec-reviewed, code-reviewed (2 rounds) |
+| 5. Profile page history button | `a7f751d847` | ✅ Implemented, spec-reviewed, code-reviewed |
+| 7. Manual regression pass | — | ⏳ Blocked on a successful build |
+
+Final whole-feature review (integration correctness, cross-file consistency, privacy/scope correctness, build registration completeness): **Approved**.
+
+---
+
 ### Task 1: Database layer — `activity_history` table + CRUD
 
 **Files:**
