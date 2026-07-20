@@ -4,6 +4,7 @@
 #include "core/application.h" // Core::Restart() (Import dan keyin)
 #include "custom_branding.h"
 #include "custom_db.h"
+#include "custom_activity_history_box.h"
 #include "custom_settings.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
@@ -1662,6 +1663,16 @@ void fillActivityHistorySection(
 			Ui::Toast::Show(name + u" Include List'dan olib tashlandi."_q);
 			if (onRebuild) onRebuild();
 		});
+		const auto historyRow = content->add(
+			object_ptr<Ui::SettingsButton>(
+				content,
+				rpl::single(u"📜 Tarixni ko'rish — "_q + e.second),
+				st::settingsButtonNoIcon));
+		historyRow->addClickHandler([=, peerId = e.first, name = e.second] {
+			if (!gInstance) return;
+			gInstance->showBox(CustomActivityHistory::MakeHistoryBox(
+				&controller->session(), peerId, name));
+		});
 	}
 
 	// ── Exclude List ──────────────────────────────────────────────
@@ -1712,6 +1723,16 @@ void fillActivityHistorySection(
 			CustomSettings::RemoveFromActivityExclude(peerId);
 			Ui::Toast::Show(name + u" Exclude List'dan olib tashlandi."_q);
 			if (onRebuild) onRebuild();
+		});
+		const auto historyRow = content->add(
+			object_ptr<Ui::SettingsButton>(
+				content,
+				rpl::single(u"📜 Tarixni ko'rish — "_q + e.second),
+				st::settingsButtonNoIcon));
+		historyRow->addClickHandler([=, peerId = e.first, name = e.second] {
+			if (!gInstance) return;
+			gInstance->showBox(CustomActivityHistory::MakeHistoryBox(
+				&controller->session(), peerId, name));
 		});
 	}
 

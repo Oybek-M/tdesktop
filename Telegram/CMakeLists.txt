@@ -1100,6 +1100,8 @@ PRIVATE
     custom_settings.h
     custom_activity_history.cpp
     custom_activity_history.h
+    custom_activity_history_box.cpp
+    custom_activity_history_box.h
     custom_branding.cpp
     custom_branding.h
     custom_mod_window.cpp
