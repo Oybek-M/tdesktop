@@ -34,6 +34,10 @@ QHash<QString, QString> gBlocklist;
 QHash<int, bool> gWhitelistCategories;
 QHash<int, bool> gBlocklistCategories;
 
+// Activity History Log: Include/Exclude — Whitelist/Blocklist'dan mustaqil.
+QHash<QString, QString> gActivityInclude;
+QHash<QString, QString> gActivityExclude;
+
 // ── JSON peer lists ────────────────────────────────────────────────────────
 // Fayl manzili: <AppData>/CustomMod/peer_lists.json
 // Format:
@@ -72,11 +76,27 @@ void SavePeerLists() {
         blCats[QString::number(it.key())] = it.value();
     }
 
+    QJsonArray aInc, aExc;
+    for (auto it = gActivityInclude.constBegin(); it != gActivityInclude.constEnd(); ++it) {
+        QJsonObject o;
+        o[QStringLiteral("id")]   = it.key();
+        o[QStringLiteral("name")] = it.value();
+        aInc.append(o);
+    }
+    for (auto it = gActivityExclude.constBegin(); it != gActivityExclude.constEnd(); ++it) {
+        QJsonObject o;
+        o[QStringLiteral("id")]   = it.key();
+        o[QStringLiteral("name")] = it.value();
+        aExc.append(o);
+    }
+
     QJsonObject root;
     root[QStringLiteral("whitelist")] = wl;
     root[QStringLiteral("blacklist")] = bl;
     root[QStringLiteral("wl_categories")] = wlCats;
     root[QStringLiteral("bl_categories")] = blCats;
+    root[QStringLiteral("activity_include")] = aInc;
+    root[QStringLiteral("activity_exclude")] = aExc;
 
     QFile f(PeerListsFilePath());
     if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
@@ -120,6 +140,20 @@ void LoadPeerLists() {
         const int key = it.key().toInt(&ok);
         if (ok) gBlocklistCategories[key] = it.value().toBool();
     }
+
+    gActivityInclude.clear();
+    for (const auto &v : root[QStringLiteral("activity_include")].toArray()) {
+        const auto o  = v.toObject();
+        const auto id = o[QStringLiteral("id")].toString();
+        if (!id.isEmpty()) gActivityInclude[id] = o[QStringLiteral("name")].toString();
+    }
+
+    gActivityExclude.clear();
+    for (const auto &v : root[QStringLiteral("activity_exclude")].toArray()) {
+        const auto o  = v.toObject();
+        const auto id = o[QStringLiteral("id")].toString();
+        if (!id.isEmpty()) gActivityExclude[id] = o[QStringLiteral("name")].toString();
+    }
 }
 
 void UpdateValue(const QString &id, bool value) {
@@ -133,6 +167,7 @@ void UpdateValue(const QString &id, bool value) {
     else if (id == "mutualContactShowInChatList") gValues.mutualContactShowInChatList = value;
     else if (id == "mutualContactShowInContactsList") gValues.mutualContactShowInContactsList = value;
     else if (id == "mutualContactShowInProfile") gValues.mutualContactShowInProfile = value;
+    else if (id == "activityHistoryTrackAllContacts") gValues.activityHistoryTrackAllContacts = value;
 }
 
 void UpdateString(const QString &id, const QString &value) {
@@ -177,6 +212,9 @@ void Init() {
         "mutualContactShowInProfile", true).toBool();
     gValues.mutualContactProfileEmoji = settings.value(
         "mutualContactProfileEmoji", u"🤝"_q).toString();
+
+    gValues.activityHistoryTrackAllContacts = settings.value(
+        "activityHistoryTrackAllContacts", true).toBool();
 
     // Per-peer ghost overrides
     settings.beginGroup("GhostModePerPeer");
@@ -608,6 +646,74 @@ QString GetPeerDisplayName(const QString &peerId) {
         return it.value();
     }
     return QString();
+}
+
+// ── Activity History Log: Include List ───────────────────────────────────
+
+void AddToActivityInclude(const QString &peerId, const QString &displayName) {
+    if (!gInitialized) Init();
+    gActivityInclude[peerId] = displayName;
+    gActivityExclude.remove(peerId); // mutual exclusion
+    SavePeerLists();
+}
+
+void RemoveFromActivityInclude(const QString &peerId) {
+    if (!gInitialized) Init();
+    gActivityInclude.remove(peerId);
+    SavePeerLists();
+}
+
+QVector<QPair<QString, QString>> GetActivityInclude() {
+    if (!gInitialized) Init();
+    QVector<QPair<QString, QString>> result;
+    result.reserve(gActivityInclude.size());
+    for (auto it = gActivityInclude.constBegin(); it != gActivityInclude.constEnd(); ++it) {
+        result.append({ it.key(), it.value() });
+    }
+    return result;
+}
+
+bool IsInActivityInclude(const QString &peerId) {
+    if (!gInitialized) Init();
+    return gActivityInclude.contains(peerId);
+}
+
+// ── Activity History Log: Exclude List ───────────────────────────────────
+
+void AddToActivityExclude(const QString &peerId, const QString &displayName) {
+    if (!gInitialized) Init();
+    gActivityExclude[peerId] = displayName;
+    gActivityInclude.remove(peerId); // mutual exclusion
+    SavePeerLists();
+}
+
+void RemoveFromActivityExclude(const QString &peerId) {
+    if (!gInitialized) Init();
+    gActivityExclude.remove(peerId);
+    SavePeerLists();
+}
+
+QVector<QPair<QString, QString>> GetActivityExclude() {
+    if (!gInitialized) Init();
+    QVector<QPair<QString, QString>> result;
+    result.reserve(gActivityExclude.size());
+    for (auto it = gActivityExclude.constBegin(); it != gActivityExclude.constEnd(); ++it) {
+        result.append({ it.key(), it.value() });
+    }
+    return result;
+}
+
+bool IsInActivityExclude(const QString &peerId) {
+    if (!gInitialized) Init();
+    return gActivityExclude.contains(peerId);
+}
+
+bool ShouldTrackActivity(const QString &peerId, bool isContact) {
+    if (!gInitialized) Init();
+    if (peerId.isEmpty()) return false;
+    if (IsInActivityExclude(peerId)) return false;
+    if (IsInActivityInclude(peerId)) return true;
+    return gValues.activityHistoryTrackAllContacts && isContact;
 }
 
 } // namespace CustomSettings

@@ -39,6 +39,10 @@ struct Values {
     QString mutualContactContactsListEmoji = u"🤝"_q;
     bool mutualContactShowInProfile = true;
     QString mutualContactProfileEmoji = u"🤝"_q;
+    // Activity History Log: ism/username/rasm/last-seen o'zgarishlarini
+    // kuzatish. Include/Exclude ro'yxatlari alohida QHash'larda saqlanadi
+    // (pastga qarang) — bu shunchaki global default toggle.
+    bool activityHistoryTrackAllContacts = true;
 };
 
 void Init();
@@ -66,6 +70,8 @@ inline bool    MutualContactShowInContactsList() { return Get().mutualContactSho
 inline QString MutualContactContactsListEmoji()  { return Get().mutualContactContactsListEmoji; }
 inline bool    MutualContactShowInProfile()      { return Get().mutualContactShowInProfile; }
 inline QString MutualContactProfileEmoji()       { return Get().mutualContactProfileEmoji; }
+
+inline bool ActivityHistoryTrackAllContacts() { return Get().activityHistoryTrackAllContacts; }
 
 // Per-chat Ghost Mode override (legacy C12).
 [[nodiscard]] bool GhostModeForPeer(const QString &peerId);
@@ -154,5 +160,28 @@ void SetBlocklistCategory(PeerType type, bool enabled);
 // Whitelist yoki Blocklist da saqlanganini tekshiradi.
 // Topilmasa — bo'sh QString qaytadi (caller o'zi peerId ni ishlata oladi).
 [[nodiscard]] QString GetPeerDisplayName(const QString &peerId);
+
+// ── Activity History Log: Include/Exclude ro'yxatlari ───────────────────
+// Whitelist/Blocklist bilan bir xil funksiya to'plami va mutual-exclusion
+// xatti-harakati, lekin BUTUNLAY MUSTAQIL QHash'larda saqlanadi — bu
+// ro'yxatlar Ghost/AntiDelete/AntiEdit uchun ishlatiladigan Whitelist/
+// Blocklist bilan aralashtirilmaydi (butunlay boshqa maqsad).
+
+void AddToActivityInclude(const QString &peerId, const QString &displayName);
+void RemoveFromActivityInclude(const QString &peerId);
+[[nodiscard]] QVector<QPair<QString,QString>> GetActivityInclude();
+[[nodiscard]] bool IsInActivityInclude(const QString &peerId);
+
+void AddToActivityExclude(const QString &peerId, const QString &displayName);
+void RemoveFromActivityExclude(const QString &peerId);
+[[nodiscard]] QVector<QPair<QString,QString>> GetActivityExclude();
+[[nodiscard]] bool IsInActivityExclude(const QString &peerId);
+
+// Ustuvorlik: Exclude List (false) > Include List (true, standart holatdan
+// qat'iy nazar) > (activityHistoryTrackAllContacts && isContact) > false.
+// isContact — chaqiruvchi tomonidan beriladi (bu fayl Data::PeerData ga
+// bog'liq emas, boshqa CustomSettings funksiyalari kabi faqat QString bilan
+// ishlaydi).
+[[nodiscard]] bool ShouldTrackActivity(const QString &peerId, bool isContact);
 
 } // namespace CustomSettings
