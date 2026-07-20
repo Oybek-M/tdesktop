@@ -177,6 +177,19 @@ void Init() {
     execSql("CREATE INDEX IF NOT EXISTS idx_tc_cached_at "
             "ON text_cache(cached_at)");
 
+    // Activity History Log: kontaktlarning ism/username/rasm/last-seen
+    // o'zgarishlari — faqat ilova legal ravishda qabul qilgan ma'lumot
+    // (see custom_activity_history.cpp for the capture logic).
+    execSql("CREATE TABLE IF NOT EXISTS activity_history ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "peer_id TEXT NOT NULL, "
+            "field TEXT NOT NULL, "
+            "old_value TEXT, "
+            "new_value TEXT, "
+            "observed_at INTEGER NOT NULL)");
+    execSql("CREATE INDEX IF NOT EXISTS idx_activity_history_peer "
+            "ON activity_history(peer_id, observed_at DESC)");
+
     RunMigrations();
 }
 
@@ -1593,6 +1606,91 @@ void ClearAllArchive() {
         gDeletedCache.clear();
         gEditedCache.clear();
     }
+}
+
+// ---------------------------------------------------------------------------
+// Activity History Log
+// ---------------------------------------------------------------------------
+
+void SaveActivityHistoryEntry(
+        const QString &peerId,
+        const QString &field,
+        bool hasOldValue,
+        const QString &oldValue,
+        const QString &newValue,
+        qint64 observedAt) {
+    Init();
+    if (!gDb) return;
+
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "INSERT INTO activity_history "
+            "(peer_id, field, old_value, new_value, observed_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        bindText(stmt, 1, peerId);
+        bindText(stmt, 2, field);
+        if (hasOldValue) {
+            bindText(stmt, 3, oldValue);
+        } else {
+            sqlite3_bind_null(stmt, 3);
+        }
+        bindText(stmt, 4, newValue);
+        sqlite3_bind_int64(stmt, 5, observedAt);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+}
+
+bool GetLatestActivityHistoryValue(
+        const QString &peerId,
+        const QString &field,
+        QString &outValue) {
+    Init();
+    if (!gDb) return false;
+
+    bool found = false;
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "SELECT new_value FROM activity_history "
+            "WHERE peer_id = ? AND field = ? "
+            "ORDER BY observed_at DESC, id DESC LIMIT 1",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        bindText(stmt, 1, peerId);
+        bindText(stmt, 2, field);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            outValue = colText(stmt, 0);
+            found = true;
+        }
+        sqlite3_finalize(stmt);
+    }
+    return found;
+}
+
+QVector<ActivityHistoryEntry> GetActivityHistory(const QString &peerId) {
+    Init();
+    QVector<ActivityHistoryEntry> result;
+    if (!gDb) return result;
+
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "SELECT field, old_value, new_value, observed_at "
+            "FROM activity_history WHERE peer_id = ? "
+            "ORDER BY observed_at DESC, id DESC",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        bindText(stmt, 1, peerId);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            ActivityHistoryEntry entry;
+            entry.field = colText(stmt, 0);
+            entry.hasOldValue = (sqlite3_column_type(stmt, 1) != SQLITE_NULL);
+            entry.oldValue = entry.hasOldValue ? colText(stmt, 1) : QString();
+            entry.newValue = colText(stmt, 2);
+            entry.observedAt = sqlite3_column_int64(stmt, 3);
+            result.append(entry);
+        }
+        sqlite3_finalize(stmt);
+    }
+    return result;
 }
 
 // ---------------------------------------------------------------------------

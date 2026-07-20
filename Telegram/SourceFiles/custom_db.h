@@ -249,4 +249,42 @@ void ClearDeletedArchive();
 void ClearEditedArchive();
 void ClearAllArchive();
 
+// ── Activity History Log ──────────────────────────────────────────────────
+// Kontaktlarning ism/username/rasm/last-seen o'zgarishlari — faqat ilova
+// legal ravishda (joriy maxfiylik sozlamalari asosida) qabul qilgan
+// ma'lumot. Yozuq faqat CustomSettings::ShouldTrackActivity() true
+// bo'lganda amalga oshiriladi (chaqiruvchi tomonidan tekshiriladi).
+
+struct ActivityHistoryEntry {
+    QString field;         // "name" | "username" | "photo" | "status"
+    bool hasOldValue = false; // false = bu shu peer/field uchun BIRINCHI yozuv
+    QString oldValue;      // hasOldValue=false bo'lsa mazmunsiz (bo'sh)
+    QString newValue;
+    qint64 observedAt = 0; // unix timestamp (base::unixtime::now())
+};
+
+// Yangi yozuv qo'shadi. hasOldValue=false — bu peer/field juftligi uchun
+// birinchi marta kuzatilayotganini bildiradi (old_value ustuniga SQL NULL
+// yoziladi, "o'zgarish" emas "kuzatish boshlang'ich holati" sifatida).
+void SaveActivityHistoryEntry(
+    const QString &peerId,
+    const QString &field,
+    bool hasOldValue,
+    const QString &oldValue,
+    const QString &newValue,
+    qint64 observedAt);
+
+// Shu peer/field uchun eng oxirgi yozilgan qiymatni qaytaradi.
+// Qaytish qiymati: true — topildi (outValue to'ldirildi), false — hali
+// hech qanday yozuv yo'q (birinchi kuzatish bo'ladi).
+bool GetLatestActivityHistoryValue(
+    const QString &peerId,
+    const QString &field,
+    QString &outValue);
+
+// Shu peer uchun BARCHA maydonlar bo'yicha to'liq jurnal, eng yangisidan
+// boshlab (observed_at DESC). History Viewer Box shu funksiyani ishlatadi.
+[[nodiscard]] QVector<ActivityHistoryEntry> GetActivityHistory(
+    const QString &peerId);
+
 } // namespace CustomDB
