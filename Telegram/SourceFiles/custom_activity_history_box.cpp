@@ -65,6 +65,10 @@ QVector<OnlinePeriod> ReconstructOnlinePeriods(
 			openFrom = 0;
 		}
 	}
+	// Eslatma: agar loop tugaganda openFrom hali ham > 0 bo'lsa (ya'ni oxirgi
+	// status yozuvi "online:" bo'lib, undan keyin "offline:" kelmagan bo'lsa),
+	// bu ochiq davr e'tiborga olinmaydi. v1 uchun qabul qilinadi — "hozirgi
+	// vaqt = now()" kodlanmaydi.
 	return result;
 }
 
@@ -97,6 +101,9 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 				|| latestStatus == u"within_week"_q
 				|| latestStatus == u"within_month"_q
 				|| latestStatus == u"long_ago"_q)) {
+			// entries ro'yxati eng yangisidan boshlanadi (newest-first), shuning uchun
+			// birinchi topilgan online:/offline: yozuv — bizning eng so'nggi haqiqiy
+			// ko'ra olgan last-seen qiymatimiz.
 			for (const auto &e : entries) {
 				if (e.field == u"status"_q && (e.newValue.startsWith(u"online:"_q)
 						|| e.newValue.startsWith(u"offline:"_q))) {
