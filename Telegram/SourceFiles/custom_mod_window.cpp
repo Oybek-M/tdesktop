@@ -224,6 +224,10 @@ void fillPeersTab(
 void fillPerChatSection(
 	not_null<Ui::VerticalLayout*> content,
 	not_null<Window::SessionController*> controller);
+void fillActivityHistorySection(
+	not_null<Ui::VerticalLayout*> content,
+	not_null<Window::SessionController*> controller,
+	Fn<void()> onRebuild);
 void fillArchiveTab(
 	not_null<Ui::VerticalLayout*> content,
 	Fn<void()> onRefresh);
@@ -1554,6 +1558,166 @@ void fillPerChatSection(
 	}
 }
 
+// ── Activity History Log: kuzatish qamrovi + kuzatilayotganlar ro'yxati ──
+void fillActivityHistorySection(
+		not_null<Ui::VerticalLayout*> content,
+		not_null<Window::SessionController*> controller,
+		Fn<void()> onRebuild) {
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(u"🕒 Activity History"_q),
+			st::defaultSubsectionTitle),
+		st::defaultSubsectionTitlePadding);
+
+	{
+		const auto desc = content->add(
+			object_ptr<Ui::FlatLabel>(
+				content,
+				rpl::single(u"Kontaktlarning ism, username, rasm va "
+					"last-seen o'zgarishlarini vaqt bilan saqlaydi — faqat "
+					"ilova legal ravishda qabul qilgan ma'lumot, hech qanday "
+					"maxfiylik cheklovi aylanib o'tilmaydi."_q),
+				st::customModHintLabel),
+			st::boxRowPadding,
+			style::al_justify);
+		content->widthValue() | rpl::on_next([=](int w) {
+			const auto lw = w
+				- st::boxRowPadding.left()
+				- st::boxRowPadding.right();
+			if (lw > 0) {
+				desc->resizeToWidth(lw);
+				desc->update();
+			}
+		}, desc->lifetime());
+	}
+
+	// ── Global toggle ─────────────────────────────────────────────
+	Ui::AddSkip(content, 8);
+	{
+		const auto btn = content->add(
+			object_ptr<Ui::SettingsButton>(
+				content,
+				rpl::single(u"Barcha Contact'larni kuzatish"_q),
+				st::settingsButtonNoIcon));
+		btn->toggleOn(rpl::single(
+			CustomSettings::ActivityHistoryTrackAllContacts()));
+		btn->toggledValue()
+			| rpl::skip(1)
+			| rpl::on_next([=](bool on) {
+				CustomSettings::Set(u"activityHistoryTrackAllContacts"_q, on);
+				Ui::Toast::Show(on
+					? u"Barcha kontaktlarni kuzatish yoqildi ✓"_q
+					: u"Barcha kontaktlarni kuzatish oʻchirildi"_q);
+			}, btn->lifetime());
+	}
+
+	// ── Include List ──────────────────────────────────────────────
+	Ui::AddSkip(content, 12);
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(u"Include List — standart holatdan qat'iy nazar "
+				"har doim kuzatiladi:"_q),
+			st::customModHintLabel),
+		st::boxRowPadding);
+	content->add(
+		object_ptr<Ui::RoundButton>(
+			content,
+			rpl::single(u"Chat tanlash — Include"_q),
+			st::defaultBoxButton),
+		st::boxRowPadding)
+	->addClickHandler([=] {
+		if (!gInstance) return;
+		gInstance->showBox(Window::PrepareChooseRecipientBox(
+			&controller->session(),
+			[=](not_null<Data::Thread*> thread) -> bool {
+				const auto peer = thread->peer();
+				if (!peer->isUser()) {
+					Ui::Toast::Show(
+						u"Faqat shaxsiy chatlar (User) kuzatiladi."_q);
+					return true;
+				}
+				const auto peerId = QString::number(peer->id.value);
+				const auto name = peer->name();
+				if (CustomSettings::IsInActivityInclude(peerId)) {
+					Ui::Toast::Show(u"Bu chat allaqachon Include List'da."_q);
+					return true;
+				}
+				CustomSettings::AddToActivityInclude(peerId, name);
+				Ui::Toast::Show(name + u" Include List'ga qoʻshildi."_q);
+				if (onRebuild) onRebuild();
+				return true;
+			},
+			rpl::single(u"Include List'ga qoʻshish"_q)));
+	});
+	for (const auto &e : CustomSettings::GetActivityInclude()) {
+		const auto row = content->add(
+			object_ptr<Ui::SettingsButton>(
+				content,
+				rpl::single(u"➖ "_q + e.second),
+				st::settingsButtonNoIcon));
+		row->addClickHandler([=, peerId = e.first, name = e.second] {
+			CustomSettings::RemoveFromActivityInclude(peerId);
+			Ui::Toast::Show(name + u" Include List'dan olib tashlandi."_q);
+			if (onRebuild) onRebuild();
+		});
+	}
+
+	// ── Exclude List ──────────────────────────────────────────────
+	Ui::AddSkip(content, 12);
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(u"Exclude List — hech qachon kuzatilmaydi:"_q),
+			st::customModHintLabel),
+		st::boxRowPadding);
+	content->add(
+		object_ptr<Ui::RoundButton>(
+			content,
+			rpl::single(u"Chat tanlash — Exclude"_q),
+			st::defaultBoxButton),
+		st::boxRowPadding)
+	->addClickHandler([=] {
+		if (!gInstance) return;
+		gInstance->showBox(Window::PrepareChooseRecipientBox(
+			&controller->session(),
+			[=](not_null<Data::Thread*> thread) -> bool {
+				const auto peer = thread->peer();
+				if (!peer->isUser()) {
+					Ui::Toast::Show(
+						u"Faqat shaxsiy chatlar (User) kuzatiladi."_q);
+					return true;
+				}
+				const auto peerId = QString::number(peer->id.value);
+				const auto name = peer->name();
+				if (CustomSettings::IsInActivityExclude(peerId)) {
+					Ui::Toast::Show(u"Bu chat allaqachon Exclude List'da."_q);
+					return true;
+				}
+				CustomSettings::AddToActivityExclude(peerId, name);
+				Ui::Toast::Show(name + u" Exclude List'ga qoʻshildi."_q);
+				if (onRebuild) onRebuild();
+				return true;
+			},
+			rpl::single(u"Exclude List'ga qoʻshish"_q)));
+	});
+	for (const auto &e : CustomSettings::GetActivityExclude()) {
+		const auto row = content->add(
+			object_ptr<Ui::SettingsButton>(
+				content,
+				rpl::single(u"➖ "_q + e.second),
+				st::settingsButtonNoIcon));
+		row->addClickHandler([=, peerId = e.first, name = e.second] {
+			CustomSettings::RemoveFromActivityExclude(peerId);
+			Ui::Toast::Show(name + u" Exclude List'dan olib tashlandi."_q);
+			if (onRebuild) onRebuild();
+		});
+	}
+
+	Ui::AddSkip(content, st::settingsThumbSkip);
+}
+
 void fillPeersTab(
 		not_null<Ui::VerticalLayout*> content,
 		not_null<Window::SessionController*> controller,
@@ -1614,6 +1778,10 @@ void fillPeersTab(
 	Ui::AddSkip(content, st::settingsThumbSkip);
 	fillPerChatSection(content, controller);
 	Ui::AddSkip(content, st::settingsThumbSkip);
+
+	Ui::AddDivider(content);
+	Ui::AddSkip(content, st::settingsThumbSkip);
+	fillActivityHistorySection(content, controller, onRebuild);
 }
 
 void fillArchiveTab(
