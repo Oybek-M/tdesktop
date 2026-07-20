@@ -60,15 +60,22 @@ QString DecodeStatusLabel(const QString &encoded) {
 		return u"uzoq vaqt oldin (aniq vaqt yashiringan)"_q;
 	} else if (encoded == u"empty"_q || encoded.isEmpty()) {
 		return u"noma'lum"_q;
-	} else if (encoded.startsWith(u"online:"_q)) {
-		const auto ts = encoded.mid(7).toLongLong();
-		return u"hozir online (taxminan "_q
-			+ QDateTime::fromSecsSinceEpoch(ts).toString(u"dd.MM.yyyy HH:mm"_q)
-			+ u" gacha)"_q;
+	}
+	if (encoded.startsWith(u"online:"_q)) {
+		bool ok = false;
+		const auto ts = encoded.mid(7).toLongLong(&ok);
+		if (ok && ts > 0) {
+			return u"hozir online (taxminan "_q
+				+ QDateTime::fromSecsSinceEpoch(ts).toString(u"dd.MM.yyyy HH:mm"_q)
+				+ u" gacha)"_q;
+		}
 	} else if (encoded.startsWith(u"offline:"_q)) {
-		const auto ts = encoded.mid(8).toLongLong();
-		return u"oxirgi marta ko'rilgan: "_q
-			+ QDateTime::fromSecsSinceEpoch(ts).toString(u"dd.MM.yyyy HH:mm"_q);
+		bool ok = false;
+		const auto ts = encoded.mid(8).toLongLong(&ok);
+		if (ok && ts > 0) {
+			return u"oxirgi marta ko'rilgan: "_q
+				+ QDateTime::fromSecsSinceEpoch(ts).toString(u"dd.MM.yyyy HH:mm"_q);
+		}
 	}
 	return encoded;
 }
