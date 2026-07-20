@@ -97,6 +97,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/shadow.h"
 #include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/slide_wrap.h"
+#include "custom_activity_history_box.h"
+#include "custom_settings.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_controller.h" // Window::Controller::show.
 #include "window/window_peer_menu.h"
@@ -1293,6 +1295,7 @@ private:
 	void addBalanceActions(not_null<UserData*> user);
 	void addInviteToGroupAction(not_null<UserData*> user);
 	void addShareContactAction(not_null<UserData*> user);
+	void addActivityHistoryAction(not_null<UserData*> user);
 	void addEditContactAction(not_null<UserData*> user);
 	void addDeleteContactAction(not_null<UserData*> user);
 	void addBotCommandActions(not_null<UserData*> user);
@@ -3123,6 +3126,23 @@ void ActionsFiller::addJoinChannelAction(
 	);
 }
 
+void ActionsFiller::addActivityHistoryAction(not_null<UserData*> user) {
+	const auto peerId = QString::number(user->id.value);
+	AddActionButton(
+		_wrap,
+		rpl::single(u"📜 Faollik tarixi"_q),
+		rpl::single(CustomSettings::ShouldTrackActivity(
+			peerId, user->isContact())),
+		[=] {
+			_controller->parentController()->show(
+				CustomActivityHistory::MakeHistoryBox(
+					&user->session(),
+					peerId,
+					user->name()));
+		},
+		nullptr);
+}
+
 void ActionsFiller::fillUserActions(not_null<UserData*> user) {
 	if (user->isBot()) {
 		addAffiliateProgram(user);
@@ -3130,6 +3150,9 @@ void ActionsFiller::fillUserActions(not_null<UserData*> user) {
 		addInviteToGroupAction(user);
 	}
 	addShareContactAction(user);
+	if (!user->isSelf()) {
+		addActivityHistoryAction(user);
+	}
 	if (!user->isSelf()) {
 		addEditContactAction(user);
 		addDeleteContactAction(user);
