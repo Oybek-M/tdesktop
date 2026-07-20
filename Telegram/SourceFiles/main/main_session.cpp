@@ -55,6 +55,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "calls/calls_instance.h"
 #include "support/support_helper.h"
+#include "custom_activity_history.h"
 #include "lang/lang_keys.h"
 #include "core/application.h"
 #include "ui/text/text_utilities.h"
@@ -173,6 +174,8 @@ Session::Session(
 , _fastButtonsBots(std::make_unique<Support::FastButtonsBots>(this))
 , _saveSettingsTimer([=] { saveSettings(); }) {
 	Expects(_settings != nullptr);
+
+	CustomActivityHistory::Init(this);
 
 	_api->requestTermsUpdate();
 	_api->requestFullPeer(_user);
