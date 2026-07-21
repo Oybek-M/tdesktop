@@ -340,7 +340,7 @@ const Ui::Text::String &Entry::chatListNameText() const {
 		_chatListNameVersion = version;
 		auto name = chatListName();
 		if (const auto history = asHistory()) {
-			if (const auto user = history->peer()->asUser()) {
+			if (const auto user = history->peer->asUser()) {
 				if (CustomSettings::MutualContactShowInChatList()
 						&& user->isContact()
 						&& (user->flags() & UserDataFlag::MutualContact)) {

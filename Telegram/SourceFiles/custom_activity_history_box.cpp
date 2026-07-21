@@ -10,6 +10,7 @@
 #include "styles/style_layers.h"
 #include "styles/style_boxes.h"
 #include "styles/style_settings.h"
+#include "lang/lang_keys.h"
 #include <QtCore/QDateTime>
 
 namespace CustomActivityHistory {
@@ -29,12 +30,12 @@ QString FormatEntryLine(const CustomDB::ActivityHistoryEntry &entry) {
 		? DecodeStatusLabel(entry.newValue)
 		: (entry.newValue.isEmpty() ? u"(bo'sh)"_q : entry.newValue);
 	if (!entry.hasOldValue) {
-		return fieldLabel + u": " + valueLabel + u" (kuzatish boshlandi, " + when + u")"_q;
+		return fieldLabel + u": "_q + valueLabel + u" (kuzatish boshlandi, "_q + when + u")"_q;
 	}
 	const auto oldLabel = (entry.field == u"status"_q)
 		? DecodeStatusLabel(entry.oldValue)
 		: (entry.oldValue.isEmpty() ? u"(bo'sh)"_q : entry.oldValue);
-	return fieldLabel + u": '" + oldLabel + u"' -> '" + valueLabel + u"' (" + when + u")"_q;
+	return fieldLabel + u": '"_q + oldLabel + u"' -> '"_q + valueLabel + u"' ("_q + when + u")"_q;
 }
 
 struct OnlinePeriod {
