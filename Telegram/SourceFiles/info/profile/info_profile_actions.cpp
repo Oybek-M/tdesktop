@@ -3128,13 +3128,14 @@ void ActionsFiller::addJoinChannelAction(
 
 void ActionsFiller::addActivityHistoryAction(not_null<UserData*> user) {
 	const auto peerId = QString::number(user->id.value);
+	const auto controller = _controller->parentController();
 	AddActionButton(
 		_wrap,
 		rpl::single(u"📜 Faollik tarixi"_q),
 		rpl::single(CustomSettings::ShouldTrackActivity(
 			peerId, user->isContact())),
 		[=] {
-			_controller->parentController()->show(
+			controller->show(
 				CustomActivityHistory::MakeHistoryBox(
 					&user->session(),
 					peerId,
