@@ -287,4 +287,10 @@ bool GetLatestActivityHistoryValue(
 [[nodiscard]] QVector<ActivityHistoryEntry> GetActivityHistory(
     const QString &peerId);
 
+// Delete activity_history entries older than |days| days (default 365 —
+// this table is a long-term history log, unlike ghost_reads/text_cache's
+// 30-day caches, so a much longer retention is used by default). Called
+// automatically by SaveActivityHistoryEntry(); safe to call manually.
+void PruneStaleActivityHistory(int days = 365);
+
 } // namespace CustomDB

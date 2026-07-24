@@ -44,6 +44,12 @@ static QHash<QString, QHash<long long, QString>> gEditedCache;
 // explicitly loaded; EnsurePeerCacheLoaded() merges rather than overwrites,
 // so that's safe either way.
 static QSet<QString> gLoadedPeers;
+// Activity History Log: peerId -> field -> latest new_value. Same lazy
+// per-peer-load pattern as gDeletedCache/gEditedCache above (see
+// EnsureActivityCacheLoaded below) — added to fix a first-start
+// performance regression (repeated per-field SQLite reads with no cache).
+static QHash<QString, QHash<QString, QString>> gActivityLatestCache;
+static QSet<QString> gActivityLoadedPeers;
 
 // Batch write queue: SaveMessage() enqueues here; FlushPendingWrites() commits all at once.
 static QVector<ActionedMessage> gPendingWrites;
@@ -282,6 +288,8 @@ void LoadRestoreCache() {
     gDeletedCache.clear();
     gEditedCache.clear();
     gLoadedPeers.clear();
+    gActivityLatestCache.clear();
+    gActivityLoadedPeers.clear();
 }
 
 // Loads one peer's deleted/edited records from DB into the caches, unless
@@ -1436,6 +1444,24 @@ bool ImportFullBackup(const QString &sourcePath, bool fullReplace) {
             "  SELECT 1 FROM main.ghost_reads cur "
             "  WHERE cur.peer_id = imp.peer_id AND cur.timestamp >= imp.timestamp"
             ")");
+        // activity_history rows are immutable point-in-time records (like
+        // actioned_messages, not like ghost_reads), so append-only merge is
+        // correct here too — skip rows that already exist identically. If
+        // importing an older backup predating this table, import_db simply
+        // has no such table and this statement fails silently (execSql only
+        // logs via qDebug, does not abort the transaction).
+        execSql(
+            "INSERT INTO main.activity_history "
+            "(peer_id, field, old_value, new_value, observed_at) "
+            "SELECT imp.peer_id, imp.field, imp.old_value, imp.new_value, imp.observed_at "
+            "FROM import_db.activity_history imp "
+            "WHERE NOT EXISTS ("
+            "  SELECT 1 FROM main.activity_history cur "
+            "  WHERE cur.peer_id = imp.peer_id AND cur.field = imp.field "
+            "    AND cur.observed_at = imp.observed_at "
+            "    AND IFNULL(cur.old_value,'') = IFNULL(imp.old_value,'') "
+            "    AND cur.new_value = imp.new_value"
+            ")");
         execSql("COMMIT");
 
         sqlite3_stmt *detachStmt = nullptr;
@@ -1612,6 +1638,38 @@ void ClearAllArchive() {
 // Activity History Log
 // ---------------------------------------------------------------------------
 
+// Loads one peer's latest-value-per-field into gActivityLatestCache on
+// first touch, unless already loaded — mirrors EnsurePeerCacheLoaded()
+// above, applied to the activity_history table.
+static void EnsureActivityCacheLoaded(const QString &peerId) {
+    {
+        QMutexLocker locker(&gCacheMutex);
+        if (gActivityLoadedPeers.contains(peerId)) return;
+    }
+    Init();
+    if (!gDb) return;
+
+    QHash<QString, QString> latest;
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "SELECT field, new_value FROM activity_history "
+            "WHERE peer_id = ? ORDER BY observed_at ASC, id ASC",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        bindText(stmt, 1, peerId);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            // ASC tartib — oxirgi yozilgan qator eng yangi qiymat, shuning
+            // uchun hash'ga ustma-ust yozilaveradi va oxiri eng yangisi qoladi.
+            latest[colText(stmt, 0)] = colText(stmt, 1);
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    QMutexLocker locker(&gCacheMutex);
+    if (gActivityLoadedPeers.contains(peerId)) return; // race guard
+    gActivityLatestCache[peerId] = latest;
+    gActivityLoadedPeers.insert(peerId);
+}
+
 void SaveActivityHistoryEntry(
         const QString &peerId,
         const QString &field,
@@ -1620,6 +1678,11 @@ void SaveActivityHistoryEntry(
         const QString &newValue,
         qint64 observedAt) {
     Init();
+    // Prune once every 50 saves — same pattern as SaveGhostRead/CacheMessageText.
+    static int sActivitySaveCount = 0;
+    if (++sActivitySaveCount % 50 == 0) {
+        PruneStaleActivityHistory(365);
+    }
     if (!gDb) return;
 
     sqlite3_stmt *stmt = nullptr;
@@ -1640,31 +1703,53 @@ void SaveActivityHistoryEntry(
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }
+
+    // Keep the in-memory cache in sync so repeat lookups this session see
+    // the new value without another SQLite round-trip.
+    {
+        QMutexLocker locker(&gCacheMutex);
+        gActivityLatestCache[peerId][field] = newValue;
+        gActivityLoadedPeers.insert(peerId);
+    }
+}
+
+// Delete activity_history entries older than |days| days. Same pattern as
+// PruneStaleGhostReads, but observed_at is a unix-timestamp INTEGER column
+// (not a formatted TEXT timestamp like ghost_reads.timestamp), so the
+// cutoff is computed and bound as an int64 instead of a string.
+void PruneStaleActivityHistory(int days) {
+    Init();
+    if (!gDb) return;
+
+    const qint64 cutoff =
+        QDateTime::currentDateTime().addDays(-days).toSecsSinceEpoch();
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "DELETE FROM activity_history WHERE observed_at < ?",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, cutoff);
+        sqlite3_step(stmt);
+        const int removed = sqlite3_changes(gDb);
+        sqlite3_finalize(stmt);
+        if (removed > 0) {
+            qDebug() << "PruneStaleActivityHistory: removed" << removed
+                     << "entries older than" << days << "days.";
+        }
+    }
 }
 
 bool GetLatestActivityHistoryValue(
         const QString &peerId,
         const QString &field,
         QString &outValue) {
-    Init();
-    if (!gDb) return false;
-
-    bool found = false;
-    sqlite3_stmt *stmt = nullptr;
-    if (sqlite3_prepare_v2(gDb,
-            "SELECT new_value FROM activity_history "
-            "WHERE peer_id = ? AND field = ? "
-            "ORDER BY observed_at DESC, id DESC LIMIT 1",
-            -1, &stmt, nullptr) == SQLITE_OK) {
-        bindText(stmt, 1, peerId);
-        bindText(stmt, 2, field);
-        if (sqlite3_step(stmt) == SQLITE_ROW) {
-            outValue = colText(stmt, 0);
-            found = true;
-        }
-        sqlite3_finalize(stmt);
-    }
-    return found;
+    EnsureActivityCacheLoaded(peerId);
+    QMutexLocker locker(&gCacheMutex);
+    const auto peerIt = gActivityLatestCache.constFind(peerId);
+    if (peerIt == gActivityLatestCache.constEnd()) return false;
+    const auto fieldIt = peerIt->constFind(field);
+    if (fieldIt == peerIt->constEnd()) return false;
+    outValue = fieldIt.value();
+    return true;
 }
 
 QVector<ActivityHistoryEntry> GetActivityHistory(const QString &peerId) {
