@@ -61,7 +61,7 @@ void SetPlainTextLeaf(
 		const style::TextStyle &textStyle,
 		int width) {
 	return std::max(
-		leaf.countHeight(width, true),
+		leaf.countHeight(width),
 		TextLineHeight(textStyle));
 }
 
@@ -69,7 +69,7 @@ void SetPlainTextLeaf(
 		const Ui::Text::String &leaf,
 		const QRect &textRect,
 		const style::TextStyle &textStyle) {
-	const auto lines = leaf.countLinesGeometry(textRect.width(), true);
+	const auto lines = leaf.countLinesGeometry(textRect.width());
 	return textRect.y() + (lines.empty()
 		? TextLineBaseline(textStyle)
 		: lines.front().baseline);
@@ -466,6 +466,10 @@ void ChannelMediaBlock::handleJoinedChange() {
 
 MediaBlock::~MediaBlock() = default;
 
+bool MediaBlock::alive() const {
+	return true;
+}
+
 void MediaBlock::setHost(MediaBlockHost *host) {
 	if (_host == host) {
 		return;
@@ -501,7 +505,8 @@ const style::Markdown &MediaBlock::layoutStyle() const {
 }
 
 void MediaBlock::setMediaPixelScale(double scale) {
-	_mediaPixelScale = std::max(scale, 1.);
+	_mediaPixelScale = scale;
+	mediaPixelScaleUpdated();
 }
 
 double MediaBlock::mediaPixelScale() const {
@@ -521,6 +526,9 @@ void MediaBlock::requestRelayout(QRect articleRect) const {
 }
 
 void MediaBlock::layoutStyleUpdated() {
+}
+
+void MediaBlock::mediaPixelScaleUpdated() {
 }
 
 void MediaBlock::hostUpdated() {

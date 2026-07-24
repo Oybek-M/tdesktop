@@ -64,10 +64,21 @@ void PaintImageCenterCrop(Painter &p, QRect rect, const QImage &image) {
 		CenterCropSourceRect(image.size(), rect.size()));
 }
 
-[[nodiscard]] bool ImageCoversRect(const QImage &image, QRect rect) {
+[[nodiscard]] bool ImageCoversRect(
+		const QImage &image,
+		QRect rect,
+		double pixelScale) {
 	const auto ratio = std::max(image.devicePixelRatio(), 1.);
-	return (image.width() / ratio >= rect.width())
-		&& (image.height() / ratio >= rect.height());
+	return (image.width() / ratio >= rect.width() * pixelScale)
+		&& (image.height() / ratio >= rect.height() * pixelScale);
+}
+
+[[nodiscard]] QSize ScaledImageRequestSize(QSize size, double scale) {
+	return (scale == 1.)
+		? size
+		: QSize(
+			std::max(int(std::ceil(size.width() * scale)), 1),
+			std::max(int(std::ceil(size.height() * scale)), 1));
 }
 
 [[nodiscard]] int PullquoteIconReserveWidth(
@@ -81,13 +92,15 @@ void PaintImageCenterCrop(Painter &p, QRect rect, const QImage &image) {
 		Painter &p,
 		const std::shared_ptr<Ui::DynamicImage> &image,
 		QRect rect,
+		double pixelScale,
 		bool requireCovering = false) {
 	if (!image || rect.isEmpty()) {
 		return false;
 	}
-	if (const auto frame = image->image(std::max(rect.width(), rect.height()));
-		!frame.isNull()) {
-		if (requireCovering && !ImageCoversRect(frame, rect)) {
+	const auto requested = int(std::ceil(
+		std::max(rect.width(), rect.height()) * pixelScale));
+	if (const auto frame = image->image(requested); !frame.isNull()) {
+		if (requireCovering && !ImageCoversRect(frame, rect, pixelScale)) {
 			return false;
 		}
 		PaintImageCenterCrop(p, rect, frame);
@@ -100,11 +113,12 @@ void PaintImageCenterCrop(Painter &p, QRect rect, const QImage &image) {
 		Painter &p,
 		QRect rect,
 		const std::shared_ptr<Ui::DynamicImage> &thumbnail,
-		const std::shared_ptr<Ui::DynamicImage> &previousThumbnail) {
-	return PaintDynamicImage(p, thumbnail, rect, true)
-		|| PaintDynamicImage(p, previousThumbnail, rect, true)
-		|| PaintDynamicImage(p, previousThumbnail, rect)
-		|| PaintDynamicImage(p, thumbnail, rect);
+		const std::shared_ptr<Ui::DynamicImage> &previousThumbnail,
+		double pixelScale) {
+	return PaintDynamicImage(p, thumbnail, rect, pixelScale, true)
+		|| PaintDynamicImage(p, previousThumbnail, rect, pixelScale, true)
+		|| PaintDynamicImage(p, previousThumbnail, rect, pixelScale)
+		|| PaintDynamicImage(p, thumbnail, rect, pixelScale);
 }
 
 void UpdateResolvedImage(
@@ -166,15 +180,16 @@ void RefreshResolvedBlockImage(
 		const std::shared_ptr<Ui::DynamicImage> &thumbnail,
 		const std::shared_ptr<Ui::DynamicImage> &full,
 		const std::shared_ptr<Ui::DynamicImage> &previousThumbnail,
-		const std::shared_ptr<Ui::DynamicImage> &previousFull) {
-	return PaintDynamicImage(p, full, rect, true)
-		|| PaintDynamicImage(p, previousFull, rect, true)
-		|| PaintDynamicImage(p, full, rect)
-		|| PaintDynamicImage(p, previousFull, rect)
-		|| PaintDynamicImage(p, thumbnail, rect, true)
-		|| PaintDynamicImage(p, previousThumbnail, rect, true)
-		|| PaintDynamicImage(p, previousThumbnail, rect)
-		|| PaintDynamicImage(p, thumbnail, rect);
+		const std::shared_ptr<Ui::DynamicImage> &previousFull,
+		double pixelScale) {
+	return PaintDynamicImage(p, full, rect, pixelScale, true)
+		|| PaintDynamicImage(p, previousFull, rect, pixelScale, true)
+		|| PaintDynamicImage(p, full, rect, pixelScale)
+		|| PaintDynamicImage(p, previousFull, rect, pixelScale)
+		|| PaintDynamicImage(p, thumbnail, rect, pixelScale, true)
+		|| PaintDynamicImage(p, previousThumbnail, rect, pixelScale, true)
+		|| PaintDynamicImage(p, previousThumbnail, rect, pixelScale)
+		|| PaintDynamicImage(p, thumbnail, rect, pixelScale);
 }
 
 [[nodiscard]] const style::Markdown &PaintStyle(
@@ -217,7 +232,7 @@ void RefreshResolvedBlockImage(
 	if (textRect.isEmpty() || (textWidth <= 0)) {
 		return 0;
 	}
-	return int(leaf.countLinesGeometry(textWidth, true).size());
+	return int(leaf.countLinesGeometry(textWidth).size());
 }
 
 void PaintSelectableTextLeaf(
@@ -656,7 +671,9 @@ void RefreshBlockThumbnail(
 	if (!block.photoRuntime || block.thumbnailRect.isEmpty()) {
 		return;
 	}
-	const auto size = block.thumbnailRect.size();
+	const auto size = ScaledImageRequestSize(
+		block.thumbnailRect.size(),
+		context.mediaPixelScale);
 	if (size.isEmpty() || block.thumbnailRequestSize == size) {
 		return;
 	}
@@ -688,7 +705,9 @@ void RefreshRelatedArticleImages(
 	if (!block.photoRuntime || block.thumbnailRect.isEmpty()) {
 		return;
 	}
-	const auto size = block.thumbnailRect.size();
+	const auto size = ScaledImageRequestSize(
+		block.thumbnailRect.size(),
+		context.mediaPixelScale);
 	RefreshResolvedBlockImage(
 		block,
 		context,
@@ -731,8 +750,7 @@ void PaintTextLeaf(
 			&leaf,
 			[&] {
 				return int(leaf.countLinesGeometry(
-					availableWidth,
-					true).size());
+					availableWidth).size());
 			});
 		const auto baseLine = context.reveal->nextLine;
 		context.reveal->nextLine += lineCount;
@@ -762,7 +780,7 @@ void PaintTextLeaf(
 			.position = rect.topLeft(),
 			.availableWidth = availableWidth,
 			.geometry = (elisionLines
-				? Ui::Text::SimpleGeometry(availableWidth, elisionLines, 0, true)
+				? Ui::Text::SimpleGeometry(availableWidth, elisionLines, 0, false)
 				: TextGeometry(availableWidth)),
 			.align = align,
 			.clip = context.clip,
@@ -2288,7 +2306,8 @@ void PaintEmbedPostBlock(
 				p,
 				block.thumbnailRect,
 				block.thumbnailImage,
-				block.previousThumbnailImage);
+				block.previousThumbnailImage,
+				headerContext.mediaPixelScale);
 			p.restore();
 		}
 		if (!block.labelRect.isEmpty()) {
@@ -2556,7 +2575,8 @@ void PaintRelatedArticleBlock(
 						block.thumbnailImage,
 						block.fullImage,
 						block.previousThumbnailImage,
-						block.previousFullImage);
+						block.previousFullImage,
+						visibleContext.mediaPixelScale);
 					p.restore();
 				} else {
 					(void)PaintRelatedArticleImage(
@@ -2565,7 +2585,8 @@ void PaintRelatedArticleBlock(
 						block.thumbnailImage,
 						block.fullImage,
 						block.previousThumbnailImage,
-						block.previousFullImage);
+						block.previousFullImage,
+						visibleContext.mediaPixelScale);
 				}
 			}
 			if (!block.labelRect.isEmpty()) {
@@ -2753,7 +2774,7 @@ void PaintDetailsBlock(
 			context,
 			block.actionRect,
 			block.actionRect.width(),
-			style::al_right);
+			block.rtl ? style::al_left : style::al_right);
 	}
 	p.restore();
 

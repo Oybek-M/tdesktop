@@ -244,13 +244,17 @@ public:
 
 	void open(Qt::MouseButton button) const override;
 
+	void releaseHeavyData() override;
+
 private:
+	[[nodiscard]] std::shared_ptr<::Data::PhotoMedia> media() const;
+
 	const not_null<Main::Session*> _session;
 	const not_null<PhotoData*> _photo;
 	const ::Data::FileOrigin _origin;
 	const FullMsgId _itemId;
 	const Fn<FullMsgId()> _itemIdResolver;
-	const std::shared_ptr<::Data::PhotoMedia> _media;
+	mutable std::shared_ptr<::Data::PhotoMedia> _media;
 
 };
 
@@ -268,11 +272,18 @@ CachedPagePhotoRuntime::CachedPagePhotoRuntime(
 , _media(photo->createMediaView()) {
 }
 
+std::shared_ptr<::Data::PhotoMedia> CachedPagePhotoRuntime::media() const {
+	if (!_media) {
+		_media = _photo->createMediaView();
+	}
+	return _media;
+}
+
 std::shared_ptr<Ui::DynamicImage> CachedPagePhotoRuntime::thumbnail(
 		QSize size) const {
-	_media->wanted(::Data::PhotoSize::Small, _origin);
+	media()->wanted(::Data::PhotoSize::Small, _origin);
 	return std::make_shared<CachedPagePhotoDynamicImage>(
-		_media,
+		media(),
 		_photo,
 		_origin,
 		CachedPagePhotoImageKind::Thumbnail,
@@ -281,9 +292,9 @@ std::shared_ptr<Ui::DynamicImage> CachedPagePhotoRuntime::thumbnail(
 
 std::shared_ptr<Ui::DynamicImage> CachedPagePhotoRuntime::full(
 		QSize size) const {
-	_media->wanted(::Data::PhotoSize::Large, _origin);
+	media()->wanted(::Data::PhotoSize::Large, _origin);
 	return std::make_shared<CachedPagePhotoDynamicImage>(
-		_media,
+		media(),
 		_photo,
 		_origin,
 		CachedPagePhotoImageKind::Full,
@@ -291,18 +302,18 @@ std::shared_ptr<Ui::DynamicImage> CachedPagePhotoRuntime::full(
 }
 
 bool CachedPagePhotoRuntime::loaded() const {
-	_media->wanted(::Data::PhotoSize::Large, _origin);
-	return _media->loaded();
+	media()->wanted(::Data::PhotoSize::Large, _origin);
+	return media()->loaded();
 }
 
 bool CachedPagePhotoRuntime::loading() const {
-	_media->wanted(::Data::PhotoSize::Large, _origin);
+	media()->wanted(::Data::PhotoSize::Large, _origin);
 	return _photo->displayLoading();
 }
 
 double CachedPagePhotoRuntime::progress() const {
-	_media->wanted(::Data::PhotoSize::Large, _origin);
-	return _media->progress();
+	media()->wanted(::Data::PhotoSize::Large, _origin);
+	return media()->progress();
 }
 
 void CachedPagePhotoRuntime::open(Qt::MouseButton button) const {
@@ -320,6 +331,10 @@ void CachedPagePhotoRuntime::open(Qt::MouseButton button) const {
 			item ? item->sublistPeerId() : PeerId(),
 		});
 	}
+}
+
+void CachedPagePhotoRuntime::releaseHeavyData() {
+	_media = nullptr;
 }
 
 [[nodiscard]] ImageWithLocation CachedPageMapImageData(
@@ -453,13 +468,17 @@ public:
 
 	void open(Qt::MouseButton button) const override;
 
+	void releaseHeavyData() override;
+
 private:
+	[[nodiscard]] std::shared_ptr<::Data::DocumentMedia> media() const;
+
 	const not_null<Main::Session*> _session;
 	const not_null<DocumentData*> _document;
 	const ::Data::FileOrigin _origin;
 	const FullMsgId _itemId;
 	const Fn<FullMsgId()> _itemIdResolver;
-	const std::shared_ptr<::Data::DocumentMedia> _media;
+	mutable std::shared_ptr<::Data::DocumentMedia> _media;
 
 };
 
@@ -477,8 +496,16 @@ CachedPageDocumentRuntime::CachedPageDocumentRuntime(
 , _media(document->createMediaView()) {
 }
 
+auto CachedPageDocumentRuntime::media() const
+-> std::shared_ptr<::Data::DocumentMedia> {
+	if (!_media) {
+		_media = _document->createMediaView();
+	}
+	return _media;
+}
+
 bool CachedPageDocumentRuntime::loaded() const {
-	return _media->loaded();
+	return media()->loaded();
 }
 
 bool CachedPageDocumentRuntime::loading() const {
@@ -504,6 +531,10 @@ void CachedPageDocumentRuntime::open(Qt::MouseButton button) const {
 			item ? item->sublistPeerId() : PeerId(),
 		});
 	}
+}
+
+void CachedPageDocumentRuntime::releaseHeavyData() {
+	_media = nullptr;
 }
 
 class CachedPageInlineDocumentImage final : public Ui::DynamicImage {
@@ -1058,7 +1089,6 @@ private:
 	const Fn<void(QString)> _openChannel;
 	const Fn<void(QString)> _joinChannel;
 	mutable std::shared_ptr<Markdown::IvHistoryViewMediaHost> _hostedMediaHost;
-	mutable bool _hostedMediaHostDied = false;
 	mutable std::vector<PendingInstantViewMediaItem> _pendingInstantViewItems;
 	mutable base::flat_map<uint64, rpl::lifetime> _channelJoinedSubscriptions;
 	mutable rpl::event_stream<uint64> _channelJoinedChanges;
@@ -1241,13 +1271,8 @@ QString CachedPageMediaRuntime::mentionNameEntityData(uint64 userId) const {
 auto CachedPageMediaRuntime::hostedMediaHost(
 		not_null<Window::SessionController*> controller) const
 -> std::shared_ptr<Markdown::IvHistoryViewMediaHost> {
-	if (_hostedMediaHostDied) {
-		return nullptr;
-	}
 	if (_hostedMediaHost && !_hostedMediaHost->itemAlive()) {
-		_hostedMediaHostDied = true;
 		_hostedMediaHost = nullptr;
-		return nullptr;
 	}
 	if (_useExistingView) {
 		const auto view = _view.get();
@@ -1328,6 +1353,7 @@ auto CachedPageMediaRuntime::hostedMediaBlockFactory() const
 			descriptor.layoutHint = QSize(prepared.width, prepared.height);
 			descriptor.host = host;
 			descriptor.spoiler = prepared.spoiler;
+			descriptor.editMode = prepared.editMode;
 			descriptor.mediaFactory = [photo, spoiler = prepared.spoiler](
 					not_null<HistoryView::Element*> view) {
 				return std::make_unique<HistoryView::Photo>(
@@ -1375,6 +1401,7 @@ auto CachedPageMediaRuntime::hostedMediaBlockFactory() const
 				prepared.media.height);
 			descriptor.host = host;
 			descriptor.spoiler = prepared.media.spoiler;
+			descriptor.editMode = prepared.editMode;
 			descriptor.mediaFactory = [media](
 					not_null<HistoryView::Element*> view) {
 				return media->createView(
@@ -1567,6 +1594,8 @@ auto CachedPageMediaRuntime::hostedMediaBlockFactory() const
 			descriptor.stableId = prepared.id.value;
 			descriptor.copyText = CachedPageGroupedMediaCopyText(prepared);
 			descriptor.host = host;
+			descriptor.editMode = prepared.editMode;
+			descriptor.fileOrigin = origin;
 			if (slideshow) {
 				descriptor.kind = Markdown::IvHistoryViewMediaKind::Slideshow;
 				descriptor.slideMediaFactories = std::move(slideFactories);

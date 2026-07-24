@@ -576,6 +576,7 @@ struct PreparedPhotoBlockData {
 	TextWithEntities caption;
 	bool spoiler = false;
 	bool viewerOpen = false;
+	bool editMode = false;
 };
 
 enum class PreparedMediaItemKind {
@@ -595,6 +596,7 @@ struct PreparedVideoBlockData {
 	PreparedMediaBlockId id;
 	PreparedMediaItemData media;
 	TextWithEntities caption;
+	bool editMode = false;
 };
 
 struct PreparedAudioBlockData {
@@ -639,6 +641,7 @@ struct PreparedGroupedMediaBlockData {
 	PreparedGroupedMediaIntent intent = PreparedGroupedMediaIntent::Collage;
 	std::vector<PreparedGroupedMediaItemData> items;
 	TextWithEntities caption;
+	bool editMode = false;
 };
 
 struct PreparedPlaceholderBlockData {
@@ -706,6 +709,7 @@ struct PreparedBlock {
 	bool supplementary = false;
 	bool pullquote = false;
 	bool quoteAuthor = false;
+	bool footer = false;
 	bool forceTextSegment = false;
 	bool orderedReversed = false;
 	std::optional<PreparedEditBlockSource> editBlock;
@@ -809,6 +813,7 @@ struct MarkdownArticleContent {
 	std::vector<PreparedFootnote> footnotes;
 	std::vector<PreparedFormulaSlot> formulas;
 	std::shared_ptr<MediaRuntime> mediaRuntime;
+	std::shared_ptr<const Iv::RichPage> richPage;
 	bool editMode = false;
 	PrepareFailureStatus failure;
 	PrepareDebugStats debug;
@@ -854,6 +859,10 @@ struct NativeInstantViewPrepareResult {
 [[nodiscard]] MarkdownPrepareDimensions CaptureMarkdownPrepareDimensions();
 [[nodiscard]] MarkdownPrepareDimensions CaptureMarkdownPrepareDimensions(
 	const style::Markdown &st);
+[[nodiscard]] QString HeadingLevelLabel(int level);
+[[nodiscard]] QString FormatPreparedOrderedRawMarkerText(
+	const QString &raw,
+	ListDelimiter delimiter);
 [[nodiscard]] QString SerializeInlineTextObjectEntity(
 	const InlineTextObjectEntity &object);
 [[nodiscard]] QString InlineFormulaCopySource(const QString &source);

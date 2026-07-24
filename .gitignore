@@ -6,6 +6,7 @@ Release/
 /ThirdParty/
 /Telegram/ThirdParty/dispatch/
 /Telegram/build/target
+/Telegram/build/ai-machine-tag
 /Telegram/tests/
 /Telegram/gyp/tests/*.test
 /Telegram/out/

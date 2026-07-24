@@ -23,6 +23,7 @@ ivMenuToggle: IconButton(defaultIconButton) {
 	ripple: defaultRippleAnimationBgOver;
 }
 ivMenuPosition: point(-2px, 40px);
+ivZoomDropdownPosition: point(-2px, 0px);
 ivBackIcon: icon {{ "box_button_back", menuIconColor }};
 ivBack: IconButton(ivMenuToggle) {
 	width: 60px;
@@ -184,6 +185,12 @@ ivEditorBottomSend: SendButton(historySend) {
 		rippleAreaSize: ivEditorBottomCircleSize;
 		rippleAreaPosition: point(0px, 0px);
 	}
+	stars: RoundButton(defaultActiveButton) {
+		height: ivEditorBottomCircleSize;
+		padding: margins(6px, 0px, 10px, 0px);
+		textTop: 11px;
+		width: -8px;
+	}
 	sendIconFg: windowFgActive;
 }
 ivEditorBottomSaveSend: SendButton(historySend) {
@@ -226,6 +233,7 @@ ivEditorToolbarBlockquoteIcon: icon {{ "menu/rich/blockquote-24x24", menuIconCol
 ivEditorToolbarCodeIcon: icon {{ "menu/rich/code-24x24", menuIconColor }};
 ivEditorToolbarMathIcon: icon {{ "menu/rich/math-24x24", menuIconColor }};
 ivEditorToolbarDividerIcon: icon {{ "menu/rich/divider-24x24", menuIconColor }};
+ivEditorToolbarFooterIcon: icon {{ "menu/rich/footer-24x24", menuIconColor }};
 ivEditorToolbarOrderedListIcon: icon {{ "menu/rich/ordered_list-24x24", menuIconColor }};
 ivEditorToolbarBulletListIcon: icon {{ "menu/rich/bullet_list-24x24", menuIconColor }};
 ivEditorToolbarTaskListIcon: icon {{ "menu/rich/task_list-24x24", menuIconColor }};
@@ -239,12 +247,41 @@ ivEditorToolbarDetailsIcon: icon {{ "menu/rich/details-24x24", menuIconColor }};
 ivEditorToolbarTableIcon: icon {{ "menu/rich/table-24x24", menuIconColor }};
 ivEditorToolbarLocationIcon: icon {{ "menu/rich/location-24x24", menuIconColor }};
 ivEditorToolbarAudioIcon: icon {{ "menu/rich/audio-24x24", menuIconColor }};
+ivSummaryTableIcon: IconEmoji {
+	icon: icon {{ "menu/rich/table-18x18", dialogsTextFg }};
+	padding: margins(0px, 1px, 3px, 0px);
+}
+ivSummaryMediaIcon: IconEmoji {
+	icon: icon {{ "menu/rich/attach-18x18", dialogsTextFg }};
+	padding: margins(0px, 1px, 3px, 0px);
+}
+ivSummaryAudioIcon: IconEmoji {
+	icon: icon {{ "menu/rich/audio-18x18", dialogsTextFg }};
+	padding: margins(0px, 1px, 3px, 0px);
+}
+ivSummaryLocationIcon: IconEmoji {
+	icon: icon {{ "menu/rich/location-18x18", dialogsTextFg }};
+	padding: margins(0px, 1px, 3px, 0px);
+}
+ivSummaryPullquoteIcon: IconEmoji {
+	icon: icon {{ "menu/rich/pullquote-18x18", dialogsTextFg }};
+	padding: margins(0px, 1px, 3px, 0px);
+}
+ivSummaryBlockquoteIcon: IconEmoji {
+	icon: icon {{ "menu/rich/blockquote-18x18", dialogsTextFg }};
+	padding: margins(0px, 1px, 3px, 0px);
+}
+ivSummaryMathIcon: IconEmoji {
+	icon: icon {{ "menu/rich/math-18x18", dialogsTextFg }};
+	padding: margins(0px, 1px, 3px, 0px);
+}
 ivEditorMediaCornerSize: 27px;
 ivEditorMediaCornerSkip: 6px;
 ivEditorMediaAddIcon: icon {{ "menu/rich/media_add-20x20", windowFgActive }};
 ivEditorMediaUploadRadialSize: 44px;
 ivEditorMediaToCollageIcon: icon {{ "menu/rich/to_collage-20x20", windowFgActive }};
 ivEditorMediaToSlideshowIcon: icon {{ "menu/rich/to_slideshow-20x20", windowFgActive }};
+ivEditorTableAddCellsIcon: icon {{ "menu/rich/table_add_cells-24x24", menuIconColor }};
 ivEditorTableAddRowAboveIcon: icon {{ "menu/rich/table_add_row_above-24x24", menuIconColor }};
 ivEditorTableAddRowBelowIcon: icon {{ "menu/rich/table_add_row_below-24x24", menuIconColor }};
 ivEditorTableAddColumnLeftIcon: icon {{ "menu/rich/table_add_column_left-24x24", menuIconColor }};
@@ -252,12 +289,17 @@ ivEditorTableAddColumnRightIcon: icon {{ "menu/rich/table_add_column_right-24x24
 ivEditorTableHeaderIcon: icon {{ "menu/rich/table_highlight-24x24", menuIconColor }};
 ivEditorTableHeaderOffIcon: icon {{ "menu/rich/table_highlight_off-24x24", menuIconColor }};
 ivEditorTableBorderlessIcon: icon {{ "menu/rich/table_borderless-24x24", menuIconColor }};
+ivEditorTableStripedIcon: icon {{ "menu/rich/table_striped-24x24", menuIconColor }};
+ivEditorTableAlignmentIcon: icon {{ "menu/rich/table_alignment-24x24", menuIconColor }};
 ivEditorTableAlignLeftIcon: icon {{ "menu/rich/align_left-24x24", menuIconColor }};
 ivEditorTableAlignCenterIcon: icon {{ "menu/rich/align_center-24x24", menuIconColor }};
 ivEditorTableAlignRightIcon: icon {{ "menu/rich/align_right-24x24", menuIconColor }};
 ivEditorTableAlignTopIcon: icon {{ "menu/rich/align_top-24x24", menuIconColor }};
 ivEditorTableAlignMiddleIcon: icon {{ "menu/rich/align_middle-24x24", menuIconColor }};
 ivEditorTableAlignBottomIcon: icon {{ "menu/rich/align_bottom-24x24", menuIconColor }};
+ivEditorTableDeleteCellsIcon: icon {{ "menu/rich/table_delete_cells-24x24", menuIconColor }};
+ivEditorTableDeleteRowsIcon: icon {{ "menu/rich/table_delete_row-24x24", menuIconColor }};
+ivEditorTableDeleteColumnsIcon: icon {{ "menu/rich/table_delete_column-24x24", menuIconColor }};
 ivEditorTableMergeIcon: icon {{ "menu/rich/table_merge-24x24", menuIconColor }};
 ivEditorTableSplitIcon: icon {{ "menu/rich/table_split-24x24", menuIconColor }};
 ivEditorInlineFieldMargins: margins(4px, 0px, 6px, 0px);
@@ -522,6 +564,7 @@ Markdown {
 	heading4: TextStyle;
 	heading5: TextStyle;
 	heading6: TextStyle;
+	footer: TextStyle;
 	code: TextStyle;
 	pagePadding: margins;
 	pageMaxWidth: pixels;
@@ -914,6 +957,10 @@ defaultMarkdown: Markdown {
 		font: font(15px semibold);
 		lineHeight: 22px;
 	}
+	footer: TextStyle(defaultMarkdownBodyStyle) {
+		font: font(11px);
+		lineHeight: 18px;
+	}
 	code: defaultMarkdownCodeStyle;
 	pagePadding: margins(0px, 0px, 0px, 16px);
 	pageMaxWidth: 732px;
@@ -941,7 +988,6 @@ defaultMarkdown: Markdown {
 }
 messageMarkdownBodyStyle: TextStyle(messageTextStyle) {
 	font: font(13px);
-	lineHeight: 20px;
 }
 messageMarkdownCodeStyle: TextStyle(defaultMarkdownCodeStyle) {
 	font: font(13px);
@@ -981,6 +1027,10 @@ messageMarkdownHeading6Style: TextStyle(messageMarkdownBodyStyle) {
 	font: font(14px semibold);
 	lineHeight: 21px;
 }
+messageMarkdownFooterStyle: TextStyle(messageMarkdownBodyStyle) {
+	font: font(12px);
+	lineHeight: 19px;
+}
 messageMarkdownDetailsSummaryStyle: TextStyle(messageMarkdownBodyStyle) {
 	linkUnderline: kLinkUnderlineNever;
 }
@@ -991,7 +1041,7 @@ messageMarkdownAudioTitleStyle: TextStyle(messageMarkdownBodyStyle) {
 messageMarkdownAudioSubtitleStyle: TextStyle(messageMarkdownDetailsSummaryStyle) {
 }
 messageMarkdownBlockSkips: MarkdownBlockSkips {
-	paragraph: 8px;
+	paragraph: 4px;
 	heading: 10px;
 	code: 8px;
 	rule: 8px;
@@ -1171,6 +1221,7 @@ messageMarkdown: Markdown(defaultMarkdown) {
 	heading4: messageMarkdownHeading4Style;
 	heading5: messageMarkdownHeading5Style;
 	heading6: messageMarkdownHeading6Style;
+	footer: messageMarkdownFooterStyle;
 	code: messageMarkdownCodeStyle;
 	pagePadding: margins(0px, 0px, 0px, 0px);
 	pageMaxWidth: msgMaxWidth;

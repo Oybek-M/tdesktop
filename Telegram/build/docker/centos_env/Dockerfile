@@ -46,6 +46,7 @@ sed -i '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/")/ -O0 {% if LTO %}-fno-lto -fno-use-
 for i in EXE SHARED MODULE; do
 	sed -i '1i string(APPEND CMAKE_'$i'_LINKER_FLAGS_DEBUG_INIT " -fuse-ld=lld")' "$CMAKE_ROOT/Modules/CMakeCommonLanguageInclude.cmake"
 done
+sed -i '/CMAKE_EXE_LINKER_FLAGS_INIT/s/")/ -Wl,--exclude-libs,ALL")/' "$CMAKE_ROOT/Modules/CMakeCommonLanguageInclude.cmake"
 sed -i '/__gcc_hints/d' "$CMAKE_ROOT/Modules/Compiler/GNU-FindBinUtils.cmake"
 sed -i '1i set(_CMAKE_TOOLCHAIN_LOCATION "")' "$CMAKE_ROOT/Modules/CMakeFindBinUtils.cmake"
 sed -i 's/NO_DEFAULT_PATH//g; s/PKG_CONFIG_ALLOW_SYSTEM_LIBS/PKG_CONFIG_IS_DUMB/g' "$CMAKE_ROOT/Modules/FindPkgConfig.cmake"
@@ -117,7 +118,38 @@ implib /usr/lib64/libwayland-cursor.so
 implib /usr/lib64/libwayland-client.so
 implib /usr/lib64/libwayland-server.so
 implib /usr/lib64/libX11-xcb.so
+implib /usr/lib64/libX11.so
 implib /usr/lib64/libxcb.so
+
+# Implib.so can only intercept functions, while the static libXext,
+# libXfixes, libXdamage, libXcomposite, libXrender reference three Xlib
+# threading data symbols. Define them with real locks (the always-on
+# XInitThreads semantics of libX11 1.8+). The layout is private to this
+# implementation: whether the real libX11 interposes these or keeps its
+# own copies, each lock implementation only ever sees its own objects.
+cat > libX11.locks.c <<'EOF2'
+#include <pthread.h>
+
+typedef struct _LockInfoRec {
+	pthread_mutex_t mutex;
+} LockInfoRec, *LockInfoPtr;
+
+static LockInfoRec GlobalLock = { PTHREAD_MUTEX_INITIALIZER };
+
+static void LockMutex(LockInfoPtr lock) {
+	pthread_mutex_lock(&lock->mutex);
+}
+
+static void UnlockMutex(LockInfoPtr lock) {
+	pthread_mutex_unlock(&lock->mutex);
+}
+
+LockInfoPtr _Xglobal_lock = &GlobalLock;
+void (*_XLockMutex_fn)(LockInfoPtr) = LockMutex;
+void (*_XUnlockMutex_fn)(LockInfoPtr) = UnlockMutex;
+EOF2
+gcc $CFLAGS -c -o libX11.locks.o libX11.locks.c
+ar rs /usr/local/lib64/libX11.a libX11.locks.o
 
 cd ../..
 rm -rf Implib.so
@@ -128,7 +160,7 @@ RUN <<EOF
 git init patches
 cd patches
 git remote add origin https://github.com/desktop-app/patches.git
-git fetch --depth=1 origin 701cfb4b3d6612188d168f198c842114fd64726f
+git fetch --depth=1 origin 5c6549de54d24aa11bff0968b92fae06afe5b168
 git reset --hard FETCH_HEAD
 rm -rf .git
 EOF
@@ -632,7 +664,7 @@ COPY --link --from=xv /usr/src/xv-cache /
 COPY --link --from=nv-codec-headers /usr/src/nv-codec-headers-cache /
 
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b n6.1.1 --depth=1 https://github.com/FFmpeg/FFmpeg.git
+git clone -b n6.1.6 --depth=1 https://github.com/FFmpeg/FFmpeg.git
 cd FFmpeg
 ./configure \
 	--extra-cflags="-fno-lto -DCONFIG_SAFE_BITSTREAM_READER=1" \

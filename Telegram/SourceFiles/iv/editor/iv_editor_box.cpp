@@ -172,7 +172,7 @@ enum class ToolbarActionId : uchar {
 	case ToolbarActionId::Math:
 		return tr::lng_article_insert_math(tr::now);
 	case ToolbarActionId::Blockquote:
-		return tr::lng_article_insert_blockquote(tr::now);
+		return tr::lng_menu_formatting_blockquote(tr::now);
 	case ToolbarActionId::Pullquote:
 		return tr::lng_article_insert_pullquote(tr::now);
 	case ToolbarActionId::CodeBlock:
@@ -420,18 +420,6 @@ int TryToExtendWidthBy(not_null<Window*> window, int addToWidth) {
 		window->setGeometry(QRect(newLeft, inner.y(), newWidth, inner.height()));
 	}
 	return addToWidth;
-}
-
-[[nodiscard]] QString HeadingLabel(int level) {
-	switch (level) {
-	case 1: return tr::lng_article_insert_heading1(tr::now);
-	case 2: return tr::lng_article_insert_heading2(tr::now);
-	case 3: return tr::lng_article_insert_heading3(tr::now);
-	case 4: return tr::lng_article_insert_heading4(tr::now);
-	case 5: return tr::lng_article_insert_heading5(tr::now);
-	case 6: return tr::lng_article_insert_heading6(tr::now);
-	}
-	return tr::lng_article_insert_heading1(tr::now);
 }
 
 [[nodiscard]] QString SubmitText(const ShowWindowDescriptor &descriptor) {
@@ -921,7 +909,7 @@ void Toolbar::fillHeadingMenu(not_null<Ui::PopupMenu*> menu) {
 			: QKeySequence();
 		Menu::AddActiveColorAction(
 			menu,
-			WithTabShortcut(HeadingLabel(level), shortcut),
+			WithTabShortcut(Markdown::HeadingLevelLabel(level), shortcut),
 			[=] {
 				if (_editor) {
 					_editor->insertBlock({
@@ -951,16 +939,6 @@ void Toolbar::fillBlockStyleMenu(not_null<Ui::PopupMenu*> menu) {
 	const auto starSize = premium
 		? 0
 		: st::ivEditorStyleMenuPremiumStarSize;
-	const auto withShortcut = [&](const QString &label, QKeySequence seq) {
-		if (!premium) {
-			return label;
-		}
-		const auto shortcut = seq.toString(QKeySequence::NativeText);
-		return shortcut.isEmpty()
-			? label
-			: (label + QChar('\t') + shortcut);
-	};
-
 	auto sub = std::make_unique<Ui::PopupMenu>(menu, st::popupMenuWithIcons);
 	fillHeadingMenu(not_null<Ui::PopupMenu*>(sub.get()));
 	menu->addAction(
@@ -979,8 +957,8 @@ void Toolbar::fillBlockStyleMenu(not_null<Ui::PopupMenu*> menu) {
 		(kind == Kind::Paragraph));
 	Menu::AddActiveColorAction(
 		menu,
-		withShortcut(
-			tr::lng_article_insert_blockquote(tr::now),
+		WithTabShortcut(
+			tr::lng_menu_formatting_blockquote(tr::now),
 			Ui::kBlockquoteSequence),
 		[=] { insertType(State::InsertBlockType::Blockquote); },
 		&st::ivEditorToolbarBlockquoteIcon,
@@ -994,12 +972,19 @@ void Toolbar::fillBlockStyleMenu(not_null<Ui::PopupMenu*> menu) {
 		starSize);
 	Menu::AddActiveColorAction(
 		menu,
-		withShortcut(
+		WithTabShortcut(
 			tr::lng_article_insert_code(tr::now),
 			Ui::kMonospaceSequence),
 		[=] { insertType(State::InsertBlockType::Code); },
 		&st::ivEditorToolbarCodeIcon,
 		(kind == Kind::Code));
+	Menu::AddActiveColorAction(
+		menu,
+		tr::lng_article_insert_footer(tr::now),
+		[=] { insertType(State::InsertBlockType::Footer); },
+		&st::ivEditorToolbarFooterIcon,
+		(kind == Kind::Footer),
+		starSize);
 	Menu::AddActiveColorAction(
 		menu,
 		tr::lng_article_insert_divider(tr::now),
@@ -1027,8 +1012,13 @@ void Toolbar::applyBlockText() {
 		_editor->insertBlock({ .type = State::InsertBlockType::Code });
 		break;
 	case Kind::Heading:
-		_editor->applyToolbarFormatAction(
-			Widget::ToolbarFormatAction::PlainText);
+		_editor->insertBlock({
+			.type = State::InsertBlockType::Heading,
+			.headingLevel = info.headingLevel,
+		});
+		break;
+	case Kind::Footer:
+		_editor->insertBlock({ .type = State::InsertBlockType::Footer });
 		break;
 	default:
 		break;
@@ -1378,19 +1368,20 @@ int Toolbar::contentMaxWidth() const {
 int Toolbar::resizeGetHeight(int width) {
 	const auto padding = st::ivEditorToolbarPadding;
 	const auto top = padding.top();
-	const auto column = _editor
-		? _editor->articleColumnForWidth(width)
-		: Widget::ArticleColumn{ 0, width };
-	const auto fitsArticle = (column.width >= contentMaxWidth());
-	const auto left = fitsArticle ? column.left : 0;
-	const auto right = fitsArticle ? (column.left + column.width) : width;
-	const auto undoRedoLeft = left;
+	const auto undoRedoLeft = padding.left();
 	_undoRedoPill->moveToLeft(undoRedoLeft, top, width);
-	const auto controlsLeft = undoRedoLeft
+	const auto controlsWidth = _controlsPill->naturalSize().width();
+	const auto staticCommandLeft = undoRedoLeft
 		+ _undoRedoPill->naturalSize().width()
 		+ st::ivEditorToolbarGroupsSkip;
+	const auto centeredCommandLeft = (width - controlsWidth) / 2;
+	const auto controlsLeft = std::max(
+		staticCommandLeft,
+		centeredCommandLeft);
 	_controlsPill->moveToLeft(controlsLeft, top, width);
-	const auto emojiLeft = right - _emojiPill->naturalSize().width();
+	const auto emojiLeft = width
+		- padding.right()
+		- _emojiPill->naturalSize().width();
 	_emojiPill->moveToLeft(emojiLeft, top, width);
 	updateInputMask();
 	if (_hovered && _hovered->isHidden()) {
@@ -1507,7 +1498,6 @@ public:
 	explicit Impl(ShowWindowDescriptor descriptor);
 	~Impl();
 	void close();
-	void activateClose();
 
 private:
 	void setupWindow(ShowWindowDescriptor &&descriptor);
@@ -1583,14 +1573,10 @@ void WindowHost::Impl::close() {
 	finishClose();
 }
 
-void WindowHost::Impl::activateClose() {
-	if (confirmCancel()) {
-		finishClose();
-	}
-}
-
 void WindowHost::Impl::setupWindow(ShowWindowDescriptor &&descriptor) {
-	const auto title = tr::lng_article_editor_title(tr::now);
+	const auto title = descriptor.title.isEmpty()
+		? tr::lng_article_editor_title(tr::now)
+		: descriptor.title;
 
 	if (!descriptor.state) {
 		descriptor.state = std::make_shared<State>();
@@ -1608,7 +1594,6 @@ void WindowHost::Impl::setupWindow(ShowWindowDescriptor &&descriptor) {
 		descriptor.showCreated(_show);
 	}
 	window->setTitle(title);
-	window->setWindowTitle(title);
 	window->setMinimumSize(st::ivEditorWindowMinSize);
 	window->setGeometry(DefaultWindowGeometry());
 
@@ -1691,7 +1676,9 @@ void WindowHost::Impl::setupWindow(ShowWindowDescriptor &&descriptor) {
 		},
 		descriptor.session);
 	window->setMinimumWidth(minimalWindowWidth());
-	if (descriptor.discarded) {
+	const auto save = (descriptor.submitType
+		== ShowWindowDescriptor::SubmitType::Save);
+	if (descriptor.discarded && !save) {
 		_discard = object_ptr<ToolbarPill>(
 			_bottom.data(),
 			st::ivEditorPillShadow);
@@ -1705,7 +1692,7 @@ void WindowHost::Impl::setupWindow(ShowWindowDescriptor &&descriptor) {
 			discard();
 		});
 	}
-	if (descriptor.submitType == ShowWindowDescriptor::SubmitType::Save) {
+	if (save) {
 		_cancel = object_ptr<ToolbarPill>(
 			_bottom.data(),
 			st::ivEditorPillShadow);
@@ -1816,8 +1803,6 @@ void WindowHost::Impl::setupWindow(ShowWindowDescriptor &&descriptor) {
 		});
 		setupBottomAiStar(button, session);
 	}
-	const auto save = (descriptor.submitType
-		== ShowWindowDescriptor::SubmitType::Save);
 	_send = object_ptr<Ui::SendButton>(
 		_bottom.data(),
 		save ? st::ivEditorBottomSaveSend : st::ivEditorBottomSend);
@@ -1952,7 +1937,7 @@ void WindowHost::Impl::setupWindow(ShowWindowDescriptor &&descriptor) {
 	_toolbar->raise();
 	_bottom->raise();
 	window->show();
-	editor->activateInitialNode();
+	editor->activateInitialNodeAtEnd();
 }
 
 void WindowHost::Impl::setupBottomAiStar(
@@ -2076,12 +2061,8 @@ void WindowHost::Impl::layout() {
 	_toolbar->raise();
 	_bottomFade->setGeometry(0, height - bottomHeight, editorWidth, bottomHeight);
 	_bottom->setGeometry(0, height - bottomHeight, editorWidth, bottomHeight);
-	const auto column = _editor->articleColumnForWidth(editorWidth);
-	const auto fitsArticle = (column.width >= _toolbar->contentMaxWidth());
-	const auto right = fitsArticle
-		? (column.left + column.width)
-		: editorWidth;
-	const auto left = fitsArticle ? column.left : 0;
+	const auto right = editorWidth - padding.right();
+	const auto left = padding.left();
 	const auto leftPill = _discard
 		? _discard.data()
 		: _cancel.data();
@@ -2426,10 +2407,6 @@ WindowHost::~WindowHost() = default;
 
 void WindowHost::close() {
 	_impl->close();
-}
-
-void WindowHost::activateClose() {
-	_impl->activateClose();
 }
 
 std::unique_ptr<WindowHost> ShowWindow(ShowWindowDescriptor descriptor) {

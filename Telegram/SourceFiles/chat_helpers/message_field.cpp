@@ -540,7 +540,10 @@ auto InitMessageFieldHandlers(MessageFieldHandlersArgs &&args)
 	field->setInstantReplacesEnabled(
 		Core::App().settings().replaceEmojiValue());
 	field->setMarkdownReplacesEnabled(rpl::single(Ui::MarkdownEnabledState{
-		Ui::MarkdownEnabled{ std::move(args.allowMarkdownTags) }
+		Ui::MarkdownEnabled{
+			std::move(args.allowMarkdownTags),
+			args.allowTypedMarkdown
+		}
 	}));
 	if (const auto &show = args.show) {
 		field->setEditLinkCallback(

@@ -75,6 +75,8 @@ struct InstantViewMediaRuntime
 : RuntimeComponent<InstantViewMediaRuntime, Element> {
 	QString pageUrl;
 	QSize forcedSize;
+	Media *forcedFor = nullptr;
+	double mediaPixelScale = 1.;
 };
 
 struct HistoryMessageRichPage
@@ -184,7 +186,10 @@ public:
 		QPoint point,
 		StateRequest request) const override;
 	void updatePressed(QPoint point) override;
-	bool consumeHorizontalScroll(QPoint position, int delta) override;
+	bool consumeHorizontalScroll(
+		QPoint position,
+		int delta,
+		Qt::ScrollPhase phase) override;
 	[[nodiscard]] bool canConsumeHorizontalScroll(
 		QPoint position,
 		int delta) const override;

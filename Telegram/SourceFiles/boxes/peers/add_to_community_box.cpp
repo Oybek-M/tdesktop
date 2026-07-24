@@ -134,10 +134,15 @@ void CreateCommunityBox(
 		st::defaultInputField,
 		tr::lng_community_create_name()));
 	box->setFocusCallback([=] { field->setFocusFast(); });
+	box->addSkip(st::defaultBoxCheckbox.margin.top() + st::defaultVerticalListSkip);
 
 	const auto hidden = box->addRow(object_ptr<Ui::Checkbox>(
 		box,
-		tr::lng_community_create_hidden(tr::now),
+		(peer->isUser()
+			? tr::lng_community_create_hidden_bot
+			: peer->isBroadcast()
+			? tr::lng_community_create_hidden_channel
+			: tr::lng_community_create_hidden)(tr::now),
 		false,
 		st::defaultBoxCheckbox));
 
@@ -275,6 +280,8 @@ void ShowAddPeerToCommunity(
 			show->showBox(Ui::MakeConfirmBox({
 				.text = (peer->isUser()
 					? tr::lng_community_add_confirm_bot()
+					: peer->isBroadcast()
+					? tr::lng_community_add_confirm_channel()
 					: tr::lng_community_add_confirm()),
 				.confirmed = sure,
 				.confirmText = tr::lng_community_add_confirm_add(),
@@ -300,6 +307,8 @@ void ShowAddToCommunityBox(
 		auto above = object_ptr<Ui::VerticalLayout>(box);
 		Ui::AddDividerText(above, peer->isUser()
 			? tr::lng_community_add_about_bot()
+			: peer->isBroadcast()
+			? tr::lng_community_add_about_channel()
 			: tr::lng_community_add_about());
 		Ui::AddSkip(above);
 		Settings::AddButtonWithIcon(
