@@ -225,6 +225,17 @@ void fillPeersTab(
 void fillPerChatSection(
 	not_null<Ui::VerticalLayout*> content,
 	not_null<Window::SessionController*> controller);
+// Avatar + ism + ID + o'chirish tugmasi bilan bitta peer qatorini quradi
+// va uni |content| ga qo'shadi. White/Black List'dagi fillPeerSection's
+// state->addEntry bilan bir xil vizual pattern, lekin SlideWrap/entryWraps
+// holat boshqaruvisiz — chaqiruvchi butun bo'limni onRebuild() orqali
+// to'liq qayta quradi (Include/Exclude List shu tarzda ishlaydi).
+void AddAvatarPeerRow(
+	not_null<Ui::VerticalLayout*> content,
+	not_null<Window::SessionController*> controller,
+	const QString &peerId,
+	const QString &name,
+	Fn<void()> onDelete);
 void fillActivityHistorySection(
 	not_null<Ui::VerticalLayout*> content,
 	not_null<Window::SessionController*> controller,
@@ -1560,6 +1571,91 @@ void fillPerChatSection(
 }
 
 // ── Activity History Log: kuzatish qamrovi + kuzatilayotganlar ro'yxati ──
+void AddAvatarPeerRow(
+		not_null<Ui::VerticalLayout*> content,
+		not_null<Window::SessionController*> controller,
+		const QString &peerId,
+		const QString &name,
+		Fn<void()> onDelete) {
+	constexpr int kRowH    = 56;
+	constexpr int kAvSize  = 38;
+	constexpr int kPadL = 14;
+	constexpr int kPadR = 12;
+	constexpr int kGap  = 12;
+	constexpr int kDelBtnW = 76;
+
+	const auto row = content->add(object_ptr<Ui::RpWidget>(content));
+	row->setFixedHeight(kRowH);
+
+	// Avatar circle — real userpic agar peer cache da bo'lsa,
+	// aks holda fallback (harf + rang).
+	const auto av = Ui::CreateChild<Ui::RpWidget>(row);
+	av->setFixedSize(kAvSize, kAvSize);
+	const auto userpicView = std::make_shared<Ui::PeerUserpicView>();
+	const auto session = &controller->session();
+	av->paintRequest() | rpl::on_next([=](QRect) {
+		Painter p(av);
+		PaintPeerAvatar(
+			p,
+			QRect(0, 0, kAvSize, kAvSize),
+			peerId,
+			name,
+			session,
+			*userpicView);
+	}, av->lifetime());
+
+	const auto nameLabel = Ui::CreateChild<Ui::FlatLabel>(
+		row,
+		rpl::single(name.isEmpty() ? peerId : name),
+		st::boxLabel);
+	const auto idLabel = Ui::CreateChild<Ui::FlatLabel>(
+		row,
+		rpl::single(u"ID: "_q + peerId),
+		st::customModHintLabel);
+	const auto delBtn = Ui::CreateChild<Ui::RoundButton>(
+		row,
+		rpl::single(u"Oʻchirish"_q),
+		st::attentionBoxButton);
+	delBtn->setFixedWidth(kDelBtnW);
+	av->show();
+	nameLabel->show();
+	idLabel->show();
+	delBtn->show();
+
+	row->paintRequest() | rpl::on_next([=](QRect) {
+		Painter p(row);
+		p.fillRect(kPadL + kAvSize + kGap, kRowH - 1,
+			row->width() - kPadL - kAvSize - kGap - kPadR, 1,
+			st::shadowFg->c);
+	}, row->lifetime());
+
+	const auto layoutRow = [=](int w) {
+		const auto avY = (kRowH - kAvSize) / 2;
+		av->move(kPadL, avY);
+		av->update();
+		const auto textX = kPadL + kAvSize + kGap;
+		const auto textW = w - textX - kGap - kDelBtnW - kPadR;
+		if (textW <= 0) return;
+		nameLabel->resizeToWidth(textW);
+		nameLabel->move(textX, 10);
+		nameLabel->update();
+		idLabel->resizeToWidth(textW);
+		idLabel->move(textX, 10 + nameLabel->height() + 2);
+		idLabel->update();
+		const auto btnY = (kRowH - st::defaultBoxButton.height) / 2;
+		delBtn->move(w - kPadR - kDelBtnW, btnY);
+	};
+	row->widthValue() | rpl::on_next(layoutRow, row->lifetime());
+	if (content->width() > 0) layoutRow(content->width());
+
+	if (onDelete) {
+		delBtn->addClickHandler([=] {
+			delBtn->setDisabled(true);
+			onDelete();
+		});
+	}
+}
+
 void fillActivityHistorySection(
 		not_null<Ui::VerticalLayout*> content,
 		not_null<Window::SessionController*> controller,
@@ -1653,12 +1749,9 @@ void fillActivityHistorySection(
 			rpl::single(u"Include List'ga qoʻshish"_q)));
 	});
 	for (const auto &e : CustomSettings::GetActivityInclude()) {
-		const auto row = content->add(
-			object_ptr<Ui::SettingsButton>(
-				content,
-				rpl::single(u"➖ "_q + e.second),
-				st::settingsButtonNoIcon));
-		row->addClickHandler([=, peerId = e.first, name = e.second] {
+		const auto peerId = e.first;
+		const auto name = e.second;
+		AddAvatarPeerRow(content, controller, peerId, name, [=] {
 			CustomSettings::RemoveFromActivityInclude(peerId);
 			Ui::Toast::Show(name + u" Include List'dan olib tashlandi."_q);
 			if (onRebuild) onRebuild();
@@ -1666,9 +1759,9 @@ void fillActivityHistorySection(
 		const auto historyRow = content->add(
 			object_ptr<Ui::SettingsButton>(
 				content,
-				rpl::single(u"📜 Tarixni ko'rish — "_q + e.second),
+				rpl::single(u"📜 Tarixni ko'rish — "_q + name),
 				st::settingsButtonNoIcon));
-		historyRow->addClickHandler([=, peerId = e.first, name = e.second] {
+		historyRow->addClickHandler([=] {
 			if (!gInstance) return;
 			gInstance->showBox(CustomActivityHistory::MakeHistoryBox(
 				&controller->session(), peerId, name));
@@ -1714,12 +1807,9 @@ void fillActivityHistorySection(
 			rpl::single(u"Exclude List'ga qoʻshish"_q)));
 	});
 	for (const auto &e : CustomSettings::GetActivityExclude()) {
-		const auto row = content->add(
-			object_ptr<Ui::SettingsButton>(
-				content,
-				rpl::single(u"➖ "_q + e.second),
-				st::settingsButtonNoIcon));
-		row->addClickHandler([=, peerId = e.first, name = e.second] {
+		const auto peerId = e.first;
+		const auto name = e.second;
+		AddAvatarPeerRow(content, controller, peerId, name, [=] {
 			CustomSettings::RemoveFromActivityExclude(peerId);
 			Ui::Toast::Show(name + u" Exclude List'dan olib tashlandi."_q);
 			if (onRebuild) onRebuild();
@@ -1727,9 +1817,9 @@ void fillActivityHistorySection(
 		const auto historyRow = content->add(
 			object_ptr<Ui::SettingsButton>(
 				content,
-				rpl::single(u"📜 Tarixni ko'rish — "_q + e.second),
+				rpl::single(u"📜 Tarixni ko'rish — "_q + name),
 				st::settingsButtonNoIcon));
-		historyRow->addClickHandler([=, peerId = e.first, name = e.second] {
+		historyRow->addClickHandler([=] {
 			if (!gInstance) return;
 			gInstance->showBox(CustomActivityHistory::MakeHistoryBox(
 				&controller->session(), peerId, name));
