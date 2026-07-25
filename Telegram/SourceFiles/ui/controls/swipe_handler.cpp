@@ -172,12 +172,6 @@ void SetupSwipeHandler(SwipeHandlerArgs &&args) {
 					: rawRatio,
 				0.,
 				kMaxRatio);
-			qDebug() << "SWIPEDEBUG: processEnd ratio=" << ratio
-				<< "usedDelta=" << delta.value_or(state->delta).x()
-				<< "threshold=" << state->threshold
-				<< "hasCallback=" << bool(state->finishByTopData.callback)
-				<< "willTrigger=" << (ratio >= 1
-					&& bool(state->finishByTopData.callback));
 			if ((ratio >= 1) && state->finishByTopData.callback) {
 				Ui::PostponeCall(
 					widget,
@@ -210,12 +204,6 @@ void SetupSwipeHandler(SwipeHandlerArgs &&args) {
 		update(state->data);
 	};
 	const auto updateWith = [=, generateFinish = args.init](UpdateArgs args) {
-		qDebug() << "SWIPEDEBUG: updateWith CALLED delta=" << args.delta
-			<< "started=" << state->started
-			<< "hasDirection=" << bool(state->direction)
-			<< "orientation=" << (state->orientation
-				? (*state->orientation == Qt::Horizontal ? "H" : "V")
-				: "none");
 		const auto fillFinishByTop = [&] {
 			if (!args.delta.x()) {
 				return;
@@ -238,23 +226,6 @@ void SetupSwipeHandler(SwipeHandlerArgs &&args) {
 				setOrientation(Qt::Vertical);
 			}
 		};
-		const auto tryLockOrientation = [=](QPointF delta, bool allowAmbiguous) {
-			state->delta = delta;
-			const auto diffXtoY = std::abs(delta.x()) - std::abs(delta.y());
-			constexpr auto kOrientationThreshold = 1.;
-			qDebug() << "SWIPEDEBUG: orientation decision diffXtoY=" << diffXtoY
-				<< "dontStart=" << state->dontStart
-				<< "delta=" << delta;
-			if (diffXtoY > kOrientationThreshold) {
-				if (!state->dontStart) {
-					setOrientation(Qt::Horizontal);
-				}
-			} else if (diffXtoY < -kOrientationThreshold) {
-				setOrientation(Qt::Vertical);
-			} else if (allowAmbiguous) {
-				setOrientation(std::nullopt);
-			}
-		};
 		if (!state->started || state->touch != args.touch) {
 			state->started = true;
 			state->data.reachRatio = 0.;
@@ -262,27 +233,29 @@ void SetupSwipeHandler(SwipeHandlerArgs &&args) {
 			state->startAt = args.position;
 			state->cursorPosition = widget->mapFromGlobal(args.globalCursor);
 			if (!state->touch) {
-				// args.delta already is valid. Some platforms (e.g. Windows
-				// precision touchpad) can deliver an entire wheel-based
-				// swipe as a single event with no follow-up ScrollUpdate
-				// before ScrollEnd, so a second updateWith() call that
-				// would normally lock the orientation may never arrive.
-				// Lock it immediately here using this same delta instead.
+				// args.delta already is valid.
 				fillFinishByTop();
-				if (state->direction) {
-					tryLockOrientation(args.delta, false);
-				} else {
-					state->delta = QPointF();
-				}
 			} else {
 				// args.delta depends on state->startAt, so it's invalid.
 				state->direction = std::nullopt;
-				state->delta = QPointF();
 			}
+			state->delta = QPointF();
 		} else if (!state->direction) {
 			fillFinishByTop();
 		} else if (!state->orientation) {
-			tryLockOrientation(args.delta, true);
+			state->delta = args.delta;
+			const auto diffXtoY = std::abs(args.delta.x())
+				- std::abs(args.delta.y());
+			constexpr auto kOrientationThreshold = 1.;
+			if (diffXtoY > kOrientationThreshold) {
+				if (!state->dontStart) {
+					setOrientation(Qt::Horizontal);
+				}
+			} else if (diffXtoY < -kOrientationThreshold) {
+				setOrientation(Qt::Vertical);
+			} else {
+				setOrientation(std::nullopt);
+			}
 		} else if (*state->orientation == Qt::Horizontal) {
 			state->delta = args.delta;
 			const auto rawRatio = 0
@@ -290,9 +263,6 @@ void SetupSwipeHandler(SwipeHandlerArgs &&args) {
 			const auto ratio = state->finishByTopData.keepRatioWithinRange
 				? state->ratioRange.calcRatio(rawRatio)
 				: rawRatio;
-			qDebug() << "SWIPEDEBUG: updateWith H ratio=" << ratio
-				<< "delta.x=" << args.delta.x()
-				<< "threshold=" << state->threshold;
 			updateRatio(ratio);
 			constexpr auto kResetReachedOn = 0.95;
 			constexpr auto kBounceDuration = crl::time(500);
@@ -389,41 +359,20 @@ void SetupSwipeHandler(SwipeHandlerArgs &&args) {
 		case QEvent::Wheel: {
 			const auto w = static_cast<QWheelEvent*>(e.get());
 			if (skipWheelEvent && skipWheelEvent(w)) {
-				qDebug() << "SWIPEDEBUG: swipe_handler skipWheelEvent=true, aborting";
 				processEnd();
 				break;
 			}
 			const auto phase = w->phase();
-			qDebug() << "SWIPEDEBUG: swipe_handler wheel phase=" << phase
-				<< "buttons=" << w->buttons()
-				<< "orientation=" << (state->orientation
-					? (*state->orientation == Qt::Horizontal ? "H" : "V")
-					: "none");
 			if (phase == Qt::NoScrollPhase) {
-				qDebug() << "SWIPEDEBUG: NoScrollPhase, ignoring event entirely";
 				break;
 			} else if (phase == Qt::ScrollBegin) {
 				// Reset state in case we lost some TouchEnd.
 				processEnd();
 			}
-			// Once a horizontal swipe is already committed, trailing
-			// inertia (ScrollMomentum) should keep feeding it rather than
-			// abort it outright - some platforms (e.g. Windows precision
-			// touchpad) deliver most of a swipe's distance as momentum
-			// ticks after the fingers already lifted. Before orientation
-			// is locked, momentum is still treated as a cancel so a stray
-			// inertial tail can't start a gesture on its own.
-			const auto momentumContinues = (phase == Qt::ScrollMomentum)
-				&& (state->orientation == Qt::Horizontal);
 			const auto cancel = w->buttons()
 				|| (phase == Qt::ScrollEnd)
-				|| (phase == Qt::ScrollMomentum && !momentumContinues);
-			if (phase == Qt::ScrollMomentum) {
-				qDebug() << "SWIPEDEBUG: ScrollMomentum tick, continues="
-					<< momentumContinues;
-			}
+				|| (phase == Qt::ScrollMomentum);
 			if (cancel) {
-				qDebug() << "SWIPEDEBUG: swipe cancelled (buttons/end/momentum)";
 				processEnd();
 			} else {
 				const auto invert = (w->inverted() ? -1 : 1);
