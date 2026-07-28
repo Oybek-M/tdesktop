@@ -167,6 +167,7 @@ void UpdateValue(const QString &id, bool value) {
     else if (id == "mutualContactShowInChatList") gValues.mutualContactShowInChatList = value;
     else if (id == "mutualContactShowInContactsList") gValues.mutualContactShowInContactsList = value;
     else if (id == "mutualContactShowInProfile") gValues.mutualContactShowInProfile = value;
+    else if (id == "mutualContactShowInMembersList") gValues.mutualContactShowInMembersList = value;
     else if (id == "activityHistoryTrackAllContacts") gValues.activityHistoryTrackAllContacts = value;
 }
 
@@ -176,6 +177,7 @@ void UpdateString(const QString &id, const QString &value) {
     else if (id == "mutualContactChatListEmoji") gValues.mutualContactChatListEmoji = value;
     else if (id == "mutualContactContactsListEmoji") gValues.mutualContactContactsListEmoji = value;
     else if (id == "mutualContactProfileEmoji") gValues.mutualContactProfileEmoji = value;
+    else if (id == "mutualContactMembersListEmoji") gValues.mutualContactMembersListEmoji = value;
 }
 
 void UpdateInt(const QString &id, int value) {
@@ -212,6 +214,10 @@ void Init() {
         "mutualContactShowInProfile", true).toBool();
     gValues.mutualContactProfileEmoji = settings.value(
         "mutualContactProfileEmoji", u"🤝"_q).toString();
+    gValues.mutualContactShowInMembersList = settings.value(
+        "mutualContactShowInMembersList", true).toBool();
+    gValues.mutualContactMembersListEmoji = settings.value(
+        "mutualContactMembersListEmoji", u"🤝"_q).toString();
 
     gValues.activityHistoryTrackAllContacts = settings.value(
         "activityHistoryTrackAllContacts", true).toBool();

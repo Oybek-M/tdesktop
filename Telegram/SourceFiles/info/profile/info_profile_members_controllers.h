@@ -56,6 +56,8 @@ public:
 
 	[[nodiscard]] UserData *user() const;
 
+	QString generateName() override;
+
 	int elementsCount() const override;
 	QRect elementGeometry(int element, int outerWidth) const override;
 	bool elementDisabled(int element) const override;

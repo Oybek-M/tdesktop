@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/profile/info_profile_members_controllers.h"
 
 #include "boxes/peers/edit_participants_box.h"
+#include "custom_settings.h"
 #include "info/profile/info_profile_values.h"
 #include "data/data_chat.h"
 #include "data/data_user.h"
@@ -77,6 +78,18 @@ MemberListRow::Type MemberListRow::type() const {
 
 UserData *MemberListRow::user() const {
 	return peer()->asUser();
+}
+
+QString MemberListRow::generateName() {
+	auto name = PeerListRow::generateName();
+	if (const auto u = user()) {
+		if (CustomSettings::MutualContactShowInMembersList()
+				&& u->isContact()
+				&& (u->flags() & UserDataFlag::MutualContact)) {
+			name += u" "_q + CustomSettings::MutualContactMembersListEmoji();
+		}
+	}
+	return name;
 }
 
 void MemberListRow::setRefreshCallback(Fn<void()> callback) {

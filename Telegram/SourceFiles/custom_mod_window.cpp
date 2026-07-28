@@ -463,6 +463,7 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 		else if (id == u"mutualContactShowInChatList"_q) current = val.mutualContactShowInChatList;
 		else if (id == u"mutualContactShowInContactsList"_q) current = val.mutualContactShowInContactsList;
 		else if (id == u"mutualContactShowInProfile"_q) current = val.mutualContactShowInProfile;
+		else if (id == u"mutualContactShowInMembersList"_q) current = val.mutualContactShowInMembersList;
 
 		const auto btn = content->add(
 			object_ptr<Ui::SettingsButton>(
@@ -723,6 +724,25 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 		st::boxRowPadding);
 
 	Ui::AddSkip(content, 8);
+	addToggle(
+		u"mutualContactShowInMembersList"_q,
+		u"Guruh a'zolari roʻyxatida koʻrsatish"_q,
+		QString());
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(u"Belgi (Guruh a'zolari roʻyxati uchun):"_q),
+			st::defaultSubsectionTitle),
+		st::defaultSubsectionTitlePadding);
+	const auto membersListEmojiInput = content->add(
+		object_ptr<Ui::InputField>(
+			content,
+			st::defaultInputField,
+			rpl::single(u"Emoji"_q),
+			CustomSettings::MutualContactMembersListEmoji()),
+		st::boxRowPadding);
+
+	Ui::AddSkip(content, 8);
 	content->add(
 		object_ptr<Ui::RoundButton>(
 			content,
@@ -739,6 +759,9 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 		CustomSettings::SetString(
 			u"mutualContactProfileEmoji"_q,
 			profileEmojiInput->getLastText().trimmed());
+		CustomSettings::SetString(
+			u"mutualContactMembersListEmoji"_q,
+			membersListEmojiInput->getLastText().trimmed());
 		Ui::Toast::Show(u"Saqlandi!"_q);
 	});
 

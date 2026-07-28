@@ -32,13 +32,15 @@ struct Values {
     QString spoofDeviceModel = u"Samsung Galaxy S26 Ultra"_q;
     QString spoofSystemVersion = u"Android 15"_q;
     // Mutual-Contact Indikatori: mutual_contact bo'lgan peerlar ismi yoniga
-    // emoji qo'shish, 3 mustaqil joy uchun mustaqil toggle+emoji.
+    // emoji qo'shish, 4 mustaqil joy uchun mustaqil toggle+emoji.
     bool mutualContactShowInChatList = true;
     QString mutualContactChatListEmoji = u"🤝"_q;
     bool mutualContactShowInContactsList = true;
     QString mutualContactContactsListEmoji = u"🤝"_q;
     bool mutualContactShowInProfile = true;
     QString mutualContactProfileEmoji = u"🤝"_q;
+    bool mutualContactShowInMembersList = true;
+    QString mutualContactMembersListEmoji = u"🤝"_q;
     // Activity History Log: ism/username/rasm/last-seen o'zgarishlarini
     // kuzatish. Include/Exclude ro'yxatlari alohida QHash'larda saqlanadi
     // (pastga qarang) — bu shunchaki global default toggle.
@@ -70,6 +72,8 @@ inline bool    MutualContactShowInContactsList() { return Get().mutualContactSho
 inline QString MutualContactContactsListEmoji()  { return Get().mutualContactContactsListEmoji; }
 inline bool    MutualContactShowInProfile()      { return Get().mutualContactShowInProfile; }
 inline QString MutualContactProfileEmoji()       { return Get().mutualContactProfileEmoji; }
+inline bool    MutualContactShowInMembersList()  { return Get().mutualContactShowInMembersList; }
+inline QString MutualContactMembersListEmoji()   { return Get().mutualContactMembersListEmoji; }
 
 inline bool ActivityHistoryTrackAllContacts() { return Get().activityHistoryTrackAllContacts; }
 
