@@ -119,8 +119,18 @@ record_id = hex( SHA256( kind ‖ 0x00 ‖ peer_hash ‖ 0x00 ‖
 ```
 
 `‖` — konkatenatsiya, `0x00` — ajratuvchi bayt (ambiguity oldini oladi).
-`msg_id` bo'lmagan kind'lar uchun (`setting`, `peer_directory`) `msg_id = 0`
-va o'rniga kalit satri `occurred_at` bilan birga ishlatiladi (3.2 ga qarang).
+
+`msg_id` tabiiy ravishda mavjud bo'lmagan kind'lar uchun uning o'rniga
+**diskriminator** ishlatiladi (aks holda bitta peer uchun bir soniyada
+sodir bo'lgan ikki xil hodisa bir xil `record_id` olib, biri jimgina
+yo'qolardi):
+
+| kind | `msg_id` o'rnida ishlatiladigan qiymat |
+|---|---|
+| `deleted`, `edited`, `ghost_read` | haqiqiy `msg_id` |
+| `activity` | `SHA256(field)` ning birinchi 8 bayti (int64 sifatida) |
+| `setting` | `SHA256(setting_key)` ning birinchi 8 bayti |
+| `peer_directory` | `0` (bitta peer uchun bitta yozuv, `occurred_at` ajratadi) |
 
 **Xossasi:** ikki xil qurilma bir xil hodisani ko'rsa — bir xil `record_id`
 hosil qiladi. Dedup hech qanday muvofiqlashtirishsiz ishlaydi. Server uni
@@ -140,15 +150,26 @@ Payload — shifrlanishdan oldingi JSON obyekti.
 | `setting` | 0 | `{key, value}` |
 | `peer_directory` | 0 | `{entries: [{peer_hash, name, username, type}]}` |
 
-`activity` uchun `record_id` hisoblashda `msg_id` o'rniga
-`SHA256(field)` ning birinchi 8 bayti ishlatiladi — chunki bitta peer
-uchun bir soniyada turli maydonlar o'zgarishi mumkin.
+### 3.3 Ikki xil semantika — aralashtirmaslik kerak
 
-`setting` va `peer_directory` — **LWW (last-write-wins)** semantikasiga ega:
-bir xil kalit uchun eng katta `occurred_at` g'olib. Qolgan kind'lar
-append-only.
+Bu yerda ikkita **butunlay boshqa** mexanizm bor va ular bir-birini
+almashtirmaydi:
 
-### 3.3 Konflikt qoidasi
+**(a) Dedup — yozish paytida.** Bir xil `record_id` ikki marta kelsa, bu
+*bitta hodisaning ikki marta kuzatilishi* degani. Faqat bittasi saqlanadi.
+
+**(b) LWW — o'qish paytida.** `setting` va `peer_directory` uchun bir xil
+kalitning turli vaqtdagi qiymatlari **turli `record_id`** oladi (chunki
+`occurred_at` har xil), shuning uchun hammasi saqlanadi. Joriy qiymat
+o'qish paytida tanlanadi: shu kalit uchun **eng katta `occurred_at`**.
+
+Ya'ni LWW — bu konflikt hal qilish emas, **proyeksiya**. Tarix saqlanib
+qoladi va kerak bo'lsa orqaga qaytarish mumkin.
+
+Qolgan kind'lar (`deleted`, `edited`, `activity`, `ghost_read`) —
+sof append-only, proyeksiya kerak emas.
+
+### 3.4 Dedup konflikt qoidasi
 
 Bir xil `record_id` ikki marta kelsa: **`observed_at` kichigi g'olib.**
 
@@ -516,7 +537,9 @@ Shuning uchun:
 Ikkita alohida kod yo'li yozilmaydi va import yo'li avtomatik ravishda sync
 testlari bilan qamrab olinadi.
 
-**`key_fingerprint`** = `SHA256(master_key)[0:8]` — import qilayotgan qurilma
+**`key_fingerprint`** = `SHA256("customsync-fingerprint-v1" ‖ master_key)[0:8]`
+— domen ajratilgan (master kalitning to'g'ridan-to'g'ri hash'i emas).
+Import qilayotgan qurilma
 kalit mos kelishini oldindan tekshiradi va noto'g'ri kalit bo'lsa aniq xato
 beradi (yuzlab deshifrlash xatosi o'rniga).
 
