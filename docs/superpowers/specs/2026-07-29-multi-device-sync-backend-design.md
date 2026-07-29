@@ -207,7 +207,7 @@ va bir vaqtda bir nechta qulf ochish usuli mumkin bo'lmasdi.
 |---|---|---|
 | Kontent shifrlash | AES-256-GCM | 12 baytli tasodifiy nonce, 16 baytli tag |
 | Kalit hosil qilish | HKDF-SHA256 | Yuqoridagi info satrlari |
-| Paroldan KEK | PBKDF2-HMAC-SHA256 | 600 000 iteratsiya, 16 baytli salt |
+| Paroldan KEK | PBKDF2-HMAC-SHA256 | 600 000 iteratsiya, 16 baytli salt (email escrow uchun 2 000 000 — 4.4.1) |
 | Peer yashirish | HMAC-SHA256 → 16 bayt → hex | Deterministik |
 
 **PBKDF2, Argon2 emas** — chunki Web Crypto API Argon2'ni qo'llab-quvvatlamaydi
@@ -240,7 +240,35 @@ Istalgan bittasi kalitni ochadi.
 | Custom parol | Server (`key_wraps`) | PBKDF2(parol, salt) |
 | Har bir qurilma | **Lokal** OS keystore | OS himoyasi (biometrika/PIN) |
 | Tiklash kodi | Server (`key_wraps`) | PBKDF2(kod, salt) |
-| Email escrow | Server (`key_wraps`) | PBKDF2(email_qismi ‖ PIN, salt) |
+| Email escrow | Server (`key_wraps`) | PBKDF2(email_qismi ‖ PIN, salt) — 4.4.1 ga qarang |
+
+#### 4.4.1 Email escrow va PIN kuchi
+
+Email qismi — 128 bitli tasodifiy satr (base32, guruhlangan). Uni server
+yaratadi va bir marta email'ga yuboradi; serverda saqlanmaydi.
+
+PIN — foydalanuvchi tanlaydigan ikkinchi omil. **Uni yodlash shart emas** —
+u shunchaki **email'dan boshqa joyda** turishi kerak (qog'oz, password
+manager, seyf). Maqsad — xotira emas, ajratish.
+
+**Diqqat qilinadigan hujum:** agar hujumchi email qismini qo'lga kiritsa,
+qolgan PIN'ni **offline brute-force** qila oladi (o'ralgan kalit blob'i
+serverda, uni yuklab olib server tashqarisida sinash mumkin). 6 xonali
+raqamli PIN = 10⁶ variant — 600 000 iteratsiyali PBKDF2 bilan ham
+zamonaviy GPU uni soatlar ichida yoradi. Ya'ni PIN o'z vazifasini
+bajarmaydi.
+
+Shuning uchun email escrow o'rami uchun **kuchaytirilgan parametrlar**:
+
+| Parametr | Qiymat | Sabab |
+|---|---|---|
+| Minimal PIN uzunligi | 8 belgi | 10⁸ (raqam) yoki 2·10¹⁴ (alfanumerik) |
+| Tavsiya | Alfanumerik yoki qisqa parol-ibora | Raqamdan ancha kuchli |
+| PBKDF2 iteratsiya | **2 000 000** (boshqa o'ramlarda 600 000) | Brute-force narxini 3.3× oshiradi |
+| Wrap yuklab olish | Rate limit: 5 urinish / soat / IP | Onlayn hujumni to'sadi |
+
+UI PIN kuchini real vaqtda ko'rsatadi va 8 belgidan qisqasini qabul
+qilmaydi. 4 xonali "bank kartasi uslubidagi" PIN **ataylab taqiqlangan**.
 
 **Muhim:** qurilma o'rami serverda saqlanmaydi — master kalit to'g'ridan-to'g'ri
 OS keystore ichida yotadi va uni OS o'zi himoya qiladi. Serverdagi o'ramlar
@@ -281,8 +309,9 @@ shifrlanib jo'natiladi. **Qulf — pauza, yo'qotish emas.**
    undan yangi tiklash kodi yoki yangi parol o'rami chiqariladi.
 2. **Parol esda bo'lsa** — server `key_wraps`dan parol o'ramini beradi.
 3. **Tiklash kodi bo'lsa** — xuddi shunday.
-4. **Faqat email bo'lsa** — email qismi + eslab qolingan PIN birgalikda
-   KEK hosil qiladi. Email'ning o'zi yetarli emas, PIN'ning o'zi ham yetarli emas.
+4. **Faqat email bo'lsa** — email qismi + PIN birgalikda KEK hosil qiladi.
+   Email'ning o'zi yetarli emas, PIN'ning o'zi ham yetarli emas
+   (parametrlar va PIN kuchi talablari: 4.4.1).
 
 **Ochiq aytilgan cheklov:** umumiy xavfsizlik darajasi **eng zaif yoqilgan
 o'ramga** teng. Email escrow yoqiq bo'lsa, arxiv himoyasi "email + PIN"
