@@ -2013,12 +2013,24 @@ var hkdfCases = new[] { "customsync-content-v1", "customsync-media-v1", "customs
 var masterKey = Convert.FromHexString(
     "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f");
 
+// Salt ATAYLAB oshkora 32 baytlik nol. RFC 5869 "salt berilmagan"
+// holatini HashLen nol sifatida ta'riflaydi, lekin kutubxonalar buni
+// turlicha amalga oshiradi (ba'zilari bo'sh salt, ba'zilari nol massiv)
+// — bu jimgina interop buzilishining klassik manbai. Oshkora nol salt
+// beshala platformada bir xil natija berishini kafolatlaydi.
+var hkdfZeroSalt = new byte[32];
+
 var hkdf = hkdfCases.Select(info => new
 {
-    input = new { master_key_hex = Convert.ToHexString(masterKey).ToLowerInvariant(), info },
+    input = new
+    {
+        master_key_hex = Convert.ToHexString(masterKey).ToLowerInvariant(),
+        salt_hex = Convert.ToHexString(hkdfZeroSalt).ToLowerInvariant(),
+        info
+    },
     expected_key_hex = Convert.ToHexString(
         HKDF.DeriveKey(HashAlgorithmName.SHA256, masterKey, 32,
-            salt: null, info: Encoding.UTF8.GetBytes(info))).ToLowerInvariant()
+            salt: hkdfZeroSalt, info: Encoding.UTF8.GetBytes(info))).ToLowerInvariant()
 }).ToArray();
 
 var document = new
