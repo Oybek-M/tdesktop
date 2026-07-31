@@ -23,7 +23,7 @@ yubormaydi, shuning uchun keyinroq ulanib "tiklab olish" imkonsiz.
 ### Yakuniy ko'rinish (5 ta app)
 
 | App | Stack | Holat |
-|---|---|---|
+|-----|-------|-------|
 | `tdesktop` | C++/Qt | Mavjud — bu bo'lakda sync agenti qo'shiladi |
 | `tmobile-android` | Kotlin (exteraGram fork) | Keyingi bo'lak |
 | `tmobile-ios` | Swift (Telegram-iOS fork) | Keyingi bo'lak |
@@ -43,8 +43,6 @@ mobil klientlar hech qanday server o'zgarishisiz ulanadi.
 
 - Telegram protokolining o'zini o'zgartirish yoki reverse engineering
 - Boshqa foydalanuvchilar ma'lumotiga kirish — faqat o'z akkaunt, o'z qurilmalar
-- Store'ga (App Store / Play Store) chiqarish
-- Real-time chat funksiyalari — sinxronlanadigan narsa faqat CustomMod arxivi
 
 ---
 
@@ -180,6 +178,14 @@ barcha qurilmalar bir xil natijaga keladi.
 
 `observed_at` teng bo'lsa — `device_id` leksikografik kichigi g'olib
 (sof determinizm uchun; amalda deyarli uchramaydi).
+
+**Yaxshiroq kuzatuv kelganda `seq` yangilanadi.** Agar mavjud yozuv
+almashtirilsa (yangi `observed_at` kichikroq), unga **yangi `seq`**
+beriladi. Sababi: boshqa qurilmalar allaqachon eski nusxani tortib
+olgan bo'lishi mumkin — yangi `seq` ularni tuzatilgan nusxani qayta
+tortib olishga majbur qiladi. Shuning uchun sxemada PRIMARY KEY
+`record_id`, `seq` esa alohida UNIQUE ustun (6-bo'limga qarang) —
+`seq` o'zgaruvchan, `record_id` esa hech qachon o'zgarmaydi.
 
 ---
 
@@ -482,8 +488,8 @@ CREATE TABLE sync_counter (
 );
 
 CREATE TABLE records (
-  seq          BIGINT PRIMARY KEY,       -- sync_counter dan
-  record_id    TEXT UNIQUE NOT NULL,
+  record_id    TEXT PRIMARY KEY,
+  seq          BIGINT NOT NULL UNIQUE,   -- sync_counter dan; cursor manbasi
   kind         TEXT NOT NULL,
   peer_hash    TEXT NOT NULL,
   msg_id       BIGINT NOT NULL DEFAULT 0,
