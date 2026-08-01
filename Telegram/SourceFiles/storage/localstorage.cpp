@@ -554,7 +554,14 @@ const QString &readAutoupdatePrefixRaw() {
 			return AutoupdatePrefix(value);
 		}
 	}
-	return AutoupdatePrefix("https://td.telegram.org");
+	// CustomMod's own closed VPS mirror (default before any local
+	// tdata/prefix override). Basic-auth credentials embedded in the
+	// URL only gate opportunistic scanning of the bare domain - anyone
+	// who already has this binary has the update content anyway, same
+	// reasoning as the RSA key split (docs/self-update/key-management.md).
+	// Runtime-overridable via writeAutoupdatePrefix() without a rebuild.
+	return AutoupdatePrefix(
+		"https://cmupdate:3GnYk0nPYUH90hew5DIRqm1R@updates.2007.uz/secure");
 }
 
 void writeAutoupdatePrefix(const QString &prefix) {

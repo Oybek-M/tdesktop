@@ -104,23 +104,35 @@ GitHub'ni yopiq qilish yangi mexanizm talab qilmaydi — bu VPS-secure
 uchun allaqachon rejalashtirilgan `Authorization` sarlavhasining aynan
 o'zi. Ya'ni bitta mexanizm, uchta manzil.
 
-#### Shifrlash baribir qoladi
+#### ⚠️ Qaror (2026-08-02): shifrlash qatlami SKIP qilindi
 
-Endi u yagona to'siq emas, **qatlamlardan biri**:
+Implement paytida topilgan gap: bu qatlamni qo'shish `update_checker.cpp`
+ning yuklab olish yo'liga real deshifrlash kodi qo'shishni talab
+qilardi (packer/reliz skripti shifrlaydi, lekin hech bir task klientda
+deshifrlashni qo'shmagan edi — bu o'zi ham bir kamchilik edi).
+
+Ko'rib chiqilgach, foydasi past deb topildi: AES kaliti **xuddi shu
+binary ichida** joylashadi (ilova bilan birga tarqaladi) — demak bu
+faqat "tokenni bilmagan, lekin binary'ni ham olmagan" tor holatga
+foyda beradi. Binary'ga ega har kim (ya'ni ilovani o'rnatgan har kim)
+kalitni ham darhol oladi, shuning uchun bu qatlam haqiqiy hujumchidan
+deyarli himoya qilmaydi — xuddi api_id himoyalanmasligi haqidagi
+3.2-bo'limning yuqoridagi xulosasi bilan bir xil mantiq.
+
+Qaror: **shifrlash qo'shilmaydi.** Faqat ikki qatlam qoladi — yopiq
+mirror (token/parol) + RSA imzo. Bular real himoya beradi: mirror
+buzilsa ham soxta paket imzosiz o'tolmaydi, imzo kaliti esa
+binary'da yo'q (faqat public key bor).
 
 ```
 Yopiq mirror → paketni olish uchun token kerak
-Shifrlash    → token sizib chiqsa ham blob mazmunsiz
 Imzo         → mirror buzilsa ham soxta yangilanish yasab bo'lmaydi
 ```
-
-Har biri boshqa xatoni qoplaydi. Bu yetarli daraja — bundan
-narigisi shu loyiha uchun oqlanmaydi.
 
 ### 3.3 Reliz oqimi
 
 ```
-build → packer (SIQADI + imzolaydi) → shifrlash → 3 mirror'ga yuklash → tekshirish
+build → packer (SIQADI + imzolaydi) → 3 mirror'ga yuklash → tekshirish
 ```
 
 `packer` build natijasini **siqadi va imzolaydi** — ikkalasini birga.
@@ -303,48 +315,42 @@ guessing them would only surface as a failure on the first real update."
 - Create: `docs/self-update/key-management.md`
 - Modify: manba koddagi public key konstantasi (Task 1 da aniqlangan joy)
 
-- [ ] **Step 1: RSA kalit juftligini yaratish**
+- [x] **Step 1: RSA kalit juftligini yaratish**
 
-```bash
-openssl genrsa -out customsync-updates-private.pem 2048
-openssl rsa -in customsync-updates-private.pem -pubout -out customsync-updates-public.pem
-```
+**Bajarildi, lekin 2048 emas 1024-bit bilan** — sabab
+`key-management.md` §1'da yozilgan: `packer.cpp`/`update_checker.cpp`
+`hSigLen=128` (bayt) ni fayl formatining bir qismi sifatida qattiq
+yozib qo'ygan, bu 1024-bit imzo uzunligi.
 
-- [ ] **Step 2: Private kalitni xavfsiz joyga qo'yish**
+- [x] **Step 2: Private kalitni xavfsiz joyga qo'yish**
 
-- Repozitoriydan **tashqarida** saqlang
-- `.gitignore` ga `*-private.pem` qo'shing
-- **Kamida ikki joyga zaxiralang** (masalan parol menejeri + shifrlangan
-  USB). Bu kalit yo'qolsa boshqa yangilanish chiqara olmaysiz.
+`DesktopPrivate/` (repo tashqarisida), `.gitignore`ga qo'shildi. ⚠️
+**Qo'lda zaxiralash hali qilinmagan** — parol menejeri + USB, siz
+bajarishingiz kerak (`key-management.md` §4).
 
-- [ ] **Step 3: Public kalitni kodga qo'yish**
+- [x] **Step 3: Public kalitni kodga qo'yish**
 
-Task 1 da aniqlangan `UpdatesPublicKey` konstantasini o'zimiznikiga
-almashtiring. **Rasmiy kalitni butunlay olib tashlang** — qoldirilsa,
-rasmiy paket ham yaroqli deb qabul qilinishi mumkin.
+`config.h` va `packer.cpp` ikkalasida almashtirildi (bir xil kalit).
 
-- [ ] **Step 4: Shifrlash kalitini yaratish**
+- [x] ~~**Step 4: Shifrlash kalitini yaratish**~~ — SKIP QILINDI
 
-```bash
-openssl rand -hex 32
-```
+2026-08-02: foydalanuvchi tasdiqladi. Sabab 3.2-bo'limda yozilgan —
+AES kaliti binary ichida bo'lgani uchun real himoya bermaydi.
 
-Natijani manba kodga konstanta sifatida qo'ying (3.2-bo'lim).
+- [x] **Step 5: URL konstantalarini almashtirish**
 
-- [ ] **Step 5: URL konstantalarini almashtirish**
-
-Rasmiy `updates.tdesktop.com` manzillarini o'z mirror ro'yxatingizga
-almashtiring. Ro'yxat tartibi 3.1-bo'limdagidek.
+VPS mirror (`updates.2007.uz/secure`, Basic-auth URL ichida) va yopiq
+Telegram kanal (`kFeedChannelId`, `ResolveOwnChannel`) kodga yozildi.
+GitHub repo (`Oybek-M/tdesktop-releases`, private) mavjud, lekin
+`HttpChecker` bir vaqtda faqat bitta prefiks bilan ishlaydi — GitHub'ni
+avtomatik urinish Task 4'da hal qilinadi.
 
 - [ ] **Step 6: Infratuzilmani tayyorlash**
 
-VPS'da:
-```bash
-sudo mkdir -p /var/www/updates/{secure,pub}/{win,linux,mac}
-```
-
-Nginx: `secure/` uchun HTTP Basic auth yoki maxfiy prefiks;
-`pub/` ochiq. GitHub'da: reliz uchun repo tanlash.
+DNS qo'shildi (`updates.2007.uz` → VPS IP, tasdiqlandi). Nginx config +
+htpasswd + certbot **hali foydalanuvchi tomonidan bajarilmagan** —
+aniq buyruqlar suhbatda berilgan, VPS'ga sudo kirish kerak bo'lgani
+uchun avtomatik delegatsiya permission classifier tomonidan bloklandi.
 
 - [ ] **Step 7: Hujjatlashtirish va commit**
 
