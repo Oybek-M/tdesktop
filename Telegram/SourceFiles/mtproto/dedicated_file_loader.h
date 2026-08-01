@@ -113,6 +113,12 @@ private:
 class DedicatedLoader : public AbstractDedicatedLoader {
 public:
 	struct Location {
+		// Shared with emoji_sets_manager.cpp and spellchecker_common.cpp,
+		// which always set a real public username. An empty username
+		// (as CustomMod's own private feed channel produces - see
+		// MtpChecker::parseText in update_checker.cpp) tells
+		// StartDedicatedLoader to resolve via the fixed channel id
+		// instead (ResolveOwnChannel), since a private channel has none.
 		QString username;
 		int32 postId = 0;
 	};
@@ -153,6 +159,17 @@ private:
 void ResolveChannel(
 	not_null<MTP::WeakInstance*> mtp,
 	const QString &username,
+	Fn<void(const MTPInputChannel &channel)> done,
+	Fn<void()> fail);
+
+// CustomMod's private update-feed channel has no username, so it can't
+// go through contacts.resolveUsername like ResolveChannel() above.
+// Instead this resolves the fixed channel id (kFeedChannelId) using
+// whatever the local session already knows about it. Only channel
+// members have that data loaded, so a non-member silently gets `fail()`
+// - that IS the access control, no separate mechanism needed.
+void ResolveOwnChannel(
+	not_null<MTP::WeakInstance*> mtp,
 	Fn<void(const MTPInputChannel &channel)> done,
 	Fn<void()> fail);
 

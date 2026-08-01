@@ -997,10 +997,7 @@ void MtpChecker::start() {
 		crl::on_main(this, [=] { fail(); });
 		return;
 	}
-	const auto updaterVersion = Platform::AutoUpdateVersion();
-	const auto feed = "tdhbcfeed"
-		+ (updaterVersion > 1 ? QString::number(updaterVersion) : QString());
-	MTP::ResolveChannel(&_mtp, feed, [=](
+	MTP::ResolveOwnChannel(&_mtp, [=](
 			const MTPInputChannel &channel) {
 		_mtp.send(
 			MTPmessages_GetHistory(
@@ -1024,7 +1021,9 @@ void MtpChecker::gotMessage(const MTPmessages_Messages &result) {
 	if (!location) {
 		fail();
 		return;
-	} else if (location->username.isEmpty()) {
+	} else if (!location->postId) {
+		// validateLatestLocation() returns a default-constructed
+		// FileLocation (postId == 0) when we're already up to date.
 		done(nullptr);
 		return;
 	}
@@ -1072,18 +1071,18 @@ auto MtpChecker::parseText(const QByteArray &text) const
 				).arg(version));
 			return false;
 		}
+		// Format: "{version}:{postId}" - no username/channel needed,
+		// the feed channel is a fixed constant (kFeedChannelId).
 		const auto full = (*entry).toString();
 		const auto start = full.indexOf(':');
-		const auto post = full.indexOf('#');
-		if (start <= 0 || post < start) {
+		if (start <= 0) {
 			LOG(("Update Error: MTP entry '%1' is bad for version %2."
 				).arg(full
 				).arg(version));
 			return false;
 		}
-		bestLocation.username = full.mid(start + 1, post - start - 1);
-		bestLocation.postId = base::StringViewMid(full, post + 1).toInt();
-		if (bestLocation.username.isEmpty() || !bestLocation.postId) {
+		bestLocation.postId = base::StringViewMid(full, start + 1).toInt();
+		if (!bestLocation.postId) {
 			LOG(("Update Error: MTP entry '%1' is bad for version %2."
 				).arg(full
 				).arg(version));

@@ -12,6 +12,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h" // Session::account.
 #include "core/application.h"
 #include "base/call_delayed.h"
+#include "data/data_session.h" // Data::Session::channelLoaded.
+#include "data/data_channel.h" // ChannelData::inputChannel.
 
 namespace MTP {
 namespace {
@@ -438,6 +440,34 @@ void ResolveChannel(
 	), doneHandler, failHandler);
 }
 
+// CustomMod's private update-feed channel. Public and safe to keep in
+// source: knowing this id alone does not grant access, Telegram still
+// requires per-account access_hash to resolve it, and only members
+// have that loaded locally. See docs/self-update/updater-contract.md
+// section 5.2/6.6 for the full reasoning.
+constexpr auto kFeedChannelId = ChannelId(3924690533ULL);
+
+void ResolveOwnChannel(
+		not_null<MTP::WeakInstance*> mtp,
+		Fn<void(const MTPInputChannel &channel)> done,
+		Fn<void()> fail) {
+	const auto session = mtp->session();
+	const auto strong = session.get();
+	if (!mtp->valid() || !strong) {
+		fail();
+		return;
+	}
+	const auto channel = strong->data().channelLoaded(kFeedChannelId);
+	if (!channel) {
+		// Not a member (or the channel isn't loaded into this session
+		// yet) - fail silently so the caller's HTTP mirror fallback
+		// takes over. This is the intended access control.
+		fail();
+		return;
+	}
+	done(channel->inputChannel());
+}
+
 std::optional<MTPMessage> GetMessagesElement(
 		const MTPmessages_Messages &list) {
 	return list.match([&](const MTPDmessages_messagesNotModified &) {
@@ -470,7 +500,18 @@ void StartDedicatedLoader(
 	};
 
 	const auto &[username, postId] = location;
-	ResolveChannel(mtp, username, [=, postId = postId](
+	const auto resolve = [=](
+			Fn<void(const MTPInputChannel &channel)> done,
+			Fn<void()> fail) {
+		if (username.isEmpty()) {
+			// Private channel (CustomMod's own update feed) - no
+			// username to resolve, use the fixed channel id instead.
+			ResolveOwnChannel(mtp, std::move(done), std::move(fail));
+		} else {
+			ResolveChannel(mtp, username, std::move(done), std::move(fail));
+		}
+	};
+	resolve([=](
 			const MTPInputChannel &channel) {
 		mtp->send(
 			MTPchannels_GetMessages(

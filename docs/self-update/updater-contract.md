@@ -298,6 +298,25 @@ tdesktop esa `config.h`dagi public key bilan tekshiradi. Ikkalasi
 almashtirilganda **ikkalasi ham** yangilanishi kerak, aks holda
 imzo tekshiruvi muvaffaqiyatsiz bo'ladi.
 
+### 6.7 Implement qilindi: `ResolveOwnChannel`
+
+`dedicated_file_loader.cpp`ga hardcoded `kFeedChannelId` (yopiq kanal
+ID) va `ResolveOwnChannel()` qo'shildi — 5.2-bo'limdagi yechimning aynan
+o'zi. **Muhim tuzatish:** `DedicatedLoader::Location`/`ResolveChannel`
+`emoji_sets_manager.cpp` va `spellchecker_common.cpp` bilan **birga
+ishlatiladigan umumiy mexanizm** ekani aniqlandi — ular haqiqiy public
+username bilan chaqiradi. Shu sabab `Location.username`ni olib
+tashlamadim (bu ularni sindirar edi), aksincha: `StartDedicatedLoader`
+endi `username.isEmpty()` bo'lsa `ResolveOwnChannel`ga, bo'lmasa eski
+`ResolveChannel`ga yo'naltiradi — ikkala eski funksionallik ham
+o'zgarishsiz qoladi.
+
+`MtpChecker`ning xabar formati soddalashtirildi:
+`"{version}:{username}#{postId}"` → `"{version}:{postId}"` (username
+kerak emas, kanal doim bir xil). `parseText` bo'sh username bilan
+`FileLocation` qaytaradi, bu esa `StartDedicatedLoader`ni avtomatik
+`ResolveOwnChannel` yo'liga yo'naltiradi.
+
 ### 6.6 Ikki-bosqichli indirection va shared `ResolveChannel` — yangi topilma
 
 Kontraktning oldingi versiyasida "ikkita joy tuzatish kerak" degan
