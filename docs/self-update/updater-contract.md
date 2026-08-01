@@ -110,40 +110,83 @@ almashtirsak:
 Bu rejadagi uchta mirror muammosini butunlay yo'q qiladi va sizning
 "private qilish" savolingizga eng toza javob bo'lishi mumkin.
 
-**Lekin tekshirilishi kerak** (Ochiq savollar, 6-bo'lim) — kanal
-nomini almashtirish yetarlimi yoki boshqa bog'liqliklar bormi.
+### 5.1 Tekshirildi: kanal nomini almashtirish YETARLI EMAS
 
-Agar ishlasa, mirror strategiyasi shunday bo'lishi mumkin:
+`dedicated_file_loader.cpp:434`:
+
+```cpp
+mtp->send(MTPcontacts_ResolveUsername(
+    MTP_flags(0),
+    MTP_string(username),
+    MTP_string()
+), doneHandler, failHandler);
+```
+
+`ResolveChannel` **faqat username orqali** ishlaydi
+(`contacts.resolveUsername`). Yopiq kanalda username yo'q → resolve
+muvaffaqiyatsiz bo'ladi. Ya'ni `"tdhbcfeed"` o'rniga o'z kanalimiz
+nomini yozib qo'yish **ishlamaydi**.
+
+### 5.2 Lekin g'oya baribir amalga oshadi — kichik o'zgarish bilan
+
+`ResolveChannel` ning yagona vazifasi — `MTPInputChannel` hosil qilish,
+u esa shunchaki `MTP_inputChannel(channel_id, access_hash)`.
+
+Agar akkaunt kanalning **a'zosi** bo'lsa, bu ikkala qiymat lokal
+sessiyada allaqachon mavjud — resolve umuman kerak emas.
+
+**Yechim:**
+
+```cpp
+// ResolveChannel(...) o'rniga:
+// 1. Kanal ID si kodda qattiq yoziladi (u hamma uchun bir xil)
+// 2. access_hash lokal sessiyadan olinadi
+//    (session->data().channelLoaded(channelId)->access_hash)
+// 3. MTP_inputChannel(MTP_long(id), MTP_long(accessHash)) quriladi
+```
+
+⚠️ **`access_hash` ni kodga yozib bo'lmaydi** — u har bir akkaunt
+uchun har xil. Uni ish vaqtida lokal sessiyadan olish shart.
+
+**Yon foyda:** akkaunt kanal a'zosi bo'lmasa, `channelLoaded` null
+qaytaradi va tekshiruv jimgina muvaffaqiyatsiz bo'ladi — ya'ni
+**yangilanishni faqat kanal a'zolari oladi.** Bu bizga aynan kerak
+bo'lgan kirish nazorati, qo'shimcha mexanizmsiz.
+
+Taxminiy hajm: `MtpChecker::start()` da ~15-20 satr.
+
+### 5.3 Yakuniy mirror strategiyasi
 
 ```
-1. O'z Telegram kanalimiz (MtpChecker)  ← asosiy, hosting kerak emas
-2. VPS HTTP (HttpChecker)               ← zaxira
-3. GitHub private repo                  ← oxirgi chora
+1. O'z YOPIQ Telegram kanalimiz (MtpChecker)  ← asosiy, hosting kerak emas
+2. VPS HTTP (HttpChecker)                     ← zaxira
+3. GitHub private repo                        ← oxirgi chora
 ```
 
 ---
 
-## 6. Ochiq savollar (hali tekshirilmagan)
+## 6. Ochiq savollar
 
-Bularni implement boshlashdan **oldin** aniqlash kerak. Taxmin
-qilinmadi — kodda topilmagan narsa shu yerda ochiq qoldirildi.
+Eng muhimi (yopiq kanal masalasi) **hal qilindi** — 5.1/5.2 ga qarang.
+Qolganlari implement paytida aniqlanadi; ular dizaynni o'zgartirmaydi,
+faqat tafsilotlarni to'ldiradi.
 
 1. `Local::readAutoupdatePrefix()` standart qiymatni qayerdan oladi?
    `writeAutoupdatePrefix()` bormi — ya'ni prefiksni **kod
    o'zgartirmasdan** sozlash mumkinmi?
 2. `HttpChecker` so'raydigan `/current` faylining **formati** qanday?
    (`gotResponse()`, 736-qator va undan keyin)
-3. `MtpChecker` kanal xabaridan havolani qanday ajratadi? Xabar
-   qanday formatda bo'lishi kerak?
+3. `MtpChecker` kanal xabaridan havolani qanday ajratadi?
+   (`parseText`, ~1084-1086 — `username` va `postId` ajratiladi.)
+   Xabar qanday formatda yozilishi kerak?
 4. Ikkala checker birga ishlaydimi yoki biri ikkinchisining
    zaxirasimi? Qaysi biri birinchi?
 5. `packer.cpp` qanday argumentlar qabul qiladi va chiqish fayli
    nomini qanday hosil qiladi?
-6. **MtpChecker uchun kanalni almashtirish yetarlimi?** Kanal ochiq
-   bo'lishi shartmi (`ResolveChannel` username orqali ishlaydi —
-   yopiq kanalda username bo'lmaydi)?
 
-> 6-savol eng muhimi: yopiq kanalda username yo'q, `ResolveChannel`
-> esa username bilan ishlaydi. Agar shunday bo'lsa, "yopiq kanal"
-> g'oyasi ishlamaydi va HTTP mirror'larga qaytish kerak bo'ladi.
-> Buni birinchi navbatda tekshirish kerak.
+⚠️ **3-savolda kutilmagan bog'liqlik bor:** `parseText` xabardan
+`username` ajratadi va keyin `StartDedicatedLoader` uni yana resolve
+qiladi (`dedicated_file_loader.cpp:473`). Ya'ni yopiq kanalga o'tishda
+**ikkita** joyni tuzatish kerak bo'lishi mumkin: kanalning o'zini
+topish (5.2) va xabar ichidagi havolani ochish. Implement paytida
+`parseText` va `StartDedicatedLoader` ni birga ko'rib chiqing.
