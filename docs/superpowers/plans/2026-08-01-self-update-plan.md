@@ -66,38 +66,65 @@ yangilanish yasay olmaydi — imzo mos kelmasa paket rad etiladi.
 **Foydasi:** VPS o'chsa yoki domen muddati tugasa, yangilanish GitHub
 orqali kelaveradi. Bitta nuqtaga bog'liqlik yo'q.
 
-### 3.2 api_id muammosi va uni hal qilish
+### 3.2 api_id muammosi: mirror'larni yopish
 
-Build ichida sizning shaxsiy `api_id` / `api_hash` ingiz bor
-(`TDESKTOP_API_ID=28454823`). GitHub Releases ochiq bo'lgani uchun,
-u yerdagi paketni istagan odam yuklab olib, sizning API hisobingiz
-ostida ishlatishi mumkin. Suiiste'mol bo'lsa Telegram o'sha `api_id`
-ni bloklaydi va **barcha** build'laringiz ishlamay qoladi.
+Build ichida shaxsiy `api_id` / `api_hash` bor
+(`TDESKTOP_API_ID=28454823`). Suiiste'mol qilinsa Telegram uni
+bloklaydi va **barcha** build'laringiz ishlamay qoladi.
 
-**Yechim: paketni imzolashdan tashqari SHIFRLASH ham.**
+#### Teskari muhandislikdan himoya qilib bo'ladimi — yo'q
 
-Simmetrik kalit ilova ichiga kompilyatsiya qilinadi. Ochiq mirror'da
-faqat mazmunsiz blob turadi. Kalitni olish uchun ilovaning o'zi kerak,
-ilovani olish uchun esa birinchi nusxani siz qo'lda berasiz — ya'ni
-zanjir yopiq.
+Buni oshkora aytish kerak, chunki noto'g'ri taxmin ustiga qaror
+qurilmasin:
+
+**Klient tomonidagi sirni himoya qilib bo'lmaydi.** Ilova `api_id`
+bilan Telegram'ga ulanishi kerak → u ilova ichida bo'lishi shart →
+ilovani ishga tushira olgan odam uni chiqarib ola oladi. Bu
+printsipial cheklov, implementatsiya sifati masalasi emas.
+
+Obfuskatsiya (VMProtect, Themida va shu kabilar) narxni oshiradi,
+lekin to'smaydi. Ustiga: qimmat, build'ni buzishi mumkin, antivirus
+false-positive beradi va har yangi kompilyator versiyasida qayta
+sozlash kerak. Bu loyiha uchun foydasi xarajatiga arzimaydi.
+
+#### Buning o'rniga: muammoni yo'q qilamiz
+
+Xavf shifrlashning kuchida emas — **paketning ochiq joyda turishida**.
+Ochiq joyda turmasa, teskari muhandislik savoli umuman tug'ilmaydi.
+
+Shuning uchun **uchala mirror ham yopiq bo'ladi:**
+
+| Mirror | Himoya |
+|---|---|
+| VPS (secure) | HTTP Basic auth |
+| VPS (pub) | Maxfiy prefiks (URL'ni bilmagan topa olmaydi) |
+| GitHub | **Private repo + Personal Access Token** |
+
+GitHub'ni yopiq qilish yangi mexanizm talab qilmaydi — bu VPS-secure
+uchun allaqachon rejalashtirilgan `Authorization` sarlavhasining aynan
+o'zi. Ya'ni bitta mexanizm, uchta manzil.
+
+#### Shifrlash baribir qoladi
+
+Endi u yagona to'siq emas, **qatlamlardan biri**:
 
 ```
-Imzo      → paket haqiqiyligini isbotlaydi  (kim yasaganini)
-Shifrlash → paket mazmunini yashiradi       (nima ekanini)
+Yopiq mirror → paketni olish uchun token kerak
+Shifrlash    → token sizib chiqsa ham blob mazmunsiz
+Imzo         → mirror buzilsa ham soxta yangilanish yasab bo'lmaydi
 ```
 
-Ikkalasi turli maqsadga xizmat qiladi va ikkalasi ham kerak.
-
-**Diqqat:** bu "kuchli" himoya emas — ilovani teskari muhandislik
-qilgan odam kalitni topa oladi. Maqsad — tasodifiy yuklab olishni
-to'sish, professional hujumdan himoya emas. Lekin `api_id` ni
-himoyalash uchun aynan shu darajadagi to'siq yetarli.
+Har biri boshqa xatoni qoplaydi. Bu yetarli daraja — bundan
+narigisi shu loyiha uchun oqlanmaydi.
 
 ### 3.3 Reliz oqimi
 
 ```
-build → packer (imzolash) → shifrlash → 3 ta mirror'ga yuklash → tekshirish
+build → packer (SIQADI + imzolaydi) → shifrlash → 3 mirror'ga yuklash → tekshirish
 ```
+
+`packer` build natijasini **siqadi va imzolaydi** — ikkalasini birga.
+Biz ustiga shifrlash va yuklashni qo'shamiz.
 
 Bularning hammasi **bitta skript** bilan bajariladi. Qo'lda qadam qancha
 kam bo'lsa, xato ehtimoli shuncha kam.
@@ -113,6 +140,72 @@ kam bo'lsa, xato ehtimoli shuncha kam.
 ⚠️ **Private kalitni yo'qotsangiz** boshqa yangilanish chiqara olmaysiz —
 barcha o'rnatilgan nusxalar qo'lda almashtirilishi kerak bo'ladi.
 Uni zaxiralash Task 2 ning majburiy qismi.
+
+---
+
+### 3.5 Kelajakdagi kengayish — bugundan hisobga olinadi
+
+Bu tizim oxir-oqibat **barcha 5 ta app** ni qamraydi va boshqaruv
+backend'ga o'tadi. Bugun buni qurmaymiz, lekin **keyin qayta yozishga
+majbur qilmaydigan qarorlar** qabul qilamiz.
+
+**Yakuniy ko'rinish:**
+
+| Nima | Qanday yangilanadi |
+|---|---|
+| `tdesktop` | Ilova ichidan (bu plan) |
+| `tmobile-android` | Ilova ichidan, xuddi shu manifest formati |
+| `tmobile-ios` | Ilova ichidan (App Store'siz, ad-hoc) |
+| `server-backend` | **CI/CD** — o'zini avtomatik yangilaydi |
+| `server-controller` | Backend bilan birga |
+
+Va: **backend boshqaruv panelidan klientlarga yangilanish chiqarish** —
+ya'ni yangi reliz yuklab, qaysi platformaga va qachon tarqatilishini
+o'sha yerdan boshqarish.
+
+#### Buning bugungi dizaynga ta'siri — bitta qoida
+
+> **Manifest formati statik nginx va backend uchun bir xil bo'lishi
+> shart.**
+
+Ya'ni klient "manifest fayl" so'raydi va uni kim bergani — nginx'dagi
+statik fayl yoki backend'dagi endpoint — **ahamiyatsiz** bo'lishi kerak.
+
+Buning natijasi:
+
+1. Bugun statik fayllar bilan boshlaymiz — backend'ni kutmaymiz
+2. Backend tayyor bo'lganda u shunchaki **yana bitta mirror** bo'ladi
+3. Ko'chish = URL almashtirish, klient kodi o'zgarmaydi
+4. Statik mirror'lar **doimiy zaxira** bo'lib qoladi — backend o'chsa
+   yangilanish baribir keladi
+
+Bu muhim: agar manifest'ni backend'ga bog'lab qo'ysak, backend
+o'chganda yangilanish ham to'xtaydi — va aynan shunday paytda
+tuzatish chiqarish kerak bo'lishi mumkin.
+
+#### Manifest'ga bugundan kiritiladigan maydonlar
+
+Kelajakda kerak bo'ladi, hozir ishlatilmasa ham **bo'sh joy
+qoldiriladi** (keyin format o'zgarmasligi uchun):
+
+```
+platform      win | linux | mac | android | ios
+channel       stable | beta          (kelajakda bosqichma-bosqich tarqatish uchun)
+min_version   undan eski versiyalar to'g'ridan-to'g'ri yangilana olmaydi
+mandatory     majburiy yangilanishmi
+notes         reliz izohi (UI'da ko'rsatiladi)
+```
+
+Task 1 da aniqlangan mavjud format bu maydonlarni qabul qilmasa —
+ular alohida yon fayl (`meta.json`) sifatida beriladi, asosiy formatni
+buzmasdan.
+
+#### Bu ish qayerda rejalashtiriladi
+
+Backend tomonidagi qism **bu planda emas** — u multi-device
+seriyasiga `06 — release management` sifatida qo'shiladi va C
+yo'nalishi boshlanganda yoziladi. Bu yerda faqat **format
+muvofiqligi** ta'minlanadi.
 
 ---
 
@@ -173,6 +266,21 @@ birinchi sinovda ma'lum bo'ladi.
 **Bu hujjat keyingi barcha task'lar uchun manba bo'ladi.** Taxmin
 qoldirmang — kodda topilmagan narsani "aniqlanishi kerak" deb
 belgilang, o'ylab topmang.
+
+- [ ] **Step 4: Kelajakka moslikni baholash**
+
+3.5-bo'limdagi maydonlar (`platform`, `channel`, `min_version`,
+`mandatory`, `notes`) mavjud formatga sig'adimi — aniqlang.
+
+Sig'masa: ular alohida `meta.json` yon fayl sifatida beriladi degan
+qarorni kontrakt hujjatida yozib qo'ying. Bu keyinroq backend
+boshqaruv paneli qo'shilganda formatni **buzmasdan** kengaytirish
+imkonini beradi.
+
+**Nima uchun hozir:** format bir marta chiqarilgach, uni o'zgartirish
+eski versiyadagi klientlarni sindiradi — ular yangi formatni
+tushunmaydi va yangilana olmaydi, ya'ni ularni qo'lda almashtirishga
+to'g'ri keladi. Aynan shu narsadan qochish uchun bu ish qilinmoqda.
 
 - [ ] **Step 4: Commit**
 
@@ -410,6 +518,15 @@ Undan keyin hamma narsa avtomatik.
 
 Agar birinchi o'rnatish ham qulay bo'lishi kerak bo'lsa — bu alohida
 kichik ish (oddiy installer), keyinroq muhokama qilinadi.
+
+**Mobil klientlar uchun yangilanish.** Android va iOS ilovalar hali
+mavjud emas (D yo'nalishi). Ular yozilganda shu manifest formatidan
+foydalanadi — 3.5-bo'lim shuni ta'minlaydi.
+
+**Backend'ning o'zini yangilash (CI/CD) va boshqaruv panelidan reliz
+chiqarish.** Bular C yo'nalishiga tegishli va u yerda
+`06 — release management` plani sifatida yoziladi. Bu yerda faqat
+formatning ularga mos bo'lishi kafolatlanadi.
 
 ---
 

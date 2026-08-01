@@ -20,6 +20,18 @@ o'zidan oldingilariga tayanadi.
 | 3 | `server-controller` web app | Ko'rish, boshqarish, statistika | [03-web-controller](2026-07-29-multi-device-sync-03-web-controller.md) ✅ |
 | 4 | Storage lifecycle manager | Monitoring, retention, arxivlash, xavfsiz o'chirish | [04-storage-lifecycle](2026-07-29-multi-device-sync-04-storage-lifecycle.md) ✅ |
 | 5 | Always-on TDLib capture service | Muammo A hal bo'ladi | [05-capture-service](2026-07-29-multi-device-sync-05-capture-service.md) ✅ |
+| 6 | Release management | Backend CI/CD + boshqaruv panelidan klientlarga reliz chiqarish | ⏳ Hali yozilmagan |
+
+**06 nima uchun bu seriyada:** [self-update plani](2026-08-01-self-update-plan.md)
+tdesktop uchun statik mirror'lar bilan boshlanadi va backend'ni kutmaydi.
+Backend tayyor bo'lgach, u **yana bitta mirror** bo'lib qo'shiladi va
+ustiga boshqaruv qatlami keladi: yangi reliz yuklash, qaysi platformaga
+va qachon tarqatish, qaysi qurilma qaysi versiyada ekanini ko'rish,
+hamda backend'ning **o'zini** CI/CD bilan yangilash.
+
+Shart: manifest formati statik nginx va backend uchun **bir xil** bo'lishi
+kerak (self-update plani 3.5-bo'limi). Shunda ko'chish faqat URL
+almashtirish bo'ladi va statik mirror'lar doimiy zaxira bo'lib qoladi.
 
 **1 nima uchun 1a va 1b ga bo'lindi:** bitta hujjat sifatida u o'qib
 bo'lmaydigan darajada uzun bo'lardi va delegatsiya qilinganda ishonchsiz
