@@ -13,19 +13,22 @@ Oxirgi yangilanish: 2026-08-01
 Hozirgi asosiy ish. Boshqa yo'nalishlar bunga aralashmasligi kerak.
 
 **Repo:** `Telegram/tdesktop`, branch `Oybek`
-**Holat:** v7.0.5 upstream sync qilingan, build muvaffaqiyatli o'tgan
+**Holat:** **v7.0.7** ga sync qilingan, build o'tgan, qo'lda sinovdan o'tgan
 
 **Ochiq vazifalar:**
 
 | № | Vazifa | Holat |
 |---|---|---|
-| A1 | To'liq qo'lda tekshiruv — ilova normal ishlayaptimi | Keyingi qadam |
-| A2 | Upstream v7.0.5 → v7.0.7 sync (2 ta yangi reliz) | Kutilmoqda |
+| A1 | To'liq qo'lda tekshiruv | ✅ 2026-08-01, kritik muammo yo'q |
+| A2 | Upstream v7.0.5 → v7.0.7 sync | ✅ 2026-08-01, `2e61fdcbc2` (162 commit, 2 konflikt) |
 | A3 | Log shovqinini kamaytirish (`API Warning: not loaded minimal channel applied.`) | Past ustuvorlik, tekshirilmagan |
+
+**v7.0.7 bilan kelgan yangi bog'liqliklar:** `Telegram/ThirdParty/libcbor`
+va `libfido2` (FIDO2/passkey). Build muammosiz o'tdi.
 
 ---
 
-## B — Self-update mexanizmi 💡 TAKLIF QILINGAN
+## B — Self-update mexanizmi ⚡ KEYINGI ISH
 
 Har rebuild'dan keyin ilovani fleshka/cloud orqali qo'lda tarqatish
 muammosini hal qiladi. Bir nechta desktop qurilma va boshqa
