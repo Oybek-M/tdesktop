@@ -23,6 +23,7 @@
 #include "ui/wrap/vertical_layout.h"
 #include "window/themes/window_theme.h"
 #include "window/window_peer_menu.h"
+#include "inline_bots/bot_attach_web_view.h" // InlineBots::PeerType(s)
 #include "window/window_session_controller.h"
 #include "styles/style_basic.h"
 #include "styles/style_custom_mod.h"
@@ -96,6 +97,46 @@ void PaintPeerAvatar(
 	p.setFont(f);
 	const auto letter = name.isEmpty() ? u"?"_q : name.left(1).toUpper();
 	p.drawText(rect, letter, QTextOption(Qt::AlignCenter));
+}
+
+// Peer tanlash oynasi — CustomMod ro'yxatlari (White/Black List, Per-Chat,
+// Activity Include/Exclude) uchun.
+//
+// typesRestriction ATAYLAB berilmoqda va uni olib tashlash mumkin emas.
+//
+// Usiz PrepareChooseRecipientBox filtr sifatida nullptr uzatadi
+// (window_peer_menu.cpp: `typesRestriction ? ... : Fn<...>()`), va shunda
+// ChooseRecipientBoxController::createRow o'zining FORWARD uchun
+// mo'ljallangan standart qoidasiga tushadi:
+//
+//     peer->isBroadcast() && !Data::CanSendAnything(peer)  → o'tkazib yuboriladi
+//
+// Ya'ni post qila olmaydigan kanallar ro'yxatga umuman tushmaydi. Oddiy
+// obunachi bo'lgan kanallar (odatda shaxsiy kanallar) aynan shu holatda —
+// natijada ular tanlash oynasida ko'rinmaydi. Ochiq kanallar esa global
+// username qidiruvi orqali baribir topilgani uchun "faqat ochiq kanallar
+// chiqyapti" degan taassurot paydo bo'ladi.
+//
+// Bizga yozish huquqi umuman ahamiyatsiz: biz peer'ni ro'yxatga
+// qo'shyapmiz, unga xabar yubormayapmiz. Barcha turlarni berish esa
+// tur bo'yicha filtr yaratadi va yuborish huquqi tekshiruvini butunlay
+// almashtiradi.
+[[nodiscard]] object_ptr<Ui::BoxContent> ChoosePeerBox(
+		not_null<Main::Session*> session,
+		FnMut<bool(not_null<Data::Thread*>)> &&chosen,
+		rpl::producer<QString> title) {
+	auto types = InlineBots::PeerTypes();
+	types |= InlineBots::PeerType::Bot;
+	types |= InlineBots::PeerType::User;
+	types |= InlineBots::PeerType::Group;
+	types |= InlineBots::PeerType::Broadcast;
+
+	return Window::PrepareChooseRecipientBox(
+		session,
+		std::move(chosen),
+		std::move(title),
+		nullptr,
+		types);
 }
 
 [[nodiscard]] QString MakeWordDiff(
@@ -987,7 +1028,7 @@ void fillPeerSection(
 	->addClickHandler([=] {
 		if (!gInstance) return;
 		// Box custom window ichida ochiladi (LayerManager orqali).
-		gInstance->showBox(Window::PrepareChooseRecipientBox(
+		gInstance->showBox(ChoosePeerBox(
 			&controller->session(),
 			[=](not_null<Data::Thread*> thread) -> bool {
 				const auto peer = thread->peer();
@@ -1363,7 +1404,7 @@ void fillPerChatSection(
 		st::boxRowPadding)
 	->addClickHandler([=] {
 		if (!gInstance) return;
-		gInstance->showBox(Window::PrepareChooseRecipientBox(
+		gInstance->showBox(ChoosePeerBox(
 			&controller->session(),
 			[=](not_null<Data::Thread*> thread) -> bool {
 				const auto peer = thread->peer();
@@ -1749,7 +1790,7 @@ void fillActivityHistorySection(
 		st::boxRowPadding)
 	->addClickHandler([=] {
 		if (!gInstance) return;
-		gInstance->showBox(Window::PrepareChooseRecipientBox(
+		gInstance->showBox(ChoosePeerBox(
 			&controller->session(),
 			[=](not_null<Data::Thread*> thread) -> bool {
 				const auto peer = thread->peer();
@@ -1807,7 +1848,7 @@ void fillActivityHistorySection(
 		st::boxRowPadding)
 	->addClickHandler([=] {
 		if (!gInstance) return;
-		gInstance->showBox(Window::PrepareChooseRecipientBox(
+		gInstance->showBox(ChoosePeerBox(
 			&controller->session(),
 			[=](not_null<Data::Thread*> thread) -> bool {
 				const auto peer = thread->peer();
