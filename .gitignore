@@ -75,3 +75,9 @@ settings.local.json
 
 # Generated changelog page (built by CI, deployed to GitHub Pages)
 /docs/changelog/
+
+# Update-signing keys must never enter this repo, even by accident
+# (real location: DesktopPrivate/, a sibling directory outside this repo)
+*-private.pem
+packer_private.h
+alpha_private.h
