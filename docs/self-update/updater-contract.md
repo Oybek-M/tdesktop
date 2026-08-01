@@ -165,28 +165,155 @@ Taxminiy hajm: `MtpChecker::start()` da ~15-20 satr.
 
 ---
 
-## 6. Ochiq savollar
+## 6. Ochiq savollar — barchasi hal qilindi
 
-Eng muhimi (yopiq kanal masalasi) **hal qilindi** — 5.1/5.2 ga qarang.
-Qolganlari implement paytida aniqlanadi; ular dizaynni o'zgartirmaydi,
-faqat tafsilotlarni to'ldiradi.
+### 6.1 `readAutoupdatePrefix()` standart qiymati va runtime sozlash
 
-1. `Local::readAutoupdatePrefix()` standart qiymatni qayerdan oladi?
-   `writeAutoupdatePrefix()` bormi — ya'ni prefiksni **kod
-   o'zgartirmasdan** sozlash mumkinmi?
-2. `HttpChecker` so'raydigan `/current` faylining **formati** qanday?
-   (`gotResponse()`, 736-qator va undan keyin)
-3. `MtpChecker` kanal xabaridan havolani qanday ajratadi?
-   (`parseText`, ~1084-1086 — `username` va `postId` ajratiladi.)
-   Xabar qanday formatda yozilishi kerak?
-4. Ikkala checker birga ishlaydimi yoki biri ikkinchisining
-   zaxirasimi? Qaysi biri birinchi?
-5. `packer.cpp` qanday argumentlar qabul qiladi va chiqish fayli
-   nomini qanday hosil qiladi?
+`localstorage.cpp:543-586`. Standart qiymat kodda **literal**:
+`"https://td.telegram.org"` (557-qator). Runtime override ikki bosqichli:
 
-⚠️ **3-savolda kutilmagan bog'liqlik bor:** `parseText` xabardan
-`username` ajratadi va keyin `StartDedicatedLoader` uni yana resolve
-qiladi (`dedicated_file_loader.cpp:473`). Ya'ni yopiq kanalga o'tishda
-**ikkita** joyni tuzatish kerak bo'lishi mumkin: kanalning o'zini
-topish (5.2) va xabar ichidagi havolani ochish. Implement paytida
-`parseText` va `StartDedicatedLoader` ni birga ko'rib chiqing.
+1. `AutoupdatePrefix()` — process-lifetime statik keshdagi qiymat (bo'sh bo'lmasa shuni qaytaradi)
+2. `tdata/prefix` fayli (`cWorkingDir() + "tdata/prefix"`) — diskdan o'qiladi
+
+`writeAutoupdatePrefix(prefix)` (560-qator) mavjud — bu qiymatni **kod
+o'zgartirmasdan** o'zgartirish imkonini beradi: faylga yozadi va agar
+`cAutoUpdate()` yoqilgan bo'lsa, darhol yangi tekshiruvni boshlaydi
+(`Core::UpdateChecker().start()`). Ammo bu funksiya UI'dan chaqirilmaydi
+hech qayerda hozircha — faqat storage qatlamida mavjud.
+
+**Xulosa:** VPS HTTP mirror manzilini `config.h`'da qattiq yozish shart
+emas — `writeAutoupdatePrefix()` orqali runtime'da o'zgartirish mumkin
+bo'lgan joy tayyor turibdi. Task 2'da shundan foydalanish mumkin, lekin
+birinchi ishga tushirishda baribir default qiymat kerak (chunki fayl
+mavjud bo'lmagan holatda `"https://td.telegram.org"` ga qaytadi) — shu
+default literal `config.h` yonida almashtiriladigan joyga ko'chiriladi.
+
+### 6.2 `/current` fayl formati (`HttpChecker`)
+
+`update_checker.cpp:751-836`. Ikki format qabul qilinadi (eskisi va
+yangisi), ikkalasi ham sinaladi:
+
+**Eski format** (`parseOldResponse`, 786-802): oddiy matn,
+`"{version}:{url}"`, regex `^\s*(\d+)\s*:\s*([\x21-\x7f]+)\s*$`.
+`url` `"beta_"` bilan boshlansa — beta versiya, `url` dan `"beta_"`
+kesib tashlanadi va oxiriga `"_{signature}"` qo'shiladi.
+
+**Yangi format** (`parseResponse` → `ParseCommonMap`, 592-682, JSON):
+
+```json
+{
+  "linux": {
+    "stable": { "released": "5001002:tsetup.5.1.2.tar.xz" },
+    "beta":   { "released": "5001003:tbupd5001003" }
+  },
+  "win": { ... },
+  "mac": { ... }
+}
+```
+
+Struktura: `{platform}.{type}.{released|testing}`. `platform` —
+`Platform::AutoUpdateKey()` (masalan `"linux"`, `"win"`, `"win64"`,
+`"winarm"`, `"mac"`, `"macarm"`). `type` — `"stable"`/`"beta"`/`"alpha"`
+(qaysilari tekshirilishi `cAlphaVersion()`/`cInstallBetaVersion()`ga
+bog'liq). Kalit `"released"` yoki `"testing"` — `testing()` flag'iga
+qarab (test build'lar `"testing"` maydonini o'qiydi, productionda
+`"released"`). Qiymat: `"{version}:{link}"` yoki faqat raqam
+(`(*version).isDouble()`). `link` ichida `{version}` va `{signature}`
+placeholder'lari almashtiriladi. Yakuniy URL
+`Local::readAutoupdatePrefix() + link` (835-qator).
+
+**Xulosa Task 4 uchun:** VPS'ga statik `/current` fayli — yuqoridagi
+JSON formatida, `link` maydoni **nisbiy** yo'l (prefiks avtomatik
+qo'shiladi).
+
+### 6.3 `MtpChecker` xabar formati va ikki bosqichli indirection
+
+`update_checker.cpp:1051-1099`. Kanal xabarining matni **xuddi shu
+`ParseCommonMap` JSON formatini** ishlatadi (6.2 bilan bir xil parser,
+`testing()` argumenti bilan). Farqi: `"released"`/`"testing"` qiymati
+link emas, balki `"{version}:{username}#{postId}"` — ya'ni xabar
+matnidagi JSON **fayl havolasini emas, boshqa Telegram xabarini**
+ko'rsatadi (`bestLocation.username`, `bestLocation.postId`).
+
+Bu degani — **ikki bosqichli indirection**:
+1. `"tdhbcfeed"` kanalidan **oxirgi xabar** olinadi (`MTPmessages_GetHistory`, limit=1)
+2. O'sha xabar matni JSON — u ichida yozilgan `username#postId` boshqa
+   (yoki xuddi shu) kanaldagi **fayl o'zi joylashgan xabarni** ko'rsatadi
+3. `StartDedicatedLoader` o'sha ikkinchi xabarni oladi va undagi
+   dokumentni yuklaydi (`ParseFile`, `dedicated_file_loader.cpp`)
+
+### 6.4 Checker'lar bir vaqtda ishlaydi, ketma-ket emas
+
+`update_checker.cpp:1505-1511`: `HttpChecker` va `MtpChecker`
+**parallel** ishga tushiriladi (ikkalasi ham `startImplementation`
+bilan bir vaqtda chaqiriladi — birinchi navbatda kutish yo'q).
+
+`tryLoaders()` (1596-1647) ikkalasi ham tugashini kutadi
+(`_httpImplementation.checker || _mtpImplementation.checker` bo'lsa
+hali kutadi), keyin qaror qabul qiladi:
+- Faqat MTP loader topsa → MTP ishlatiladi
+- Faqat HTTP loader topsa → HTTP ishlatiladi
+- Ikkalasi ham topsa → **navbat bilan almashtiriladi**
+  (`_usingMtprotoLoader` flag har chaqiriqda teskarisiga o'giriladi) —
+  bittasi yuklab olishda muvaffaqiyatsiz bo'lsa, keyingi urinishda
+  avtomatik boshqasiga o'tadi
+- Ikkalasi ham muvaffaqiyatsiz bo'lsa → `_failed` fire qilinadi
+
+**Xulosa:** bizning "asosiy = MTP yopiq kanal, zaxira = HTTP" rejamiz
+(5.3-bo'lim) kod arxitekturasiga mos — ikkalasi baribir parallel
+ishlaydi va bir-birining tabiiy failover'i bo'ladi, qo'shimcha kod
+yozish shart emas.
+
+### 6.5 `packer.cpp` argumentlari
+
+`Telegram/SourceFiles/_other/packer.cpp:151-518`. CLI argumentlar:
+
+| Flag | Vazifasi |
+|---|---|
+| `-path {fayl yoki papka}` | Paketlanadigan manba (bir nechta marta berilishi mumkin) |
+| `-version {N}` | Versiya raqami (masalan `5001002` — bu `5.1.2`), `1016` dan katta bo'lishi shart |
+| `-target {win64\|winarm}` | Windows arxitekturasi (Windows build'ida) |
+| `-arch {x86_64\|arm64}` | macOS arxitekturasi |
+| `-beta` | Beta kanal — beta kalit bilan imzolanadi |
+| `-alpha {N}` | Alpha versiya raqami — alohida imzolash yo'li |
+| `-alphakey` | Faqat alpha kalit faylini yozib chiqadi, paketlamaydi |
+
+**Chiqish fayl nomi** (497-513): platformaga qarab
+`tx64upd{version}` / `tarm64upd{version}` / `tupdate{version}` (Windows),
+`tmacupd{version}` / `tarmacupd{version}` (macOS),
+`tlinuxupd{version}` (Linux). Bular kontrakt hujjatining 3-bo'limidagi
+`tupdate` prefiksli fayl nomlari bilan mos keladi.
+
+**Imzolash jarayoni allaqachon o'zida sig'diradi hamma narsani:**
+LZMA bilan siqadi → SHA1 hash → RSA imzo (`PrivateKey`/`PrivateBetaKey`,
+`packer_private.h` dan, repo'da **yo'q** — alohida saqlanadi) → darhol
+o'z ichida `PublicKey`/`PublicBetaKey` bilan tekshirib ko'radi → faylga
+yozadi. Ya'ni **bitta buyruq** compress+sign+verify+write bajaradi —
+alohida "siqish" va "imzolash" bosqichlariga bo'linmagan.
+
+⚠️ **Muhim:** `packer.cpp`dagi `PublicKey`/`PublicBetaKey` (14-28-qator)
+`config.h`dagi `UpdatesPublicKey`/`UpdatesPublicBetaKey` bilan **bir xil
+juftlik bo'lishi shart** — packer o'z public key'i bilan tasdiqlaydi,
+tdesktop esa `config.h`dagi public key bilan tekshiradi. Ikkalasi
+almashtirilganda **ikkalasi ham** yangilanishi kerak, aks holda
+imzo tekshiruvi muvaffaqiyatsiz bo'ladi.
+
+### 6.6 Ikki-bosqichli indirection va shared `ResolveChannel` — yangi topilma
+
+Kontraktning oldingi versiyasida "ikkita joy tuzatish kerak" degan
+ogohlantirish bor edi (`parseText` + `StartDedicatedLoader`). Kodni
+o'qib chiqib **yaxshi xabar** topildi: ikkalasi ham bitta umumiy
+funksiyani chaqiradi — `ResolveChannel`
+(`dedicated_file_loader.cpp:386-439`):
+
+- `MtpChecker::start()` (1003-qator) — `"tdhbcfeed"` kanalini topish uchun
+- `StartDedicatedLoader` (473-qator) — 6.3-bo'limdagi ikkinchi xabarning kanalini topish uchun
+
+**Xulosa:** yopiq kanalga o'tish uchun **faqat bitta joyni** —
+`ResolveChannel` funksiyasining o'zini — o'zgartirish kifoya (5.2-bo'limdagi
+access_hash yechimi). Ikkala chaqiruv joyi ham avtomatik ravishda yangi
+xatti-harakatni oladi. Ammo amaliy natija baribir ikki xabarni talab
+qiladi (6.3): agar ikkalasi ham bitta yopiq kanalda bo'lsa (eng oddiy
+variant — feed xabari va fayl xabari bitta kanalda), `ResolveChannel`
+bir marta channel_id/access_hash'ni hal qiladi va ikkala chaqiruv ham
+undan foydalanadi (natija keshlanadi — 406-414-qator, `ResolveCache`).
