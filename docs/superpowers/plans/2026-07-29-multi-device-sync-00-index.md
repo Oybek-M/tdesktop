@@ -17,7 +17,7 @@ o'zidan oldingilariga tayanadi.
 | 1a | Backend poydevori | Sxema, runtime config, qurilma auth, JWT, audit | [01a-backend-foundation](2026-07-29-multi-device-sync-01a-backend-foundation.md) ✅ |
 | 1b | Backend sync yadrosi | `seq`, push/pull, media, kalitlar, pagination, WS, `.cmx` | [01b-backend-sync](2026-07-29-multi-device-sync-01b-backend-sync.md) ✅ |
 | 2 | `tdesktop` sync agenti | Desktop ma'lumoti serverga chiqadi — birinchi haqiqiy qiymat | [02-tdesktop-agent](2026-07-29-multi-device-sync-02-tdesktop-agent.md) ✅ |
-| 3 | `server-controller` web app | Ko'rish, boshqarish, statistika | `…-03-web-controller.md` |
+| 3 | `server-controller` web app | Ko'rish, boshqarish, statistika | [03-web-controller](2026-07-29-multi-device-sync-03-web-controller.md) ✅ |
 | 4 | Storage lifecycle manager | Monitoring, retention, arxivlash, xavfsiz o'chirish | `…-04-storage-lifecycle.md` |
 | 5 | Always-on TDLib capture service | Muammo A hal bo'ladi | `…-05-capture-service.md` |
 
