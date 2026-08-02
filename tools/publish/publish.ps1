@@ -233,14 +233,14 @@ if (-not $anySucceeded) {
 # stores a truncated file blocks updates for everyone pointed at it,
 # and nobody finds out until someone reports the app never updating.
 
-function Verify-Url($label, $url) {
+function Verify-Url($label, $url, $headers = @{}) {
     if (-not $results.ContainsKey($label) -or -not $results[$label].ok) {
         return  # already failed to upload, nothing to verify
     }
     Write-Host "Verifying $label ($url)..." -ForegroundColor Cyan
     $checkPath = Join-Path $WorkDir "verify-$label"
     try {
-        Invoke-WebRequest -Uri $url -OutFile $checkPath -ErrorAction Stop
+        Invoke-WebRequest -Uri $url -Headers $headers -OutFile $checkPath -ErrorAction Stop
         $remoteHash = (Get-FileHash $checkPath -Algorithm SHA256).Hash
         if ($remoteHash -ne $localHash) {
             $results[$label] = @{ ok = $false; error = "checksum mismatch: local=$localHash remote=$remoteHash" }
@@ -254,7 +254,19 @@ function Verify-Url($label, $url) {
     }
 }
 
-Verify-Url "vps-secure" "https://$($Secrets.secure_user):$($Secrets.secure_pass)@updates.2007.uz/secure/win/$packageName"
+# NOTE: credentials go in an Authorization header, not embedded as
+# user:pass@host in the URL - Invoke-WebRequest on Windows PowerShell
+# 5.1 silently drops URL-embedded userinfo instead of sending it as
+# Basic auth, which made every verify attempt come back 401 even with
+# the correct password (found 2026-08-02 against the live VPS: curl -u
+# succeeded with the same credentials while Invoke-WebRequest with an
+# embedded-credential URL failed).
+$secureAuthHeader = @{
+    Authorization = "Basic " + [Convert]::ToBase64String(
+        [Text.Encoding]::ASCII.GetBytes("$($Secrets.secure_user):$($Secrets.secure_pass)")
+    )
+}
+Verify-Url "vps-secure" "https://updates.2007.uz/secure/win/$packageName" $secureAuthHeader
 Verify-Url "vps-pub"    "https://updates.2007.uz/$($Secrets.pub_prefix)/win/$packageName"
 
 # --- Step 6: summary ---------------------------------------------------
