@@ -423,7 +423,8 @@ orqali sinaldi.
 | **Imzo buzilgan paket** | ✅ **Rad etildi** — log: `Update Error: bad RSA signature of update file!` |
 | To'g'ri imzolangan paket | ✅ Imzo tekshiruvidan **o'tdi** (xatosi yo'q), keyingi (decompression) bosqichiga yetdi — payload sun'iy bo'lgani uchun u yerda kutilganidek to'xtadi |
 | Yopiq Telegram kanal orqali resolve | ✅ Ishladi — "MTP is unavailable"/"resolve failed" emas, "JSON parse xatosi" (chunki kanalga hali manifest post qilinmagan, kutilgan) |
-| Qayta ishga tushirish + sozlamalar saqlanishi | ⏳ **Sinalmadi** — buning uchun haqiqiy Packer-siqilgan paket kerak, Task 4'da |
+| Haqiqiy Packer-siqilgan paket to'liq pipeline | ✅ 2026-08-02, Task 4 boshida: `Packer.exe` qurildi (pastga qarang), zararsiz test-fayl bilan haqiqiy paket yasaldi, lokal serverdan yuklandi — SHA1+RSA+LZMA decompress hammasi xatosiz o'tdi, "New version is ready" holatiga yetdi |
+| Qayta ishga tushirish (real `Telegram.exe` bilan almashtirish) | ⏳ **Ataylab sinalmadi** — buning uchun ikkinchi haqiqiy build kerak (joriy 7.0.7'dan farqli), ishlab turgan nusxani buzish xavfi bor edi. Pipeline'ning o'zi tasdiqlangani uchun past xavfli qoldiq |
 | Server yetib bo'lmasa jim o'tish / eski versiya taklif qilinmasligi | ⏳ Sinalmadi (kod o'zgarmagan, past xavf) |
 
 **Yo'l-yo'lakay topilgan, Task 4 uchun muhim ikkita format detali**
@@ -453,7 +454,13 @@ arbitrary code."
 ## Task 4: Reliz skripti va mirror'lar
 
 **Files:**
-- Create: `tools/release/publish.ps1` (yoki `.sh`)
+- Create: `tools/publish/publish.ps1`
+
+⚠️ **Yo'l `tools/release/` emas, `tools/publish/`:** `.gitignore`dagi
+`Release/` qoidasi (build papkalarini chetlab o'tish uchun) Windows'da
+katta-kichik harf farqlanmagani sabab `tools/release/`ni ham tasodifan
+ushlab qolar edi. Global gitignore qoidasiga tegilmadi, papka nomi
+almashtirildi.
 
 - [ ] **Step 1: Skriptni yozish**
 
