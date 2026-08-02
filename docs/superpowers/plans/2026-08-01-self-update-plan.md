@@ -324,9 +324,9 @@ yozib qo'ygan, bu 1024-bit imzo uzunligi.
 
 - [x] **Step 2: Private kalitni xavfsiz joyga qo'yish**
 
-`DesktopPrivate/` (repo tashqarisida), `.gitignore`ga qo'shildi. ⚠️
-**Qo'lda zaxiralash hali qilinmagan** — parol menejeri + USB, siz
-bajarishingiz kerak (`key-management.md` §4).
+`DesktopPrivate/` (repo tashqarisida), `.gitignore`ga qo'shildi.
+Qo'lda zaxiralash 2026-08-02'da foydalanuvchi tomonidan bajarildi
+(`key-management.md` §4).
 
 - [x] **Step 3: Public kalitni kodga qo'yish**
 
@@ -345,14 +345,17 @@ GitHub repo (`Oybek-M/tdesktop-releases`, private) mavjud, lekin
 `HttpChecker` bir vaqtda faqat bitta prefiks bilan ishlaydi — GitHub'ni
 avtomatik urinish Task 4'da hal qilinadi.
 
-- [ ] **Step 6: Infratuzilmani tayyorlash**
+- [x] **Step 6: Infratuzilmani tayyorlash**
 
-DNS qo'shildi (`updates.2007.uz` → VPS IP, tasdiqlandi). Nginx config +
-htpasswd + certbot **hali foydalanuvchi tomonidan bajarilmagan** —
-aniq buyruqlar suhbatda berilgan, VPS'ga sudo kirish kerak bo'lgani
-uchun avtomatik delegatsiya permission classifier tomonidan bloklandi.
+DNS (`updates.2007.uz` → `109.199.108.248`), nginx vhost (`/secure/`
+Basic-auth, `/4f2c434f2f125037fdc4ad93/` pub) va certbot sertifikati
+2026-08-02'da foydalanuvchi tomonidan VPS'da to'g'ridan-to'g'ri
+bajarildi (avtomatik delegatsiya permission classifier tomonidan
+bloklangani uchun). Tekshirildi: `/secure/current` to'g'ri parol bilan
+404, noto'g'ri parol bilan 401, `/pub/current` autentifikatsiyasiz 404,
+sertifikat ishonchli (curl `-k` flag'siz ishlaydi).
 
-- [ ] **Step 7: Hujjatlashtirish va commit**
+- [x] **Step 7: Hujjatlashtirish va commit**
 
 `key-management.md` da yozing: kalit qayerda, zaxira qayerda, yo'qolsa
 nima qilish kerak.
