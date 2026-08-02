@@ -462,38 +462,37 @@ katta-kichik harf farqlanmagani sabab `tools/release/`ni ham tasodifan
 ushlab qolar edi. Global gitignore qoidasiga tegilmadi, papka nomi
 almashtirildi.
 
-- [ ] **Step 1: Skriptni yozish**
+- [x] **Step 1: Skriptni yozish**
 
-Bitta buyruq bilan to'liq reliz:
+`tools/publish/publish.ps1` yozildi. Shifrlash qadami **yo'q** —
+2026-08-02'da skip qilingan (3.2-bo'lim). Qolgan 5 qadam bor: versiya
+o'qish → packer bilan imzolash → 3 mirror'ga yuklash → qaytarib
+yuklab checksum solishtirish → natija.
 
-```
-1. Versiyani tekshirish (version.h dagi bilan mos kelishi)
-2. packer bilan imzolash
-3. Shifrlash
-4. Uchala mirror'ga yuklash
-5. Har biridan qaytarib yuklab olib, checksum solishtirish
-6. Natijani ko'rsatish
-```
+- [x] **Step 2: Xato holatlarini boshqarish**
 
-**5-qadam majburiy:** yuklandi deb hisoblab qo'yish yetarli emas —
-har bir mirror haqiqatan to'g'ri fayl berayotganini tekshirish kerak.
-Buzilgan mirror foydalanuvchilarga yangilanishni to'sadi.
-
-- [ ] **Step 2: Xato holatlarini boshqarish**
-
-| Holat | Xatti-harakat |
-|---|---|
-| Bitta mirror ishlamadi | Ogohlantirish, qolganlariga davom etish |
-| **Hamma mirror ishlamadi** | **Xato bilan to'xtash** |
-| Checksum mos kelmadi | Xato, o'sha mirror "buzuq" deb belgilanadi |
-| Private kalit topilmadi | Darhol to'xtash, aniq xabar |
+Barcha 4 holat skriptda ishlangan: private kalit yo'q → darhol
+to'xtash; bitta mirror ishlamasa → ogohlantirish + davom; hammasi
+ishlamasa → xato bilan to'xtash; checksum mos kelmasa → o'sha mirror
+"buzuq" deb belgilanadi.
 
 - [ ] **Step 3: Uchi-uchiga sinash**
 
-Haqiqiy mirror'larga reliz chiqaring va boshqa mashinadagi (yoki
-virtual mashinadagi) o'rnatilgan nusxa uni olishini tekshiring.
+⏳ **Hali qilinmagan** — quyidagilar kerak:
 
-- [ ] **Step 4: Commit**
+1. VPS uchun alohida SSH kalit sozlash (parol emas — skript
+   avtomatlashtirilgan, parolni qo'lda kiritolmaydi). Ko'rsatmalar
+   skriptning boshidagi `.NOTES` bo'limida.
+2. `gh` CLI orqali `Oybek-M/tdesktop-releases` repo'siga yozish
+   huquqi borligini tekshirish.
+3. Haqiqiy relizni chiqarib, uchala mirror'dan ham to'g'ri kelayotganini
+   tasdiqlash.
+
+Signature+decompression pipeline'ning o'zi Task 3'da allaqachon
+haqiqiy Packer paketi bilan tasdiqlangan — bu yerda faqat yuklash
+avtomatikasi sinaladi.
+
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
