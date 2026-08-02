@@ -2509,6 +2509,36 @@ if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_wins
         endif()
 
         set_target_properties(Packer PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${output_folder})
+    elseif (NOT DESKTOP_APP_DISABLE_AUTOUPDATE)
+        # CustomMod: Packer.exe is needed for release signing even
+        # without an official DESKTOP_APP_SPECIAL_TARGET build (that
+        # flag also adds /WX to common_options, which would force a
+        # full rebuild of Telegram itself just to get Packer - so this
+        # branch defines Packer independently, deliberately NOT added
+        # as a dependency of Telegram, so `cmake --build --target
+        # Packer` never touches the main app build.
+        add_executable(Packer)
+        init_target(Packer)
+
+        nice_target_sources(Packer ${src_loc}
+        PRIVATE
+            _other/packer.cpp
+            _other/packer.h
+        )
+
+        target_link_libraries(Packer
+        PRIVATE
+            desktop-app::external_qt
+            desktop-app::external_zlib
+            desktop-app::external_auto_updates
+            desktop-app::external_openssl
+        )
+
+        if (DESKTOP_APP_USE_PACKAGED)
+            target_compile_definitions(Packer PRIVATE PACKER_USE_PACKAGED)
+        endif()
+
+        set_target_properties(Packer PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${output_folder})
     endif()
 elseif (build_winstore)
     add_executable(StartupTask WIN32)
