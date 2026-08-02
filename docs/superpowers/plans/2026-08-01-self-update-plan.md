@@ -376,58 +376,68 @@ stock Telegram Desktop and silently remove every customisation."
 **Files:**
 - Modify: build konfiguratsiyasi (`DESKTOP_APP_DISABLE_AUTOUPDATE=OFF`)
 
-- [ ] **Step 1: Task 2 bajarilganini tasdiqlash**
-
-Boshlashdan oldin tekshiring:
+- [x] **Step 1: Task 2 bajarilganini tasdiqlash**
 
 ```bash
 grep -rn "updates.tdesktop.com" Telegram/SourceFiles/core/update_checker.cpp
 ```
 
-Kutilgan: **hech narsa topilmasligi kerak.** Topilsa — Task 2 tugamagan,
-davom etmang.
+Natija bo'sh — tasdiqlandi.
 
-- [ ] **Step 2: Autoupdate'ni yoqish**
+- [x] **Step 2: Autoupdate'ni yoqish**
 
 ```bash
 cmake -S . -B out -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF
 ```
 
-- [ ] **Step 3: Build**
+- [x] **Step 3: Build**
 
-⚠️ **~34 daqiqa. Foydalanuvchidan so'rang.**
+2026-08-02: build muvaffaqiyatli o'tdi (58 succeeded, 0 failed,
+~60 daqiqa). `Updater.exe` ham qurildi.
 
-Bu build `Updater.exe` ni ham yasaydi — u ishlab turgan `Telegram.exe`
-ni almashtiradigan yordamchi dastur.
+- [x] **Step 4: Sinov paketi yasash — muqobil usul bilan**
 
-- [ ] **Step 4: Sinov paketi yasash**
+`Packer.exe` build qilinmadi: uning CMake target'i faqat
+`DESKTOP_APP_SPECIAL_TARGET` bo'sh bo'lmaganda qo'shiladi, va bu
+flag yoqilsa `common_options`ga `/WX` (warning-as-error) qo'shiladi —
+bu **butun loyihani qayta build qilishni** talab qilardi va yangi
+ogohlantirishlar sabab build buzilish xavfi bor edi. Bu xavfni
+Task 4'ga (haqiqiy reliz uchun Packer baribir kerak) qoldirdik.
 
-Task 1 da aniqlangan `packer` argumentlari bilan, versiyani joriydan
-bittaga oshirib.
+O'rniga: xuddi shu formatda (RSA sig[128] + SHA1[20] + LZMA-props
+placeholder[5] + size[4] + payload) `openssl dgst -sha1 -sign` bilan
+qo'lda ikkita test-paket yasaldi — biri to'g'ri, biri imzosi ichida
+1 bayt o'zgartirilgan. Payload haqiqiy LZMA emas (faqat imzo
+tekshiruvini sinash uchun) — decompression bosqichigacha yetib
+bormaydi, bu kutilgan.
 
-- [ ] **Step 5: Lokal mirror bilan sinash**
+- [x] **Step 5: Lokal mirror bilan sinash**
 
-Lokal HTTP server ko'taring va URL'ni vaqtincha unga qarating:
+`python -m http.server` orqali, ilovaning ishlab turgan nusxasida
+(qayta build qilmasdan) `tdata/prefix` faylini vaqtincha lokal
+serverga yo'naltirib, Settings → Advanced → "Check for updates"
+orqali sinaldi.
 
-```bash
-python -m http.server 8000 --directory ./test-updates
-```
-
-Tekshiriladigan holatlar:
-
-| Holat | Kutilgan |
+| Holat | Natija |
 |---|---|
-| Yangi versiya bor | Aniqlanadi, yuklab olinadi, qayta ishga tushirishni taklif qiladi |
-| Qayta ishga tushirilgandan keyin | Yangi versiya ishlaydi, **CustomMod sozlamalari saqlanadi** |
-| **Imzo buzilgan paket** | **Rad etiladi** — bu eng muhim tekshiruv |
-| Server yetib bo'lmaydi | Jimgina o'tkazib yuboriladi, ilova normal ishlaydi |
-| Versiya joriydan eski | Yangilanish taklif qilinmaydi |
+| **Imzo buzilgan paket** | ✅ **Rad etildi** — log: `Update Error: bad RSA signature of update file!` |
+| To'g'ri imzolangan paket | ✅ Imzo tekshiruvidan **o'tdi** (xatosi yo'q), keyingi (decompression) bosqichiga yetdi — payload sun'iy bo'lgani uchun u yerda kutilganidek to'xtadi |
+| Yopiq Telegram kanal orqali resolve | ✅ Ishladi — "MTP is unavailable"/"resolve failed" emas, "JSON parse xatosi" (chunki kanalga hali manifest post qilinmagan, kutilgan) |
+| Qayta ishga tushirish + sozlamalar saqlanishi | ⏳ **Sinalmadi** — buning uchun haqiqiy Packer-siqilgan paket kerak, Task 4'da |
+| Server yetib bo'lmasa jim o'tish / eski versiya taklif qilinmasligi | ⏳ Sinalmadi (kod o'zgarmagan, past xavf) |
 
-**Imzo tekshiruvini albatta sinang:** paketning bir baytini o'zgartirib,
-rad etilishiga ishonch hosil qiling. Bu ishlamasa, butun xavfsizlik
-modeli qog'ozda qoladi.
+**Yo'l-yo'lakay topilgan, Task 4 uchun muhim ikkita format detali**
+(qo'lda sinaganda xato qilib, keyin tuzatilgan):
 
-- [ ] **Step 6: Commit**
+1. `/current4` JSON'da `"released"` va `"link"` **alohida, bir xil
+   darajadagi** maydonlar bo'lishi kerak
+   (`{"released":7000008,"link":"/win/tupdate7000008"}`), MtpChecker
+   uchun ishlatiladigan `"version:postId"` uslubidagi birlashtirilgan
+   satr emas — bu ikki checker ikki xil formatni kutadi.
+2. `link` qiymati **boshida `/` bilan** yozilishi shart — klient kodi
+   `prefix + link`ni oddiy qo'shadi, orada ajratuvchi qo'ymaydi.
+
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
