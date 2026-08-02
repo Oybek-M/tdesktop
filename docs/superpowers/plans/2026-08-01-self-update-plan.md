@@ -527,9 +527,27 @@ failure is invisible until someone reports the app never updating."
 
 ## Task 5: Linux
 
-- [ ] **Step 1: `updater_linux.cpp` ni ko'rib chiqish**
-- [ ] **Step 2: Linux uchun build va paket**
-- [ ] **Step 3: Task 3 dagi jadval bo'yicha sinash**
+⚠️ **2026-08-02: bloklangan — Linux mashina/klient yo'q, amaliy sinov
+imkonsiz.** Kod ko'rib chiqish (Step 1) bajarildi, qolganlari shu sabab
+ochiq qoldi.
+
+- [x] **Step 1: `updater_linux.cpp` ni ko'rib chiqish**
+
+Natija: bu faylda URL yoki kalitga oid **hech qanday hardcode yo'q** —
+u faqat tayyorlangan paketni exe papkasiga ko'chiruvchi oddiy dastur.
+Barcha manzil/kalit mantig'i (`config.h`, `update_checker.cpp`,
+`localstorage.cpp`, CMakeLists'dagi `Packer` targeti) allaqachon barcha
+platformalar uchun umumiy va Task 2/3'da yangilangan — Linux uchun
+qo'shimcha kod o'zgartirish **shart emas**.
+
+Muhim cheklov topildi: `packer.cpp:493-499` chiqish fayl nomini
+(`tlinuxupd{version}`) **compile-time** `#ifdef`/`#else` bilan
+tanlaydi (Windows/macOS emas bo'lsa Linux shoxobchasi). Demak Packer
+Windows'dan cross-compile qilib Linux paket yasay olmaydi — haqiqatan
+ham Linux mashinada build+run qilinishi kerak.
+
+- [ ] **Step 2: Linux uchun build va paket** — Linux mashina kerak
+- [ ] **Step 3: Task 3 dagi jadval bo'yicha sinash** — Linux klient kerak
 - [ ] **Step 4: Reliz skriptiga Linux qo'shish**
 - [ ] **Step 5: Commit**
 
@@ -541,14 +559,27 @@ failure is invisible until someone reports the app never updating."
 ishga tushirishga qarshilik qiladi (Gatekeeper), va yangilanish
 jarayoni ham imzolangan bo'lishi kerak.
 
+⚠️ **2026-08-02: bloklangan — macOS mashina/klient yo'q, amaliy sinov
+imkonsiz.** Kod ko'rib chiqish (Step 2) bajarildi, qolganlari shu sabab
+ochiq qoldi (shu jumladan Step 1 — codesign talablarini aniqlash ham
+haqiqiy Mac'da sinash bilan bog'liq).
+
 - [ ] **Step 1: Codesign talablarini aniqlash**
 
 Apple Developer hisobi bor. Aniqlash kerak: ad-hoc imzolash yetarlimi,
 yoki notarization ham kerakmi. Bu javob qolgan qadamlarni belgilaydi.
 
-- [ ] **Step 2: `updater_osx.m` ni ko'rib chiqish**
-- [ ] **Step 3: Build, imzolash, paket**
-- [ ] **Step 4: Sinash**
+- [x] **Step 2: `updater_osx.m` ni ko'rib chiqish**
+
+Natija: Linux bilan bir xil — bu faylda ham URL/kalitga oid hech
+qanday hardcode yo'q, faqat fayl ko'chirish mantig'i. Qo'shimcha kod
+o'zgartirish shart emas. `packer.cpp`dagi `#elif defined Q_OS_MAC`
+shoxobchasi (`tarmacupd`/`tmacupd`) ham Linux'dagiga o'xshab
+compile-time — Packer haqiqiy macOS'da build+run bo'lishi kerak,
+qolaversa codesign/notarization talabi (Step 1) buning ustiga qo'shiladi.
+
+- [ ] **Step 3: Build, imzolash, paket** — macOS mashina kerak
+- [ ] **Step 4: Sinash** — macOS klient kerak
 - [ ] **Step 5: Reliz skriptiga macOS qo'shish**
 - [ ] **Step 6: Commit**
 
