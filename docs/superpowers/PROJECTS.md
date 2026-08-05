@@ -4,7 +4,7 @@ Bu fayl qaysi ish **hozir faol**, qaysi biri **to'xtatib qo'yilgan** va
 qaysi biri **hali muhokama bosqichida** ekanini ko'rsatadi. Yangi
 sessiya boshlanganda birinchi shu yerga qarang.
 
-Oxirgi yangilanish: 2026-08-01
+Oxirgi yangilanish: 2026-08-02
 
 ---
 
@@ -28,23 +28,25 @@ va `libfido2` (FIDO2/passkey). Build muammosiz o'tdi.
 
 ---
 
-## B — Self-update mexanizmi ⚡ KEYINGI ISH
+## B — Self-update mexanizmi ✅ Windows tayyor, Linux/macOS bloklangan
 
 Har rebuild'dan keyin ilovani fleshka/cloud orqali qo'lda tarqatish
 muammosini hal qiladi. Bir nechta desktop qurilma va boshqa
 foydalanuvchilar (masalan aka) paydo bo'lganda bu muammo keskinlashadi.
 
-**Holat:** tahlil qilingan, spec yozilmagan. Foydalanuvchi ruxsatini
-kutmoqda.
+**Holat (2026-08-02):** Windows uchun **to'liq ishlab turibdi,
+production'da** — haqiqiy v7.0.7 relizi uchala mirror'ga (VPS secure,
+VPS pub, GitHub) chiqarilgan va tasdiqlangan. Kirish nuqtasi:
+[`../self-update/HANDOFF.md`](../self-update/HANDOFF.md).
 
-**Asosiy topilma:** tdesktop'ning **butun updater mexanizmi allaqachon
-kodda mavjud** — u shunchaki `DESKTOP_APP_DISABLE_AUTOUPDATE=ON` bilan
-o'chirilgan. Noldan yozish kerak emas.
+Keyingi versiyani chiqarish bitta buyruq: `.\tools\publish\release.ps1`
+(tdesktop repo ichida, `out\Release` build qilingandan keyin).
 
-**Muhim xavf:** updater'ni yoqishdan **oldin** URL va public key
-almashtirilishi SHART. Aks holda "yangilanishni tekshirish" rasmiy
-Telegram build'ini yuklab olib, bizning fork'ni **butunlay bosib
-ketadi** va barcha customization yo'qoladi.
+**Linux/macOS (Task 5-6):** kod ko'rib chiqilgan, qo'shimcha
+o'zgartirish kerak emasligi tasdiqlangan, lekin build/sinov qadamlari
+**Linux/macOS mashina yo'qligi sababli bloklangan** — Packer.exe'ning
+chiqish fayl nomi compile-time aniqlanadi, cross-compile qilib
+bo'lmaydi. Mashina paydo bo'lganda davom ettiriladi.
 
 **A yo'nalishiga bog'liqligi:** yo'q. Update server oddiy statik fayl
 (nginx) — B yo'nalishiga ham bog'liq emas, mustaqil bajarilishi mumkin.
