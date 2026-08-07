@@ -26,7 +26,8 @@ qilinmagan**. Keyingi qadam: build + haqiqiy self-update sinovi
 | A2 | Upstream v7.0.5 → v7.0.7 sync | ✅ 2026-08-01, `2e61fdcbc2` (162 commit, 2 konflikt) |
 | A3 | Log shovqinini kamaytirish (`API Warning: not loaded minimal channel applied.`) | Past ustuvorlik, tekshirilmagan |
 | A4 | Upstream v7.0.7 → v7.0.9 sync (to'liq `dev→SafeWall→Customizations↔Oybek` zanjiri orqali) | ✅ 2026-08-06, 100 commit, 1 konflikt (`lib_ui` submodule) |
-| A5 | Build v7.0.9 + haqiqiy self-update sinovi | ⏳ Navbatda — build hali boshlanmagan |
+| A5 | Build v7.0.9 + haqiqiy self-update sinovi | ⏳ Navbatda — user o'zi build qilmoqda |
+| A6 | Qt 5.15.18 → Qt 6.5+ ga o'tish | 🕓 Keyingi tasklarga qo'shildi (2026-08-07). Qat'iy texnik zaruriyat yo'q — sof tarixiy: `Libraries\win64`da faqat Qt5 SDK bor. O'tish `lib_ui` fork'ini keraksiz qiladi va upstream bilan uzoq muddatli mosligini yaxshilaydi, lekin alohida katta ish (Qt6 SDK sozlash + qayta konfiguratsiya + boshqa yashirin Qt5/6 nomuvofiqliklar chiqishi mumkin — bitta misol allaqachon topilgan: `info_media_grid_zoom.cpp`dagi `QNativeGestureEvent::position()`). Self-update sinovi tugagach ko'rib chiqiladi. |
 
 **v7.0.7 bilan kelgan yangi bog'liqliklar:** `Telegram/ThirdParty/libcbor`
 va `libfido2` (FIDO2/passkey). Build muammosiz o'tdi.
