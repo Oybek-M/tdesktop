@@ -1,23 +1,33 @@
 # Self-update — implement uchun kirish nuqtasi
 
-Bu faylni **birinchi** o'qing. Oxirgi yangilanish: 2026-08-02.
+Bu faylni **birinchi** o'qing. Oxirgi yangilanish: 2026-08-06.
 
 ---
 
 ## 0. TL;DR — hozirgi holat
 
-**Windows uchun self-update ishlab turibdi va production'da.** v7.0.7
-akangizga/boshqa qurilmalarga allaqachon shu mexanizm bilan
-tarqatilgan yoki tarqatilishga tayyor. Keyingi versiyani chiqarish —
-bitta buyruq:
+**Windows uchun self-update mexanizmi tayyor va production'da (v7.0.7
+uchun sinalgan).** Hozir **haqiqiy real-world sinov o'rtasida
+to'xtatilgan**: `Oybek` branch v7.0.7'dan **v7.0.9**'ga sync qilindi
+(2026-08-06), lekin **hali build qilinmagan**. Keyingi sessiyada
+davom etish tartibi:
+
+1. **Build qiling** (Telegram.exe + Updater.exe + Packer.exe,
+   `out\Release`).
+2. `.\tools\publish\release.ps1` bilan haqiqiy v7.0.9 relizini
+   chiqaring.
+3. Hozir ishlab turgan **v7.0.7 nusxangizda** "Check for Updates"
+   bosib, bu safar **oxirigacha** ("Update Telegram" tugmasini bosib,
+   dastur qayta ishga tushguncha) boring — bu birinchi to'liq
+   real-world self-update sinovi bo'ladi (akkaunt/sozlamalar
+   saqlanishini tasdiqlash).
+
+Keyingi versiyalar uchun (bu sinovdan keyin, doimiy jarayon):
 
 ```powershell
 .\tools\publish\release.ps1
 ```
 
-Agar shu sessiyada qiladigan ishingiz "yangi versiya chiqarish" bo'lsa
-— boshqa hech narsani o'qimasdan shu buyruqni ishga tushirsangiz
-bo'ladi (avval Telegram/Updater/Packer build qilingan bo'lishi shart).
 Qolgan bo'limlar — **nima uchun** shunday ishlashi va **Linux/macOS**
 uchun qolgan ishlar.
 
@@ -65,6 +75,42 @@ push kombinatsiyasi) ba'zan avto-rejim classifier tomonidan
 bloklanishi mumkin — shunda alohida `ssh`/`scp`/`git` buyruqlari bilan
 qo'lda takrorlash kerak bo'ladi (bu holat oldin uchragan, ishlaydigan
 workaround).
+
+---
+
+## 2.5. v7.0.9 sync (2026-08-06) — branch flow tiklandi, lib_ui fork
+
+Bu safar upstream sync **to'liq `dev → SafeWall → Customizations ↔
+Oybek` zanjiri orqali** bajarildi (avvalgi sync'lar to'g'ridan-to'g'ri
+`Oybek`ga qilingan edi, zanjir uzoq vaqt ishlatilmay eskirib qolgan
+edi). Muhim topilmalar:
+
+- **`Customizations` branch'i butunlay reset qilindi** — u eski
+  (2026-03/06 dagi, Saidjon bilan qilingan Ghost Mode/AntiDelete/SQLite
+  tajribalari) tarixni saqlab turgan edi, `Oybek`dan mutlaqo boshqa
+  bazada. User qarori: bu eski tarix endi asosiy nuqta emas —
+  `Customizations` `Oybek`ning nusxasiga tekislandi, keyin `SafeWall`
+  (v7.0.9) shu ustiga merge qilindi. Eski tarix git'da yo'qolmagan
+  (reflog/eski SHA orqali topsa bo'ladi), lekin branch ko'rsatkichi
+  endi undan uzoqlashgan — **`origin/Customizations` force-push
+  qilingan**.
+- **Merge deyarli konfliktsiz o'tdi** — faqat bitta konflikt:
+  `Telegram/lib_ui` submodule pointer'i (bizning Qt5 patch'imiz
+  sababli). Yechim: upstream'ning yangi `lib_ui` commit'i ustiga
+  bizning Qt5-guard patch'imiz (`fix: restore Qt5 compatibility
+  guards...`) qayta cherry-pick qilindi (konfliktsiz).
+- **Muhim topilma:** bu Qt5 patch hech qachon GitHub'da bo'lmagan —
+  faqat lokal kompyuterda "tasodifan" saqlanib qolgan edi (chunki
+  `desktop-app/lib_ui`ga yozish huquqimiz yo'q). Bu **fresh clone'da
+  ishlamay qolishi mumkin edi**. Yechim: `desktop-app/lib_ui`
+  `Oybek-M/lib_ui`ga fork qilindi (branch: `oybek-qt5-patch`),
+  `.gitmodules` shu fork'ga yo'naltirildi. Endi istalgan yangi clone
+  ham ishlaydi.
+- Barcha self-update fayllari (config.h kaliti, update_checker.cpp,
+  localstorage.cpp mirror URL, packer.cpp, CMakeLists.txt Packer
+  target) merge'dan keyin **tekshirilib, saqlanib qolgani tasdiqlangan**.
+- `dev`, `SafeWall`, `Customizations`, `Oybek` — barchasi push qilindi.
+  Hech narsa hali **build qilinmagan**.
 
 ---
 

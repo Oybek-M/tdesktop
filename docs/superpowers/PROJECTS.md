@@ -4,7 +4,7 @@ Bu fayl qaysi ish **hozir faol**, qaysi biri **to'xtatib qo'yilgan** va
 qaysi biri **hali muhokama bosqichida** ekanini ko'rsatadi. Yangi
 sessiya boshlanganda birinchi shu yerga qarang.
 
-Oxirgi yangilanish: 2026-08-02
+Oxirgi yangilanish: 2026-08-06
 
 ---
 
@@ -13,7 +13,10 @@ Oxirgi yangilanish: 2026-08-02
 Hozirgi asosiy ish. Boshqa yo'nalishlar bunga aralashmasligi kerak.
 
 **Repo:** `Telegram/tdesktop`, branch `Oybek`
-**Holat:** **v7.0.7** ga sync qilingan, build o'tgan, qo'lda sinovdan o'tgan
+**Holat:** **v7.0.9** ga sync qilingan (2026-08-06), lekin **hali build
+qilinmagan**. Keyingi qadam: build + haqiqiy self-update sinovi
+(v7.0.7 ishlab turgan nusxada v7.0.9'ga yangilanish) — tafsilot
+[`../self-update/HANDOFF.md`](../self-update/HANDOFF.md)da.
 
 **Ochiq vazifalar:**
 
@@ -22,9 +25,18 @@ Hozirgi asosiy ish. Boshqa yo'nalishlar bunga aralashmasligi kerak.
 | A1 | To'liq qo'lda tekshiruv | ✅ 2026-08-01, kritik muammo yo'q |
 | A2 | Upstream v7.0.5 → v7.0.7 sync | ✅ 2026-08-01, `2e61fdcbc2` (162 commit, 2 konflikt) |
 | A3 | Log shovqinini kamaytirish (`API Warning: not loaded minimal channel applied.`) | Past ustuvorlik, tekshirilmagan |
+| A4 | Upstream v7.0.7 → v7.0.9 sync (to'liq `dev→SafeWall→Customizations↔Oybek` zanjiri orqali) | ✅ 2026-08-06, 100 commit, 1 konflikt (`lib_ui` submodule) |
+| A5 | Build v7.0.9 + haqiqiy self-update sinovi | ⏳ Navbatda — build hali boshlanmagan |
 
 **v7.0.7 bilan kelgan yangi bog'liqliklar:** `Telegram/ThirdParty/libcbor`
 va `libfido2` (FIDO2/passkey). Build muammosiz o'tdi.
+
+**v7.0.9 sync bilan kelgan muhim o'zgarish:** `Customizations` branch'i
+eski (Saidjon-davri) tarixdan tozalanib, `Oybek`ga tekislandi —
+force-push qilindi. `Telegram/lib_ui` submodule'i endi rasmiy
+`desktop-app/lib_ui` o'rniga bizning fork'imizga (`Oybek-M/lib_ui`)
+ishora qiladi — bizning Qt5 moslik patch'imiz uchun (rasmiyda yo'q,
+faqat fork'da). Tafsilot: `docs/self-update/HANDOFF.md` §2.5.
 
 ---
 
