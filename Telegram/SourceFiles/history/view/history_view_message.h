@@ -74,6 +74,9 @@ struct HiddenSenderTooltip
 struct InstantViewMediaRuntime
 : RuntimeComponent<InstantViewMediaRuntime, Element> {
 	QString pageUrl;
+	QSize forcedSize;
+	Media *forcedFor = nullptr;
+	double mediaPixelScale = 1.;
 };
 
 struct HistoryMessageRichPage
@@ -104,6 +107,7 @@ struct HistoryMessageRichPage
 	mutable QPoint handlerHorizontalScrollPoint;
 	mutable bool handlerHorizontalScrollActive = false;
 	mutable ClickHandlerPtr handlerHorizontalScrollPressed;
+	mutable int handlerCodeHeaderSegmentIndex = -1;
 	mutable std::optional<Iv::Markdown::PreparedLink> handlerPreparedLink;
 	mutable Iv::Markdown::MediaActivation handlerMediaActivation;
 	mutable Iv::Markdown::PreparedPlaceholderBlockId handlerPlaceholderId;
@@ -182,7 +186,10 @@ public:
 		QPoint point,
 		StateRequest request) const override;
 	void updatePressed(QPoint point) override;
-	bool consumeHorizontalScroll(QPoint position, int delta) override;
+	bool consumeHorizontalScroll(
+		QPoint position,
+		int delta,
+		Qt::ScrollPhase phase) override;
 	[[nodiscard]] bool canConsumeHorizontalScroll(
 		QPoint position,
 		int delta) const override;
@@ -350,6 +357,10 @@ private:
 		QRect &g,
 		const PaintContext &context) const;
 	void paintFromName(
+		Painter &p,
+		QRect &trect,
+		const PaintContext &context) const;
+	void paintEphemeralBadge(
 		Painter &p,
 		QRect &trect,
 		const PaintContext &context) const;

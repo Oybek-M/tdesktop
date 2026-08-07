@@ -132,7 +132,9 @@ bool GroupedMedia::hideMessageText() const {
 
 GroupedMedia::Mode GroupedMedia::DetectMode(not_null<Data::Media*> media) {
 	const auto document = media->document();
-	return (document && !document->isVideoFile())
+	return (document
+		&& !document->isVideoFile()
+		&& !document->isAnimation())
 		? Mode::Column
 		: Mode::Grid;
 }
@@ -324,6 +326,16 @@ QRect GroupedMedia::groupItemRect(int index) const {
 			groupedPadding().top());
 	}
 	return {};
+}
+
+Media *GroupedMedia::partMediaAt(QPoint point) const {
+	point -= QPoint(0, groupedPadding().top());
+	for (const auto &part : _parts) {
+		if (part.geometry.contains(point)) {
+			return part.content.get();
+		}
+	}
+	return nullptr;
 }
 
 Media *GroupedMedia::lookupSpoilerTagMedia() const {

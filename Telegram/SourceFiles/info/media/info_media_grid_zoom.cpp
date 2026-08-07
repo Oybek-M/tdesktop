@@ -13,7 +13,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/core_settings.h"
 #include "ui/ui_utility.h"
 #include "styles/style_info.h"
-#include "styles/style_layers.h"
 #include "styles/style_overview.h"
 
 namespace Info::Media {
@@ -185,7 +184,7 @@ bool ListZoom::handleNativeGesture(not_null<QNativeGestureEvent*> e) {
 	} else if (!isZoomable()) {
 		return false;
 	}
-	const auto anchor = e->position().toPoint();
+	const auto anchor = e->pos();
 	_pinchAccumulated += e->value();
 	while (_pinchAccumulated >= kPinchStep) {
 		_pinchAccumulated -= kPinchStep;
