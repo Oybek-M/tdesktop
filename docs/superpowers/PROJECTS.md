@@ -4,7 +4,7 @@ Bu fayl qaysi ish **hozir faol**, qaysi biri **to'xtatib qo'yilgan** va
 qaysi biri **hali muhokama bosqichida** ekanini ko'rsatadi. Yangi
 sessiya boshlanganda birinchi shu yerga qarang.
 
-Oxirgi yangilanish: 2026-08-06
+Oxirgi yangilanish: 2026-08-08
 
 ---
 
@@ -13,10 +13,12 @@ Oxirgi yangilanish: 2026-08-06
 Hozirgi asosiy ish. Boshqa yo'nalishlar bunga aralashmasligi kerak.
 
 **Repo:** `Telegram/tdesktop`, branch `Oybek`
-**Holat:** **v7.0.9** ga sync qilingan (2026-08-06), lekin **hali build
-qilinmagan**. Keyingi qadam: build + haqiqiy self-update sinovi
-(v7.0.7 ishlab turgan nusxada v7.0.9'ga yangilanish) — tafsilot
-[`../self-update/HANDOFF.md`](../self-update/HANDOFF.md)da.
+**Holat:** **v7.0.9** build qilindi va chiqarildi (2026-08-08), lekin
+⚠️ **birinchi real-world self-update sinovi muvaffaqiyatsiz tugadi**
+— update yuklandi, dastur restart bo'ldi, lekin versiya v7.0.7'da
+qolib ketdi, sabab hali aniqlanmagan. Keyingi sessiya shu yerdan
+boshlanadi — tafsilot va tekshirish ro'yxati:
+[`../self-update/HANDOFF.md`](../self-update/HANDOFF.md) §0.1.
 
 **Ochiq vazifalar:**
 
@@ -26,8 +28,9 @@ qilinmagan**. Keyingi qadam: build + haqiqiy self-update sinovi
 | A2 | Upstream v7.0.5 → v7.0.7 sync | ✅ 2026-08-01, `2e61fdcbc2` (162 commit, 2 konflikt) |
 | A3 | Log shovqinini kamaytirish (`API Warning: not loaded minimal channel applied.`) | Past ustuvorlik, tekshirilmagan |
 | A4 | Upstream v7.0.7 → v7.0.9 sync (to'liq `dev→SafeWall→Customizations↔Oybek` zanjiri orqali) | ✅ 2026-08-06, 100 commit, 1 konflikt (`lib_ui` submodule) |
-| A5 | Build v7.0.9 + haqiqiy self-update sinovi | ⏳ Navbatda — user o'zi build qilmoqda |
+| A5 | Build v7.0.9 + haqiqiy self-update sinovi | ⚠️ 2026-08-08: build+reliz ✅, update-apply sinovi ❌ — versiya o'zgarmadi, sabab noma'lum |
 | A6 | Qt 5.15.18 → Qt 6.5+ ga o'tish | 🕓 Keyingi tasklarga qo'shildi (2026-08-07). Qat'iy texnik zaruriyat yo'q — sof tarixiy: `Libraries\win64`da faqat Qt5 SDK bor. O'tish `lib_ui` fork'ini keraksiz qiladi va upstream bilan uzoq muddatli mosligini yaxshilaydi, lekin alohida katta ish (Qt6 SDK sozlash + qayta konfiguratsiya + boshqa yashirin Qt5/6 nomuvofiqliklar chiqishi mumkin — bitta misol allaqachon topilgan: `info_media_grid_zoom.cpp`dagi `QNativeGestureEvent::position()`). Self-update sinovi tugagach ko'rib chiqiladi. |
+| A7 | VS2022→VS2026 ko'chishi bilan bog'liq build-muhit tuzatishlari | ✅ 2026-08-08 — toolset, QT env var, api_id/api_hash, `DESKTOP_APP_DISABLE_AUTOUPDATE` qayta yoqildi. Tafsilot: `docs/self-update/HANDOFF.md` §2.6 |
 
 **v7.0.7 bilan kelgan yangi bog'liqliklar:** `Telegram/ThirdParty/libcbor`
 va `libfido2` (FIDO2/passkey). Build muammosiz o'tdi.

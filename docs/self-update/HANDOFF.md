@@ -1,28 +1,64 @@
 # Self-update — implement uchun kirish nuqtasi
 
-Bu faylni **birinchi** o'qing. Oxirgi yangilanish: 2026-08-06.
+Bu faylni **birinchi** o'qing. Oxirgi yangilanish: 2026-08-08.
 
 ---
 
 ## 0. TL;DR — hozirgi holat
 
-**Windows uchun self-update mexanizmi tayyor va production'da (v7.0.7
-uchun sinalgan).** Hozir **haqiqiy real-world sinov o'rtasida
-to'xtatilgan**: `Oybek` branch v7.0.7'dan **v7.0.9**'ga sync qilindi
-(2026-08-06), lekin **hali build qilinmagan**. Keyingi sessiyada
-davom etish tartibi:
+⚠️ **BLOKLANGAN — birinchi real-world update-apply sinovi
+MUVAFFAQIYATSIZ tugadi, sabab hali aniqlanmagan.** Keyingi sessiya
+aynan shu yerdan boshlanishi kerak — pastga qarang (§0.1).
 
-1. **Build qiling** (Telegram.exe + Updater.exe + Packer.exe,
-   `out\Release`).
-2. `.\tools\publish\release.ps1` bilan haqiqiy v7.0.9 relizini
-   chiqaring.
-3. Hozir ishlab turgan **v7.0.7 nusxangizda** "Check for Updates"
-   bosib, bu safar **oxirigacha** ("Update Telegram" tugmasini bosib,
-   dastur qayta ishga tushguncha) boring — bu birinchi to'liq
-   real-world self-update sinovi bo'ladi (akkaunt/sozlamalar
-   saqlanishini tasdiqlash).
+Build va reliz qismi ishladi:
 
-Keyingi versiyalar uchun (bu sinovdan keyin, doimiy jarayon):
+1. ✅ v7.0.9 build qilindi (Telegram.exe, Updater.exe, Packer.exe —
+   VS2022→2026 ko'chishi bilan bog'liq ikkita muammo hal qilindi,
+   §2.6 ga qarang).
+2. ✅ `.\tools\publish\release.ps1` bilan haqiqiy v7.0.9 (7000009)
+   chiqarildi, uchala mirror (VPS secure, VPS pub, GitHub) tasdiqlandi.
+3. ❌ **Test nusxada (`C:\TelegramTest-v7.0.7\`) update-apply
+   ishlamadi** — pastga qarang.
+
+### 0.1. ⚠️ Hal qilinmagan muammo: update yuklandi, lekin qo'llanmadi
+
+**Kuzatilgan:** Test nusxada (v7.0.7, `C:\TelegramTest-v7.0.7\`)
+"Check for Updates" bosildi → "New version is ready" chiqdi → "Update
+Telegram" bosildi → yuklab olindi (50.6 MB, 100%) → dastur **yopilib
+qayta ochildi** (restart sikli ishladi) → lekin **Settings sidebar
+hali ham "Telegram Desktop Version 7.0.7 x64" ko'rsatmoqda** — versiya
+o'zgarmadi.
+
+**Tasdiqlangan faktlar** (keyingi sessiya qayta tekshirmasin):
+- Mirror'lardagi paket to'g'ri va tekshirilgan (checksum mos,
+  `release.ps1` xatosiz tugagan).
+- Signature verification avval (Task 3, jonli test) alohida
+  tasdiqlangan — imzo tekshiruvi ishlaydi.
+- Restart sikli **sodir bo'ldi** (dastur yopilib qayta ochildi) — bu
+  `Updater.exe`ning umuman ishga tushmaganini emas, balki fayl
+  almashtirish bosqichida nimadir noto'g'ri ketganini ko'rsatadi.
+
+**Keyingi sessiyada tekshirish kerak (`superpowers:systematic-debugging`
+bo'yicha, taxmin qilmasdan):**
+1. `C:\TelegramTest-v7.0.7\tdata\DebugLogs\` ichida `-debug` flag bilan
+   ishga tushirib, `Updater`ning o'z logini olish (`updater.log`
+   ga o'xshash, `_other/updater_win.cpp`dagi `writeLog()` chiqishi).
+2. `C:\TelegramTest-v7.0.7\tdata\tupdates\` papkasi hali ham
+   mavjudmi — agar `ready`/`temp` ichida chala qolgan bo'lsa, bu
+   `Updater.exe` fayllarni ko'chirishda to'xtab qolganini bildiradi.
+3. `Telegram.exe`ning fayl vaqti/hajmi haqiqatan o'zgarganmi (agar
+   o'zgarmagan bo'lsa — almashtirish umuman sodir bo'lmagan;
+   `Get-FileHash`/`Get-Item` bilan tekshirish).
+4. Bugun `Updater.exe`ning o'zi ham qayta build qilingan edi (VS2022→
+   2026 toolset muammosi tufayli, §2.6) — ehtimol shu yangi build'da
+   biror regressiya bor, avvalgi (eski, `v143` bilan qurilgan)
+   `Updater.exe` bilan solishtirib ko'rish foydali bo'lishi mumkin.
+5. `readAutoupdatePrefix()` process-lifetime keshlash muammosi
+   (avvalgi sessiyada topilgan) bu safar daxldor emasligini
+   tasdiqlash — chunki foydalanuvchi **to'liq restart** qilgan edi.
+
+Keyingi versiyalarni chiqarish (muammo hal qilingandan keyin, doimiy
+jarayon):
 
 ```powershell
 .\tools\publish\release.ps1
@@ -111,6 +147,55 @@ edi). Muhim topilmalar:
   target) merge'dan keyin **tekshirilib, saqlanib qolgani tasdiqlangan**.
 - `dev`, `SafeWall`, `Customizations`, `Oybek` — barchasi push qilindi.
   Hech narsa hali **build qilinmagan**.
+
+---
+
+## 2.6. VS2022 → VS2026 ko'chishi (2026-08-08) — build muhiti tuzatildi
+
+Foydalanuvchi Visual Studio'ni 2022'dan 2026'ga yangiladi (v143 toolset
+o'rniga v145), bu `out\` CMake keshini butunlay eskirtirib qo'ydi.
+Ketma-ket 3 ta muammo chiqdi va hal qilindi:
+
+1. **`MSB8020` — v143 toolset topilmadi.** `out\CMakeCache.txt`da
+   eski VS2022 generator/toolset qattiq yozilgan edi. Yechim:
+   `CMakeCache.txt` + `CMakeFiles/`ni o'chirib,
+   `cmake -S . -B out -G "Visual Studio 18 2026" -A x64` bilan qayta
+   konfiguratsiya qilindi.
+2. **`QT` muhit o'zgaruvchisi yo'qolgan edi** (eski keshda saqlangan
+   ekan, alohida hech qayerda emas) — `QT=5.15.18` qayta va **doimiy**
+   (`User` env var) o'rnatildi.
+3. **`api_id`/`api_hash` ham eski keshda yo'qolgan edi** — foydalanuvchi
+   qayta kiritdi, `-D TDESKTOP_API_ID=... -D TDESKTOP_API_HASH=...`
+   bilan qayta konfiguratsiya qilindi.
+
+⚠️ **Eng jiddiy topilma — o'zim yaratgan xato:** CMake keshini
+tozalaganimda, avvalroq yoqilgan **`DESKTOP_APP_DISABLE_AUTOUPDATE=OFF`**
+ham standart holatiga (**ON — self-update o'chirilgan**) qaytib
+ketgan edi, men shuni darhol payqamadim. Natija: `Updater`/`Packer`
+loyihalari CMake tomonidan qayta yaratilmay, disk'da eski (`v143`)
+holida "stale" bo'lib qoldi — shu sabab faqat shu ikkalasi build'da
+xato berdi (qolgan 57 loyiha muammosiz o'tdi). Sabab
+`message(STATUS ...)` diagnostikasi bilan topildi: o'sha bo'lim umuman
+ishga tushmagani (`DIAG` chiqishi yo'qligi) `DESKTOP_APP_DISABLE_AUTOUPDATE`
+keshda `ON` ekanini ko'rsatdi. Tuzatish:
+`-D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF` qo'shildi, qayta konfiguratsiya
+qilindi — ikkalasi ham `v145`da to'g'ri qayta yaratildi.
+
+**Har safar CMake keshi tozalanganda eslab qolish kerak** — quyidagi
+`-D` flag'lar barchasi kerak, aks holda birortasi standart holatiga
+qaytib, kutilmagan build xatosiga olib keladi:
+```
+-D TDESKTOP_API_ID=<sizniki>
+-D TDESKTOP_API_HASH=<sizniki>
+-D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF
+```
+Va `QT=5.15.18` muhit o'zgaruvchisi o'rnatilgan bo'lishi kerak (endi
+doimiy o'rnatilgan, User darajasida).
+
+**CPU cheklovi (`ProcessorNumber=8`, 2026-07-03'da hujjatlashtirilgan)
+har CMake reconfigure'da o'chib ketadi** — `.vcxproj` fayllar qayta
+yaratilganda qayta qo'llash kerak bo'ladi (bash bir-liner sifatida bu
+sessiyada bir necha marta ishlatilgan, tarixni qarang).
 
 ---
 
