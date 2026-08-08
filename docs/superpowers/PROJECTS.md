@@ -13,11 +13,12 @@ Oxirgi yangilanish: 2026-08-08
 Hozirgi asosiy ish. Boshqa yo'nalishlar bunga aralashmasligi kerak.
 
 **Repo:** `Telegram/tdesktop`, branch `Oybek`
-**Holat:** **v7.0.9** build qilindi va chiqarildi (2026-08-08), lekin
-⚠️ **birinchi real-world self-update sinovi muvaffaqiyatsiz tugadi**
-— update yuklandi, dastur restart bo'ldi, lekin versiya v7.0.7'da
-qolib ketdi, sabab hali aniqlanmagan. Keyingi sessiya shu yerdan
-boshlanadi — tafsilot va tekshirish ro'yxati:
+**Holat:** ✅ **v7.0.9 build qilindi, chiqarildi va real-world
+self-update sinovi muvaffaqiyatli o'tdi** (2026-08-08). Birinchi
+urinishda update-apply ishlamagan edi — ildiz sabab (`Packer.exe`ning
+`release-staging\` prefiksini noto'g'ri arxivlashi) topilib tuzatildi,
+paket qayta chiqarildi, qayta sinovda versiya haqiqatan v7.0.7'dan
+v7.0.9'ga o'zgardi. Tafsilot:
 [`../self-update/HANDOFF.md`](../self-update/HANDOFF.md) §0.1.
 
 **Ochiq vazifalar:**
@@ -28,9 +29,10 @@ boshlanadi — tafsilot va tekshirish ro'yxati:
 | A2 | Upstream v7.0.5 → v7.0.7 sync | ✅ 2026-08-01, `2e61fdcbc2` (162 commit, 2 konflikt) |
 | A3 | Log shovqinini kamaytirish (`API Warning: not loaded minimal channel applied.`) | Past ustuvorlik, tekshirilmagan |
 | A4 | Upstream v7.0.7 → v7.0.9 sync (to'liq `dev→SafeWall→Customizations↔Oybek` zanjiri orqali) | ✅ 2026-08-06, 100 commit, 1 konflikt (`lib_ui` submodule) |
-| A5 | Build v7.0.9 + haqiqiy self-update sinovi | ⚠️ 2026-08-08: build+reliz ✅, update-apply sinovi ❌ — versiya o'zgarmadi, sabab noma'lum |
-| A6 | Qt 5.15.18 → Qt 6.5+ ga o'tish | 🕓 Keyingi tasklarga qo'shildi (2026-08-07). Qat'iy texnik zaruriyat yo'q — sof tarixiy: `Libraries\win64`da faqat Qt5 SDK bor. O'tish `lib_ui` fork'ini keraksiz qiladi va upstream bilan uzoq muddatli mosligini yaxshilaydi, lekin alohida katta ish (Qt6 SDK sozlash + qayta konfiguratsiya + boshqa yashirin Qt5/6 nomuvofiqliklar chiqishi mumkin — bitta misol allaqachon topilgan: `info_media_grid_zoom.cpp`dagi `QNativeGestureEvent::position()`). Self-update sinovi tugagach ko'rib chiqiladi. |
+| A5 | Build v7.0.9 + haqiqiy self-update sinovi | ✅ 2026-08-08: build+reliz+update-apply hammasi tasdiqlandi (2 marta chiqarildi — `publish.ps1`dagi path bug tuzatilgach) |
+| A6 | Qt 5.15.18 → Qt 6.5+ ga o'tish | 🕓 Keyingi tasklarga qo'shildi (2026-08-07). Qat'iy texnik zaruriyat yo'q — sof tarixiy: `Libraries\win64`da faqat Qt5 SDK bor. O'tish `lib_ui` fork'ini keraksiz qiladi va upstream bilan uzoq muddatli mosligini yaxshilaydi, lekin alohida katta ish (Qt6 SDK sozlash + qayta konfiguratsiya + boshqa yashirin Qt5/6 nomuvofiqliklar chiqishi mumkin — bitta misol allaqachon topilgan: `info_media_grid_zoom.cpp`dagi `QNativeGestureEvent::position()`). |
 | A7 | VS2022→VS2026 ko'chishi bilan bog'liq build-muhit tuzatishlari | ✅ 2026-08-08 — toolset, QT env var, api_id/api_hash, `DESKTOP_APP_DISABLE_AUTOUPDATE` qayta yoqildi. Tafsilot: `docs/self-update/HANDOFF.md` §2.6 |
+| A8 | `publish.ps1` Packer path bug (release-staging prefiksi) | ✅ 2026-08-08 — tuzatildi, v7.0.9 qayta chiqarildi, sinovdan o'tdi. Tafsilot: `docs/self-update/HANDOFF.md` §0.1 |
 
 **v7.0.7 bilan kelgan yangi bog'liqliklar:** `Telegram/ThirdParty/libcbor`
 va `libfido2` (FIDO2/passkey). Build muammosiz o'tdi.
@@ -50,9 +52,12 @@ Har rebuild'dan keyin ilovani fleshka/cloud orqali qo'lda tarqatish
 muammosini hal qiladi. Bir nechta desktop qurilma va boshqa
 foydalanuvchilar (masalan aka) paydo bo'lganda bu muammo keskinlashadi.
 
-**Holat (2026-08-02):** Windows uchun **to'liq ishlab turibdi,
-production'da** — haqiqiy v7.0.7 relizi uchala mirror'ga (VPS secure,
-VPS pub, GitHub) chiqarilgan va tasdiqlangan. Kirish nuqtasi:
+**Holat (2026-08-08):** Windows uchun **to'liq ishlab turibdi,
+production'da, va endi to'liq real-world update-apply sinovidan
+o'tgan** (v7.0.7 → v7.0.9, haqiqiy "Check for Updates" tugmasi orqali,
+fayl almashtirish bosqichigacha tasdiqlangan — ilgari faqat signature
+tekshiruvi sinalgan edi). Yo'lda topilgan `publish.ps1` path bug'i
+(§0.1) tuzatildi. Kirish nuqtasi:
 [`../self-update/HANDOFF.md`](../self-update/HANDOFF.md).
 
 Keyingi versiyani chiqarish bitta buyruq: `.\tools\publish\release.ps1`

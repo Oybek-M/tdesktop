@@ -6,59 +6,79 @@ Bu faylni **birinchi** o'qing. Oxirgi yangilanish: 2026-08-08.
 
 ## 0. TL;DR — hozirgi holat
 
-⚠️ **BLOKLANGAN — birinchi real-world update-apply sinovi
-MUVAFFAQIYATSIZ tugadi, sabab hali aniqlanmagan.** Keyingi sessiya
-aynan shu yerdan boshlanishi kerak — pastga qarang (§0.1).
-
-Build va reliz qismi ishladi:
+✅ **Windows uchun to'liq ishlaydi va real-world sinovdan o'tdi.**
+Birinchi to'liq download+restart+apply sikli 2026-08-08 kuni muvaffaqiyatli
+yakunlandi (v7.0.7 → v7.0.9, test nusxada, "Check for Updates" tugmasi
+orqali).
 
 1. ✅ v7.0.9 build qilindi (Telegram.exe, Updater.exe, Packer.exe —
    VS2022→2026 ko'chishi bilan bog'liq ikkita muammo hal qilindi,
    §2.6 ga qarang).
 2. ✅ `.\tools\publish\release.ps1` bilan haqiqiy v7.0.9 (7000009)
    chiqarildi, uchala mirror (VPS secure, VPS pub, GitHub) tasdiqlandi.
-3. ❌ **Test nusxada (`C:\TelegramTest-v7.0.7\`) update-apply
-   ishlamadi** — pastga qarang.
+3. ⚠️→✅ **Birinchi urinishda update-apply ishlamadi** — ildiz sabab
+   topilib tuzatildi, qayta chiqarilgan paket bilan sinov muvaffaqiyatli
+   o'tdi. To'liq tafsilot: §0.1.
 
-### 0.1. ⚠️ Hal qilinmagan muammo: update yuklandi, lekin qo'llanmadi
+### 0.1. ✅ Hal qilindi: "release-staging\" prefiksi bug'i (Packer.exe)
 
-**Kuzatilgan:** Test nusxada (v7.0.7, `C:\TelegramTest-v7.0.7\`)
+**Kuzatilgan (2026-08-08, birinchi urinish):** Test nusxada (v7.0.7,
+keyinchalik `C:\Users\Oybek\Pictures\Release\`ga ko'chirilgan)
 "Check for Updates" bosildi → "New version is ready" chiqdi → "Update
 Telegram" bosildi → yuklab olindi (50.6 MB, 100%) → dastur **yopilib
 qayta ochildi** (restart sikli ishladi) → lekin **Settings sidebar
 hali ham "Telegram Desktop Version 7.0.7 x64" ko'rsatmoqda** — versiya
-o'zgarmadi.
+o'zgarmadi, hech qanday xato oynasi chiqmadi.
 
-**Tasdiqlangan faktlar** (keyingi sessiya qayta tekshirmasin):
-- Mirror'lardagi paket to'g'ri va tekshirilgan (checksum mos,
-  `release.ps1` xatosiz tugagan).
-- Signature verification avval (Task 3, jonli test) alohida
-  tasdiqlangan — imzo tekshiruvi ishlaydi.
-- Restart sikli **sodir bo'ldi** (dastur yopilib qayta ochildi) — bu
-  `Updater.exe`ning umuman ishga tushmaganini emas, balki fayl
-  almashtirish bosqichida nimadir noto'g'ri ketganini ko'rsatadi.
+**Ildiz sabab (`superpowers:systematic-debugging` bo'yicha topildi):**
+Test nusxani `-debug` flag bilan qayta ishga tushirib, `Updater.exe`ning
+o'z log faylini (`DebugLogs\<timestamp>_upd.txt`, `_other/updater_win.cpp`
+dagi `writeLog()` chiqishi) o'qish orqali aniqlandi:
 
-**Keyingi sessiyada tekshirish kerak (`superpowers:systematic-debugging`
-bo'yicha, taxmin qilmasdan):**
-1. `C:\TelegramTest-v7.0.7\tdata\DebugLogs\` ichida `-debug` flag bilan
-   ishga tushirib, `Updater`ning o'z logini olish (`updater.log`
-   ga o'xshash, `_other/updater_win.cpp`dagi `writeLog()` chiqishi).
-2. `C:\TelegramTest-v7.0.7\tdata\tupdates\` papkasi hali ham
-   mavjudmi — agar `ready`/`temp` ichida chala qolgan bo'lsa, bu
-   `Updater.exe` fayllarni ko'chirishda to'xtab qolganini bildiradi.
-3. `Telegram.exe`ning fayl vaqti/hajmi haqiqatan o'zgarganmi (agar
-   o'zgarmagan bo'lsa — almashtirish umuman sodir bo'lmagan;
-   `Get-FileHash`/`Get-Item` bilan tekshirish).
-4. Bugun `Updater.exe`ning o'zi ham qayta build qilingan edi (VS2022→
-   2026 toolset muammosi tufayli, §2.6) — ehtimol shu yangi build'da
-   biror regressiya bor, avvalgi (eski, `v143` bilan qurilgan)
-   `Updater.exe` bilan solishtirib ko'rish foydali bo'lishi mumkin.
-5. `readAutoupdatePrefix()` process-lifetime keshlash muammosi
-   (avvalgi sessiyada topilgan) bu safar daxldor emasligini
-   tasdiqlash — chunki foydalanuvchi **to'liq restart** qilgan edi.
+```
+Copying file 'tupdates\temp\release-staging\Telegram.exe' to
+'C:\...\Release\release-staging\Telegram.exe'..
+```
 
-Keyingi versiyalarni chiqarish (muammo hal qilingandan keyin, doimiy
-jarayon):
+`Updater.exe` fayllarni to'g'ri nusxaladi (xatosiz, "Update succeed!"),
+lekin **noto'g'ri manzilga** — asosiy o'rnatish papkasiga emas, ichidagi
+ishlatilmaydigan `release-staging\` subpapkasiga. Sabab —
+`tools/publish/publish.ps1:136` Packer.exe'ni `-path $StagingDir` bilan
+chaqirar edi, bu yerda `$StagingDir` = `...\release-staging`ning to'liq
+yo'li. `Telegram/SourceFiles/_other/packer.cpp:158-162`da Packer arxivga
+yoziladigan nisbiy nom uchun `remove` prefiksini birinchi `-path`
+argumentining `QFileInfo(...).canonicalPath()`idan hisoblaydi — bu esa
+**direktoriya argumenti uchun uning ota-papkasini** qaytaradi (Qt oxirgi
+segmentni "fayl nomi" deb hisoblaydi, papka bo'lsa ham). Natijada
+`remove` = `...\out\Release\` bo'lib qoldi, `release-staging\` qismi
+kesilmadi — arxivdagi har bir fayl `release-staging\Telegram.exe` nomi
+bilan saqlandi, `Telegram.exe` emas. Bu bug **publish.ps1 yozilgan
+kunidan beri bor edi** — birinchi to'liq apply sinovi shu kunga qadar
+hech qachon o'tkazilmagani uchun ilgari sezilmagan (faqat signature
+tekshiruvi sinalgan edi).
+
+**Tuzatish** (`tools/publish/publish.ps1`, Step 2): `$StagingDir`ning
+o'zini emas, ichidagi har bir top-level elementni (`Telegram.exe`,
+`Updater.exe`, `modules\`) alohida absolyut `-path` argumenti sifatida
+uzatish — shunda Packer `remove` prefiksini `$StagingDir`ning o'ziga
+to'g'ri hisoblaydi:
+
+```powershell
+$stagingEntries = Get-ChildItem -Path $StagingDir -Force
+$packerPathArgs = foreach ($entry in $stagingEntries) { "-path"; $entry.FullName }
+& $PackerExe @packerPathArgs -version $version -target win64
+```
+
+**Tasdiqlash:** `release.ps1 -DryRun` bilan Packer'ning fayl ro'yxati
+tekshirildi (`Telegram.exe`, `Updater.exe`,
+`modules/x64/d3d/d3dcompiler_47.dll` — prefikssiz). Keyin haqiqiy
+v7.0.9 qayta chiqarildi (3 mirror ham OK), test nusxada "Check for
+Updates" qayta bosildi — **`log.txt`da `Launched version: 7000009`
+chiqdi, `Telegram.exe` fayli haqiqatan almashtirilgan (227,763,200
+bayt, yangi timestamp)**. To'liq real-world update-apply endi ishlaydi.
+
+Keyingi versiyalarni chiqarish (bitta buyruq, hech qanday qo'shimcha
+qadam kerak emas):
 
 ```powershell
 .\tools\publish\release.ps1

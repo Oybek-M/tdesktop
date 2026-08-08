@@ -129,11 +129,27 @@ $version = [int]$Matches[1]
 Write-Host "Version: $version" -ForegroundColor Cyan
 
 # --- Step 2: sign with Packer ----------------------------------------------
-
+#
+# Packer computes the archive-relative name of each file by stripping a
+# "remove" prefix equal to QFileInfo(firstPathArg).canonicalPath() - for a
+# directory argument that's the directory's PARENT, not the directory
+# itself (Qt treats the last path segment as a "file name" regardless of
+# whether it's actually a folder). Passing -path $StagingDir therefore
+# archived every file as "release-staging\<name>" instead of "<name>",
+# so Updater.exe copied the update into a nested release-staging\ folder
+# instead of over the real installation (found 2026-08-08 debugging why
+# a real update download+restart cycle left the version unchanged).
+# Fix: pass each top-level entry inside $StagingDir as its own -path, so
+# the prefix Packer strips is $StagingDir itself.
 Write-Host "Signing with Packer.exe..." -ForegroundColor Cyan
+$stagingEntries = Get-ChildItem -Path $StagingDir -Force
+if (-not $stagingEntries) {
+    Fail "Staging directory is empty: $StagingDir"
+}
+$packerPathArgs = foreach ($entry in $stagingEntries) { "-path"; $entry.FullName }
 Push-Location $WorkDir
 try {
-    & $PackerExe -path $StagingDir -version $version -target win64
+    & $PackerExe @packerPathArgs -version $version -target win64
     if ($LASTEXITCODE -ne 0) {
         Fail "Packer.exe exited with code $LASTEXITCODE"
     }
