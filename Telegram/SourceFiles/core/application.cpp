@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "custom_branding.h"
 #include "custom_db.h"
 #include "custom_settings.h"
+#include "custom_upstream_checker.h"
 
 #include "data/data_abstract_structure.h"
 #include "data/data_channel.h"
@@ -274,6 +275,7 @@ Application::~Application() {
 void Application::run() {
 	CustomDB::Init();
 	CustomSettings::Init();
+	CustomUpstream::Init();
 	CustomBranding::Load();
 	// Branding icon (agar JSON da iconPath ko'rsatilgan bo'lsa) — startup vaqtida.
 	{

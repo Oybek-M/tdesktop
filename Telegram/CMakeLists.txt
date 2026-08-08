@@ -1102,6 +1102,8 @@ PRIVATE
     custom_db.h
     custom_settings.cpp
     custom_settings.h
+    custom_upstream_checker.cpp
+    custom_upstream_checker.h
     custom_activity_history.cpp
     custom_activity_history.h
     custom_activity_history_box.cpp
