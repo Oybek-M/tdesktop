@@ -45,6 +45,11 @@ struct Values {
     // kuzatish. Include/Exclude ro'yxatlari alohida QHash'larda saqlanadi
     // (pastga qarang) — bu shunchaki global default toggle.
     bool activityHistoryTrackAllContacts = true;
+    // ── Upstream (rasmiy) versiya tekshiruvchisi ─────────────────────────
+    bool upstreamCheckEnabled = true;
+    int upstreamCheckIntervalMinutes = 1440;  // standart: kunlik
+    QString upstreamLastKnownVersion;         // oxirgi FOYDALANUVCHIGA bildirilgan versiya
+    qint64 upstreamLastCheckedAt = 0;         // unix timestamp (soniya)
 };
 
 void Init();
@@ -76,6 +81,14 @@ inline bool    MutualContactShowInMembersList()  { return Get().mutualContactSho
 inline QString MutualContactMembersListEmoji()   { return Get().mutualContactMembersListEmoji; }
 
 inline bool ActivityHistoryTrackAllContacts() { return Get().activityHistoryTrackAllContacts; }
+
+inline bool    UpstreamCheckEnabled()          { return Get().upstreamCheckEnabled; }
+inline int     UpstreamCheckIntervalMinutes()  { return Get().upstreamCheckIntervalMinutes; }
+inline QString UpstreamLastKnownVersion()      { return Get().upstreamLastKnownVersion; }
+inline qint64  UpstreamLastCheckedAt()         { return Get().upstreamLastCheckedAt; }
+// qint64 generic Set/SetInt(int) orqali saqlanolmaydi (32-bit chegara) —
+// shuning uchun alohida, per-peer setter'lar kabi maxsus funksiya.
+void SetUpstreamLastCheckedAt(qint64 timestamp);
 
 // Per-chat Ghost Mode override (legacy C12).
 [[nodiscard]] bool GhostModeForPeer(const QString &peerId);

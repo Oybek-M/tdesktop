@@ -169,6 +169,7 @@ void UpdateValue(const QString &id, bool value) {
     else if (id == "mutualContactShowInProfile") gValues.mutualContactShowInProfile = value;
     else if (id == "mutualContactShowInMembersList") gValues.mutualContactShowInMembersList = value;
     else if (id == "activityHistoryTrackAllContacts") gValues.activityHistoryTrackAllContacts = value;
+    else if (id == "upstreamCheckEnabled") gValues.upstreamCheckEnabled = value;
 }
 
 void UpdateString(const QString &id, const QString &value) {
@@ -178,10 +179,12 @@ void UpdateString(const QString &id, const QString &value) {
     else if (id == "mutualContactContactsListEmoji") gValues.mutualContactContactsListEmoji = value;
     else if (id == "mutualContactProfileEmoji") gValues.mutualContactProfileEmoji = value;
     else if (id == "mutualContactMembersListEmoji") gValues.mutualContactMembersListEmoji = value;
+    else if (id == "upstreamLastKnownVersion") gValues.upstreamLastKnownVersion = value;
 }
 
 void UpdateInt(const QString &id, int value) {
     if (id == "spoofDeviceType") gValues.spoofDeviceType = value;
+    else if (id == "upstreamCheckIntervalMinutes") gValues.upstreamCheckIntervalMinutes = value;
 }
 
 } // namespace
@@ -221,6 +224,15 @@ void Init() {
 
     gValues.activityHistoryTrackAllContacts = settings.value(
         "activityHistoryTrackAllContacts", true).toBool();
+
+    gValues.upstreamCheckEnabled = settings.value(
+        "upstreamCheckEnabled", true).toBool();
+    gValues.upstreamCheckIntervalMinutes = settings.value(
+        "upstreamCheckIntervalMinutes", 1440).toInt();
+    gValues.upstreamLastKnownVersion = settings.value(
+        "upstreamLastKnownVersion", QString()).toString();
+    gValues.upstreamLastCheckedAt = settings.value(
+        "upstreamLastCheckedAt", qint64(0)).toLongLong();
 
     // Per-peer ghost overrides
     settings.beginGroup("GhostModePerPeer");
@@ -286,6 +298,12 @@ void SetInt(const QString &id, int value) {
     UpdateInt(id, value);
     QSettings settings("CustomMod", "TelegramDesktop");
     settings.setValue(id, value);
+}
+
+void SetUpstreamLastCheckedAt(qint64 timestamp) {
+    gValues.upstreamLastCheckedAt = timestamp;
+    QSettings settings("CustomMod", "TelegramDesktop");
+    settings.setValue("upstreamLastCheckedAt", timestamp);
 }
 
 QString SpoofLangPack() {
