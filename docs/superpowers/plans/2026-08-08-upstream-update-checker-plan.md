@@ -398,7 +398,7 @@ git commit -m "feat(upstream): wire checker into app startup and build"
 **Files:**
 - Modify: `Telegram/SourceFiles/custom_mod_window.cpp`
 
-- [ ] **Step 1: `#include` qo'shish**
+- [x] **Step 1: `#include` qo'shish**
 
 Fayl boshidagi `#include "ui/toast/toast.h"` qatoridan keyin:
 
@@ -409,7 +409,7 @@ Fayl boshidagi `#include "ui/toast/toast.h"` qatoridan keyin:
 
 (Agar `<QtGui/QDesktopServices>` va `<QtCore/QUrl>` hali include qilinmagan bo'lsa, ularni ham shu yerga qo'shing — "GitHub'da ko'rish" tugmasi uchun kerak.)
 
-- [ ] **Step 2: Forward declaration qo'shish**
+- [x] **Step 2: Forward declaration qo'shish**
 
 280-283 qatorlar atrofidagi `fillActivityHistorySection` e'lonidan keyin:
 
@@ -421,7 +421,9 @@ void fillActivityHistorySection(
 void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content);
 ```
 
-- [ ] **Step 3: `fillUpstreamCheckSection` funksiyasini yozish**
+- [x] **Step 3: `fillUpstreamCheckSection` funksiyasini yozish**
+
+> **Amalda kiritilgan qo'shimcha tuzatish (code-quality review, 2026-08-08):** `CheckNow(applyResult)` chaqiruvi `CheckNow(crl::guard(content, applyResult))`ga o'zgartirildi — asinxron callback Custom Window yopilgandan keyin kelsa, `linkWrap`/`freqWrap`ga dangling pointer orqali murojaat qilish xavfi (use-after-free) shu orqali oldi olindi. Shuningdek `#include <algorithm>` aniq qo'shildi (`std::max` uchun). Commit `d724ac4792`.
 
 `fillGeneralTab` funksiyasidan OLDIN (masalan 480-qator atrofida, `fillGeneralTab`ning ta'rifidan oldin) yangi funksiya qo'shiladi:
 
@@ -639,7 +641,7 @@ void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content) {
 }
 ```
 
-- [ ] **Step 4: `fillGeneralTab`ga chaqiruvni ulash**
+- [x] **Step 4: `fillGeneralTab`ga chaqiruvni ulash**
 
 `fillGeneralTab` funksiyasining oxirida (927-928 qatorlar atrofida, "Saqlash" tugmasi bloki tugagandan keyin, funksiya yopilishidan oldin):
 
@@ -660,12 +662,14 @@ void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content) {
 }
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Telegram/SourceFiles/custom_mod_window.cpp
 git commit -m "feat(upstream): add Custom Window UI section for upstream checker"
 ```
+
+✅ Bajarildi va push qilindi: commit `6119f121b3` (implementatsiya) + `d724ac4792` (code-quality review'dagi CRITICAL/IMPORTANT topilmalarni tuzatish). Spec compliance ✅ va code quality ✅ ikkalasi ham tasdiqlangan.
 
 ---
 
