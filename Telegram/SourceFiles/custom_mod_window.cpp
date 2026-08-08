@@ -1058,6 +1058,8 @@ void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content) {
 	const auto isPreset = [](int minutes) {
 		return minutes == 60 || minutes == 1440 || minutes == 10080;
 	};
+	const auto selectedMinutes = std::make_shared<rpl::variable<int>>(
+		CustomSettings::UpstreamCheckIntervalMinutes());
 
 	const auto customWrap = freqForm->add(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
@@ -1084,6 +1086,7 @@ void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content) {
 		const auto clamped = std::max(ok ? parsed : 1440, 15);
 		CustomSettings::SetInt(u"upstreamCheckIntervalMinutes"_q, clamped);
 		CustomUpstream::UpdateAutoTimer();
+		*selectedMinutes = clamped;
 		Ui::Toast::Show(
 			u"Chastota saqlandi: "_q + QString::number(clamped) + u" daqiqa"_q);
 	});
@@ -1093,15 +1096,21 @@ void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content) {
 
 	for (const auto &preset : kPresets) {
 		const auto minutes = preset.minutes;
+		const auto label = preset.label;
 		freqForm->add(
 			object_ptr<Ui::RoundButton>(
 				freqForm,
-				rpl::single(preset.label),
+				selectedMinutes->value() | rpl::map([=](int current) {
+					return (current == minutes)
+						? (u"✓ "_q + label)
+						: label;
+				}),
 				st::defaultBoxButton),
 			st::boxRowPadding)
 		->addClickHandler([=] {
 			CustomSettings::SetInt(u"upstreamCheckIntervalMinutes"_q, minutes);
 			CustomUpstream::UpdateAutoTimer();
+			*selectedMinutes = minutes;
 			customWrap->toggle(false, anim::type::normal);
 			Ui::Toast::Show(u"Chastota saqlandi."_q);
 		});
