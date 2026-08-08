@@ -31,6 +31,7 @@
 #include "styles/style_layers.h"
 #include "styles/style_settings.h"
 
+#include <algorithm>
 #include <QtCore/QDateTime>
 #include <QtCore/QDir>
 #include <QtCore/QFileInfo>
@@ -1021,7 +1022,7 @@ void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content) {
 		st::boxRowPadding)
 	->addClickHandler([=] {
 		*statusText = u"Tekshirilmoqda..."_q;
-		CustomUpstream::CheckNow(applyResult);
+		CustomUpstream::CheckNow(crl::guard(content, applyResult));
 	});
 
 	// ── Avtomatik tekshirish toggle ───────────────────────────────────
