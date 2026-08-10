@@ -128,6 +128,17 @@ if (ShouldGhost(peerIdStr)) { return; }
 ```
 `ShouldGhost` whitelist ham tekshiradi — peer whitelist da bo'lsa global ghost off bo'lsa ham ishlaydi.
 
+**✅ Real-muhitda tasdiqlangan (2026-08-09):** `ShouldAnonymousStory(peerId)` mexanizmi
+(`data/data_stories.cpp` — `sendMarkAsReadRequest`/`markAsRead`/`sendIncrementViewsRequests`,
+commit `9ac334478f`, 2026-06-11'dan beri o'zgarishsiz) ikkinchi (test) akkountdan
+tekshirildi: shu akkountdan story qo'yilib, CustomMod client orqali (anonim
+yoqilgan holatda) ko'rildi — foydalanuvchi ismi story'ning "Ko'rganlar" ro'yxatida
+**chiqmadi**. Mexanizm to'g'ri ishlayotgani amaliyotda tasdiqlandi, qo'shimcha
+o'zgartirish talab qilinmadi. (Eslatma: bir marta noto'g'ri "bu tugma o'lik"
+degan xulosaga kelingan edi — sabab: `StoryAnonymousView()` getter funksiyasi
+qidirilgan, aslida qiymat `ShouldAnonymousStory()` ichida `gValues.storyAnonymousView`
+orqali to'g'ridan-to'g'ri o'qiladi.)
+
 ---
 
 ## 6. Last Seen (Tasdiqlash)
