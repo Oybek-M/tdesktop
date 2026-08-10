@@ -50,6 +50,10 @@ struct Values {
     int upstreamCheckIntervalMinutes = 1440;  // standart: kunlik
     QString upstreamLastKnownVersion;         // oxirgi FOYDALANUVCHIGA bildirilgan versiya
     qint64 upstreamLastCheckedAt = 0;         // unix timestamp (soniya)
+    // ── Story media zaxirasi (A11) ───────────────────────────────────────
+    // Story vaqt-kuzatuvidan MUSTAQIL, alohida tugma — disk-sarflovchi
+    // funksiya, shuning uchun standart holatda O'CHIRILGAN (opt-in).
+    bool storyMediaBackupEnabled = false;
 };
 
 void Init();
@@ -86,6 +90,7 @@ inline bool    UpstreamCheckEnabled()          { return Get().upstreamCheckEnabl
 inline int     UpstreamCheckIntervalMinutes()  { return Get().upstreamCheckIntervalMinutes; }
 inline QString UpstreamLastKnownVersion()      { return Get().upstreamLastKnownVersion; }
 inline qint64  UpstreamLastCheckedAt()         { return Get().upstreamLastCheckedAt; }
+inline bool    StoryMediaBackupEnabled()       { return Get().storyMediaBackupEnabled; }
 // qint64 generic Set/SetInt(int) orqali saqlanolmaydi (32-bit chegara) —
 // shuning uchun alohida, per-peer setter'lar kabi maxsus funksiya.
 void SetUpstreamLastCheckedAt(qint64 timestamp);

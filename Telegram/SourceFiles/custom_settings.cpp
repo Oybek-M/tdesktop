@@ -170,6 +170,7 @@ void UpdateValue(const QString &id, bool value) {
     else if (id == "mutualContactShowInMembersList") gValues.mutualContactShowInMembersList = value;
     else if (id == "activityHistoryTrackAllContacts") gValues.activityHistoryTrackAllContacts = value;
     else if (id == "upstreamCheckEnabled") gValues.upstreamCheckEnabled = value;
+    else if (id == "storyMediaBackupEnabled") gValues.storyMediaBackupEnabled = value;
 }
 
 void UpdateString(const QString &id, const QString &value) {
@@ -233,6 +234,9 @@ void Init() {
         "upstreamLastKnownVersion", QString()).toString();
     gValues.upstreamLastCheckedAt = settings.value(
         "upstreamLastCheckedAt", qint64(0)).toLongLong();
+
+    gValues.storyMediaBackupEnabled = settings.value(
+        "storyMediaBackupEnabled", false).toBool();
 
     // Per-peer ghost overrides
     settings.beginGroup("GhostModePerPeer");
