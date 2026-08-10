@@ -27,7 +27,7 @@ v7.0.9'ga o'zgardi. Tafsilot:
 |---|---|---|
 | A1 | To'liq qo'lda tekshiruv | ✅ 2026-08-01, kritik muammo yo'q |
 | A2 | Upstream v7.0.5 → v7.0.7 sync | ✅ 2026-08-01, `2e61fdcbc2` (162 commit, 2 konflikt) |
-| A3 | Log shovqinini kamaytirish (`API Warning: not loaded minimal channel applied.`) | Past ustuvorlik, tekshirilmagan |
+| A3 | Log shovqinini kamaytirish (`API Warning: not loaded minimal channel applied.`) | 🟡 2026-08-09: root cause topildi (`data_session.cpp:966`, rasmiy kod, `LOG` shartsiz yoziladi — `DEBUG_LOG`ga o'tkazish mumkin edi), lekin user tuzatmaslikni tanladi — kod o'zgarishsiz qoldi. Past ustuvor, kerak bo'lsa keyinroq qaytiladi. |
 | A4 | Upstream v7.0.7 → v7.0.9 sync (to'liq `dev→SafeWall→Customizations↔Oybek` zanjiri orqali) | ✅ 2026-08-06, 100 commit, 1 konflikt (`lib_ui` submodule) |
 | A5 | Build v7.0.9 + haqiqiy self-update sinovi | ✅ 2026-08-08: build+reliz+update-apply hammasi tasdiqlandi (2 marta chiqarildi — `publish.ps1`dagi path bug tuzatilgach) |
 | A6 | Qt 5.15.18 → Qt 6.5+ ga o'tish | 🕓 Keyingi tasklarga qo'shildi (2026-08-07). Qat'iy texnik zaruriyat yo'q — sof tarixiy: `Libraries\win64`da faqat Qt5 SDK bor. O'tish `lib_ui` fork'ini keraksiz qiladi va upstream bilan uzoq muddatli mosligini yaxshilaydi, lekin alohida katta ish (Qt6 SDK sozlash + qayta konfiguratsiya + boshqa yashirin Qt5/6 nomuvofiqliklar chiqishi mumkin — bitta misol allaqachon topilgan: `info_media_grid_zoom.cpp`dagi `QNativeGestureEvent::position()`). |
