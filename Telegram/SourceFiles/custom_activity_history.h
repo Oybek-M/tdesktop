@@ -30,4 +30,8 @@ void Init(not_null<Main::Session*> session);
 // funksiyani ishlatadi.
 [[nodiscard]] QString DecodeStatusLabel(const QString &encoded);
 
+// EncodeStatus() bilan bir xil rolda — "story" maydoni uchun. `encoded`
+// — story'ning qo'yilgan vaqti (unix timestamp, matn sifatida).
+[[nodiscard]] QString DecodeStoryLabel(const QString &encoded);
+
 } // namespace CustomActivityHistory

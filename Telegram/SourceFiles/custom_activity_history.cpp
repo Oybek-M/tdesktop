@@ -7,8 +7,11 @@
 #include "data/data_lastseen_status.h"
 #include "data/data_peer.h"
 #include "data/data_user.h"
+#include "data/data_stories.h"
+#include "data/data_story.h"
 #include "main/main_session.h"
 #include <QtCore/QDateTime>
+#include <range/v3/algorithm/max_element.hpp>
 
 namespace CustomActivityHistory {
 namespace {
@@ -80,6 +83,16 @@ QString DecodeStatusLabel(const QString &encoded) {
 	return encoded;
 }
 
+QString DecodeStoryLabel(const QString &encoded) {
+	bool ok = false;
+	const auto ts = encoded.toLongLong(&ok);
+	if (!ok || ts <= 0) {
+		return u"noma'lum"_q;
+	}
+	return u"📖 Hikoya qo'ydi: "_q
+		+ QDateTime::fromSecsSinceEpoch(ts).toString(u"dd.MM.yyyy HH:mm"_q);
+}
+
 void Init(not_null<Main::Session*> session) {
 	using Flag = Data::PeerUpdate::Flag;
 
@@ -116,6 +129,44 @@ void Init(not_null<Main::Session*> session) {
 				EncodeStatus(user->lastseen(), now),
 				now);
 		}
+	}, session->lifetime());
+
+	// ── Story post-vaqti signali (A11 §1) ────────────────────────────────
+	// Story HECH QACHON ochilmaydi — faqat mavjud sinxronizatsiya orqali
+	// kelgan metadata (sana) o'qiladi. Stories::markAsRead() bu yerda
+	// HECH QACHON chaqirilmaydi (xavfsizlik invarianti).
+	session->data().stories().itemsChanged(
+	) | rpl::on_next([=](PeerId peerId) {
+		const auto user = session->data().peer(peerId)->asUser();
+		if (!user) {
+			return; // faqat User (shaxsiy chat) kuzatiladi
+		}
+		const auto peerId2 = QString::number(user->id.value);
+		if (!CustomSettings::ShouldTrackActivity(peerId2, user->isContact())) {
+			return;
+		}
+
+		auto &stories = session->data().stories();
+		const auto source = stories.source(peerId);
+		if (!source || source->ids.empty()) {
+			return; // hozircha aktiv story yo'q
+		}
+		const auto latest = *ranges::max_element(
+			source->ids,
+			ranges::less{},
+			&Data::StoryIdDates::date);
+		const auto found = stories.lookup({ peerId, latest.id });
+		if (!found) {
+			return;
+		}
+		const auto story = *found;
+		const auto now = base::unixtime::now();
+
+		RecordField(
+			peerId2,
+			u"story"_q,
+			QString::number(story->date()),
+			now);
 	}, session->lifetime());
 }
 
