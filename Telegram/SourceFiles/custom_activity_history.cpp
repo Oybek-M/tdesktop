@@ -81,6 +81,12 @@ void MaybeBackupStoryMedia(
 		photo->load(Data::PhotoSize::Large, origin);
 		gPendingStoryMedia.push_back({ photo, nullptr, std::move(media) });
 	} else if (const auto document = story->document()) {
+		// Raw pointer, no keepalive (unlike photo's PhotoMedia shared_ptr
+		// above): Data::Session owns DocumentData objects for the whole
+		// session lifetime once created (matches how DocumentData* is held
+		// elsewhere in this codebase, e.g. data_document.cpp's own
+		// finishLoad() hook) — safe to assume it outlives this pending
+		// download.
 		document->save(origin, QString());
 		gPendingStoryMedia.push_back({ nullptr, document, nullptr });
 	}
