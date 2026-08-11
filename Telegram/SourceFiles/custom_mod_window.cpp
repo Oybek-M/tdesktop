@@ -504,6 +504,7 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 		else if (id == u"antiEdit"_q) current = val.antiEdit;
 		else if (id == u"spoofMobile"_q) current = val.spoofMobile;
 		else if (id == u"storyAnonymousView"_q) current = val.storyAnonymousView;
+		else if (id == u"storyMediaBackupEnabled"_q) current = val.storyMediaBackupEnabled;
 		else if (id == u"mutualContactShowInChatList"_q) current = val.mutualContactShowInChatList;
 		else if (id == u"mutualContactShowInContactsList"_q) current = val.mutualContactShowInContactsList;
 		else if (id == u"mutualContactShowInProfile"_q) current = val.mutualContactShowInProfile;
@@ -668,6 +669,10 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 		u"storyAnonymousView"_q,
 		u"Hikoyalarni anonim koʻrish"_q,
 		u"Hikoyani koʻrganingiz haqida egasiga bildirish yuborilmaydi."_q);
+	addToggle(
+		u"storyMediaBackupEnabled"_q,
+		u"Hikoya media'sini saqlash"_q,
+		u"Kuzatilayotgan userlarning hikoya (story) rasmi/videosi avtomatik, ko'rmasdan lokal saqlanadi. Disk joyini sarflaydi, standart holatda o'chirilgan."_q);
 	addToggle(
 		u"bypassRestrictions"_q,
 		u"Cheklangan chatda nusxalash va yuborish"_q,
