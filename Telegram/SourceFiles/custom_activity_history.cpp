@@ -12,9 +12,79 @@
 #include "main/main_session.h"
 #include <QtCore/QDateTime>
 #include <range/v3/algorithm/max_element.hpp>
+#include "data/data_photo.h"
+#include "data/data_photo_media.h"
+#include "data/data_document.h"
+#include "data/data_file_origin.h"
+#include "ui/image/image.h"
+#include "base/flat_set.h"
+#include <QtCore/QStandardPaths>
+#include <QtCore/QDir>
 
 namespace CustomActivityHistory {
 namespace {
+
+struct PendingStoryMedia {
+	PhotoData *photo = nullptr;
+	DocumentData *document = nullptr;
+	std::shared_ptr<Data::PhotoMedia> photoMedia; // photo bo'lsa, media view'ni tirik saqlaydi
+};
+
+std::vector<PendingStoryMedia> gPendingStoryMedia;
+base::flat_set<FullStoryId> gProcessedStoryMedia;
+
+QString SaveStoryImage(const QImage &image, PhotoId id) {
+	const auto baseDir = QStandardPaths::writableLocation(
+		QStandardPaths::HomeLocation)
+		+ u"/customizationMainFolder/medias/images"_q;
+	QDir().mkpath(baseDir);
+	const auto path = baseDir + u"/story_"_q + QString::number(id) + u".jpg"_q;
+	image.save(path, "JPEG");
+	return path;
+}
+
+void CheckPendingStoryMedia() {
+	for (auto it = gPendingStoryMedia.begin(); it != gPendingStoryMedia.end();) {
+		auto done = false;
+		if (it->document) {
+			const auto path = it->document->filepath(true);
+			if (!path.isEmpty()) {
+				CustomDB::SaveMediaFile(path, u"video"_q);
+				done = true;
+			}
+		} else if (it->photo && it->photoMedia) {
+			if (it->photoMedia->loaded()) {
+				if (const auto image = it->photoMedia->image(
+						Data::PhotoSize::Large)) {
+					const auto qimg = image->original();
+					if (!qimg.isNull()) {
+						SaveStoryImage(qimg, it->photo->id);
+					}
+				}
+				done = true;
+			}
+		} else {
+			done = true; // noto'g'ri holat, ro'yxatdan chiqarish
+		}
+		it = done ? gPendingStoryMedia.erase(it) : std::next(it);
+	}
+}
+
+void MaybeBackupStoryMedia(
+		not_null<Data::Story*> story,
+		Data::FileOriginStory origin) {
+	if (!CustomSettings::StoryMediaBackupEnabled()) {
+		return;
+	}
+	if (const auto photo = story->photo()) {
+		auto media = photo->createMediaView();
+		photo->load(Data::PhotoSize::Large, origin);
+		gPendingStoryMedia.push_back({ photo, nullptr, std::move(media) });
+	} else if (const auto document = story->document()) {
+		document->save(origin, QString());
+		gPendingStoryMedia.push_back({ nullptr, document, nullptr });
+	}
+}
 
 void RecordField(
 		const QString &peerId,
@@ -167,6 +237,17 @@ void Init(not_null<Main::Session*> session) {
 			u"story"_q,
 			QString::number(story->date()),
 			now);
+
+		const auto fullId = FullStoryId{ peerId, latest.id };
+		if (!gProcessedStoryMedia.contains(fullId)) {
+			gProcessedStoryMedia.emplace(fullId);
+			MaybeBackupStoryMedia(story, fullId);
+		}
+	}, session->lifetime());
+
+	session->downloaderTaskFinished(
+	) | rpl::on_next([=] {
+		CheckPendingStoryMedia();
 	}, session->lifetime());
 }
 
