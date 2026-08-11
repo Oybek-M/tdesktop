@@ -24,16 +24,21 @@ QString FormatEntryLine(const CustomDB::ActivityHistoryEntry &entry) {
 		if (entry.field == u"username"_q) return u"Username"_q;
 		if (entry.field == u"photo"_q) return u"Rasm"_q;
 		if (entry.field == u"status"_q) return u"Last-seen"_q;
+		if (entry.field == u"story"_q) return u"Hikoya"_q;
 		return entry.field;
 	}();
 	const auto valueLabel = (entry.field == u"status"_q)
 		? DecodeStatusLabel(entry.newValue)
+		: (entry.field == u"story"_q)
+		? DecodeStoryLabel(entry.newValue)
 		: (entry.newValue.isEmpty() ? u"(bo'sh)"_q : entry.newValue);
 	if (!entry.hasOldValue) {
 		return fieldLabel + u": "_q + valueLabel + u" (kuzatish boshlandi, "_q + when + u")"_q;
 	}
 	const auto oldLabel = (entry.field == u"status"_q)
 		? DecodeStatusLabel(entry.oldValue)
+		: (entry.field == u"story"_q)
+		? DecodeStoryLabel(entry.oldValue)
 		: (entry.oldValue.isEmpty() ? u"(bo'sh)"_q : entry.oldValue);
 	return fieldLabel + u": '"_q + oldLabel + u"' -> '"_q + valueLabel + u"' ("_q + when + u")"_q;
 }
