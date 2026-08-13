@@ -566,6 +566,31 @@ bool ShouldBackgroundCache(const QString &peerId) {
     return AntiDeleteForPeer(peerId) || AntiEditForPeer(peerId);
 }
 
+QString TrackingReason(const QString &peerId) {
+    if (!gInitialized) Init();
+    // A13/K5.3: foydalanuvchi "nega bu chat kuzatilmayapti?" degan savolga
+    // taxmin qilmasdan javob topsin — ShouldBackgroundCache bilan AYNAN
+    // bir xil zanjir, faqat natija o'rniga sababni qaytaradi.
+    if (peerId.isEmpty()) {
+        return u"Noma'lum chat"_q;
+    }
+    if (IsInBlocklist(peerId)) {
+        return u"Qora ro'yxat — kuzatilmaydi"_q;
+    }
+    if (IsInWhitelist(peerId)) {
+        return u"Oq ro'yxat — kuzatiladi"_q;
+    }
+    const auto perPeer = gAntiDeletePerPeer.constFind(peerId);
+    if (perPeer != gAntiDeletePerPeer.constEnd()) {
+        return perPeer.value()
+            ? u"Shu chat sozlamasi — kuzatiladi"_q
+            : u"Shu chat sozlamasi — kuzatilmaydi"_q;
+    }
+    return gValues.antiDelete
+        ? u"Umumiy sozlama — kuzatiladi"_q
+        : u"Umumiy sozlama — kuzatilmaydi"_q;
+}
+
 bool ShouldAnonymousStory(const QString &peerId) {
     if (!gInitialized) Init();
     if (!peerId.isEmpty() && IsInBlocklist(peerId)) return false;

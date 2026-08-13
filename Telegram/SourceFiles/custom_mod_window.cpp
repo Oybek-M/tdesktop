@@ -690,6 +690,33 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 		u"Offline xabar bazasi"_q,
 		u"Xabarlar va medialarni internet boʻlmaganda ham koʻrish uchun qurilmada saqlaydi."_q);
 
+	// A13/K6.3: arxiv statistikasi — foydalanuvchi arxiv haqiqatan
+	// to'layotganini va qancha joy egallayotganini ko'rib tursin.
+	{
+		const auto archived = CustomDB::ArchivedMessageCount();
+		const auto sizeMb = CustomDB::DatabaseSizeBytes() / (1024 * 1024);
+		const auto stats = content->add(
+			object_ptr<Ui::FlatLabel>(
+				content,
+				rpl::single(u"Arxivda "_q
+					+ QString::number(archived)
+					+ u" ta xabar saqlangan. Baza hajmi: "_q
+					+ QString::number(sizeMb)
+					+ u" MB."_q),
+				st::customModHintLabel),
+			st::boxRowPadding,
+			style::al_justify);
+		content->widthValue() | rpl::on_next([=](int w) {
+			const auto lw = w
+				- st::boxRowPadding.left()
+				- st::boxRowPadding.right();
+			if (lw > 0) {
+				stats->resizeToWidth(lw);
+				stats->update();
+			}
+		}, stats->lifetime());
+	}
+
 	// ── Mutual-Contact Indikatori ─────────────────────────────────────
 	Ui::AddDivider(content);
 	Ui::AddSkip(content, st::settingsThumbSkip);

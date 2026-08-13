@@ -169,10 +169,24 @@ void SetBlocklistCategory(PeerType type, bool enabled);
 [[nodiscard]] bool ShouldGhost(const QString &peerId);
 
 // T32+: Background cache (text_cache) ga qaysi peerlar tushishini hal qiladi.
-// Performance uchun ATAYLAB cheklangan: faqat WhiteList YOKI Per-Chat override
-// orqali AntiDelete/AntiEdit yoqilgan peerlar. Global flag ON bo'lsa ham
-// barcha chatlarni cache qilmaymiz (disk/CPU isrofini oldini olish).
+// A13/D3 (2026-08-13) — XATTI-HARAKAT O'ZGARDI. Ilgari bu funksiya global
+// antiDelete/antiEdit bayrog'ini ATAYLAB e'tiborsiz qoldirardi (disk/CPU
+// tejash uchun: faqat WhiteList yoki Per-Chat override'li peerlar cache'ga
+// tushardi). Amalda bu tuzoq bo'lib chiqdi: ShouldAntiDelete() true qaytarib,
+// foydalanuvchiga "AntiDelete yoqilgan" deb ko'rinardi, lekin fon-cache
+// ishlamagani uchun suhbatdosh butun chatni o'chirsa ma'lumot yo'qolardi.
+// Endi zanjir ShouldAntiDelete/ShouldAntiEdit bilan bir xil:
+//   Blocklist > Whitelist > Per-Chat override > global bayroq.
+// Ya'ni global bayroq YOQILGAN bo'lsa barcha chatlar cache'ga tushadi —
+// disk sarfi ortadi, lekin "yoqilgan" degani haqiqatan ishlaydi degani.
+// Disk'ni cheklash kerak bo'lsa — global bayroqni o'chirib, Whitelist yoki
+// Per-Chat override ishlating.
 [[nodiscard]] bool ShouldBackgroundCache(const QString &peerId);
+
+// A13/K5.3: ShouldBackgroundCache bilan bir xil zanjir, lekin natija o'rniga
+// SABABNI qaytaradi ("Oq ro'yxat — kuzatiladi", "Umumiy sozlama —
+// kuzatilmaydi", ...). Custom Window'da ko'rsatiladi.
+[[nodiscard]] QString TrackingReason(const QString &peerId);
 
 // Story anonim ko'rish — faqat story view/markRead ni bloklaydi.
 // GhostMode dan alohida: xabar o'qildi belgilari bilan aloqasi yo'q.

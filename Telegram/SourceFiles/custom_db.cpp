@@ -842,6 +842,27 @@ void ExecRaw(const char *sql) {
     execSql(sql);
 }
 
+qint64 DatabaseSizeBytes() {
+    return QFileInfo(dbFilePath()).size();
+}
+
+int ArchivedMessageCount() {
+    Init();
+    if (!gDb) return 0;
+    int result = 0;
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "SELECT COUNT(*) FROM text_cache "
+            "WHERE COALESCE(is_archived, 0) = 1",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            result = sqlite3_column_int(stmt, 0);
+        }
+        sqlite3_finalize(stmt);
+    }
+    return result;
+}
+
 void CacheMessageText(
         const QString &peerId,
         long long msgId,

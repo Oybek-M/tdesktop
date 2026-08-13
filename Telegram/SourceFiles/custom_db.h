@@ -243,6 +243,10 @@ void Checkpoint();
 // Natija qaytarmaydigan buyruqlar uchun — gDb static bo'lgani sababli kerak.
 void ExecRaw(const char *sql);
 
+// A13/K6.3: Custom Window'da ko'rsatiladigan arxiv statistikasi.
+[[nodiscard]] qint64 DatabaseSizeBytes();
+[[nodiscard]] int ArchivedMessageCount();
+
 // T28: Background AntiDelete — chat ochilmagan, HistoryItem yo'q.
 // text_cache jadvalida msgId bo'yicha qidirib, agar topilsa AntiDelete
 // yoqilgan peer bo'lsa — 'deleted' yozuvi yaratamiz.
