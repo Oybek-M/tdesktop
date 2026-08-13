@@ -263,6 +263,15 @@ void RunMigrations() {
         execSql("ALTER TABLE text_cache ADD COLUMN is_media INTEGER DEFAULT 0");
     }
 
+    // v5 → v6 (A13/D4): text_cache ga is_archived ustuni.
+    //   0 = vaqtinchalik cache (eskirsa PruneStaleCachedText o'chirishi mumkin)
+    //   1 = doimiy arxiv (hech qachon avtomatik o'chirilmaydi)
+    // Butun-chat o'chirilishida faqat arxivdagi xabarlar qutqariladi, shuning
+    // uchun arxivni 30 kunlik TTL dan ajratish shart edi.
+    if (version < 6) {
+        execSql("ALTER TABLE text_cache ADD COLUMN is_archived INTEGER DEFAULT 0");
+    }
+
     // Update version stamp.
     {
         sqlite3_stmt *stmt = nullptr;
@@ -805,12 +814,32 @@ void PruneStaleCachedText(int days) {
         QDateTime::currentSecsSinceEpoch() - qint64(days) * 86400;
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
-            "DELETE FROM text_cache WHERE cached_at < ?",
+            // A13/D4: arxivlangan qatorlarga TEGMAYMIZ — ular doimiy.
+            // COALESCE eski (migratsiyadan oldingi) NULL qiymatlar uchun.
+            "DELETE FROM text_cache "
+            "WHERE cached_at < ? AND COALESCE(is_archived, 0) = 0",
             -1, &stmt, nullptr) == SQLITE_OK) {
         sqlite3_bind_int64(stmt, 1, cutoff);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }
+}
+
+void Checkpoint() {
+    Init();
+    if (!gDb) return;
+    // A13/D5: WAL faylini asosiy DB ga ko'chiradi. journal_mode=WAL +
+    // synchronous=NORMAL da to'satdan tok o'chsa, oxirgi checkpoint'dan
+    // keyingi tranzaksiyalar yo'qolishi mumkin — muntazam chaqirish shu
+    // oynani daqiqalargacha qisqartiradi, yozuv tezligini esa saqlaydi
+    // (synchronous=FULL ga o'tish hamma yozuvni sekinlashtirardi).
+    execSql("PRAGMA wal_checkpoint(TRUNCATE)");
+}
+
+void ExecRaw(const char *sql) {
+    Init();
+    if (!gDb) return;
+    execSql(sql);
 }
 
 void CacheMessageText(
@@ -820,7 +849,8 @@ void CacheMessageText(
         bool isOut,
         unsigned int msgDate,
         const QString &senderId,
-        bool isMedia) {
+        bool isMedia,
+        bool archived) {
     Init();
     if (!gDb || peerId.isEmpty() || msgId == 0) return;
     // Matn bo'sh: faqat media xabar bo'lsa cache qilamiz (delete ni bilish uchun).
@@ -830,8 +860,9 @@ void CacheMessageText(
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
             "INSERT OR REPLACE INTO text_cache "
-            "(peer_id, msg_id, text, is_out, msg_date, cached_at, sender_id, is_media) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "(peer_id, msg_id, text, is_out, msg_date, cached_at, "
+            "sender_id, is_media, is_archived) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             -1, &stmt, nullptr) == SQLITE_OK) {
         bindText(stmt, 1, peerId);
         sqlite3_bind_int64(stmt, 2, msgId);
@@ -841,6 +872,7 @@ void CacheMessageText(
         sqlite3_bind_int64(stmt, 6, QDateTime::currentSecsSinceEpoch());
         bindText(stmt, 7, senderId);
         sqlite3_bind_int(stmt, 8, isMedia ? 1 : 0);
+        sqlite3_bind_int(stmt, 9, archived ? 1 : 0);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }

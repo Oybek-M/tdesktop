@@ -25,7 +25,9 @@ struct ActionedMessage {
 // E19: Schema version constant — increment when adding new columns/tables.
 // RunMigrations() is called inside Init() automatically.
 // v5: actioned_messages + text_cache ga sender_id va is_media ustunlari qo'shildi.
-constexpr int kCurrentSchemaVersion = 5;
+// v6 (A13/D4): text_cache ga is_archived ustuni — 1 bo'lsa doimiy arxiv,
+//              PruneStaleCachedText() unga tegmaydi.
+constexpr int kCurrentSchemaVersion = 6;
 
 void Init();
 
@@ -192,6 +194,9 @@ QString SaveMediaFile(const QString &sourcePath, const QString &type); // "image
 // Yangi xabar kelganda chaqiriladi (agar ShouldBackgroundCache(peer)).
 // v5: senderId — guruhda haqiqiy yuboruvchi; isMedia — media xabar (matnsiz ham
 // cache ga tushadi, shunda background delete da o'chirilganini bilib qolamiz).
+// A13/D4: archived=true bo'lsa yozuv DOIMIY arxiv sifatida belgilanadi va
+// PruneStaleCachedText() unga tegmaydi. Standart false — mavjud
+// chaqiruvchilar xatti-harakati o'zgarmaydi.
 void CacheMessageText(
     const QString &peerId,
     long long msgId,
@@ -199,7 +204,8 @@ void CacheMessageText(
     bool isOut,
     unsigned int msgDate,
     const QString &senderId = QString(),
-    bool isMedia = false);
+    bool isMedia = false,
+    bool archived = false);
 
 // Cache dan oldingi matnni qaytaradi (bo'lmasa, bo'sh string).
 QString GetCachedText(const QString &peerId, long long msgId);
@@ -226,7 +232,16 @@ bool RecordBackgroundEdit(
     unsigned int msgDate);
 
 // Eski cache yozuvlarini tozalash. Avtomatik chaqiriladi (har CacheMessageText da).
+// A13/D4: is_archived=1 bo'lgan (doimiy arxiv) qatorlarga TEGMAYDI.
 void PruneStaleCachedText(int days = 30);
+
+// A13/D5: WAL faylini asosiy DB ga ko'chiradi — to'satdan tok o'chganda
+// yo'qotish oynasini qisqartirish uchun. CustomArchive davriy chaqiradi.
+void Checkpoint();
+
+// A13: tashqi modullar uchun oddiy SQL bajaruvchi (BEGIN/COMMIT kabi).
+// Natija qaytarmaydigan buyruqlar uchun — gDb static bo'lgani sababli kerak.
+void ExecRaw(const char *sql);
 
 // T28: Background AntiDelete — chat ochilmagan, HistoryItem yo'q.
 // text_cache jadvalida msgId bo'yicha qidirib, agar topilsa AntiDelete
