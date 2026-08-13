@@ -1089,6 +1089,30 @@ git commit -m "A13/K5-K6: chat kuzatuv sababi va arxiv statistikasi UI da"
 
 ### Task 10: K3 — "Bu chatning butun tarixini arxivla" tugmasi
 
+> ⏸️ **KECHIKTIRILDI (2026-08-13, implementatsiya paytida qabul qilingan
+> qaror).**
+>
+> **Sabab (xotira xavfi):** butun tarixni fon rejimida yuklash — barcha
+> xabarlarni `HistoryItem` obyektlari sifatida XOTIRAGA yuklash demak
+> (`addOlderSlice()` shunday ishlaydi). 10 000 xabarli chat uchun bu
+> sezilarli xotira sarfi; Telegram aynan shuning uchun tarixni
+> lazy/bo'lak-bo'lak yuklaydi. Buni to'g'ri qilish uchun alohida,
+> xotiraga yuklamaydigan yo'l kerak (masalan MTProto javobini
+> `HistoryItem` yaratmasdan to'g'ridan-to'g'ri arxivga yozish) — bu
+> alohida dizayn ishi.
+>
+> **Nega bu maqbul:** K3 — mavjud nuqsonni tuzatish emas, balki QULAYLIK
+> funksiyasi. Task 7 (scrollback hook) tufayli foydalanuvchi chatda
+> yuqoriga scroll qilgani zahoti tarix avtomatik arxivlanadi — ya'ni
+> asosiy himoya allaqachon ishlaydi. Bu tugma faqat "scroll qilmasdan,
+> hoziroq himoyala" holatini qulaylashtirardi.
+>
+> **Qayta ko'rib chiqish sharti:** foydalanuvchi shu qulaylikni aniq
+> so'rasa, avval xotiraga yuklamaydigan yondashuv bo'yicha qisqa
+> brainstorming qilinadi.
+>
+> Quyidagi qadamlar KELAJAK uchun saqlanadi, hozir bajarilmaydi.
+
 **Files:**
 - Modify: `Telegram/SourceFiles/custom_archive.h/.cpp` — yangi funksiya
 - Modify: chat menyusi fayli (Step 1 da aniqlanadi)
