@@ -669,6 +669,10 @@ private:
 
 	MsgId _topMessageId = 0; // CUSTOM GHOST MODE TRACKING
 	qint64 _ghostReadTillId = 0; // FAST CACHE
+	// CUSTOM A13: konstruktor tugagach true bo'ladi. loadDeletedMessages()
+	// shu bayroqqa qaraydi — ilgari isEmpty() ishlatilardi, lekin u bo'sh
+	// chatga (butun tarix o'chirilgan holat) inject qilishni ham to'sardi.
+	bool _deletedInjectionReady = false;
 	std::optional<MsgId> _inboxReadBefore;
 	std::optional<MsgId> _outboxReadBefore;
 	std::optional<int> _unreadCount;

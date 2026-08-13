@@ -182,6 +182,9 @@ History::History(not_null<Data::Session*> owner, PeerId peerId)
 	}
 	loadDeletedMessages();
 	updateCommunityRegistration();
+	// CUSTOM A13: shu nuqtadan keyin History to'liq qurilgan — inject
+	// xavfsiz. Yuqoridagi chaqiruv ataylab no-op bo'lib qoladi.
+	_deletedInjectionReady = true;
 }
 
 History::~History() = default;
@@ -2179,11 +2182,13 @@ std::optional<int> History::countStillUnreadLocal(MsgId readTillId) const {
 }
 
 void History::loadDeletedMessages() {
-	// isEmpty() skip qaytarildi — konstruktor da chaqirilsa invariant buziladi
-	// (insertMessageToBlocks → addNewToBack → addItemToBlock muammo).
-	// Inject faqat blocks to'la bo'lganda ishlaydi (addOlderSlice/addNewerSlice
-	// chaqirilgandan keyin).
-	if (isEmpty()) return;
+	// CUSTOM A13: ilgari `if (isEmpty()) return;` edi — bu butun chat
+	// o'chirilganda (blocks bo'sh) saqlangan xabarlarni ham ko'rsatmasdi.
+	// Aslida himoya kerak bo'lgan yagona holat — konstruktor paytidagi
+	// chaqiruv (insertMessageToBlocks → addNewToBack → addItemToBlock
+	// yarim qurilgan History ustida ishlaydi). insertMessageToBlocks()
+	// bo'sh tarixni o'zi to'g'ri hal qiladi (addNewToBack).
+	if (!_deletedInjectionReady) return;
 
 	const auto peerIdStr = QString::number(peer->id.value);
 	if (!CustomSettings::ShouldAntiDelete(peerIdStr)) return;
@@ -4581,7 +4586,12 @@ void History::clear(ClearType type, bool markEmpty) {
 	} else if (const auto channel = peer->asMegagroup()) {
 		channel->mgInfo->markupSenders.clear();
 	}
-	loadDeletedMessages();
+	// CUSTOM A13: Unload — bu shunchaki xotiradan bo'shatish, inject
+	// qilish noto'g'ri bo'lardi. ClearHistory/DeleteChat esa aynan
+	// bizga kerak bo'lgan holat (suhbatdosh butun chatni o'chirdi).
+	if (type != ClearType::Unload) {
+		loadDeletedMessages();
+	}
 
 	owner().notifyHistoryChangeDelayed(this);
 	owner().sendHistoryChangeNotifications();
