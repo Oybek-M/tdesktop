@@ -2,7 +2,11 @@
 
 #include "custom_db.h"
 #include "custom_settings.h"
+#include "data/data_document.h"
+#include "data/data_file_origin.h"
+#include "data/data_media_types.h"
 #include "data/data_peer.h"
+#include "data/data_photo.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include <QtCore/QTimer>
@@ -41,6 +45,26 @@ void WriteRow(const PendingRow &row) {
 		row.senderId,
 		row.isMedia,
 		true); // archived = true → PruneStaleCachedText tegmaydi (D4)
+}
+
+// A13/K4: kuzatilayotgan chatda media avtomatik yuklab olinadi, shunda
+// suhbatdosh butun chatni o'chirganda ham fayl qo'lda qoladi. Yuklab
+// olingach data_document.cpp dagi mavjud finishLoad() hook uni doimiy
+// papkaga (~/customizationMainFolder/medias/) ko'chiradi — bu yerda faqat
+// yuklashni BOSHLAYMIZ.
+void MaybeDownloadMedia(not_null<HistoryItem*> item) {
+	const auto media = item->media();
+	if (!media) {
+		return;
+	}
+	const auto origin = Data::FileOriginMessage(item->fullId());
+	if (const auto document = media->document()) {
+		if (document->filepath(true).isEmpty() && !document->loading()) {
+			document->save(origin, QString());
+		}
+	} else if (const auto photo = media->photo()) {
+		photo->load(Data::PhotoSize::Large, origin);
+	}
 }
 
 void FlushPending() {
@@ -83,6 +107,10 @@ void MaybeArchiveItem(not_null<HistoryItem*> item) {
 	row.msgDate = static_cast<unsigned int>(item->date());
 	row.isOut = item->out();
 	row.isMedia = isMedia;
+
+	if (isMedia) {
+		MaybeDownloadMedia(item);
+	}
 
 	if (gBatchDepth > 0) {
 		gPending.push_back(std::move(row));
