@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/history.h"
 
+#include "custom_archive.h"
 #include "custom_db.h"
 #include "custom_settings.h"
 #include <QtCore/QFile>
@@ -1854,6 +1855,16 @@ void History::addOlderSlice(const QVector<MTPMessage> &slice) {
 
 	if (const auto added = createItems(slice); !added.empty()) {
 		addCreatedOlderSlice(added);
+		// CUSTOM A13/K2: serverdan endi kelgan ESKI tarixni doimiy arxivga
+		// yozamiz. Ilgari arxivga faqat real-vaqtda kelgan xabarlar tushardi,
+		// shu sababli suhbatdosh butun chatni o'chirganda scrollback orqali
+		// ko'rilgan tarix qutqarilmasdi. Partiya rejimi — butun slice bitta
+		// tranzaksiyada, scroll paytida jank bo'lmasligi uchun.
+		CustomArchive::BeginBatch();
+		for (const auto &item : added) {
+			CustomArchive::MaybeArchiveItem(item);
+		}
+		CustomArchive::EndBatch();
 	} else {
 		// If no items were added it means we've loaded everything old.
 		_loadedAtTop = true;
@@ -1903,6 +1914,13 @@ void History::addNewerSlice(const QVector<MTPMessage> &slice) {
 		}
 
 		addToSharedMedia(added);
+		// CUSTOM A13/K2: yangi yuklangan oraliqni doimiy arxivga yozamiz
+		// (addOlderSlice dagi bilan bir xil sabab).
+		CustomArchive::BeginBatch();
+		for (const auto &item : added) {
+			CustomArchive::MaybeArchiveItem(item);
+		}
+		CustomArchive::EndBatch();
 	} else {
 		_loadedAtBottom = true;
 		setLastMessage(lastAvailableMessage());
