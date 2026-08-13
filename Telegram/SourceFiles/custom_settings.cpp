@@ -194,6 +194,29 @@ void Init() {
     if (gInitialized) return;
 
     QSettings settings("CustomMod", "TelegramDesktop");
+
+    // A13/D6: eski (snake_case) kalitlarni bir marta ko'chirish.
+    // Ular hech qachon o'qilmagan — registry da "anti_delete: true"
+    // turib, kod esa "antiDelete" ni o'qigani uchun foydalanuvchi
+    // sozlama yoqilgan deb o'ylardi. Faqat yangi kalit MAVJUD
+    // BO'LMASA ko'chiramiz, so'ng eskisini o'chiramiz — bir marta
+    // bajarilgach keyingi ishga tushirishlarda bu blok tekinga ishlaydi.
+    {
+        const auto migrate = [&](const char *oldKey, const char *newKey) {
+            if (settings.contains(oldKey)) {
+                if (!settings.contains(newKey)) {
+                    settings.setValue(newKey, settings.value(oldKey));
+                }
+                settings.remove(oldKey);
+            }
+        };
+        migrate("anti_delete", "antiDelete");
+        migrate("anti_edit", "antiEdit");
+        migrate("ghost_mode", "ghostMode");
+        migrate("bypass_restrictions", "bypassRestrictions");
+        migrate("offline_db", "offlineDb");
+    }
+
     gValues.ghostMode = settings.value("ghostMode", true).toBool();
     gValues.bypassRestrictions = settings.value("bypassRestrictions", true).toBool();
     gValues.offlineDb = settings.value("offlineDb", true).toBool();
@@ -529,12 +552,18 @@ bool ShouldGhost(const QString &peerId) {
 bool ShouldBackgroundCache(const QString &peerId) {
     if (!gInitialized) Init();
     if (peerId.isEmpty()) return false;
+    // A13/D3: ilgari oxirgi bosqich `return false` edi — global
+    // antiDelete/antiEdit bayrog'i e'tiborga olinmasdi. Natijada
+    // ShouldAntiDelete() true qaytarib turgan chatda fon-cache umuman
+    // ishlamasdi va butun-chat o'chirilishida ma'lumot yo'qolardi.
+    // Endi zanjir ShouldAntiDelete/ShouldAntiEdit bilan bir xil:
+    // Blocklist > Whitelist > per-peer override > global bayroq.
+    // (AntiDeleteForPeer o'zi per-peer xaritani tekshirib, topilmasa
+    // global qiymatga tushadi — shu sabab alohida HasPerPeerOverride
+    // shoxobchasi kerak emas.)
     if (IsInBlocklist(peerId)) return false;
     if (IsInWhitelist(peerId)) return true;
-    if (HasPerPeerOverride(peerId)) {
-        return AntiDeleteForPeer(peerId) || AntiEditForPeer(peerId);
-    }
-    return false;
+    return AntiDeleteForPeer(peerId) || AntiEditForPeer(peerId);
 }
 
 bool ShouldAnonymousStory(const QString &peerId) {
