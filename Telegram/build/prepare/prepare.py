@@ -538,7 +538,12 @@ stage('lzma', """
 win:
     git clone https://github.com/desktop-app/lzma.git
     cd lzma\\C\\Util\\LzmaLib
-    SET "ToolsetProp="
+    # CUSTOM (A6): rasmiy kod bu yerda ToolsetProp ni BO'SH qoldiradi, ya'ni
+    # .vcxproj ichidagi standart toolset (v143 = VS2022) ishlatiladi. Bu
+    # mashinada faqat VS2026 bor (MSVC 14.51 = v145), v143 esa o'rnatilmagan
+    # -> MSB8020 xatosi. Upstream ARM64 uchun allaqachon v145 ni majburlaydi
+    # (pastdagi winarm bloki), demak v145 bu loyiha uchun sinovdan o'tgan.
+    SET "ToolsetProp=/property:PlatformToolset=v145"
 winarm:
     SET "ToolsetProp=/property:PlatformToolset=v145"
 win:
@@ -1426,7 +1431,12 @@ depends:patches/breakpad.diff
 win:
     SET "PYTHONUTF8=1"
     SET "FolderPostfix="
-    SET "ToolsetProp="
+    # CUSTOM (A6): rasmiy kod bu yerda ToolsetProp ni BO'SH qoldiradi, ya'ni
+    # .vcxproj ichidagi standart toolset (v143 = VS2022) ishlatiladi. Bu
+    # mashinada faqat VS2026 bor (MSVC 14.51 = v145), v143 esa o'rnatilmagan
+    # -> MSB8020 xatosi. Upstream ARM64 uchun allaqachon v145 ni majburlaydi
+    # (pastdagi winarm bloki), demak v145 bu loyiha uchun sinovdan o'tgan.
+    SET "ToolsetProp=/property:PlatformToolset=v145"
 win64:
     SET "FolderPostfix=_x64"
 winarm:
