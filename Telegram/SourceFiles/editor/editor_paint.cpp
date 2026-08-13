@@ -650,7 +650,7 @@ bool Paint::eventFilter(QObject *obj, QEvent *e) {
 		if (_fixedCrop) {
 			zoomSceneItemsByFactor(factor);
 		} else {
-			zoomCanvas(factor, gesture->pos(), true);
+			zoomCanvas(factor, gesture->position().toPoint(), true);
 		}
 		return true;
 	} else if (e->type() == QEvent::MouseButtonPress) {
