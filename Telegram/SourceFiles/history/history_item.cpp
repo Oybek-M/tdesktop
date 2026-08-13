@@ -16,6 +16,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "custom_settings.h"
 #include "custom_db.h"
+#include "custom_archive.h"
 #include "api/api_premium.h"
 #include "api/api_sensitive_content.h"
 #include "api/api_transcribes.h"
@@ -2996,6 +2997,12 @@ void HistoryItem::setRealId(MsgId newId) {
 		_history->unregisterClientSideMessage(this);
 	}
 	_history->owner().notifyItemIdChange({ fullId(), oldId });
+
+	// CUSTOM A13/K2: shu klientdan yuborilgan xabar endi server ID ga ega va
+	// to'liq qurilgan — doimiy arxivga yozamiz. Ilgari arxivga faqat KELGAN
+	// xabarlar tushardi (data_session.cpp addNewMessage), yuborilganlar esa
+	// suhbatdosh butun chatni o'chirganda yo'qolardi.
+	CustomArchive::MaybeArchiveItem(this);
 
 	// We don't fire MessageUpdate::Flag::ReplyMarkup and update keyboard
 	// in history widget, because it can't exist for an outgoing message.

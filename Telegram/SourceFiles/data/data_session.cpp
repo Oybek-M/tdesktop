@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QDir>
 #include <QtCore/QFile>
 #include <QtCore/QFileInfo>
+#include "custom_archive.h"
 #include "custom_db.h"
 #include "custom_settings.h"
 #include "data/data_photo_media.h"
@@ -3555,25 +3556,13 @@ HistoryItem *Session::addNewMessage(
 	// sababli hookni barcha yo'llarning umumiy nuqtasiga (funnel) ko'chirdik.
 	// Faqat ShouldBackgroundCache true bo'lgan peerlar (WhiteList yoki Per-Chat
 	// override) cache ga tushadi — disk/CPU isrofini oldini olish uchun.
+	// A13/K2: mantiq CustomArchive::MaybeArchiveItem() ga ko'chirildi — gate,
+	// bo'sh-matn tekshiruvi va yozuv endi bitta joyda turadi (scrollback va
+	// chiquvchi xabar yo'llari ham shu funksiyani chaqiradi). Xatti-harakat
+	// o'zgarmagan, faqat yozuv is_archived=1 bilan ketadi — pruning uni
+	// 30 kundan keyin o'chirib yubormasligi uchun (D4).
 	if (result && type == NewMessageType::Unread) {
-		const auto peerIdStr = QString::number(
-			result->history()->peer->id.value);
-		if (::CustomSettings::ShouldBackgroundCache(peerIdStr)) {
-			const auto textValue = result->originalText().text;
-			const bool hasMedia = (result->media() != nullptr);
-			if (!textValue.isEmpty() || hasMedia) {
-				const auto senderIdStr = QString::number(
-					result->from()->id.value);
-				CustomDB::CacheMessageText(
-					peerIdStr,
-					static_cast<long long>(result->id.bare),
-					textValue,
-					result->out(),
-					static_cast<unsigned int>(result->date()),
-					senderIdStr,
-					hasMedia);
-			}
-		}
+		CustomArchive::MaybeArchiveItem(result);
 	}
 	return result;
 }
