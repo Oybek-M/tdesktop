@@ -56,6 +56,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "calls/calls_instance.h"
 #include "support/support_helper.h"
 #include "custom_activity_history.h"
+#include "custom_archive.h"
 #include "lang/lang_keys.h"
 #include "core/application.h"
 #include "ui/text/text_utilities.h"
@@ -176,6 +177,9 @@ Session::Session(
 	Expects(_settings != nullptr);
 
 	CustomActivityHistory::Init(this);
+	// A13/D5: davriy WAL checkpoint — to'satdan tok o'chganda arxiv
+	// yozuvlari yo'qolmasligi uchun. Ichida takroriy chaqiruvdan himoya bor.
+	CustomArchive::StartMaintenance();
 
 	_api->requestTermsUpdate();
 	_api->requestFullPeer(_user);
