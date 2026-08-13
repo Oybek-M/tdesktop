@@ -145,6 +145,23 @@ envForThirdPartyKey = hashlib.sha1(envForThirdPartyKeyString.encode('utf-8')).he
 modifiedEnv = os.environ.copy()
 for key in environment:
     modifiedEnv[key] = environment[key]
+
+# CUSTOM (A6): parallel build job soni.
+#
+# Windows'da jom `-j%NUMBER_OF_PROCESSORS%` bilan chaqirilardi, lekin
+# NUMBER_OF_PROCESSORS — cmd.exe himoyalagan o'zgaruvchi: `set` bilan bekor
+# qilib bo'lmaydi (bola jarayonlarda ham tizim qiymati qaytadi). 16 mantiqiy
+# yadro / 15 GB RAM li mashinada to'liq parallellik RAM ni to'ldirib, OS ni
+# muzlatadi. Shuning uchun o'z o'zgaruvchimiz — TDESKTOP_BUILD_JOBS orqali
+# cheklanadi, berilmasa avvalgidek barcha yadrolar ishlatiladi.
+#
+# MUHIM: bu ATAYLAB `environment` dict'iga qo'shilmagan — u yerga qo'shilsa
+# environmentKey (SHA1) o'zgarib, BARCHA kutubxonalarning cache kalitlari
+# bekor bo'lardi va ffmpeg/openssl kabi Qt'ga aloqasiz narsalar ham noldan
+# qayta qurilardi. modifiedEnv faqat subprocess muhitiga uzatiladi.
+modifiedEnv['JOBS'] = os.environ.get(
+    'TDESKTOP_BUILD_JOBS',
+    str(os.cpu_count()))
 if win and 'NoDefaultCurrentDirectoryInExePath' in modifiedEnv:
     del modifiedEnv['NoDefaultCurrentDirectoryInExePath']
 
@@ -627,7 +644,7 @@ win64:
 winarm:
     perl Configure no-shared no-tests debug-VC-WIN64-ARM /FS
 win:
-    jom -j%NUMBER_OF_PROCESSORS% build_libs
+    jom -j%JOBS% build_libs
     mkdir out.dbg
     move libcrypto.lib out.dbg
     move libssl.lib out.dbg
@@ -643,7 +660,7 @@ win64_release:
 winarm_release:
     perl Configure no-shared no-tests VC-WIN64-ARM /FS /Gs4096
 win_release:
-    jom -j%NUMBER_OF_PROCESSORS% build_libs
+    jom -j%JOBS% build_libs
     mkdir out
     move libcrypto.lib out
     move libssl.lib out
@@ -1581,8 +1598,8 @@ win:
     rem jom -jN occasionally fails to create the shared mkspecs\\modules-inst
     rem directory due to a race in qmake's mkpath under parallel builds; the
     rem build is incremental, so simply retrying picks up where it stopped.
-    jom -j%NUMBER_OF_PROCESSORS% || jom -j%NUMBER_OF_PROCESSORS%
-    jom -j%NUMBER_OF_PROCESSORS% install
+    jom -j%JOBS% || jom -j%JOBS%
+    jom -j%JOBS% install
 """)
 else: # qt > '6'
     branch = 'v$QT' + ('-lts-lgpl' if qt.startswith('6.2.') else '')
