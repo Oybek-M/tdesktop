@@ -1103,9 +1103,14 @@ win:
     SET MSYS2_PATH_TYPE=inherit
 
 win32:
-    SET "TOOLCHAIN=x86-win32-vs17"
+    # CUSTOM (A6): -v145 qo'shildi. Ularsiz libvpx o'z .vcxproj larini v143
+    # (VS2022) toolset bilan generatsiya qiladi -> MSB8020, chunki bu mashinada
+    # faqat VS2026 (MSVC 14.51 = v145) bor. Upstream ARM64 uchun aynan shu
+    # suffiksni allaqachon ishlatadi (pastdagi winarm) - demak libvpx configure
+    # buni qo'llab-quvvatlaydi va qiymat sinovdan o'tgan.
+    SET "TOOLCHAIN=x86-win32-vs17-v145"
 win64:
-    SET "TOOLCHAIN=x86_64-win64-vs17"
+    SET "TOOLCHAIN=x86_64-win64-vs17-v145"
 winarm:
     SET "TOOLCHAIN=arm64-win64-vs17-v145"
 win:
