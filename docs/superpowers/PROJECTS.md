@@ -39,6 +39,13 @@ uchun.
 > SHART.** Bu hujjat yangilanishi hali implement boshlanganini
 > anglatmaydi — faqat rejani qayd etadi.
 
+> 🆕 **2026-08-13, ish oxirida:** yangi kritik xato **A13** (AntiDelete
+> matnli xabarda ishlamadi) topildi — yuqoridagi bosqichlar rejasiga hali
+> kiritilmagan/joylashtirilmagan. **Keyingi sessiyada birinchi navbatda
+> user'dan so'rang:** A13 investigatsiyasi A6 build'idan OLDIN qilinsinmi
+> (A12'da bo'lgani kabi tartib) yoki A6 build davom etaversinmi — bu
+> qaror hali qabul qilinmagan.
+
 ---
 
 ## A — tdesktop CustomMod ⚡ FAOL
@@ -63,12 +70,58 @@ v7.0.9'ga o'zgardi. Tafsilot:
 | A3 | Log shovqinini kamaytirish (`API Warning: not loaded minimal channel applied.`) | 🟡 2026-08-09: root cause topildi (`data_session.cpp:966`, rasmiy kod, `LOG` shartsiz yoziladi — `DEBUG_LOG`ga o'tkazish mumkin edi), lekin user tuzatmaslikni tanladi — kod o'zgarishsiz qoldi. Past ustuvor, kerak bo'lsa keyinroq qaytiladi. |
 | A4 | Upstream v7.0.7 → v7.0.9 sync (to'liq `dev→SafeWall→Customizations↔Oybek` zanjiri orqali) | ✅ 2026-08-06, 100 commit, 1 konflikt (`lib_ui` submodule) |
 | A5 | Build v7.0.9 + haqiqiy self-update sinovi | ✅ 2026-08-08: build+reliz+update-apply hammasi tasdiqlandi (2 marta chiqarildi — `publish.ps1`dagi path bug tuzatilgach) |
-| A6 | Qt 5.15.18 → Qt 6.11.1 ga o'tish | 🔨 **Build'gacha bo'lgan barcha tayyorgarlik ishlari yakunlandi (2026-08-13).** Brainstorming orqali tasdiqlangan, spec: `docs/superpowers/specs/2026-08-13-qt6-migration-design.md`. Investigatsiya natijasi: rasmiy `tdesktop`/`desktop-app` build tizimi Qt6'ni allaqachon to'liq qo'llab-quvvatlaydi (`Telegram\build\prepare\win.bat qt6`), bu YANGI/experimental ish emas — Windows'da rasmiy default hamon Qt5 (Windows 7 moslik uchun), Qt6 ixtiyoriy `qt6` bayrog'i bilan. Bajarildi: (1) `lib_ui` submodule Qt5-fork (`Oybek-M/lib_ui`)dan rasmiy `desktop-app/lib_ui`ga qaytarildi (commit `cd9d356ddd`) — bu Qt6'gacha Qt5 build'ni vaqtincha buzadi, kutilgan holat; (2) butun `SourceFiles` bo'ylab Qt5-only API sweep qilindi (`QRegExp`, `QTextCodec`, `qAsConst`, `QStringRef`, `QDesktopWidget` va h.k. — topilmadi); (3) 3 ta `QNativeGestureEvent::pos()/globalPos()` chaqiruvi `position()/globalPosition()`ga o'zgartirildi (commit `914c1b1a95`: `info_media_grid_zoom.cpp`, `editor_paint.cpp`, `media_view_overlay_widget.cpp`). **Qolgan yagona qadam:** `win.bat qt6` (Qt'ni source'dan build qilish, taxminan soatlab) — **faqat user signal berganda** boshlanadi (laptop band bo'lmagan vaqtda). Shundan keyin `configure.bat x64 qt6 ...` + to'liq build, so'ng build paytida chiqishi mumkin bo'lgan qo'shimcha kompilyatsiya xatolarini tuzatish. A11 Task 6 bilan **bitta umumiy build**da tekshiriladi. |
+| A6 | Qt 5.15.18 → Qt 6.11.1 ga o'tish | 🔨 **Build'gacha bo'lgan barcha tayyorgarlik ishlari yakunlandi (2026-08-13).** Brainstorming orqali tasdiqlangan, spec: `docs/superpowers/specs/2026-08-13-qt6-migration-design.md`. Investigatsiya natijasi: rasmiy `tdesktop`/`desktop-app` build tizimi Qt6'ni allaqachon to'liq qo'llab-quvvatlaydi (`Telegram\build\prepare\win.bat qt6`), bu YANGI/experimental ish emas — Windows'da rasmiy default hamon Qt5 (Windows 7 moslik uchun), Qt6 ixtiyoriy `qt6` bayrog'i bilan. Bajarildi: (1) `lib_ui` submodule Qt5-fork (`Oybek-M/lib_ui`)dan rasmiy `desktop-app/lib_ui`ga qaytarildi (commit `cd9d356ddd`) — bu Qt6'gacha Qt5 build'ni vaqtincha buzadi, kutilgan holat; (2) butun `SourceFiles` bo'ylab Qt5-only API sweep qilindi (`QRegExp`, `QTextCodec`, `qAsConst`, `QStringRef`, `QDesktopWidget` va h.k. — topilmadi); (3) 3 ta `QNativeGestureEvent::pos()/globalPos()` chaqiruvi `position()/globalPosition()`ga o'zgartirildi (commit `914c1b1a95`: `info_media_grid_zoom.cpp`, `editor_paint.cpp`, `media_view_overlay_widget.cpp`). **Build boshlash urinishi (2026-08-13, natija: hali real boshlanmagan):**
+User "BUILD uchun tayyorman" dedi, keyin darhol "build qilishni real
+boshlamay tur" deb to'xtatdi (chunki A13 kritik xatosi paydo bo'ldi,
+pastga qarang) — **shuning uchun `win.bat qt6` hali HAQIQIY ishga
+tushmagan**, faqat muhit sozlash urinishlari bo'ldi:
+- 2 marta `cmd.exe /c "..."` Bash orqali chaqirildi — MSYS/Git-Bash
+  quote-mangling sababli **ikkalasi ham no-op** (banner chiqib, hech
+  narsa bajarmay darhol exit 0 bilan tugadi). **Xulosa: Bash tool orqali
+  to'g'ridan-to'g'ri `cmd.exe /c "murakkab && zanjir"` ishlatmang** —
+  buning o'rniga alohida `.bat` fayl yozib, uni chaqiring.
+- 3-urinish (PowerShell orqali alohida `.bat` fayl chaqirilib) — **haqiqiy
+  xato topildi**: `vcvars64.bat -vcvars_ver=14.44` ishlamadi —
+  `[ERROR:vcvars.bat] Toolset directory for version '14.44' was not
+  found.` Sabab: `docs/building-win.md`dagi Windows-7-moslik uchun maxsus
+  `v144.4` toolset komponenti o'rnatilmagan (faqat standart `v145` bor).
+  **User qarori (tasdiqlangan, AskUserQuestion orqali):** bizga Windows 7
+  moslik kerak emas — `-vcvars_ver=14.44` bayrog'ini olib tashlab, oddiy
+  `vcvars64.bat` (standart toolset) ishlatiladi. **Bu fix hali .bat faylga
+  yozilmagan** — keyingi sessiyada shu o'zgarishni qilib, keyin qayta
+  urinish kerak.
+
+**Ishlatiladigan skript (qayta yaratish kerak, chunki avvalgisi
+sessiya-specific temp papkada edi va yo'qolgan bo'lishi mumkin) — TUZATILGAN
+holatda (`-vcvars_ver=14.44` OLIB TASHLANGAN):**
+```bat
+@echo off
+call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"
+if errorlevel 1 (
+    echo VCVARS_FAILED
+    exit /b 1
+)
+cd /d "C:\Users\Oybek\Documents\Projects programming\Telegram\Telegram"
+tdesktop\Telegram\build\prepare\win.bat qt6
+echo PREPARE_EXIT_CODE=%errorlevel%
+```
+Ishga tushirish: **PowerShell orqali** (Bash/cmd.exe orqali EMAS —
+yuqoridagi quote-mangling muammosi), `run_in_background: true` bilan,
+masalan: `& 'C:\...\run_qt6_build.bat' *> 'C:\...\qt6_build.log'`.
+Uzoq (soatlab) jarayon — user signal berguncha ishga tushirilmasin.
+
+**Qolgan qadamlar:** (1) yuqoridagi tuzatilgan skript bilan `win.bat qt6`ni
+qayta ishga tushirish (faqat user signal berganda), (2) muvaffaqiyatli
+tugasa `configure.bat x64 qt6 -D TDESKTOP_API_ID=... -D
+TDESKTOP_API_HASH=...` (kalitlar A7'da sozlangan), (3) to'liq build, (4)
+build paytida chiqishi mumkin bo'lgan qo'shimcha kompilyatsiya xatolarini
+tuzatish. A11 Task 6 bilan **bitta umumiy build**da tekshiriladi. |
 | A7 | VS2022→VS2026 ko'chishi bilan bog'liq build-muhit tuzatishlari | ✅ 2026-08-08 — toolset, QT env var, api_id/api_hash, `DESKTOP_APP_DISABLE_AUTOUPDATE` qayta yoqildi. Tafsilot: `docs/self-update/HANDOFF.md` §2.6 |
 | A8 | `publish.ps1` Packer path bug (release-staging prefiksi) | ✅ 2026-08-08 — tuzatildi, v7.0.9 qayta chiqarildi, sinovdan o'tdi. Tafsilot: `docs/self-update/HANDOFF.md` §0.1 |
 | A9 | Upstream (rasmiy) versiya tekshiruvchisi — Custom Window'da rasmiy tdesktop'da yangi reliz bor-yo'qligini avto/qo'lda bildirish | ✅ 2026-08-09: to'liq implement, build va real-muhitda qo'lda sinov (7/7 band) muvaffaqiyatli. Spec: `docs/superpowers/specs/2026-08-08-upstream-update-checker-design.md`, reja: `docs/superpowers/plans/2026-08-08-upstream-update-checker-plan.md` (5/5 task ✅, yakuniy code review APPROVED) |
 | A10 | "Bitta tugma" sync+build+publish pipeline — foydalanuvchi mavjud bo'lganda, A9 yangilanish borligini bildirgach, sync→build→3 mirror'ga reliz ketma-ketligini bitta buyruq/tugma bilan boshlash (hozirgi 4-5 qo'lda qadam o'rniga) | 🕓 Keyingi tasklarga qo'shildi (2026-08-08). **Ataylab yarim-avtomatik** — to'liq unattended emas: build resurs-qoidasi ("build oldidan doim so'rash"), merge-konflikt qarorlari va reliz oldidan tekshiruv hali inson ishtirokini talab qiladi. A9 asosida keladi, undan keyin brainstorming qilinadi. |
 | A11 | Story post-vaqti — yashirilgan/berkitilgan last-seen'ni bilvosita aniqlash uchun qo'shimcha signal: kuzatilayotgan user story qo'yganda, uni ochmasdan/ko'rmasdan story'ning qo'yilgan vaqti mavjud "Activity History" arxiviga yoziladi (fallback signal) + ixtiyoriy story media (foto/video) zaxirasi. | 🔨 2026-08-09: 5/6 task implement+review qilindi va push qilindi (Task 1-5: settings maydoni, story-vaqt signali hook, media-backup logikasi, Custom Window toggle, History Box formatlash). **Faqat Task 6 (build + qo'lda tekshiruv) qoldi** — bu alohida emas, A6 (Qt6) bilan **bitta umumiy build**da qilinadi (2026-08-13 qayta rejalashtirildi, yuqoridagi ustuvorlik bo'limiga qarang). Spec: `docs/superpowers/specs/2026-08-09-story-activity-signal-design.md`, reja: `docs/superpowers/plans/2026-08-09-story-activity-signal-plan.md`. Xavfsizlik: mavjud "Hikoyalarni anonim ko'rish" (`ShouldAnonymousStory`) real ikkinchi akkountdan tekshirilib, to'g'ri ishlayotgani tasdiqlandi (§5, spec ichida). |
+| A13 | 🔴 **KRITIK — AntiDelete matnli xabarda ishlamadi:** shaxsiy (1-on-1) chatda suhbatdosh MATN xabar yozdi va o'chirdi — CustomMod tdesktop (Windows) buni SAQLAB QOLA OLMADI (AntiDelete kutilgan natijani bermadi), garchi bu funksiya aynan shunday holat uchun mavjud. Parallel: user mobil qurilmadan "aka messenger" deb atalgan boshqa Telegram klient/akkountga ham kirgan edi — **o'sha klient xabarni ushlab qololgan/saqlab qolgan** ("aka messenger" nima ekani aniq emas — boshqa qurilmadagi boshqa Telegram klientmi yoki oila a'zosining ilovasimi, keyingi sessiyada aniqlashtirish kerak). Qo'shimcha aniqlangan tafsilot: kompyuter keyinroq **to'g'ridan-to'g'ri o'chirilgan** (ilovani quit qilmasdan, kompyuterni butunlay o'chirish) — LEKIN bu o'chirish chatdagi yozishmadan **ancha vaqt keyin** sodir bo'lgan (ya'ni bevosita ketma-ketlikda emas). Bu detal muhim gipotezani tekshirish uchun: agar AntiDelete faqat xotirada saqlab, faqat "clean quit"da diskka yozsa — istalgan hard-kill (hatto ancha keyin bo'lsa ham) shu oraliqdagi barcha saqlanmagan yozuvlarni yo'qotgan bo'lardi; agar darhol DB'ga yozsa — bu hodisa buni tushuntira olmaydi va boshqa root cause qidirish kerak. | 🆕 **YANGI (2026-08-13), investigatsiya BOSHLANMAGAN.** `superpowers:systematic-debugging` chaqirilgan edi, lekin Phase 1 boshlanishidan oldin user to'xtatib, docs-update so'radi (model Sonnet→Opus almashtirilmoqda). **Muhim kod-kontekst (tasdiqlanmagan, faqat eslatma):** AntiDelete/AntiEdit CustomMod'ning OLDIN implement qilingan (bu sessiyada yozilmagan) funksiyasi. Ma'lum bog'liq kod: `data_document.cpp`dagi `finishLoad()` hook (`CustomSettings::AntiDelete()` bilan gate qilingan) — LEKIN bu MEDIA/document fayllar uchun, matnli xabarlar uchun EMAS — matnli-xabar AntiDelete alohida kod yo'lidan borishi kerak (hali topilmagan/tasdiqlanmagan). Memory'da eslatma bor: "O'chirilgan/tahrirlangan xabarlar restart'da saqlash: `addOlderSlice`/`addNewerSlice`ga `loadDeletedMessages()` hook qo'shilgan" — bu DB-asosidagi, restart-dan keyin ham saqlanadigan tuzilma borligini ko'rsatadi, lekin write-path (xabar o'chirilishini ushlab qolish/DB'ga yozish) qayerda ekani hali tekshirilmagan. **Keyingi qadam:** systematic-debugging Phase 1 — `log.txt`ni tekshirish, matnli-xabar AntiDelete kod yo'lini topish (`custom_*.cpp` fayllar ichida qidirish, ehtimol `history.cpp`/`data_session.cpp`dagi message-delete update handler'iga bog'liq), aniq reproduksiya shartlarini so'rash. |
 | A12 | 🔴 **KRITIK — moliyaviy ta'sirli crash:** Telegram Stars sovg'a qilish (gift) jarayonida ilova qulaydi. Reprodutsiya (2026-08-09, foydalanuvchi tomonidan): (1) CustomMod client'da stars sotib olib boshqa userga gift qilishga urinilganda — Visa kartadan pul yechildi, asosiy oynaga qaytganda **crash**, qayta ishga tushirilganda stars **noto'g'ri o'z profiliga** kredit bo'lgan (gift qilinmagan). (2) Xuddi shu urinish **rasmiy (official, tuzatilmagan) tdesktop client'da qaytarilgan** — yana Visa'dan pul yechildi, gift qabul qiluvchi chatida 100 stars paydo bo'lgani zahoti yana **crash** (to'liq yopilish), lekin qayta ishga tushirilganda bu safar gift **to'g'ri yetib borgan**. | ⏸️ **PAUZA QILINDI (2026-08-09).** `telegramdesktop/tdesktop` GitHub issue'lari tekshirildi (`gh search issues`) — aniq mos crash-report topilmadi. Eng yaqin: [#29972](https://github.com/telegramdesktop/tdesktop/issues/29972) "Concurrency issues in Telegram marketplace purchases" (stars yechilib gift boshqa/noto'g'ri joyga borishi) — lekin bu **server-tomon (MTProto) race condition** deb topilib, maintainer "bu tdesktop-specific emas, bugs.telegram.org'ga" deb yopgan, hech qanday fix/PR yo'q. User qarori: agar mavjud ma'lumot topilmasa, o'zimiz resurs sarflab debug qilmaymiz — bu ehtimol upstream/server xatosi, rasmiy tomondan tuzatilsa keyingi sync orqali o'zi keladi. **Keyinroq qayta ko'rib chiqish mumkin** agar: (a) user yana takrorlasa va aniqroq repro/crash-log to'plansa, (b) GitHub'da keyinchalik tegishli issue/fix paydo bo'lsa. |
 
 **v7.0.7 bilan kelgan yangi bog'liqliklar:** `Telegram/ThirdParty/libcbor`
