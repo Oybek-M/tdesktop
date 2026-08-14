@@ -1103,14 +1103,16 @@ win:
     SET MSYS2_PATH_TYPE=inherit
 
 win32:
-    # CUSTOM (A6): -v145 qo'shildi. Ularsiz libvpx o'z .vcxproj larini v143
-    # (VS2022) toolset bilan generatsiya qiladi -> MSB8020, chunki bu mashinada
-    # faqat VS2026 (MSVC 14.51 = v145) bor. Upstream ARM64 uchun aynan shu
-    # suffiksni allaqachon ishlatadi (pastdagi winarm) - demak libvpx configure
-    # buni qo'llab-quvvatlaydi va qiymat sinovdan o'tgan.
-    SET "TOOLCHAIN=x86-win32-vs17-v145"
+    # A6 EslatMA (2026-08-14): bu yerga -v145 qo'shib ko'rildi va ISHLAMADI --
+    # libvpx configure "Unrecognized toolchain 'x86_64-win64-vs17-v145'" deydi.
+    # Sabab: gen_msvs_vcxproj.sh platform_toolset ni target nomining 4-maydonidan
+    # oladi (ya'ni mexanizm bor), LEKIN configure dagi all_platforms ro'yxatida
+    # faqat arm64-win64-vs17-v145 bor, x86_64 varianti yo'q. Shuning uchun
+    # rasmiy qiymatga qaytarildi. Hal qilish yo'li: VS2022 v143 build tools
+    # o'rnatish (lzma/breakpad/libvpx -- uchalasi ham shu sababdan yiqilgan).
+    SET "TOOLCHAIN=x86-win32-vs17"
 win64:
-    SET "TOOLCHAIN=x86_64-win64-vs17-v145"
+    SET "TOOLCHAIN=x86_64-win64-vs17"
 winarm:
     SET "TOOLCHAIN=arm64-win64-vs17-v145"
 win:

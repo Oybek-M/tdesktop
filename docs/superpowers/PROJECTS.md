@@ -4,7 +4,17 @@ Bu fayl qaysi ish **hozir faol**, qaysi biri **to'xtatib qo'yilgan** va
 qaysi biri **hali muhokama bosqichida** ekanini ko'rsatadi. Yangi
 sessiya boshlanganda birinchi shu yerga qarang.
 
-Oxirgi yangilanish: 2026-08-13
+Oxirgi yangilanish: 2026-08-14
+
+> 🚨 **YO'L O'ZGARDI (2026-08-14):** build daraxti
+> `...\Projects programming\Telegram\Telegram\` dan **`C:\TBuild\`** ga
+> ko'chirildi. Repo endi **`C:\TBuild\tdesktop`**, kutubxonalar
+> `C:\TBuild\Libraries`, maxfiy kalitlar `C:\TBuild\DesktopPrivate`.
+> **Sabab:** upstream `prepare.py` bo'sh joyli yo'llarni qo'llab-quvvatlamaydi
+> (42 ta tirnoqsiz `%LIBS_DIR%`/`%THIRDPARTY_DIR%` ishlatilishi), bizning
+> eski yo'lda esa "Projects **programming**" bor edi. Rasmiy hujjat ham
+> aynan shunday qisqa yo'lni tavsiya qiladi (`D:\TBuild`). Qolgan 23 ta
+> loyiha o'z joyida qoldi — faqat shu daraxt ko'chdi.
 
 ---
 
@@ -110,12 +120,65 @@ yuqoridagi quote-mangling muammosi), `run_in_background: true` bilan,
 masalan: `& 'C:\...\run_qt6_build.bat' *> 'C:\...\qt6_build.log'`.
 Uzoq (soatlab) jarayon — user signal berguncha ishga tushirilmasin.
 
-**Qolgan qadamlar:** (1) yuqoridagi tuzatilgan skript bilan `win.bat qt6`ni
-qayta ishga tushirish (faqat user signal berganda), (2) muvaffaqiyatli
-tugasa `configure.bat x64 qt6 -D TDESKTOP_API_ID=... -D
-TDESKTOP_API_HASH=...` (kalitlar A7'da sozlangan), (3) to'liq build, (4)
-build paytida chiqishi mumkin bo'lgan qo'shimcha kompilyatsiya xatolarini
-tuzatish. A11 Task 6 bilan **bitta umumiy build**da tekshiriladi. |
+**BUILD URINISHLARI 2026-08-14 (⏸️ TO'XTATILDI — user ofisga ketdi):**
+Progress: **20/32 bosqich muvaffaqiyatli** (cache'da), **21/32 `libvpx`da
+bloklangan**.
+
+Yo'lda topilgan va TUZATILGAN muammolar (hammasi bir xil naqsh — upstream
+faqat ARM64 uchun to'g'ri sozlagan, x64 uchun unutgan):
+1. `-vcvars_ver=14.44` — v144.4 toolset o'rnatilmagan → bayroq olib
+   tashlandi (Windows 7 moslik bizga kerak emas).
+2. Disk 31 GB yetmasdi → `out/Telegram/` (42.9 GB oraliq artefaktlar) va
+   eski `Telegram.pdb` o'chirildi → 77 GB.
+3. `win.bat` `python %FullScriptPath%prepare.py` ni **tirnoqsiz**
+   chaqiradi → `prepare.py` to'g'ridan-to'g'ri, tirnoq bilan chaqirilyapti.
+4. `NUMBER_OF_PROCESSORS` cmd.exe himoyalagan (sinovda tasdiqlandi:
+   `set` ishlamaydi, bola jarayonda ham tizim qiymati qaytadi) →
+   `prepare.py` ga `TDESKTOP_BUILD_JOBS` qo'shildi (cache-kalitiga
+   ta'sir qilmaydigan yo'l bilan: `environment` dict'ga EMAS,
+   `modifiedEnv` ga). Hozir 6 ta job (16 yadro / 15 GB RAM da to'liq
+   parallellik OS ni muzlatadi).
+5. `prepare.py` fon rejimida `getch()` bilan
+   `"(r)ebuild, rebuild (a)ll, (s)kip..."` savolini berib qotib qolardi →
+   `silent` argumenti qo'shildi (skriptning o'z mexanizmi).
+6. Bo'sh joyli yo'l → `C:\TBuild` ga ko'chirildi (yuqoridagi ogohlantirish).
+7. `lzma` + `breakpad`: `ToolsetProp` bo'sh qolardi → v145 majburlandi.
+
+⛔ **HAL QILINMAGAN BLOKER — `v143` toolset yo'qligi (3-marta chiqdi):**
+`lzma`, `breakpad`, `libvpx` — uchalasi ham
+`error MSB8020: Platform Toolset = 'v143' cannot be found` beradi.
+Mashinada faqat VS2026 bor (MSVC 14.51 = v145); `vswhere` yagona
+instansiyani ko'rsatadi, VS2022 papkalari bo'sh qoldiq. lzma/breakpad
+uchun v145 majburlash yordam berdi, lekin **libvpx uchun ishlamadi**:
+uning `configure`idagi `all_platforms` ro'yxatida faqat
+`arm64-win64-vs17-v145` bor, `x86_64-win64-vs17-v145` yo'q
+(`Unrecognized toolchain` xatosi). Mexanizmning o'zi bor —
+`gen_msvs_vcxproj.sh` `platform_toolset` ni target nomining 4-maydonidan
+oladi — faqat oq ro'yxatga kiritilmagan. Sinab ko'rilgan `-v145`
+o'zgarishi **orqaga qaytarildi** (kodda ishlamaydigan qiymat qolmasin).
+
+**User qarori (2026-08-14):** 1-variant — **VS2022 v143 build tools
+o'rnatish** (Visual Studio Installer → "MSVC v143 - VS2022 C++ x64/x86
+build tools", ~2-3 GB) — yoki boshqa yo'l topish. Ish **vaqtincha
+to'xtatildi**.
+
+**Qayta boshlashda:** (1) v143 o'rnatilgach build skriptini qayta ishga
+tushirish (skript matni pastda), (2) `configure.bat x64 qt6 -D
+TDESKTOP_API_ID=... -D TDESKTOP_API_HASH=...`, (3) to'liq build,
+(4) A11 Task 6 va A13 bilan birga qo'lda tekshiruv.
+
+**Ishlaydigan build skripti** (`C:\TBuild` uchun, PowerShell orqali
+`run_in_background: true` bilan chaqiriladi):
+```bat
+@echo off
+call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"
+if errorlevel 1 exit /b 1
+set TDESKTOP_BUILD_JOBS=6
+set PYTHONUNBUFFERED=1
+cd /d "C:\TBuild"
+python -u "C:\TBuild\tdesktop\Telegram\build\prepare\prepare.py" qt6 silent
+echo [A6] EXIT=%errorlevel%
+``` |
 | A7 | VS2022→VS2026 ko'chishi bilan bog'liq build-muhit tuzatishlari | ✅ 2026-08-08 — toolset, QT env var, api_id/api_hash, `DESKTOP_APP_DISABLE_AUTOUPDATE` qayta yoqildi. Tafsilot: `docs/self-update/HANDOFF.md` §2.6 |
 | A8 | `publish.ps1` Packer path bug (release-staging prefiksi) | ✅ 2026-08-08 — tuzatildi, v7.0.9 qayta chiqarildi, sinovdan o'tdi. Tafsilot: `docs/self-update/HANDOFF.md` §0.1 |
 | A9 | Upstream (rasmiy) versiya tekshiruvchisi — Custom Window'da rasmiy tdesktop'da yangi reliz bor-yo'qligini avto/qo'lda bildirish | ✅ 2026-08-09: to'liq implement, build va real-muhitda qo'lda sinov (7/7 band) muvaffaqiyatli. Spec: `docs/superpowers/specs/2026-08-08-upstream-update-checker-design.md`, reja: `docs/superpowers/plans/2026-08-08-upstream-update-checker-plan.md` (5/5 task ✅, yakuniy code review APPROVED) |
