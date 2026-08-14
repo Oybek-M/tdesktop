@@ -144,6 +144,27 @@ maqsad fayl yo'li). Ikkalasini birga rejalashtirish mantiqiy.
 
 ---
 
+## ⏭️ ERTAGA SHU YERDAN BOSHLANG (2026-08-15)
+
+1. **VS2026 → Release/x64 → Build.** Oxirgi commit (backfill skaneri)
+   hali build qilinmagan. Undan oldingi build 00:15 da 0 xato bilan
+   o'tgan, ya'ni faqat 2 ta fayl qayta kompilyatsiya bo'ladi.
+2. `out\Release\Telegram.exe` → `C:\Users\Oybek\Pictures\Release\` ga
+   ko'chirish (avval ilovadan to'liq chiqish).
+3. Sinov — birinchi navbatda shu uchtasi:
+   - **T15:** 5 ta whitelist kanalda AntiDelete endi ishlaydimi
+     (kategoriya xatosi tuzatilgan)
+   - **T2:** White List'dagi chatda katta video yonidan scroll —
+     **crash bo'lmasligi kerak**
+   - **Archive tab:** "🔍 Eski media fayllarni indekslash" → keyin
+     oynani yopib qayta ochib, eksport ro'yxati to'lganini ko'rish
+4. Qolgan sinovlar: reja faylining Vazifa 15 jadvali (T1–T16).
+
+**Holat:** 11 ta commit, hammasi LOKAL — push qilinmagan (user
+xohishi bo'yicha keyin birga yuboriladi).
+
+---
+
 ## ✅ Katta media backup — KOD YOZILDI (2026-08-14 kechqurun)
 
 Spec: `docs/superpowers/specs/2026-08-14-media-backup-and-export-design.md`
