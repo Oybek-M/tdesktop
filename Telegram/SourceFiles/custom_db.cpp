@@ -2402,12 +2402,26 @@ static void RunAutoBackup() {
     // Async: this runs 5s after startup and then every 24h, and used to
     // block the UI thread for as long as ExportFullBackup() took (the same
     // freeze users hit on manual backup, just less predictably timed).
-    ExportFullBackupAsync(backupRoot, [backupRoot](const QString &result) {
-        if (result.isEmpty()) {
+    // 2026-08-14: avtomatik zaxira MEDIA'SIZ (standart ExportOptions).
+    //
+    // Ilgari u butun media papkasini nusxalar va 3 ta nusxa saqlanardi —
+    // ya'ni AppData'da media hajmining UCH BARAVARI yotardi, foydalanuvchi
+    // bexabar holda. 24 soatda bir marta takrorlanadigan operatsiya uchun
+    // bu juda qimmat.
+    //
+    // Endi zaxirada baza + sozlamalar + media INDEKSI bo'ladi (MB'lar).
+    // Ya'ni "qanday media bor edi" ma'lumoti saqlanadi, fayllarning
+    // o'zi esa asl joyida — ular allaqachon doimiy arxivda turibdi,
+    // takror nusxa saqlashning ma'nosi yo'q.
+    ExportFullBackupAsync(
+        backupRoot,
+        ExportOptions(),
+        [backupRoot](const ExportResult &result) {
+        if (result.mainZipPath.isEmpty()) {
             qDebug() << "AutoBackup: export failed";
             return;
         }
-        qDebug() << "AutoBackup: saved to" << result;
+        qDebug() << "AutoBackup: saved to" << result.mainZipPath;
 
         // Keep only the 3 most recent backups.
         QDir dir(backupRoot);
@@ -2416,6 +2430,20 @@ static void RunAutoBackup() {
         while (entries.size() > 3) {
             QFile::remove(entries.last().filePath());
             entries.removeLast();
+        }
+
+        // 2026-08-14: yetim qolgan staging papkalarini tozalash.
+        //
+        // Yuqoridagi tozalash filtri faqat `*.zip` FAYLLARINI ko'radi,
+        // shuning uchun eksport yarim yo'lda uzilganda qolib ketgan
+        // `..._tmp` PAPKALARI abadiy yotardi. Foydalanuvchi qurilmasida
+        // 2026-07-12 dan beri 7 ta shunday papka to'planib, AutoBackups
+        // hajmi 6.1 GB ga yetgan edi.
+        const auto stale = dir.entryInfoList(
+            {"CustomModBackup_*_tmp", "CustomModMedia_*_tmp"},
+            QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const auto &info : stale) {
+            QDir(info.filePath()).removeRecursively();
         }
     });
 }
