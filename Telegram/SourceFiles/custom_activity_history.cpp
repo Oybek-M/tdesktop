@@ -6,6 +6,7 @@
 #include "data/data_changes.h"
 #include "data/data_lastseen_status.h"
 #include "data/data_peer.h"
+#include "data/data_session.h"
 #include "data/data_user.h"
 #include "data/data_stories.h"
 #include "data/data_story.h"
