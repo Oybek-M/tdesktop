@@ -2,7 +2,10 @@
 
 #include "custom_db.h"
 #include "custom_settings.h"
+#include "core/application.h"
 #include "crl/crl.h"
+#include "ui/boxes/confirm_box.h"
+#include "window/window_controller.h"
 
 #include <QtCore/QDir>
 #include <QtCore/QDirIterator>
@@ -85,6 +88,31 @@ void AddBytes(long long bytes) {
     if (bytes > 0) {
         gUsedBytes.fetch_add(bytes);
     }
+}
+
+void ShowQuotaAlertIfNeeded() {
+    if (!IsFull()) {
+        return;
+    }
+    const auto window = Core::App().activeWindow();
+    if (!window) {
+        return; // oyna yo'q — keyingi ishga tushishda takrorlanadi
+    }
+    const auto toGb = [](long long bytes) {
+        return QString::number(double(bytes) / (1024.0 * 1024 * 1024), 'f', 1);
+    };
+    window->show(Ui::MakeConfirmBox({
+        .text = u"Media arxivi kvotasi to'lgan.\n\nIshlatilgan: "_q
+            + toGb(UsedBytes())
+            + u" GB / "_q
+            + toGb(LimitBytes())
+            + u" GB\n\nKatta fayllarni oldindan yuklab olish TO'XTATILDI. "
+              "Siz o'zingiz ochgan media baribir saqlanaveradi.\n\n"
+              "Hech qanday fayl o'chirilmadi. Kvotani Custom Window "
+              "orqali kengaytirishingiz yoki arxiv papkasini qo'lda "
+              "tozalashingiz mumkin."_q,
+        .inform = true,
+    }));
 }
 
 } // namespace CustomMediaQuota

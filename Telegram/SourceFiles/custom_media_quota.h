@@ -36,4 +36,15 @@ void AddBytes(long long bytes);
 // hisoblaydi, shuning uchun yagona joyda.
 [[nodiscard]] QString ArchiveRoot();
 
+// Kvota to'lgan bo'lsa ogohlantirish oynasini ko'rsatadi.
+//
+// Toast EMAS, balki tasdiqlash talab qiladigan box — foydalanuvchi
+// talabi. Muammo hal bo'lmaguncha (hajm kvotadan pastga tushmaguncha
+// yoki kvota kengaytirilmaguncha) HAR ISHGA TUSHISHDA takrorlanadi.
+// Hech qanday fayl avtomatik o'chirilmaydi.
+//
+// Chat ro'yxati yuklangach chaqiriladi — sessiya konstruktorida hali
+// oyna mavjud emas.
+void ShowQuotaAlertIfNeeded();
+
 } // namespace CustomMediaQuota

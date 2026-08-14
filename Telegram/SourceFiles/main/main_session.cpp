@@ -57,6 +57,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "support/support_helper.h"
 #include "custom_activity_history.h"
 #include "custom_archive.h"
+#include "custom_db.h"
+#include "custom_media_quota.h"
 #include "lang/lang_keys.h"
 #include "core/application.h"
 #include "ui/text/text_utilities.h"
@@ -180,6 +182,9 @@ Session::Session(
 	// A13/D5: davriy WAL checkpoint — to'satdan tok o'chganda arxiv
 	// yozuvlari yo'qolmasligi uchun. Ichida takroriy chaqiruvdan himoya bor.
 	CustomArchive::StartMaintenance();
+	// Media kvotasi: boshlang'ich qiymatni indeksdan darhol oladi, papka
+	// skaneri esa fonda ketadi (custom_media_quota.cpp izohiga qarang).
+	CustomMediaQuota::Init();
 	// A13/K1b: arxivdan tiklanadigan chatlarni chat ro'yxatiga qaytarish.
 	// Konstruktorda EMAS, balki chat ro'yxati serverdan yuklangach —
 	// aks holda History'larning folderKnown() false bo'lib, keraksiz
@@ -195,6 +200,11 @@ Session::Session(
 		return !folder; // faqat asosiy ro'yxat (arxiv papkasi emas)
 	}) | rpl::take(1) | rpl::on_next([=] {
 		CustomArchive::RestoreDeletedChats(this);
+		// Indeksni fayl tizimi bilan moslashtirish: import'dan keyin
+		// yo'q fayllar 'missing' ga, tugagan yuklashlar 'present' ga.
+		CustomDB::ReconcileMediaIndex(CustomMediaQuota::ArchiveRoot());
+		// Kvota ogohlantirishi shu yerda — konstruktorda hali oyna yo'q.
+		CustomMediaQuota::ShowQuotaAlertIfNeeded();
 	}, lifetime());
 
 	_api->requestTermsUpdate();
