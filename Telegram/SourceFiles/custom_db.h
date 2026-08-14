@@ -165,6 +165,24 @@ struct MediaPeerSummary {
 // archiveRoot — ~/customizationMainFolder. Nechta yozuv o'zgargani qaytadi.
 int ReconcileMediaIndex(const QString &archiveRoot);
 
+// Bir martalik BACKFILL skaneri: media_index v7 da paydo bo'lgan, ya'ni
+// undan OLDIN arxivlangan fayllar indeksda yo'q va shuning uchun
+// eksportga tushmaydi. Bu funksiya medias/ daraxtini aylanib chiqib,
+// indeksda yo'q har bir fayl uchun yozuv qo'shadi.
+//
+// Fayl nomi sxemalari (tarixiy tartibda):
+//   <peerId>_<msgId>_<nom>  — L2 (2026-08-14+), ikkalasi ham aniqlanadi
+//   <msgId>_<nom>           — setDeletedLocally() zaxira yo'li
+//   <nom>                   — SaveMediaFile(), hech qanday ma'lumot yo'q
+//
+// Aniqlab bo'lmaganlar peerId="0" ostida, sintetik msgId bilan
+// saqlanadi — ular ham eksportga tusha olishi uchun (dalillar
+// yo'qolmasin). Takroriy chaqiruv xavfsiz: mavjud yozuvlar tegilmaydi.
+//
+// Nechta YANGI yozuv qo'shilgani qaytadi.
+int ScanArchiveMedia(const QString &archiveRoot);
+void ScanArchiveMediaAsync(std::function<void(int added)> callback);
+
 // C11: per-message edit history — all recorded versions across all chats.
 struct EditRecord {
     QString peerId;

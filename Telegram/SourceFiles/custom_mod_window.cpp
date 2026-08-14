@@ -2527,6 +2527,30 @@ void fillAboutTab(
 				QString::number(CustomSettings::MediaBackupQuotaGb()));
 			Ui::Toast::Show(u"Saqlandi ✓"_q);
 		});
+
+		// ── Bir martalik backfill skaneri ───────────────────────────
+		// media_index v7 da paydo bo'ldi, ya'ni undan OLDIN arxivlangan
+		// fayllar indeksda yo'q va shuning uchun eksportga tushmaydi.
+		// Dalillar yo'qolmasligi uchun ularni indeksga kiritish kerak.
+		const auto scanBtn = content->add(
+			object_ptr<Ui::RoundButton>(
+				content,
+				rpl::single(u"🔍 Eski media fayllarni indekslash"_q),
+				st::defaultBoxButton),
+			st::boxRowPadding);
+		scanBtn->addClickHandler([=] {
+			scanBtn->setDisabled(true);
+			Ui::Toast::Show(u"Skanerlanmoqda, biroz kuting..."_q);
+			const auto weak = base::make_weak(content);
+			CustomDB::ScanArchiveMediaAsync([=](int added) {
+				if (!weak) return;
+				scanBtn->setDisabled(false);
+				Ui::Toast::Show(added > 0
+					? (u"%1 ta fayl indeksga qoʻshildi. Roʻyxat yangilanishi "
+						"uchun oynani yopib qayta oching."_q).arg(added)
+					: u"Yangi fayl topilmadi — hammasi allaqachon indeksda."_q);
+			});
+		});
 	}
 
 	// ── Media eksport tanlovi (2026-08-14) ──────────────────────────────
@@ -2635,7 +2659,11 @@ void fillAboutTab(
 
 		for (const auto &summary : summaries) {
 			auto name = CustomSettings::GetPeerDisplayName(summary.peerId);
-			if (name.isEmpty()) {
+			if (summary.peerId == u"0"_q) {
+				// Backfill skaneri: fayl nomidan peer aniqlanmagan eski
+				// fayllar shu guruhda. Ular ham eksport qilinishi kerak.
+				name = u"Noma'lum (eski fayllar)"_q;
+			} else if (name.isEmpty()) {
 				name = u"ID "_q + summary.peerId;
 			}
 			const auto btn = content->add(

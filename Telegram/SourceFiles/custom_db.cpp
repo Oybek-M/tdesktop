@@ -1112,6 +1112,135 @@ int ReconcileMediaIndex(const QString &archiveRoot) {
     return changed;
 }
 
+int ScanArchiveMedia(const QString &archiveRoot) {
+    Init();
+    if (!gDb) return 0;
+
+    const auto mediaRoot = archiveRoot + "/medias";
+    if (!QDir(mediaRoot).exists()) return 0;
+
+    // 1) Indeksda ALLAQACHON bor rel_path'lar — takrorlamaslik uchun.
+    QSet<QString> known;
+    // 2) peerId="0" ostidagi band msgId'lar — sintetik ID tanlashda
+    //    to'qnashuvni oldini olish uchun.
+    QSet<long long> usedSynthetic;
+    {
+        sqlite3_stmt *stmt = nullptr;
+        if (sqlite3_prepare_v2(gDb,
+                "SELECT rel_path, peer_id, msg_id FROM media_index",
+                -1, &stmt, nullptr) == SQLITE_OK) {
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                const auto rel = colText(stmt, 0);
+                if (!rel.isEmpty()) known.insert(rel);
+                if (colText(stmt, 1) == "0") {
+                    usedSynthetic.insert(sqlite3_column_int64(stmt, 2));
+                }
+            }
+            sqlite3_finalize(stmt);
+        }
+    }
+
+    const auto kindOfDir = [](const QString &dirName) {
+        if (dirName == "images") return QStringLiteral("image");
+        if (dirName == "videos") return QStringLiteral("video");
+        if (dirName == "voices") return QStringLiteral("voice");
+        return QStringLiteral("file");
+    };
+
+    auto added = 0;
+    execSql("BEGIN");
+    QDirIterator it(
+        mediaRoot,
+        QDir::Files | QDir::NoSymLinks,
+        QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        it.next();
+        const QFileInfo info = it.fileInfo();
+        // Arxiv ildizidan nisbiy yo'l — eksport ham shu shaklni kutadi.
+        const auto relPath = QDir(archiveRoot).relativeFilePath(
+            info.absoluteFilePath());
+        if (relPath.isEmpty() || known.contains(relPath)) {
+            continue;
+        }
+
+        // Fayl nomidan peerId/msgId ni ajratishga urinamiz.
+        const auto name = info.fileName();
+        const auto parts = name.split(u'_');
+        auto peerId = QStringLiteral("0");
+        auto msgId = 0LL;
+        auto parsed = false;
+        if (parts.size() >= 3) {
+            auto okPeer = false, okMsg = false;
+            const auto p = parts[0].toULongLong(&okPeer);
+            const auto m = parts[1].toLongLong(&okMsg);
+            if (okPeer && okMsg && p > 0 && m > 0) {
+                // <peerId>_<msgId>_<nom> — L2 sxemasi.
+                peerId = QString::number(p);
+                msgId = m;
+                parsed = true;
+            }
+        }
+        if (!parsed && parts.size() >= 2) {
+            auto okMsg = false;
+            const auto m = parts[0].toLongLong(&okMsg);
+            if (okMsg && m > 0) {
+                // <msgId>_<nom> — setDeletedLocally() zaxira yo'li.
+                // peer noma'lum, lekin msgId foydali.
+                msgId = m;
+                parsed = true;
+            }
+        }
+        if (!parsed) {
+            // Hech qanday ma'lumot yo'q (eski SaveMediaFile). Fayl
+            // baribir indeksga tushishi SHART — aks holda u eksportga
+            // umuman tushmaydi va dalil yo'qoladi. Sintetik, barqaror
+            // ID: rel_path hash'i, manfiy (haqiqiy msgId'lardan ajralib
+            // tursin), to'qnashuvda pastga siljitiladi.
+            msgId = -static_cast<long long>(qHash(relPath)) - 1;
+            while (usedSynthetic.contains(msgId)) {
+                --msgId;
+            }
+            usedSynthetic.insert(msgId);
+        } else if (peerId == "0") {
+            // msgId ma'lum, peer noma'lum — bu ham "0" guruhiga tushadi,
+            // shuning uchun band ID'lar ro'yxatiga qo'shamiz.
+            while (usedSynthetic.contains(msgId)) {
+                --msgId;
+            }
+            usedSynthetic.insert(msgId);
+        }
+
+        MediaIndexEntry entry;
+        entry.peerId = peerId;
+        entry.msgId = msgId;
+        entry.kind = kindOfDir(info.dir().dirName());
+        entry.fileName = name;
+        entry.relPath = relPath;
+        entry.size = info.size();
+        entry.msgDate = 0; // fayl nomidan bilib bo'lmaydi
+        entry.archivedAt = static_cast<unsigned int>(
+            info.lastModified().toSecsSinceEpoch());
+        entry.layer = u"scan"_q;
+        entry.status = u"present"_q;
+        entry.reason = u"backfill"_q;
+        UpsertMediaIndex(entry);
+        known.insert(relPath);
+        ++added;
+    }
+    execSql("COMMIT");
+    return added;
+}
+
+void ScanArchiveMediaAsync(std::function<void(int added)> callback) {
+    const auto root = QDir::homePath() + "/customizationMainFolder";
+    crl::async([root, callback] {
+        const auto added = ScanArchiveMedia(root);
+        crl::on_main([added, callback] {
+            if (callback) callback(added);
+        });
+    });
+}
+
 void Checkpoint() {
     Init();
     if (!gDb) return;
