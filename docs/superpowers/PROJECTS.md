@@ -58,6 +58,42 @@ uchun.
 
 ---
 
+## 🔴 HOZIRGI ISH — Qt6 build'idan keyingi 4 ta muammo (2026-08-14)
+
+**Qt6 build MUVAFFAQIYATLI** (`Telegram.exe` 219.5 MB, 14.08 13:20,
+`EXIT=0`). Foydalanuvchi uni ishlab turgan nusxaga ko'chirdi
+(`C:\Users\Oybek\Pictures\Release\`, eskisi `Telegram.exe.qt5-zaxira`
+sifatida saqlangan — orqaga qaytish 5 soniya). Real foydalanishda
+**4 ta muammo** topildi. Tartib foydalanuvchi bilan kelishilgan:
+3 → 2 → 4 → 1.
+
+| № | Muammo | Holat |
+|---|---|---|
+| **3** | Birinchi start sekin, bo'limlarga (Unread/Personal) birinchi o'tishda qisqa freez | ✅ **TEKSHIRILDI — regressiya emas.** Gipoteza "A13 arxiv hook'i DB'ga ko'p yozyapti" **rad etildi**: DB 150 MB (ertalabki 155 dan oshmagan), WAL atigi 0.4 MB. Kod yo'li ham buni tasdiqlaydi — `MaybeArchiveItem` `addNewMessage`da faqat `NewMessageType::Unread` uchun, `addOlderSlice`da esa chat OCHILGANDA ishlaydi; startup'da dialoglar `Existing` turida keladi. Haqiqiy sabab — **Qt6 keshlarini bir martalik qayta qurish** (shrift/glif/ikonka keshlari Qt versiyasi o'zgarganda bekor bo'ladi). Foydalanuvchi ikkinchi start'ni sinab ko'rdi: **tezroq ochildi** → gipoteza tasdiqlandi. Qo'shimcha performance yaxshilash **oxiriga surildi** (user qarori). |
+| **2** | DB'dan tiklangan chat ("Xurshida \| V", peer `7815103103`) asosiy chatList'da ko'rinmaydi — faqat qidiruvdan topib ochgandan keyin paydo bo'ladi | ✅ **TUZATILDI (kod yozildi, build kutilmoqda).** Ildiz sabab: `loadDeletedMessages()` faqat `History` obyekti YUKLANGANDA ishlaydi, `History` esa chat ochilganda yaratiladi. Yechim (K1b): `CustomDB::GetPeersWithDeletedMessages()` (arzon DISTINCT so'rov) + `CustomArchive::RestoreDeletedChats()` — har peer uchun History yaratib inject qiladi, so'ng `refreshChatListEntry()` bilan ro'yxatga qo'shadi; `folderKnown()` false bo'lsa `requestDialogEntry()` (aks holda `Expects(folderKnown())` yiqilardi). Chaqiruv `chatsListLoadedEvents()` ga bog'langan (`rpl::take(1)`), sessiya konstruktoriga EMAS. |
+| **4** | "🔔 Rasmiy versiya tekshiruvi" (A9) ishlamaydi: **"Tekshirib bo'lmadi: Connection closed"** | ⏳ **NAVBATDA.** Birinchi gipoteza (`cmake/external/qt/CMakeLists.txt` dagi `if (QT_VERSION GREATER 6)` — `6.11.1` satr, CMake uni 0 deb hisoblaydi → TLS plagini ulanmay qoladi) **TEKSHIRILDI VA RAD ETILDI**: `Telegram.vcxproj` da `qschannelbackend`, `qnetworklistmanager`, `Qt6EntryPoint`, `qwindows` — hammasi ULANGAN. Sabab boshqa, hali aniqlanmagan. **Muhim:** bu self-update'ni BUZMAYDI — A9 rasmiy tdesktop relizlarini GitHub'dan tekshiradi, o'z yangilanish kanalimiz (3 mirror) esa mutlaqo alohida mexanizm. |
+| **1** | Story ko'rayotganda orqa fon bug'i: blur ↔ shaffof holat juda tez almashadi | ⏳ **OXIRGI.** Ehtimol Qt6 render farqi (RHI/OpenGL). Eng noaniq va qimmat — shuning uchun oxirga qo'yilgan. |
+
+### Yangi versiyani boshqa qurilmalarga tarqatish (user savoli, 2026-08-14)
+
+Hozir barcha qurilmalarda `v7.0.9`, rasmiyda ham shu. **Versiyani
+ko'tarmasdan tarqatib bo'lmaydi** — self-update versiya raqamini
+solishtiradi, teng bo'lsa yangilanish taklif qilinmaydi.
+
+Versiya `Telegram/build/version` faylida, `release.ps1` o'shandan oladi.
+**Ehtiyot bo'lish kerak bo'lgan joy:** oddiy `7.0.10` qilinsa, rasmiy
+tdesktop keyinchalik haqiqiy `7.0.10` chiqarganda ma'no to'qnashuvi va
+upstream sync'da version-fayl konflikti bo'ladi. tdesktop'da bu holat
+uchun alpha/beta hisoblagichi bor — asosiy versiyani saqlab, faqat
+fork-build raqamini oshirish mumkin. **Aniq mexanizm reliz vaqtida
+`version` fayli va `set_version.py` o'qilib tanlanadi — hozircha taxmin
+qilinmadi.**
+
+**Tartib:** avval 4 ta muammo tuzatiladi, keyin versiya ko'tariladi va
+`release.ps1` bilan 3 mirror'ga chiqariladi.
+
+---
+
 ## A — tdesktop CustomMod ⚡ FAOL
 
 Hozirgi asosiy ish. Boshqa yo'nalishlar bunga aralashmasligi kerak.
@@ -120,7 +156,28 @@ yuqoridagi quote-mangling muammosi), `run_in_background: true` bilan,
 masalan: `& 'C:\...\run_qt6_build.bat' *> 'C:\...\qt6_build.log'`.
 Uzoq (soatlab) jarayon — user signal berguncha ishga tushirilmasin.
 
-**BUILD URINISHLARI 2026-08-14 (⏸️ TO'XTATILDI — user ofisga ketdi):**
+✅ **YAKUNLANDI 2026-08-14 13:20** — `prepare` 32/32, `configure` va
+to'liq build `EXIT=0`, `Telegram.exe` 219.5 MB. Yo'lda 9 ta to'siq
+yengildi; ulardan uchtasi Claude'ning o'z xatolari edi (toolset
+nomuvofiqligi, `lib_ui` ni master uchiga qadash, `data_session.h`
+include). Batafsil ro'yxat quyida.
+
+**Kelajak uchun muhim bilim:**
+- Build skripti shart: `set QT=6.11.1` (aks holda CMake qayta
+  generatsiyada Qt5 so'raydi), `set TDESKTOP_BUILD_JOBS=6`, `silent`
+  argumenti, `-vcvars_ver` YO'Q, `prepare.py` to'liq yo'l bilan.
+- Configure: `configure.bat qt6 -G "Visual Studio 18 2026" -Ax64 -Tv145 -D ...`
+  — `-Ax64` **qo'shib** yozilishi shart (`-A x64` bo'lsa `run_cmake.py`
+  dagi `arg == 'x64'` shartiga ilashib xato beradi). `-G` berilishi
+  `run_cmake.py` ning qattiq qadalgan `-T v143` blokini chetlab o'tadi —
+  shu sabab `cmake_helpers` submodule'ini patch qilish SHART BO'LMADI.
+- `qt_6.11.1` (manba+build, 30 GB) o'chirilgan; `Qt-6.11.1` (SDK,
+  4.1 GB) saqlanadi — build aynan shuni ishlatadi (`QT_DIR`).
+- Qt5 fayllari (8.2 GB) **ataylab saqlangan** — Qt6 to'liq sinovdan
+  o'tguncha orqaga qaytish yo'li.
+- Disk: to'liq build uchun kamida ~20 GB, xavfsizi 30-35 GB kerak.
+
+**Yo'lda yengilgan to'siqlar (tarix):**
 Progress: **20/32 bosqich muvaffaqiyatli** (cache'da), **21/32 `libvpx`da
 bloklangan**.
 
