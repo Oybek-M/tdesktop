@@ -12,6 +12,7 @@ struct PerPeerEntry {
     bool ghostEnabled;
     bool antiDeleteEnabled;
     bool antiEditEnabled;
+    bool mediaBackupEnabled;  // 2026-08-14
 };
 
 struct Values {
@@ -48,6 +49,11 @@ struct Values {
     // ── Upstream (rasmiy) versiya tekshiruvchisi ─────────────────────────
     bool upstreamCheckEnabled = true;
     int upstreamCheckIntervalMinutes = 1440;  // standart: kunlik
+
+    // Katta media backup (2026-08-14). Ikkalasi ham Custom Window'da
+    // o'zgartiriladi; chegaralar UpdateInt() da qisiladi.
+    int mediaBackupMaxFileMb = 100;   // 10 – 2048
+    int mediaBackupQuotaGb = 10;      // 1 – 500
     QString upstreamLastKnownVersion;         // oxirgi FOYDALANUVCHIGA bildirilgan versiya
     qint64 upstreamLastCheckedAt = 0;         // unix timestamp (soniya)
     // ── Story media zaxirasi (A11) ───────────────────────────────────────
@@ -88,6 +94,8 @@ inline bool ActivityHistoryTrackAllContacts() { return Get().activityHistoryTrac
 
 inline bool    UpstreamCheckEnabled()          { return Get().upstreamCheckEnabled; }
 inline int     UpstreamCheckIntervalMinutes()  { return Get().upstreamCheckIntervalMinutes; }
+inline int     MediaBackupMaxFileMb()          { return Get().mediaBackupMaxFileMb; }
+inline int     MediaBackupQuotaGb()            { return Get().mediaBackupQuotaGb; }
 inline QString UpstreamLastKnownVersion()      { return Get().upstreamLastKnownVersion; }
 inline qint64  UpstreamLastCheckedAt()         { return Get().upstreamLastCheckedAt; }
 inline bool    StoryMediaBackupEnabled()       { return Get().storyMediaBackupEnabled; }
@@ -163,6 +171,19 @@ void SetBlocklistCategory(PeerType type, bool enabled);
 //   4. Global flag (e.g. AntiDelete())    (user-configured default)
 //
 // Use these everywhere instead of the bare global flags.
+
+// ── Media backup (2026-08-14) ────────────────────────────────────────────
+// Per-chat override. DIQQAT: AntiDeleteForPeer() dan farqli o'laroq,
+// override yo'q bo'lsa global bayroqqa QAYTMAYDI — false qaytaradi.
+[[nodiscard]] bool MediaBackupForPeer(const QString &peerId);
+void SetMediaBackupForPeer(const QString &peerId, bool enabled);
+void ResetMediaBackupForPeer(const QString &peerId);
+
+// Katta media oldindan yuklab olinadimi. Zanjir ShouldAntiDelete() dan
+// FARQ QILADI — global bayroq hisobga OLINMAYDI (izoh .cpp da).
+//   Black List (veto) > White List > per-chat override
+// Saved Messages istisnosi chaqiruv joyida (peer->isSelf()).
+[[nodiscard]] bool ShouldMediaBackup(const QString &peerId);
 
 [[nodiscard]] bool ShouldAntiDelete(const QString &peerId);
 [[nodiscard]] bool ShouldAntiEdit(const QString &peerId);

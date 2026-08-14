@@ -1,5 +1,6 @@
 #include "custom_settings.h"
 #include "custom_db.h"
+#include <algorithm> // std::clamp
 #include <QtCore/QDir>
 #include <QtCore/QFile>
 #include <QtCore/QHash>
@@ -18,6 +19,7 @@ bool gInitialized = false;
 // Legacy per-peer overrides (C12 / C14) + NEXT-6 anti-edit.
 QHash<QString, bool> gGhostPerPeer;
 QHash<QString, bool> gAntiDeletePerPeer;
+QHash<QString, bool> gMediaBackupPerPeer;
 QHash<QString, bool> gAntiEditPerPeer;
 
 // Per-Chat Settings master list: peerId → displayName.
@@ -186,6 +188,14 @@ void UpdateString(const QString &id, const QString &value) {
 void UpdateInt(const QString &id, int value) {
     if (id == "spoofDeviceType") gValues.spoofDeviceType = value;
     else if (id == "upstreamCheckIntervalMinutes") gValues.upstreamCheckIntervalMinutes = value;
+    // Chegaralar aynan SHU YERDA qisiladi (SetInt() da emas), shunda
+    // qiymat qaysi yo'ldan kelishidan qat'i nazar — UI, Init(), yoki
+    // qo'lda tahrirlangan registry — xavfsiz oraliqda qoladi.
+    else if (id == "mediaBackupMaxFileMb") {
+        gValues.mediaBackupMaxFileMb = std::clamp(value, 10, 2048);
+    } else if (id == "mediaBackupQuotaGb") {
+        gValues.mediaBackupQuotaGb = std::clamp(value, 1, 500);
+    }
 }
 
 } // namespace
@@ -261,6 +271,13 @@ void Init() {
     gValues.storyMediaBackupEnabled = settings.value(
         "storyMediaBackupEnabled", false).toBool();
 
+    // UpdateInt orqali — chegaralar qisilishi uchun (registry qo'lda
+    // tahrirlangan bo'lsa ham xavfsiz qiymat olamiz).
+    UpdateInt("mediaBackupMaxFileMb",
+        settings.value("mediaBackupMaxFileMb", 100).toInt());
+    UpdateInt("mediaBackupQuotaGb",
+        settings.value("mediaBackupQuotaGb", 10).toInt());
+
     // Per-peer ghost overrides
     settings.beginGroup("GhostModePerPeer");
     for (const QString &key : settings.childKeys()) {
@@ -272,6 +289,13 @@ void Init() {
     settings.beginGroup("AntiDeletePerPeer");
     for (const QString &key : settings.childKeys()) {
         gAntiDeletePerPeer[key] = settings.value(key).toBool();
+    }
+    settings.endGroup();
+
+    // Per-peer media backup overrides (2026-08-14)
+    settings.beginGroup("MediaBackupPerPeer");
+    for (const QString &key : settings.childKeys()) {
+        gMediaBackupPerPeer[key] = settings.value(key).toBool();
     }
     settings.endGroup();
 
@@ -395,6 +419,58 @@ void ResetAntiDeleteForPeer(const QString &peerId) {
     settings.beginGroup("AntiDeletePerPeer");
     settings.remove(peerId);
     settings.endGroup();
+}
+
+// ── Media backup per-chat override (2026-08-14) ──────────────────────────
+
+bool MediaBackupForPeer(const QString &peerId) {
+    if (!gInitialized) Init();
+    const auto it = gMediaBackupPerPeer.constFind(peerId);
+    // 🔴 AntiDeleteForPeer() dan FARQLI: override yo'q bo'lsa GLOBAL
+    // bayroqqa qaytmaymiz, `false` qaytaramiz. Media backup uchun
+    // "hammasi uchun yoqiq" rejimi umuman mavjud emas — sababi
+    // ShouldMediaBackup() izohida.
+    return (it != gMediaBackupPerPeer.constEnd()) ? it.value() : false;
+}
+
+void SetMediaBackupForPeer(const QString &peerId, bool enabled) {
+    if (!gInitialized) Init();
+    gMediaBackupPerPeer[peerId] = enabled;
+    QSettings settings("CustomMod", "TelegramDesktop");
+    settings.beginGroup("MediaBackupPerPeer");
+    settings.setValue(peerId, enabled);
+    settings.endGroup();
+}
+
+void ResetMediaBackupForPeer(const QString &peerId) {
+    if (!gInitialized) Init();
+    gMediaBackupPerPeer.remove(peerId);
+    QSettings settings("CustomMod", "TelegramDesktop");
+    settings.beginGroup("MediaBackupPerPeer");
+    settings.remove(peerId);
+    settings.endGroup();
+}
+
+bool ShouldMediaBackup(const QString &peerId) {
+    if (!gInitialized) Init();
+    // 🔴 Bu funksiya ShouldAntiDelete() zanjiriga ATAYLAB ERGASHMAYDI.
+    //
+    // O'sha zanjirning oxirgi bo'g'ini — GLOBAL bayroq — bu yerda
+    // xavfli bo'lardi: 2026-08-14 dagi baza tozalashida global AntiDelete
+    // tufayli 981 ta peer kuzatilayotgani aniqlangan edi, aksariyati
+    // botlar va bir martalik kontaktlar. AntiDelete uchun bu arzon
+    // (chatiga bir necha KB matn), media backup uchun esa halokatli —
+    // har bir botdan video yuklab olardik va disk to'lib qolardi.
+    //
+    // Shuning uchun faqat ANIQ a'zolik hisobga olinadi:
+    //   Black List (veto) > White List > per-chat override
+    //
+    // Saved Messages istisnosi bu yerda EMAS — peerId string'idan uni
+    // aniqlab bo'lmaydi. U chaqiruv joyida (custom_archive.cpp) peer->isSelf()
+    // orqali tekshiriladi.
+    if (IsInBlocklist(peerId)) return false;
+    if (IsInWhitelist(peerId)) return true;
+    return MediaBackupForPeer(peerId);
 }
 
 // ── Whitelist ─────────────────────────────────────────────────────────────
@@ -726,7 +802,8 @@ QVector<PerPeerEntry> GetPerPeerOverrides() {
             it.value(),
             GhostModeForPeer(id),
             AntiDeleteForPeer(id),
-            AntiEditForPeer(id)
+            AntiEditForPeer(id),
+            MediaBackupForPeer(id)
         });
     }
     return result;
