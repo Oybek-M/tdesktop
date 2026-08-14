@@ -75,13 +75,22 @@ self-update qurilmoqda, shuning uchun bu holat maxsus jiddiy.
 
 **Reja talabi (kamida ikkita joy):**
 
-- [ ] Parol menejeriga (`customsync-updates-private.pem` matnini butunligicha)
-- [ ] Shifrlangan USB yoki boshqa offline saqlagichga
+- [x] **Bajarildi (foydalanuvchi tasdiqladi, 2026-08-14):** `DesktopPrivate`
+      dagi 5 ta fayl ZIP qilinib, **parol bilan himoyalangan holda** shaxsiy
+      Telegram kanaliga saqlangan.
+- [ ] Ikkinchi, mustaqil joy (shifrlangan USB yoki parol menejeri) — hali yo'q
 
-Bular hozircha **bajarilmagan** — bu qo'lda, ilova tashqarisida
-qilinadigan qadam, Claude buni siz uchun bajara olmaydi (parol
-menejeriga kirish, fizik USB). Iltimos build'dan oldin shuni bajarib
-qo'ying.
+**Holat:** bitta zaxira nusxasi bor, ya'ni eng katta xavf (yagona diskda
+yagona nusxa) yopilgan. Lekin reja "kamida ikkita joy" deydi — Telegram
+kanali ham, mahalliy disk ham bir xil hodisada (akkaunt yo'qolishi)
+yo'qolishi mumkin emas, lekin ikkalasi ham raqamli. Offline nusxa (USB)
+qo'shilsa to'liq bo'ladi.
+
+**Diqqat (2026-08-14):** build daraxti `C:\TBuild` ga ko'chirildi, ya'ni
+kalitlar endi `C:\TBuild\DesktopPrivate\` da. Tekshirildi: Documents
+papkasi OneDrive'ga sinxronlanmaydi va File History sozlanmagan — ya'ni
+mashinada kalitlarning **avtomatik** zaxirasi umuman yo'q. Yuqoridagi
+qo'lda zaxira — yagona himoya.
 
 ---
 
