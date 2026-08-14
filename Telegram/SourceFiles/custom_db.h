@@ -27,7 +27,7 @@ struct ActionedMessage {
 // v5: actioned_messages + text_cache ga sender_id va is_media ustunlari qo'shildi.
 // v6 (A13/D4): text_cache ga is_archived ustuni — 1 bo'lsa doimiy arxiv,
 //              PruneStaleCachedText() unga tegmaydi.
-constexpr int kCurrentSchemaVersion = 6;
+constexpr int kCurrentSchemaVersion = 7;
 
 void Init();
 
@@ -111,6 +111,57 @@ QVector<DeletedMessageWithPeer> GetAllDeletedMessages(int limit = 300);
 // Ishga tushishda chat ro'yxatini tiklash uchun — matn/media yuklamaydi,
 // shuning uchun startup'da arzon.
 [[nodiscard]] QVector<QString> GetPeersWithDeletedMessages();
+
+// ── Media indeks (schema v7) ─────────────────────────────────────────────
+// Har bir media xabar shu yerda qayd etiladi — hatto fayl yuklanmagan
+// bo'lsa ham. Shunday qilib "bunday fayl bor edi, lekin saqlanmadi"
+// ma'lumoti yo'qolmaydi.
+//
+// status: present — fayl arxivda bor
+//         pending — hozircha yo'q, lekin olish mumkin (chegara/kvota)
+//         missing — yo'q va endi olib bo'lmaydi (reference eskirgan)
+struct MediaIndexEntry {
+    QString peerId;
+    long long msgId = 0;
+    QString kind;          // image | video | voice | file
+    QString fileName;
+    QString relPath;       // arxiv ildizidan nisbiy yo'l
+    long long size = 0;
+    QString sha256;        // hozircha bo'sh — 7.1-eslatmaga qarang
+    unsigned int msgDate = 0;
+    unsigned int archivedAt = 0;
+    QString layer;         // l1 | l2 | l3
+    QString status;
+    QString reason;        // too_large | quota_full | reference_expired ...
+};
+
+void UpsertMediaIndex(const MediaIndexEntry &entry);
+void SetMediaIndexStatus(
+    const QString &peerId,
+    long long msgId,
+    const QString &status,
+    const QString &reason);
+[[nodiscard]] bool HasPresentMediaIndexEntry(
+    const QString &peerId,
+    long long msgId);
+
+// Eksport tanlash oynasi uchun: media'si BOR chatlar, hajmi bo'yicha
+// kamayish tartibida. Foydalanuvchi qaysi chatni eksportga qo'shishni
+// hajmiga qarab hal qiladi.
+struct MediaPeerSummary {
+    QString peerId;
+    int fileCount = 0;
+    long long totalBytes = 0;
+};
+[[nodiscard]] QVector<MediaPeerSummary> GetMediaPeerSummaries();
+
+// Kvota uchun: barcha 'present' yozuvlar hajmi yig'indisi.
+[[nodiscard]] long long TotalArchivedMediaBytes();
+
+// Import'dan keyin: 'present' deb belgilangan, lekin fayli topilmagan
+// yozuvlarni 'missing' ga o'tkazadi (bazada yolg'on ma'lumot qolmasin).
+// archiveRoot — ~/customizationMainFolder. Nechta yozuv o'zgargani qaytadi.
+int ReconcileMediaIndex(const QString &archiveRoot);
 
 // C11: per-message edit history — all recorded versions across all chats.
 struct EditRecord {

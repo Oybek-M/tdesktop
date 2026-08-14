@@ -284,6 +284,40 @@ void RunMigrations() {
         execSql("ALTER TABLE text_cache ADD COLUMN is_archived INTEGER DEFAULT 0");
     }
 
+    // v6 → v7: media_index jadvali.
+    //
+    // Nima uchun kerak: 2026-08-14 gacha saqlanmagan media haqida HECH
+    // QANDAY iz qolmasdi — "bunday fayl bor edi" ma'lumoti ham yo'q edi.
+    // Endi har bir media xabar shu yerda qayd etiladi, hatto fayl
+    // yuklanmagan bo'lsa ham (status='pending'/'missing').
+    //
+    // Nima uchun alohida fayl emas, balki JADVAL: baza eksportga
+    // allaqachon kiradi (ExportFullBackup 1-qadam), demak "indeks doim
+    // eksport qilinadi" talabi qo'shimcha ishsiz bajariladi.
+    //
+    // sha256 — Track C (customsync-server) da blob identifikatsiyasi va
+    // dublikatlarni aniqlash uchun; faqat status='present' bo'lganda
+    // hisoblanadi (katta fayl uchun qimmat operatsiya).
+    if (version < 7) {
+        execSql(
+            "CREATE TABLE IF NOT EXISTS media_index ("
+            "    peer_id     TEXT    NOT NULL,"
+            "    msg_id      INTEGER NOT NULL,"
+            "    kind        TEXT    NOT NULL,"   // image | video | voice | file
+            "    file_name   TEXT,"
+            "    rel_path    TEXT,"               // arxiv ildizidan nisbiy
+            "    size        INTEGER NOT NULL DEFAULT 0,"
+            "    sha256      TEXT,"
+            "    msg_date    INTEGER,"
+            "    archived_at INTEGER,"
+            "    layer       TEXT,"               // l1 | l2 | l3
+            "    status      TEXT    NOT NULL,"   // present | pending | missing
+            "    reason      TEXT,"
+            "    PRIMARY KEY (peer_id, msg_id))");
+        execSql("CREATE INDEX IF NOT EXISTS idx_mi_status ON media_index(status)");
+        execSql("CREATE INDEX IF NOT EXISTS idx_mi_peer   ON media_index(peer_id)");
+    }
+
     // Update version stamp.
     {
         sqlite3_stmt *stmt = nullptr;
@@ -899,6 +933,172 @@ QVector<QString> GetPeersWithDeletedMessages() {
         result.append(peerId);
     }
     return result;
+}
+
+// ── Media indeks (schema v7) ─────────────────────────────────────────────
+//
+// 7.1-eslatma (sha256): hozircha bo'sh qoldiriladi. 100 MB fayl uchun
+// SHA-256 ~0.3 soniya oladi va bu arxivlash paytida UI oqimida bo'lardi.
+// Ustun sxemada bor, shuning uchun keyinchalik fonda to'ldirish mumkin
+// (Track C blob identifikatsiyasi kerak bo'lganda).
+
+void UpsertMediaIndex(const MediaIndexEntry &entry) {
+    Init();
+    if (!gDb || entry.peerId.isEmpty()) return;
+
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "INSERT INTO media_index "
+            "(peer_id, msg_id, kind, file_name, rel_path, size, sha256, "
+            " msg_date, archived_at, layer, status, reason) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(peer_id, msg_id) DO UPDATE SET "
+            "  kind=excluded.kind,"
+            "  file_name=excluded.file_name,"
+            "  rel_path=excluded.rel_path,"
+            "  size=excluded.size,"
+            // sha256: mavjud qiymat saqlanadi, yangisi bo'sh bo'lsa yo'qotmaymiz
+            "  sha256=CASE WHEN LENGTH(excluded.sha256)>0 "
+            "              THEN excluded.sha256 ELSE sha256 END,"
+            "  msg_date=excluded.msg_date,"
+            "  archived_at=excluded.archived_at,"
+            "  layer=excluded.layer,"
+            "  status=excluded.status,"
+            "  reason=excluded.reason",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        bindText(stmt, 1, entry.peerId);
+        sqlite3_bind_int64(stmt, 2, entry.msgId);
+        bindText(stmt, 3, entry.kind);
+        bindText(stmt, 4, entry.fileName);
+        bindText(stmt, 5, entry.relPath);
+        sqlite3_bind_int64(stmt, 6, entry.size);
+        bindText(stmt, 7, entry.sha256);
+        sqlite3_bind_int64(stmt, 8, entry.msgDate);
+        sqlite3_bind_int64(stmt, 9, entry.archivedAt);
+        bindText(stmt, 10, entry.layer);
+        bindText(stmt, 11, entry.status);
+        bindText(stmt, 12, entry.reason);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+}
+
+void SetMediaIndexStatus(
+        const QString &peerId,
+        long long msgId,
+        const QString &status,
+        const QString &reason) {
+    Init();
+    if (!gDb) return;
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "UPDATE media_index SET status = ?, reason = ? "
+            "WHERE peer_id = ? AND msg_id = ?",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        bindText(stmt, 1, status);
+        bindText(stmt, 2, reason);
+        bindText(stmt, 3, peerId);
+        sqlite3_bind_int64(stmt, 4, msgId);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+}
+
+bool HasPresentMediaIndexEntry(const QString &peerId, long long msgId) {
+    Init();
+    if (!gDb) return false;
+    bool found = false;
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "SELECT 1 FROM media_index "
+            "WHERE peer_id = ? AND msg_id = ? AND status = 'present' LIMIT 1",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        bindText(stmt, 1, peerId);
+        sqlite3_bind_int64(stmt, 2, msgId);
+        found = (sqlite3_step(stmt) == SQLITE_ROW);
+        sqlite3_finalize(stmt);
+    }
+    return found;
+}
+
+QVector<MediaPeerSummary> GetMediaPeerSummaries() {
+    Init();
+    QVector<MediaPeerSummary> result;
+    if (!gDb) return result;
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "SELECT peer_id, COUNT(*), COALESCE(SUM(size), 0) "
+            "FROM media_index WHERE status = 'present' "
+            "GROUP BY peer_id ORDER BY SUM(size) DESC",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            MediaPeerSummary s;
+            s.peerId = colText(stmt, 0);
+            s.fileCount = sqlite3_column_int(stmt, 1);
+            s.totalBytes = sqlite3_column_int64(stmt, 2);
+            if (!s.peerId.isEmpty()) result.append(s);
+        }
+        sqlite3_finalize(stmt);
+    }
+    return result;
+}
+
+long long TotalArchivedMediaBytes() {
+    Init();
+    if (!gDb) return 0;
+    long long total = 0;
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "SELECT COALESCE(SUM(size), 0) FROM media_index "
+            "WHERE status = 'present'",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            total = sqlite3_column_int64(stmt, 0);
+        }
+        sqlite3_finalize(stmt);
+    }
+    return total;
+}
+
+int ReconcileMediaIndex(const QString &archiveRoot) {
+    Init();
+    if (!gDb) return 0;
+
+    // Avval barcha 'present' yozuvlarni o'qiymiz, so'ng fayl tizimini
+    // tekshiramiz — SELECT davomida UPDATE qilish SQLite'da nozik.
+    struct Row { QString peerId; long long msgId; QString relPath; };
+    QVector<Row> rows;
+    {
+        sqlite3_stmt *stmt = nullptr;
+        if (sqlite3_prepare_v2(gDb,
+                "SELECT peer_id, msg_id, rel_path FROM media_index "
+                "WHERE status = 'present'",
+                -1, &stmt, nullptr) == SQLITE_OK) {
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                rows.append({
+                    colText(stmt, 0),
+                    sqlite3_column_int64(stmt, 1),
+                    colText(stmt, 2) });
+            }
+            sqlite3_finalize(stmt);
+        }
+    }
+
+    int changed = 0;
+    execSql("BEGIN");
+    for (const auto &row : rows) {
+        if (row.relPath.isEmpty()
+            || !QFile::exists(archiveRoot + "/" + row.relPath)) {
+            SetMediaIndexStatus(
+                row.peerId,
+                row.msgId,
+                u"missing"_q,
+                u"file_not_found"_q);
+            ++changed;
+        }
+    }
+    execSql("COMMIT");
+    return changed;
 }
 
 void Checkpoint() {
