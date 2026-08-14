@@ -5,6 +5,7 @@
 #include "custom_branding.h"
 #include "custom_db.h"
 #include "custom_activity_history_box.h"
+#include "custom_media_quota.h"
 #include "custom_settings.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
@@ -1860,6 +1861,11 @@ void fillPerChatSection(
 			[=](bool on) { CustomSettings::SetAntiDeleteForPeer(peerId, on); });
 		addToggle(u"Anti-Edit"_q, entry.antiEditEnabled,
 			[=](bool on) { CustomSettings::SetAntiEditForPeer(peerId, on); });
+		// 2026-08-14: katta media'ni oldindan yuklab olish. Boshqa uchtadan
+		// FARQLI — global bayrog'i yo'q, faqat shu toggle yoki White List
+		// uni yoqadi (ShouldMediaBackup izohiga qarang).
+		addToggle(u"Media Backup"_q, entry.mediaBackupEnabled,
+			[=](bool on) { CustomSettings::SetMediaBackupForPeer(peerId, on); });
 
 		rmBtn->addClickHandler([=] {
 			rmBtn->setDisabled(true);
@@ -2459,6 +2465,70 @@ void fillAboutTab(
 			st::customModHintLabel),
 		st::defaultSubsectionTitlePadding);
 
+	// ── Katta media backup sozlamalari (2026-08-14) ─────────────────────
+	Ui::AddSkip(content, 8);
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(u"Katta media backup"_q),
+			st::defaultSubsectionTitle),
+		st::defaultSubsectionTitlePadding);
+	{
+		const auto used = CustomMediaQuota::UsedBytes();
+		const auto limit = CustomMediaQuota::LimitBytes();
+		const auto gb = [](long long bytes) {
+			return QString::number(
+				double(bytes) / (1024.0 * 1024 * 1024), 'f', 1);
+		};
+		content->add(
+			object_ptr<Ui::FlatLabel>(
+				content,
+				rpl::single(u"White List'dagi yoki 'Media Backup' yoqilgan "
+					"chatlarda media oldindan yuklab olinadi.\n"
+					"Ishlatilgan: "_q + gb(used) + u" GB / "_q
+					+ gb(limit) + u" GB"_q),
+				st::customModHintLabel),
+			st::boxRowPadding);
+
+		const auto maxInput = content->add(
+			object_ptr<Ui::InputField>(
+				content,
+				st::defaultInputField,
+				rpl::single(u"Bitta fayl chegarasi, MB (10–2048)"_q),
+				QString::number(CustomSettings::MediaBackupMaxFileMb())),
+			st::boxRowPadding);
+		const auto quotaInput = content->add(
+			object_ptr<Ui::InputField>(
+				content,
+				st::defaultInputField,
+				rpl::single(u"Umumiy kvota, GB (1–500)"_q),
+				QString::number(CustomSettings::MediaBackupQuotaGb())),
+			st::boxRowPadding);
+		content->add(
+			object_ptr<Ui::RoundButton>(
+				content,
+				rpl::single(u"💾 Saqlash"_q),
+				st::defaultBoxButton),
+			st::boxRowPadding
+		)->addClickHandler([=] {
+			auto ok = false;
+			const auto maxMb = maxInput->getLastText().trimmed().toInt(&ok);
+			if (ok) {
+				// Chegaralar CustomSettings::UpdateInt() da qisiladi.
+				CustomSettings::SetInt(u"mediaBackupMaxFileMb"_q, maxMb);
+			}
+			const auto quotaGb = quotaInput->getLastText().trimmed().toInt(&ok);
+			if (ok) {
+				CustomSettings::SetInt(u"mediaBackupQuotaGb"_q, quotaGb);
+			}
+			maxInput->setText(
+				QString::number(CustomSettings::MediaBackupMaxFileMb()));
+			quotaInput->setText(
+				QString::number(CustomSettings::MediaBackupQuotaGb()));
+			Ui::Toast::Show(u"Saqlandi ✓"_q);
+		});
+	}
+
 	// ── Media eksport tanlovi (2026-08-14) ──────────────────────────────
 	//
 	// Ro'yxat media_index dan tuziladi — ya'ni faqat HAQIQATAN media'si
@@ -2722,6 +2792,38 @@ void fillAboutTab(
 			} else {
 				Ui::Toast::Show(u"Tiklash amalga oshmadi. Fayl/papkani tekshiring."_q);
 			}
+		});
+	});
+
+	// ── Media arxivini alohida import qilish (2026-08-14) ───────────────
+	// Eksport ikkita faylga bo'linadi, shuning uchun media'ni asosiy
+	// tiklashdan KEYIN, istalgan vaqtda qo'shish mumkin bo'lishi kerak.
+	// Qayta ishga tushirish shart emas — faqat fayllar joyiga qo'yiladi
+	// va indeks 'present' ga qaytariladi.
+	const auto importMediaBtn = content->add(
+		object_ptr<Ui::RoundButton>(
+			content,
+			rpl::single(u"🎞 Media arxivini qoʻshish (CustomModMedia_*.zip)"_q),
+			st::defaultBoxButton),
+		st::boxRowPadding);
+	importMediaBtn->addClickHandler([=] {
+		const auto path = QFileDialog::getOpenFileName(
+			dialogParent,
+			u"Media arxivini tanlang (.zip)"_q,
+			QDir::homePath(),
+			u"Media arxivi (CustomModMedia_*.zip);;Barcha fayllar (*)"_q);
+		if (path.isEmpty()) return;
+
+		importMediaBtn->setDisabled(true);
+		Ui::Toast::Show(u"Media arxivi ochilmoqda, biroz kuting..."_q);
+
+		const auto weak = base::make_weak(content);
+		CustomDB::ImportMediaArchiveAsync(path, [=](bool ok) {
+			if (!weak) return;
+			importMediaBtn->setDisabled(false);
+			Ui::Toast::Show(ok
+				? u"Media arxivi qoʻshildi ✓"_q
+				: u"Media arxivini qoʻshib boʻlmadi."_q);
 		});
 	});
 
