@@ -1,6 +1,7 @@
 #include "custom_archive.h"
 
 #include "custom_db.h"
+#include "custom_media_quota.h"
 #include "custom_settings.h"
 #include "data/data_document.h"
 #include "data/data_file_origin.h"
@@ -13,6 +14,9 @@
 #include "history/history_item.h"
 #include "main/main_session.h"
 #include "storage/file_download.h" // Storage::kMaxFileInMemory
+#include <QtCore/QDateTime>
+#include <QtCore/QDir>
+#include <QtCore/QFileInfo>
 #include <QtCore/QTimer>
 #include <vector>
 
@@ -51,21 +55,148 @@ void WriteRow(const PendingRow &row) {
 		true); // archived = true → PruneStaleCachedText tegmaydi (D4)
 }
 
-// A13/K4: kuzatilayotgan chatda media avtomatik yuklab olinadi, shunda
-// suhbatdosh butun chatni o'chirganda ham fayl qo'lda qoladi. Yuklab
-// olingach data_document.cpp dagi mavjud finishLoad() hook uni doimiy
-// papkaga (~/customizationMainFolder/medias/) ko'chiradi — bu yerda faqat
-// yuklashni BOSHLAYMIZ.
+// Media turini SaveMediaFile() kutgan nomlar bilan bir xil aniqlaydi
+// (data_document.cpp:1233 dagi mantiq bilan mos).
+[[nodiscard]] QString MediaKindOf(not_null<DocumentData*> document) {
+	if (document->isVideoMessage() || document->isVoiceMessage()) {
+		return u"voice"_q;
+	} else if (document->isVideoFile()) {
+		return u"video"_q;
+	}
+	return u"file"_q;
+}
+
+[[nodiscard]] QString KindSubDir(const QString &kind) {
+	if (kind == u"voice"_q) return u"medias/voices"_q;
+	if (kind == u"video"_q) return u"medias/videos"_q;
+	if (kind == u"image"_q) return u"medias/images"_q;
+	return u"medias/files"_q;
+}
+
+// Arxiv ildizidan nisbiy yo'l: medias/<turi>/<peerId>_<msgId>_<nom>.
+// peerId+msgId prefiksi bir xil nomli fayllar bir-birini yozib
+// yubormasligi uchun (SaveMediaFile() da bu muammo bor edi — u faqat
+// fayl nomini ishlatadi va mavjud bo'lsa nusxalashni o'tkazib yuboradi).
+[[nodiscard]] QString ArchiveRelPath(
+		not_null<HistoryItem*> item,
+		not_null<DocumentData*> document,
+		const QString &kind) {
+	auto name = document->filename();
+	if (name.isEmpty()) {
+		name = u"file"_q;
+	}
+	// SaveMediaFile() dagi bilan bir xil xavfsizlik qoidalari + Windows'da
+	// taqiqlangan belgilar.
+	for (const auto ch : { u'/', u'\\', u':', u'*', u'?', u'"', u'<', u'>', u'|' }) {
+		name.remove(ch);
+	}
+	while (name.contains(u"..")) {
+		name.remove(u".."_q);
+	}
+	if (name.isEmpty()) {
+		name = u"file"_q;
+	}
+	if (name.length() > 150) {
+		const auto ext = QFileInfo(name).suffix();
+		name = name.left(140) + (ext.isEmpty() ? QString() : u"."_q + ext);
+	}
+	return KindSubDir(kind)
+		+ u"/"_q
+		+ QString::number(item->history()->peer->id.value)
+		+ u"_"_q
+		+ QString::number(item->id.bare)
+		+ u"_"_q
+		+ name;
+}
+
+void RecordIndex(
+		not_null<HistoryItem*> item,
+		not_null<DocumentData*> document,
+		const QString &kind,
+		const QString &status,
+		const QString &reason,
+		const QString &relPath) {
+	auto entry = CustomDB::MediaIndexEntry();
+	entry.peerId = QString::number(item->history()->peer->id.value);
+	entry.msgId = static_cast<long long>(item->id.bare);
+	entry.kind = kind;
+	entry.relPath = relPath;
+	entry.fileName = relPath.isEmpty()
+		? QString()
+		: relPath.mid(relPath.lastIndexOf(u'/') + 1);
+	entry.size = document->size;
+	entry.msgDate = static_cast<unsigned int>(item->date());
+	entry.archivedAt = static_cast<unsigned int>(
+		QDateTime::currentSecsSinceEpoch());
+	entry.layer = u"l2"_q;
+	entry.status = status;
+	entry.reason = reason;
+	CustomDB::UpsertMediaIndex(entry);
+}
+
+// A13/K4 + 2026-08-14 (L2): kuzatilayotgan chatda media avtomatik yuklab
+// olinadi, shunda suhbatdosh butun chatni o'chirganda ham fayl qo'lda
+// qoladi.
+//
+// Ikki xil yo'l bor:
+//   * L2 yoqilgan chat  — fayl TO'G'RIDAN-TO'G'RI arxiv papkasiga
+//     yuklanadi (haqiqiy maqsad yo'li), hajm chegarasi va kvota bilan.
+//   * Boshqa chatlar    — eski xatti-harakat: bo'sh nom bilan keshga,
+//     faqat 10 MB gacha (undan kattasi crash beradi, pastga qarang).
 void MaybeDownloadMedia(not_null<HistoryItem*> item) {
 	const auto media = item->media();
 	if (!media) {
 		return;
 	}
+	const auto peer = item->history()->peer;
+	if (peer->isSelf()) {
+		// Saved Messages: foydalanuvchidan boshqa hech kim o'chira
+		// olmaydi, ya'ni AntiDelete'ning tahdid modeli ("suhbatdosh
+		// o'chirib yubordi") bu yerda umuman qo'llanmaydi. Qattiq
+		// istisno — sozlama emas.
+		return;
+	}
+	const auto peerIdStr = QString::number(peer->id.value);
 	const auto origin = Data::FileOriginMessage(item->fullId());
 	if (const auto document = media->document()) {
 		if (!document->filepath(true).isEmpty() || document->loading()) {
 			return; // allaqachon diskda yoki yuklanmoqda
 		}
+		if (CustomSettings::ShouldMediaBackup(peerIdStr)) {
+			const auto kind = MediaKindOf(document);
+			const auto maxBytes = qint64(
+				CustomSettings::MediaBackupMaxFileMb()) * 1024 * 1024;
+			if (document->size > maxBytes) {
+				// Yuklamaymiz, lekin IZ QOLDIRAMIZ — ilgari bunday
+				// fayllar haqida hech qanday ma'lumot saqlanmasdi.
+				RecordIndex(item, document, kind,
+					u"pending"_q, u"too_large"_q, QString());
+				return;
+			}
+			if (CustomMediaQuota::IsFull()) {
+				RecordIndex(item, document, kind,
+					u"pending"_q, u"quota_full"_q, QString());
+				return;
+			}
+			const auto relPath = ArchiveRelPath(item, document, kind);
+			const auto fullPath = CustomMediaQuota::ArchiveRoot()
+				+ u"/"_q + relPath;
+			QDir().mkpath(QFileInfo(fullPath).absolutePath());
+
+			// 🔴 BO'SH NOM EMAS. Bo'sh nom "faylni xotiraga yukla"
+			// degani va FileLoader uni 10 MB bilan cheklaydi
+			// (file_download.cpp:114 Expects) — 2026-08-14 dagi
+			// crash aynan shundan edi. Bu yerni "soddalashtirib"
+			// QString() ga qaytarmang.
+			document->save(origin, fullPath);
+
+			RecordIndex(item, document, kind,
+				u"present"_q, QString(), relPath);
+			CustomMediaQuota::AddBytes(document->size);
+			return;
+		}
+		// L2 yoqilmagan chat — eski, keshga yuklash yo'li.
+		// 10 MB chegarasi MAJBURIY (yuqoridagi izohga qarang).
 		// KRITIK (2026-08-14 crash): save() ga BO'SH nom berish "faylni
 		// xotiraga yukla" degani. FileLoader konstruktori buni
 		// Storage::kMaxFileInMemory (10 MB) bilan cheklaydi:
@@ -79,10 +210,10 @@ void MaybeDownloadMedia(not_null<HistoryItem*> item) {
 		// ilovani darhol yiqitardi — chatda eski xabarlarni yuklashda,
 		// ayniqsa Saved Messages'da (u yerda katta video/fayllar ko'p).
 		//
-		// Katta fayllarni arxivlash uchun haqiqiy maqsad yo'li kerak; bu
-		// alohida vazifa (disk sarfi va fayl joylashuvi semantikasi bilan
-		// birga o'ylanishi kerak). Shu sababli hozir faqat xotiraga
-		// sig'adigan hajmdagilarni olamiz.
+		// Bu chat uchun L2 yoqilmagan, ya'ni haqiqiy maqsad yo'li yo'q —
+		// demak faqat xotiraga sig'adigan hajmdagilarni olamiz. Katta
+		// fayl kerak bo'lsa foydalanuvchi chatni White List'ga qo'shadi
+		// yoki per-chat "Media Backup" toggle'ini yoqadi.
 		if (document->size > Storage::kMaxFileInMemory) {
 			return;
 		}
