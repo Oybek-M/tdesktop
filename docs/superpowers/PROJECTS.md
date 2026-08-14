@@ -144,7 +144,41 @@ faqat ARM64 uchun to'g'ri sozlagan, x64 uchun unutgan):
 6. Bo'sh joyli yo'l → `C:\TBuild` ga ko'chirildi (yuqoridagi ogohlantirish).
 7. `lzma` + `breakpad`: `ToolsetProp` bo'sh qolardi → v145 majburlandi.
 
-⛔ **HAL QILINMAGAN BLOKER — `v143` toolset yo'qligi (3-marta chiqdi):**
+✅ **BLOKER YECHILDI (2026-08-14, ~07:30):** foydalanuvchi **MSVC v143 —
+VS 2022 C++ x64/x86 build tools (v14.44-17.14)** ni o'rnatdi (VS Installer →
+Modify → Individual components). Aynan `14.44` tanlandi, chunki
+`docs/building-win.md` aynan shu versiyani talab qiladi
+(`-vcvars_ver=14.44`). Tasdiqlangan holat:
+- `VC\Tools\MSVC\` da endi **14.44.35207** (1647 fayl) va 14.51.36231 bor
+- MSBuild PlatformToolsets: `v170 → v143`, `v180 → v145`
+- `vcvars64.bat` ishlaydi (`Environment initialized for: 'x64'`)
+
+⚠️ **HALI TEKSHIRILMAGAN:** `v143` bilan `libvpx` haqiqatan quriladimi.
+Sinov urinishi qilingan edi, lekin u **VS Installer o'rnatish jarayoni
+davom etayotgan paytda** ishga tushgani uchun `VCVARS_FAILED` bilan
+yiqildi (v143 muammosi EMAS — vaqtinchalik holat, keyin vcvars tuzaldi).
+Sinov qayta o'tkazilishi kerak.
+
+**KEYINGI QADAMLAR (aniq tartibda):**
+1. VS Installer to'liq tugaganini tasdiqlash (`Get-Process setup` bo'sh
+   bo'lsin). 2026-08-14 07:30 holatiga u hali ishlayotgan edi.
+2. **Sinov:** faqat `libvpx` bosqichini ishga tushirish —
+   `prepare.py qt6 silent libvpx` (skript:
+   `scratchpad\test_libvpx.bat`, ~1-2 daqiqa). MSB8020 chiqmasa —
+   bloker haqiqatan yopilgan.
+3. **To'liq prepare:** qolgan 11 bosqich (20 tasi cache'da, qayta
+   qurilmaydi) — pastdagi build skripti bilan.
+4. `configure.bat x64 qt6 -D TDESKTOP_API_ID=... -D TDESKTOP_API_HASH=...`
+5. To'liq loyiha build'i (~34+ daqiqa).
+6. **Qo'lda tekshiruv** — uchta ish birga: A6 (Qt6 regressiyalari),
+   **A11 Task 6** (story signal), **A13** (10 bandlik ro'yxat,
+   `specs/2026-08-13-antidelete-archive-hardening-design.md` §6).
+
+**Ixtiyoriy:** v14.44 o'rnatilgach build skriptiga `-vcvars_ver=14.44`
+bayrog'ini qaytarish mumkin — shunda muhit `docs/building-win.md` bilan
+aynan mos keladi (Windows 7 mosligi ham qaytadi). Hozir usiz ishlayapti.
+
+⛔ **Eski bloker tavsifi (tarix uchun) — `v143` toolset yo'qligi (3-marta chiqqan edi):**
 `lzma`, `breakpad`, `libvpx` — uchalasi ham
 `error MSB8020: Platform Toolset = 'v143' cannot be found` beradi.
 Mashinada faqat VS2026 bor (MSVC 14.51 = v145); `vswhere` yagona
@@ -157,10 +191,8 @@ uning `configure`idagi `all_platforms` ro'yxatida faqat
 oladi — faqat oq ro'yxatga kiritilmagan. Sinab ko'rilgan `-v145`
 o'zgarishi **orqaga qaytarildi** (kodda ishlamaydigan qiymat qolmasin).
 
-**User qarori (2026-08-14):** 1-variant — **VS2022 v143 build tools
-o'rnatish** (Visual Studio Installer → "MSVC v143 - VS2022 C++ x64/x86
-build tools", ~2-3 GB) — yoki boshqa yo'l topish. Ish **vaqtincha
-to'xtatildi**.
+**User qarori (2026-08-14):** 1-variant tanlandi va **bajarildi** —
+v14.44 o'rnatildi (yuqoriga qarang).
 
 **Qayta boshlashda:** (1) v143 o'rnatilgach build skriptini qayta ishga
 tushirish (skript matni pastda), (2) `configure.bat x64 qt6 -D
