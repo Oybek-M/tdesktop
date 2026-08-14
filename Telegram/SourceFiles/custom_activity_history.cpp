@@ -18,6 +18,7 @@
 #include "data/data_document.h"
 #include "data/data_file_origin.h"
 #include "ui/image/image.h"
+#include "storage/file_download.h" // Storage::kMaxFileInMemory
 #include "base/flat_set.h"
 #include <QtCore/QStandardPaths>
 #include <QtCore/QDir>
@@ -88,6 +89,15 @@ void MaybeBackupStoryMedia(
 		// elsewhere in this codebase, e.g. data_document.cpp's own
 		// finishLoad() hook) — safe to assume it outlives this pending
 		// download.
+		// KRITIK (2026-08-14 crash): save() ga bo'sh nom berish "xotiraga
+		// yukla" degani va FileLoader konstruktori uni 10 MB bilan cheklaydi
+		// (file_download.cpp:114 Expects). Chegaradan oshsa ilova darhol
+		// yiqiladi. Story videolari bemalol shu hajmdan oshadi, shuning
+		// uchun bu yerda ham CustomArchive::MaybeDownloadMedia() dagidek
+		// himoya kerak.
+		if (document->size > Storage::kMaxFileInMemory) {
+			return;
+		}
 		document->save(origin, QString());
 		gPendingStoryMedia.push_back({ nullptr, document, nullptr });
 	}

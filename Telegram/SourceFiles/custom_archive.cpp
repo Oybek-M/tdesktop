@@ -12,6 +12,7 @@
 #include "history/history.h"
 #include "history/history_item.h"
 #include "main/main_session.h"
+#include "storage/file_download.h" // Storage::kMaxFileInMemory
 #include <QtCore/QTimer>
 #include <vector>
 
@@ -62,9 +63,30 @@ void MaybeDownloadMedia(not_null<HistoryItem*> item) {
 	}
 	const auto origin = Data::FileOriginMessage(item->fullId());
 	if (const auto document = media->document()) {
-		if (document->filepath(true).isEmpty() && !document->loading()) {
-			document->save(origin, QString());
+		if (!document->filepath(true).isEmpty() || document->loading()) {
+			return; // allaqachon diskda yoki yuklanmoqda
 		}
+		// KRITIK (2026-08-14 crash): save() ga BO'SH nom berish "faylni
+		// xotiraga yukla" degani. FileLoader konstruktori buni
+		// Storage::kMaxFileInMemory (10 MB) bilan cheklaydi:
+		//
+		//   Expects(!_filename.isEmpty() || (_fullSize <= kMaxFileInMemory));
+		//   -- file_download.cpp:114
+		//
+		// Keshlanmaydigan hujjat uchun DocumentData::save() LoadToFileOnly
+		// rejimini tanlaydi (data_document.cpp:1292), u esa haqiqiy maqsad
+		// yo'lisiz ishlay olmaydi. Natijada 10 MB dan katta har qanday fayl
+		// ilovani darhol yiqitardi — chatda eski xabarlarni yuklashda,
+		// ayniqsa Saved Messages'da (u yerda katta video/fayllar ko'p).
+		//
+		// Katta fayllarni arxivlash uchun haqiqiy maqsad yo'li kerak; bu
+		// alohida vazifa (disk sarfi va fayl joylashuvi semantikasi bilan
+		// birga o'ylanishi kerak). Shu sababli hozir faqat xotiraga
+		// sig'adigan hajmdagilarni olamiz.
+		if (document->size > Storage::kMaxFileInMemory) {
+			return;
+		}
+		document->save(origin, QString());
 	} else if (const auto photo = media->photo()) {
 		photo->load(Data::PhotoSize::Large, origin);
 	}
