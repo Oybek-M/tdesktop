@@ -153,21 +153,21 @@ Modify → Individual components). Aynan `14.44` tanlandi, chunki
 - MSBuild PlatformToolsets: `v170 → v143`, `v180 → v145`
 - `vcvars64.bat` ishlaydi (`Environment initialized for: 'x64'`)
 
-⚠️ **HALI TEKSHIRILMAGAN:** `v143` bilan `libvpx` haqiqatan quriladimi.
-Sinov urinishi qilingan edi, lekin u **VS Installer o'rnatish jarayoni
-davom etayotgan paytda** ishga tushgani uchun `VCVARS_FAILED` bilan
-yiqildi (v143 muammosi EMAS — vaqtinchalik holat, keyin vcvars tuzaldi).
-Sinov qayta o'tkazilishi kerak.
+✅ **SINOVDAN O'TDI (2026-08-14 ~07:40):** `libvpx` bosqichi alohida
+ishga tushirilib, **muvaffaqiyatli qurildi** —
+`prepare.py qt6 silent libvpx` → `Build succeeded` (Debug|x64 va
+Release|x64), `[INSTALL] .../local/lib/x64/vpxmt.lib`, `EXIT=0`.
+`MSB8020` umuman chiqmadi. **Bloker aniq va to'liq yopildi.**
+
+(Eslatma: bundan oldingi sinov `VCVARS_FAILED` bergan edi — sabab v143
+emas, balki sinov VS Installer o'rnatishni tugatmasdan turib ishga
+tushirilgani. Dars: VS komponenti o'rnatilgach, `Get-Process setup`
+bo'shaganini kutish kerak.)
 
 **KEYINGI QADAMLAR (aniq tartibda):**
-1. VS Installer to'liq tugaganini tasdiqlash (`Get-Process setup` bo'sh
-   bo'lsin). 2026-08-14 07:30 holatiga u hali ishlayotgan edi.
-2. **Sinov:** faqat `libvpx` bosqichini ishga tushirish —
-   `prepare.py qt6 silent libvpx` (skript:
-   `scratchpad\test_libvpx.bat`, ~1-2 daqiqa). MSB8020 chiqmasa —
-   bloker haqiqatan yopilgan.
-3. **To'liq prepare:** qolgan 11 bosqich (20 tasi cache'da, qayta
-   qurilmaydi) — pastdagi build skripti bilan.
+1. **To'liq prepare:** qolgan bosqichlar (libvpx'gacha bo'lgan 20 tasi va
+   endi libvpx ham cache'da — qayta qurilmaydi) — pastdagi build skripti
+   bilan.
 4. `configure.bat x64 qt6 -D TDESKTOP_API_ID=... -D TDESKTOP_API_HASH=...`
 5. To'liq loyiha build'i (~34+ daqiqa).
 6. **Qo'lda tekshiruv** — uchta ish birga: A6 (Qt6 regressiyalari),
