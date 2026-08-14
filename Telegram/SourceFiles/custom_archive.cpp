@@ -154,7 +154,25 @@ void RestoreDeletedChats(not_null<Main::Session*> session) {
 		if (!CustomSettings::ShouldAntiDelete(peerIdStr)) {
 			continue; // bu chat uchun AntiDelete o'chirilgan
 		}
-		const auto history = owner.history(PeerId(raw));
+		const auto peerId = PeerId(raw);
+
+		// MUHIM (performans): bu ro'yxatda 300+ peer bo'lishi mumkin va
+		// ayrimlarida o'n minglab o'chirilgan xabar bor. Shuning uchun
+		// hech narsa YARATMAYDIGAN tekshiruvlardan boshlaymiz — History
+		// yaratish va inject qilish faqat haqiqatan yo'qolgan chat uchun.
+		if (!owner.peerLoaded(peerId)) {
+			continue; // peer hali yuklanmagan — tegmaymiz
+		}
+		if (const auto existing = owner.historyLoaded(peerId)) {
+			if (existing->inChatList()) {
+				continue; // chat allaqachon ro'yxatda — ish yo'q
+			}
+		}
+
+		const auto history = owner.history(peerId);
+		if (history->inChatList()) {
+			continue;
+		}
 		history->loadDeletedMessages();
 		if (history->isEmpty()) {
 			continue; // inject qilinmadi (masalan hammasi allaqachon bor)
