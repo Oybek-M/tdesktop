@@ -72,7 +72,86 @@ sifatida saqlangan — orqaga qaytish 5 soniya). Real foydalanishda
 | **3** | Birinchi start sekin, bo'limlarga (Unread/Personal) birinchi o'tishda qisqa freez | ✅ **TEKSHIRILDI — regressiya emas.** Gipoteza "A13 arxiv hook'i DB'ga ko'p yozyapti" **rad etildi**: DB 150 MB (ertalabki 155 dan oshmagan), WAL atigi 0.4 MB. Kod yo'li ham buni tasdiqlaydi — `MaybeArchiveItem` `addNewMessage`da faqat `NewMessageType::Unread` uchun, `addOlderSlice`da esa chat OCHILGANDA ishlaydi; startup'da dialoglar `Existing` turida keladi. Haqiqiy sabab — **Qt6 keshlarini bir martalik qayta qurish** (shrift/glif/ikonka keshlari Qt versiyasi o'zgarganda bekor bo'ladi). Foydalanuvchi ikkinchi start'ni sinab ko'rdi: **tezroq ochildi** → gipoteza tasdiqlandi. Qo'shimcha performance yaxshilash **oxiriga surildi** (user qarori).<br><br>**2026-08-14 (2-bosqich, kod yozildi, build kutilmoqda):** o'z kodimizdagi issiq yo'l topildi — `GetDeletedMessages()` `History::loadDeletedMessages()` dan, u esa `addOlderSlice`/`addNewerSlice` ichidan chaqiriladi, ya'ni **har bir scroll bo'lagida bitta SQLite so'rovi**, chatlarning aksariyatida esa o'chirilgan xabar umuman yo'q. `custom_db.cpp` ga `gPeersWithDeleted` filtri qo'shildi: bitta `DISTINCT` so'rov (`idx_am_peer_type` indeksidan foydalanadi) bilan bir marta to'ldiriladi, keyin peer to'plamda bo'lmasa so'rov **umuman ketmaydi**. Yolg'on-manfiy bo'lishi mumkin emas: barcha insert nuqtalari (`SaveActionedMessage` + `MarkDeleted` ning UPDATE yo'li) va tozalash nuqtalari (`LoadRestoreCache`/`ClearDeletedArchive`/`ClearAllArchive`) filtrni yangilaydi. `GetPeersWithDeletedMessages()` ham shu keshdan foydalanadi → `RestoreDeletedChats` birinchi yuklashdan keyin bepul. |
 | **2** | DB'dan tiklangan chat ("Xurshida \| V", peer `7815103103`) asosiy chatList'da ko'rinmaydi — faqat qidiruvdan topib ochgandan keyin paydo bo'ladi | ✅ **TUZATILDI (kod yozildi, build kutilmoqda).** Ildiz sabab: `loadDeletedMessages()` faqat `History` obyekti YUKLANGANDA ishlaydi, `History` esa chat ochilganda yaratiladi. Yechim (K1b): `CustomDB::GetPeersWithDeletedMessages()` (arzon DISTINCT so'rov) + `CustomArchive::RestoreDeletedChats()` — har peer uchun History yaratib inject qiladi, so'ng `refreshChatListEntry()` bilan ro'yxatga qo'shadi; `folderKnown()` false bo'lsa `requestDialogEntry()` (aks holda `Expects(folderKnown())` yiqilardi). Chaqiruv `chatsListLoadedEvents()` ga bog'langan, sessiya konstruktoriga EMAS.<br><br>**2026-08-14 qayta tekshiruvda TOPILGAN XATO (tuzatildi):** obunada `rpl::take(1)` `filter`dan OLDIN turgan edi. Bu oqim **arxiv papkasi uchun ham otiladi** (`folder != nullptr`), shuning uchun birinchi hodisa arxivniki bo'lsa `take(1)` o'shani yutib obunani tugatardi va asosiy ro'yxat hodisasi hech qachon kelmasdi → fix umuman ishlamas edi. Endi tartib `filter` → `take(1)` → `on_next`, ya'ni kodbazadagi boshqa `chatsListLoadedEvents` obunachilari bilan bir xil (`boxes/peer_list_controllers.cpp:452`). |
 | **4** | "🔔 Rasmiy versiya tekshiruvi" (A9) ishlamaydi: **"Tekshirib bo'lmadi: Connection closed"** | ⏳ **NAVBATDA.** Birinchi gipoteza (`cmake/external/qt/CMakeLists.txt` dagi `if (QT_VERSION GREATER 6)` — `6.11.1` satr, CMake uni 0 deb hisoblaydi → TLS plagini ulanmay qoladi) **TEKSHIRILDI VA RAD ETILDI**: `Telegram.vcxproj` da `qschannelbackend`, `qnetworklistmanager`, `Qt6EntryPoint`, `qwindows` — hammasi ULANGAN. **2026-08-14: ildiz sabab topildi va tuzatildi (build kutilmoqda).** Dalil zanjiri: (a) xato matni `"Connection closed"` = `QNetworkReply::RemoteHostClosedError` — ya'ni TCP **va** TLS o'rnatildi, so'ng server ulanishni yopdi; TLS backend yo'q bo'lganda xato `"TLS initialization failed"` bo'lardi; (b) `prepare.py:1693` — Windows Qt6 `-openssl linked` bilan quriladi, demak TLS backend joyida; (c) Qt5 → Qt6 da o'zgargan yagona tegishli standart: `QNetworkRequest::Http2AllowedAttribute` Qt5'da `false`, **Qt6'da `true`**. Ya'ni ALPN orqali `h2` kelishildi va o'sha seans uzildi. Yechim: `custom_upstream_checker.cpp` da HTTP/2 atayin o'chirildi (GitHub API HTTP/1.1 ni to'liq qo'llaydi — yo'qotish yo'q). Qo'shimcha: **20s transfer timeout** (ilgari javob kelmasa `finished` otilmay, `QNetworkAccessManager` hech qachon o'chirilmasdi — sizib ketish) va xato matniga **xato kodi + HTTP status** qo'shildi, shunda qayta yiqilsa bitta ishga tushirishning o'zi sababni ko'rsatadi. **Muhim:** bu self-update'ni BUZMAYDI — A9 rasmiy tdesktop relizlarini GitHub'dan tekshiradi, o'z yangilanish kanalimiz (3 mirror) esa mutlaqo alohida mexanizm. |
-| **1** | Story ko'rayotganda orqa fon bug'i: blur ↔ shaffof holat juda tez almashadi | ⏳ **OXIRGI.** Ehtimol Qt6 render farqi (RHI/OpenGL). Eng noaniq va qimmat — shuning uchun oxirga qo'yilgan. |
+| **1** | Story ko'rayotganda orqa fon bug'i: blur ↔ shaffof holat juda tez almashadi | ⏳ **OXIRGI va YAGONA qolgan.** Ehtimol Qt6 render farqi (RHI/OpenGL). Eng noaniq va qimmat — shuning uchun oxirga qo'yilgan. |
+
+### ✅ 2026-08-14 18:09 build — 2, 3, 4 REAL SINOVDAN O'TDI
+
+Foydalanuvchi tasdiqladi: tiklangan chat qidiruvsiz chatList'da paydo bo'ldi (2),
+rasmiy versiya tekshiruvi ishladi (4), scroll **sezilarli silliqroq** (3).
+Crash yo'q. Faqat 1-muammo qoldi.
+
+**Build yo'lidagi 4 ta to'siq** (hammasi hal qilindi, tafsilot commit'larda):
+Debug konfiguratsiyasi → `dnsapi.lib` yo'qligi (LNK1120) → `QT` user env
+5.15.18 bo'lgani (CMake Qt5/Qt6 to'qnashuvi, 22×MSB8066) → disk yetmasligi
+(LNK1180, tasodifiy Debug build 22 GB egallagan edi).
+
+### 🔴 Crash: 10 MB dan katta media (topildi va tuzatildi — `bfe0789969`)
+
+`log.txt:206` → `Assertion Failed! "!_filename.isEmpty() || (_fullSize <=
+Storage::kMaxFileInMemory)" file_download.cpp:114`.
+
+`DocumentData::save()` ga **bo'sh maqsad nomi** = "xotiraga yukla".
+Keshlanmaydigan hujjat uchun `save()` `LoadToFileOnly` ni tanlaydi
+(`data_document.cpp:1292`), `FileLoader` esa bo'sh nomni faqat fayl
+≤ 10 MB bo'lgandagina qabul qiladi. Yo'l: `addOlderSlice` →
+`MaybeArchiveItem` → `MaybeDownloadMedia`. Saved Messages'da katta
+fayllar ko'p → deyarli har safar yiqilardi. Xuddi shu xato A11 story
+backup'da ham bor edi (`custom_activity_history.cpp`) — ikkalasi tuzatildi.
+
+**Ataylab qilingan scope kamayishi:** >10 MB media endi avtomatik
+arxivlanmaydi. MUHIM: `DocumentData::finishLoad()` (`data_document.cpp:1064`)
+hook'i saqlanib qoldi — ya'ni foydalanuvchi **ochgan/yuklagan** media
+istalgan hajmda arxivlanaveradi. Yo'qolgan yagona narsa — hech qachon
+ochilmagan katta faylni oldindan yuklash.
+
+---
+
+## 🔵 NAVBATDAGI ISH: Katta media backup (spec YOZILMAGAN)
+
+Yuqoridagi scope kamayishini yopish uchun. **User bilan kelishilgan
+qarorlar** (spec shu asosda yoziladi):
+
+**Uch qatlamli dizayn** — bir-birini almashtirmaydi, to'ldiradi:
+1. *Bepul bazaviy* — `finishLoad` hook'i (ALLAQACHON ISHLAYDI)
+2. *Asosiy* — ro'yxatdagi chatlarda oldindan yuklash, **haqiqiy maqsad
+   fayl yo'li bilan** (bo'sh nom = crash, yuqoriga qarang)
+3. *Oxirgi imkoniyat* — o'chirish aniqlanganda urinib ko'rish.
+   Ishonchsiz (`file_reference` eskiradi), lekin urinish tekin
+
+**Ro'yxatga bog'lanish** (user qarori — alohida ro'yxat SHAKLLANTIRILMAYDI):
+```
+YOQILADI: chat White List'da  YOKI  per-chat "Media Backup" toggle
+HECH QACHON: Black List'da  YOKI  Saved Messages (peer->isSelf())
+```
+🔴 **`ShouldAntiDelete()` zanjiriga ERGASHMAYDI** — unda global bayroq
+bor, unga ergashsa global AntiDelete yoqilganda 981 ta peer'dan
+(asosan botlar) video yuklardi. White List'da atigi 5 ta chat bor,
+global bayroq esa boshqa narsa — bu ikkisi chalkashtirilmasin.
+
+Per-chat toggle "Individual sozlamalar" bo'limiga tushadi (Ghost Mode /
+Anti-Delete / Anti-Edit yoniga 4-qator).
+
+**Sozlamalar** (ikkalasi ham Custom Window'da o'zgartiriladi):
+| Sozlama | Default |
+|---|---|
+| Bitta fayl chegarasi | 100 MB |
+| Umumiy kvota | 10 GB |
+| Kvota to'lganda | Hech narsa O'CHIRILMAYDI; muammo hal bo'lmaguncha har ishga tushishda alert |
+
+**Texnik tuzoq:** faylni to'g'ridan-to'g'ri arxiv papkasiga yuklasak,
+`finishLoad` uni YANA `SaveMediaFile()` bilan nusxalaydi (fayl o'zini
+o'ziga). Manba arxiv daraxti ichida bo'lsa hook'ni o'tkazib yuborish kerak.
+Shu bilan birga o'sha hook'dagi xato ham tuzatiladi: u faqat **global**
+`AntiDelete()` ni tekshiradi, per-peer emas — ya'ni global o'chiq, chat
+whitelist'da bo'lsa media saqlanmaydi.
+
+**Export/import talabi (user):** bularning hammasi Archive tab'idagi
+import/export'ga qo'shilishi kerak, chunki Track C (customsync-server)
+uchun kerak bo'ladi. **HAL QILINMAGAN SAVOL** — eksportga fayllar
+kiradimi yoki faqat indeks? Tavsiya: ajratish. *Indeks* (yo'l, hajm,
+hash, peer, msgId, sana) — doim eksport, bir necha MB, server orqali
+bemalol sinxronlanadi. *Fayllar* — ixtiyoriy, alohida; blob storage
+alohida infratuzilma talab qiladi va Track C ni bloklamasligi kerak.
 
 ### Yangi versiyani boshqa qurilmalarga tarqatish (user savoli, 2026-08-14)
 
