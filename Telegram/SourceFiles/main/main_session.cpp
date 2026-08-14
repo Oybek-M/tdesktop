@@ -180,6 +180,16 @@ Session::Session(
 	// A13/D5: davriy WAL checkpoint — to'satdan tok o'chganda arxiv
 	// yozuvlari yo'qolmasligi uchun. Ichida takroriy chaqiruvdan himoya bor.
 	CustomArchive::StartMaintenance();
+	// A13/K1b: arxivdan tiklanadigan chatlarni chat ro'yxatiga qaytarish.
+	// Konstruktorda EMAS, balki chat ro'yxati serverdan yuklangach —
+	// aks holda History'larning folderKnown() false bo'lib, keraksiz
+	// dialog-so'rovlar toshqini bo'lardi. rpl::take(1): faqat bir marta.
+	data().chatsListLoadedEvents(
+	) | rpl::take(1) | rpl::on_next([=](Data::Folder *folder) {
+		if (!folder) { // faqat asosiy ro'yxat (arxiv papkasi emas)
+			CustomArchive::RestoreDeletedChats(this);
+		}
+	}, lifetime());
 
 	_api->requestTermsUpdate();
 	_api->requestFullPeer(_user);

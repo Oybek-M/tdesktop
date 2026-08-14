@@ -825,6 +825,26 @@ void PruneStaleCachedText(int days) {
     }
 }
 
+QVector<QString> GetPeersWithDeletedMessages() {
+    Init();
+    QVector<QString> result;
+    if (!gDb) return result;
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "SELECT DISTINCT peer_id FROM actioned_messages "
+            "WHERE type = 'deleted'",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            const auto peerId = colText(stmt, 0);
+            if (!peerId.isEmpty()) {
+                result.append(peerId);
+            }
+        }
+        sqlite3_finalize(stmt);
+    }
+    return result;
+}
+
 void Checkpoint() {
     Init();
     if (!gDb) return;

@@ -107,6 +107,11 @@ struct DeletedMessageWithPeer {
 };
 QVector<DeletedMessageWithPeer> GetAllDeletedMessages(int limit = 300);
 
+// A13/K1b: arxivda o'chirilgan xabari bor peer'lar ro'yxati (faqat ID lar).
+// Ishga tushishda chat ro'yxatini tiklash uchun — matn/media yuklamaydi,
+// shuning uchun startup'da arzon.
+[[nodiscard]] QVector<QString> GetPeersWithDeletedMessages();
+
 // C11: per-message edit history — all recorded versions across all chats.
 struct EditRecord {
     QString peerId;

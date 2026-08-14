@@ -2,6 +2,10 @@
 
 class HistoryItem;
 
+namespace Main {
+class Session;
+} // namespace Main
+
 namespace CustomArchive {
 
 // Xabarni DOIMIY arxivga yozadi, agar shu peer kuzatilayotgan bo'lsa
@@ -22,6 +26,15 @@ void MaybeArchiveItem(not_null<HistoryItem*> item);
 // Ichma-ich chaqirish xavfsiz (hisoblagich bilan).
 void BeginBatch();
 void EndBatch();
+
+// A13/K1b: ishga tushishda arxivda o'chirilgan xabari bor chatlarni chat
+// ro'yxatiga qaytaradi.
+//
+// Muammo: loadDeletedMessages() faqat History obyekti YUKLANGANDA ishlaydi,
+// History esa chat ochilganda yaratiladi. Natijada suhbatdosh butun chatni
+// o'chirgach, tiklangan tarix faqat foydalanuvchi o'sha chatni qidiruvdan
+// topib ochgandagina paydo bo'lardi — asosiy ro'yxatda ko'rinmasdi.
+void RestoreDeletedChats(not_null<Main::Session*> session);
 
 // Davriy WAL checkpoint taymerini ishga tushiradi (A13/D5) — to'satdan tok
 // o'chganda yo'qotish oynasini qisqartirish uchun. Ilova ishga tushganda

@@ -5,10 +5,13 @@
 #include "data/data_document.h"
 #include "data/data_file_origin.h"
 #include "data/data_media_types.h"
+#include "data/data_histories.h"
 #include "data/data_peer.h"
 #include "data/data_photo.h"
+#include "data/data_session.h"
 #include "history/history.h"
 #include "history/history_item.h"
+#include "main/main_session.h"
 #include <QtCore/QTimer>
 #include <vector>
 
@@ -133,6 +136,40 @@ void EndBatch() {
 	}
 	if (gBatchDepth == 0) {
 		FlushPending();
+	}
+}
+
+void RestoreDeletedChats(not_null<Main::Session*> session) {
+	const auto peers = CustomDB::GetPeersWithDeletedMessages();
+	if (peers.isEmpty()) {
+		return;
+	}
+	auto &owner = session->data();
+	for (const auto &peerIdStr : peers) {
+		auto ok = false;
+		const auto raw = peerIdStr.toULongLong(&ok);
+		if (!ok || !raw) {
+			continue;
+		}
+		if (!CustomSettings::ShouldAntiDelete(peerIdStr)) {
+			continue; // bu chat uchun AntiDelete o'chirilgan
+		}
+		const auto history = owner.history(PeerId(raw));
+		history->loadDeletedMessages();
+		if (history->isEmpty()) {
+			continue; // inject qilinmadi (masalan hammasi allaqachon bor)
+		}
+		if (history->folderKnown()) {
+			// Papkasi ma'lum — to'g'ridan-to'g'ri ro'yxatga qo'shamiz.
+			// refreshChatListEntry o'zi "ro'yxatda yo'q" holatini ham
+			// qayta ishlaydi (existenceChanged).
+			owner.refreshChatListEntry(history);
+		} else {
+			// Papka noma'lum: refreshChatListEntry Expects(folderKnown())
+			// bilan yiqilardi. Serverdan dialog yozuvini so'raymiz —
+			// javob kelgach tdesktop uni ro'yxatga o'zi qo'shadi.
+			owner.histories().requestDialogEntry(history);
+		}
 	}
 }
 
