@@ -3235,6 +3235,16 @@ void HistoryItem::setDeletedLocally() {
 					destPath = baseDir + QString::number(id.bare) + "_" + fileName;
 					QFile::copy(cachePath, destPath);
 				}
+			} else {
+				// L3 (2026-08-14): fayl lokal keshda umuman yo'q, ya'ni
+				// yuqoridagi nusxalash yo'li ishlamaydi. Oxirgi imkoniyat
+				// sifatida serverdan yuklashga urinib ko'ramiz.
+				//
+				// Bu KAFOLAT EMAS: xabar o'chirilgach `file_reference`
+				// tez orada yaroqsiz bo'ladi va server so'rovni rad
+				// etishi mumkin. Lekin urinish tekin va ba'zan ulguradi
+				// — ayniqsa suhbatdosh butun chatni birdan o'chirganda.
+				CustomArchive::TryRescueMedia(this);
 			}
 		}
 		// --- Photo ---

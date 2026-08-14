@@ -115,7 +115,8 @@ void RecordIndex(
 		const QString &kind,
 		const QString &status,
 		const QString &reason,
-		const QString &relPath) {
+		const QString &relPath,
+		const QString &layer) {
 	auto entry = CustomDB::MediaIndexEntry();
 	entry.peerId = QString::number(item->history()->peer->id.value);
 	entry.msgId = static_cast<long long>(item->id.bare);
@@ -128,7 +129,7 @@ void RecordIndex(
 	entry.msgDate = static_cast<unsigned int>(item->date());
 	entry.archivedAt = static_cast<unsigned int>(
 		QDateTime::currentSecsSinceEpoch());
-	entry.layer = u"l2"_q;
+	entry.layer = layer;
 	entry.status = status;
 	entry.reason = reason;
 	CustomDB::UpsertMediaIndex(entry);
@@ -170,12 +171,12 @@ void MaybeDownloadMedia(not_null<HistoryItem*> item) {
 				// Yuklamaymiz, lekin IZ QOLDIRAMIZ — ilgari bunday
 				// fayllar haqida hech qanday ma'lumot saqlanmasdi.
 				RecordIndex(item, document, kind,
-					u"pending"_q, u"too_large"_q, QString());
+					u"pending"_q, u"too_large"_q, QString(), u"l2"_q);
 				return;
 			}
 			if (CustomMediaQuota::IsFull()) {
 				RecordIndex(item, document, kind,
-					u"pending"_q, u"quota_full"_q, QString());
+					u"pending"_q, u"quota_full"_q, QString(), u"l2"_q);
 				return;
 			}
 			const auto relPath = ArchiveRelPath(item, document, kind);
@@ -190,9 +191,14 @@ void MaybeDownloadMedia(not_null<HistoryItem*> item) {
 			// QString() ga qaytarmang.
 			document->save(origin, fullPath);
 
+			// save() yuklashni BOSHLAYDI, tugatmaydi. Shuning uchun
+			// hozircha 'pending' — yuklash tugagach data_document.cpp
+			// dagi finishLoad() hook'i NoteArchivedDownloadFinished()
+			// orqali uni 'present' ga o'tkazadi. Darhol 'present' deb
+			// yozish indeksni yolg'onchi qilardi (yuklash uzilishi
+			// mumkin), bu esa Track C sinxronizatsiyasida tarqalardi.
 			RecordIndex(item, document, kind,
-				u"present"_q, QString(), relPath);
-			CustomMediaQuota::AddBytes(document->size);
+				u"pending"_q, u"downloading"_q, relPath, u"l2"_q);
 			return;
 		}
 		// L2 yoqilmagan chat — eski, keshga yuklash yo'li.
@@ -342,6 +348,71 @@ void RestoreDeletedChats(not_null<Main::Session*> session) {
 			owner.histories().requestDialogEntry(history);
 		}
 	}
+}
+
+void TryRescueMedia(not_null<HistoryItem*> item) {
+	const auto media = item->media();
+	if (!media) {
+		return;
+	}
+	const auto document = media->document();
+	if (!document) {
+		return; // rasm uchun setDeletedLocally() ning o'z yo'li bor
+	}
+	const auto peer = item->history()->peer;
+	if (peer->isSelf()) {
+		return;
+	}
+	const auto peerIdStr = QString::number(peer->id.value);
+	if (!CustomSettings::ShouldMediaBackup(peerIdStr)) {
+		return;
+	}
+	if (document->loading()) {
+		return; // yuklanmoqda — aralashmaymiz
+	}
+	const auto msgId = static_cast<long long>(item->id.bare);
+	if (CustomDB::HasPresentMediaIndexEntry(peerIdStr, msgId)) {
+		return; // allaqachon arxivda
+	}
+
+	const auto kind = MediaKindOf(document);
+	const auto maxBytes = qint64(
+		CustomSettings::MediaBackupMaxFileMb()) * 1024 * 1024;
+	if (document->size > maxBytes) {
+		// L3 da 'missing' — L2 dagi 'pending' dan farqli. Sabab: xabar
+		// o'chirilgan, ya'ni keyinroq qayta urinishning ma'nosi yo'q.
+		RecordIndex(item, document, kind,
+			u"missing"_q, u"too_large"_q, QString(), u"l3"_q);
+		return;
+	}
+	if (CustomMediaQuota::IsFull()) {
+		RecordIndex(item, document, kind,
+			u"missing"_q, u"quota_full"_q, QString(), u"l3"_q);
+		return;
+	}
+
+	const auto relPath = ArchiveRelPath(item, document, kind);
+	const auto fullPath = CustomMediaQuota::ArchiveRoot() + u"/"_q + relPath;
+	QDir().mkpath(QFileInfo(fullPath).absolutePath());
+	document->save(Data::FileOriginMessage(item->fullId()), fullPath);
+
+	// Urinish boshlandi. Muvaffaqiyatli bo'lsa finishLoad() buni
+	// 'present' ga o'tkazadi; bo'lmasa (file_reference eskirgan bo'lsa)
+	// yozuv shu holatda qoladi va keyingi ishga tushishda
+	// ReconcileMediaIndex() uni 'missing' ga tushiradi.
+	RecordIndex(item, document, kind,
+		u"pending"_q, u"rescue_downloading"_q, relPath, u"l3"_q);
+}
+
+void NoteArchivedDownloadFinished(
+		const QString &peerId,
+		long long msgId,
+		long long size) {
+	if (peerId.isEmpty()) {
+		return;
+	}
+	CustomDB::SetMediaIndexStatus(peerId, msgId, u"present"_q, QString());
+	CustomMediaQuota::AddBytes(size);
 }
 
 void StartMaintenance() {

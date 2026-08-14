@@ -43,7 +43,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "lottie/lottie_animation.h"
 #include "boxes/abstract_box.h" // Ui::hideLayer().
+#include "custom_archive.h"
 #include "custom_db.h"
+#include "custom_media_quota.h"
 #include "custom_settings.h"
 
 #include <QtCore/QBuffer>
@@ -1058,11 +1060,47 @@ void DocumentData::finishLoad() {
 	// in history_item.cpp re-copies from the *live* cache path, which may
 	// already be gone by then). Uses the same unified
 	// ~/customizationMainFolder/medias/ tree as SaveMediaFile() /
-	// setDeletedLocally() instead of the old standalone Downloads folder,
-	// and respects the global AntiDelete toggle (no per-peer id available
-	// here — this is a document-level hook, not tied to a specific message).
+	// setDeletedLocally() instead of the old standalone Downloads folder.
 	const auto cachePath = _loader->fileName();
-	if (!cachePath.isEmpty() && CustomSettings::AntiDelete()) {
+
+	// 2026-08-14 (1-tuzatish): per-peer qoidani hurmat qilamiz.
+	// Ilgari bu yerda faqat GLOBAL CustomSettings::AntiDelete() tekshirilar
+	// va izoh "no per-peer id available here" deb da'vo qilardi. Bu
+	// NOTO'G'RI edi — FileLoader::fileOrigin() mavjud (file_download.h:98).
+	// Natijasi: global bayroq o'chiq bo'lsa-yu chat White List'da bo'lsa,
+	// media umuman saqlanmasdi — ShouldAntiDelete() mantig'iga zid.
+	const auto fileOrigin = _loader->fileOrigin();
+	const auto fromMessage = v::is<Data::FileOriginMessage>(fileOrigin.data);
+	auto shouldSave = CustomSettings::AntiDelete();
+	if (fromMessage) {
+		const auto &msg = v::get<Data::FileOriginMessage>(fileOrigin.data);
+		shouldSave = CustomSettings::ShouldAntiDelete(
+			QString::number(msg.peer.value));
+	}
+	// Origin xabarga bog'liq bo'lmasa (avatar, sticker set va h.k.)
+	// global bayroq o'z kuchida qoladi.
+
+	// 2026-08-14 (2-tuzatish): ikki marta nusxalash tuzog'i.
+	// CustomArchive'ning L2/L3 qatlami faylni TO'G'RIDAN-TO'G'RI arxiv
+	// papkasiga yuklaydi, ya'ni _loader->fileName() arxiv yo'lining O'ZI
+	// bo'ladi. Tekshiruvsiz SaveMediaFile() uni o'ziga nusxalashga
+	// urinardi.
+	const auto alreadyInArchive = !cachePath.isEmpty()
+		&& cachePath.startsWith(CustomMediaQuota::ArchiveRoot());
+
+	if (alreadyInArchive) {
+		// L2/L3 boshlagan yuklash endi TUGADI — media indeksidagi
+		// 'pending' yozuvni 'present' ga o'tkazamiz. Holat aynan shu
+		// yerda tasdiqlanadi, chunki save() ni chaqirgan kod yuklash
+		// natijasini bilmaydi.
+		if (fromMessage) {
+			const auto &msg = v::get<Data::FileOriginMessage>(fileOrigin.data);
+			CustomArchive::NoteArchivedDownloadFinished(
+				QString::number(msg.peer.value),
+				static_cast<long long>(msg.msg.bare),
+				size);
+		}
+	} else if (!cachePath.isEmpty() && shouldSave) {
 		CustomDB::SaveMediaFile(cachePath, "file");
 	}
 

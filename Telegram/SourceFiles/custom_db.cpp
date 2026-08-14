@@ -1066,34 +1066,44 @@ int ReconcileMediaIndex(const QString &archiveRoot) {
 
     // Avval barcha 'present' yozuvlarni o'qiymiz, so'ng fayl tizimini
     // tekshiramiz — SELECT davomida UPDATE qilish SQLite'da nozik.
-    struct Row { QString peerId; long long msgId; QString relPath; };
+    struct Row { QString peerId; long long msgId; QString relPath; QString status; };
     QVector<Row> rows;
     {
         sqlite3_stmt *stmt = nullptr;
         if (sqlite3_prepare_v2(gDb,
-                "SELECT peer_id, msg_id, rel_path FROM media_index "
-                "WHERE status = 'present'",
+                "SELECT peer_id, msg_id, rel_path, status FROM media_index "
+                "WHERE status IN ('present', 'pending')",
                 -1, &stmt, nullptr) == SQLITE_OK) {
             while (sqlite3_step(stmt) == SQLITE_ROW) {
                 rows.append({
                     colText(stmt, 0),
                     sqlite3_column_int64(stmt, 1),
-                    colText(stmt, 2) });
+                    colText(stmt, 2),
+                    colText(stmt, 3) });
             }
             sqlite3_finalize(stmt);
         }
     }
 
+    // Ikki tomonlama moslashtirish — indeks o'zini-o'zi tuzatadi:
+    //   present + fayl yo'q  → missing  (import'dan keyin, yoki fayl
+    //                                    qo'lda o'chirilgan bo'lsa)
+    //   pending + fayl bor   → present  (yuklash tugagan, lekin
+    //                                    finishLoad hook'i o'tkazib
+    //                                    yuborgan — masalan ilova
+    //                                    yuklash oxirida yopilgan)
     int changed = 0;
     execSql("BEGIN");
     for (const auto &row : rows) {
-        if (row.relPath.isEmpty()
-            || !QFile::exists(archiveRoot + "/" + row.relPath)) {
+        const auto exists = !row.relPath.isEmpty()
+            && QFile::exists(archiveRoot + "/" + row.relPath);
+        if (row.status == "present" && !exists) {
             SetMediaIndexStatus(
-                row.peerId,
-                row.msgId,
-                u"missing"_q,
-                u"file_not_found"_q);
+                row.peerId, row.msgId, u"missing"_q, u"file_not_found"_q);
+            ++changed;
+        } else if (row.status == "pending" && exists) {
+            SetMediaIndexStatus(
+                row.peerId, row.msgId, u"present"_q, QString());
             ++changed;
         }
     }
