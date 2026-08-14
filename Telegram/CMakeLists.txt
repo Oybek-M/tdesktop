@@ -1100,6 +1100,8 @@ PRIVATE
     history/view/history_view_webpage_preview.h
     custom_archive.cpp
     custom_archive.h
+    custom_media_quota.cpp
+    custom_media_quota.h
     custom_db.cpp
     custom_db.h
     custom_settings.cpp
