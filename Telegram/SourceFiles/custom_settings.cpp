@@ -425,6 +425,10 @@ QVector<QPair<QString, QString>> GetWhitelist() {
 bool IsInWhitelist(const QString &peerId) {
     if (!gInitialized) Init();
     if (gWhitelist.contains(peerId)) return true;
+    // 2026-08-14: ANIQ yozuv KATEGORIYAdan ustun. Foydalanuvchi bitta
+    // chatni qo'lda Black List'ga qo'shgan bo'lsa, White List'dagi
+    // kategoriya (masalan "Guruhlar") uni qaytarib yoqmasligi kerak.
+    if (gBlocklist.contains(peerId)) return false;
     const auto type = GetPeerType(peerId);
     if (type != PeerType::Unknown) {
         const auto it = gWhitelistCategories.constFind(static_cast<int>(type));
@@ -461,6 +465,20 @@ QVector<QPair<QString, QString>> GetBlocklist() {
 bool IsInBlocklist(const QString &peerId) {
     if (!gInitialized) Init();
     if (gBlocklist.contains(peerId)) return true;
+    // 2026-08-14 (HAQIQIY XATO, foydalanuvchiga ta'sir qilgan): ANIQ
+    // White List yozuvi KATEGORIYA blokidan ustun bo'lishi kerak.
+    //
+    // Ilgari: foydalanuvchining 5 ta kanali White List'da edi, lekin
+    // Black List'da "Kanallar / superguruhlar" kategoriyasi yoqilgan.
+    // GetPeerType() ularni Channel deb aniqlagani uchun bu funksiya true
+    // qaytarardi va ShouldAntiDelete() (Blocklist > Whitelist) ularni
+    // o'chirib qo'yardi — ya'ni foydalanuvchining aniq qarori jimgina
+    // bekor qilinardi.
+    //
+    // AddToBlocklist() da gWhitelist.remove() bor, ya'ni ANIQ yozuvlar
+    // bir-birini istisno qiladi; kategoriya uchun esa bunday himoya
+    // yo'q edi. Shu bo'shliq to'ldirildi.
+    if (gWhitelist.contains(peerId)) return false;
     const auto type = GetPeerType(peerId);
     if (type != PeerType::Unknown) {
         const auto it = gBlocklistCategories.constFind(static_cast<int>(type));
