@@ -183,12 +183,18 @@ Session::Session(
 	// A13/K1b: arxivdan tiklanadigan chatlarni chat ro'yxatiga qaytarish.
 	// Konstruktorda EMAS, balki chat ro'yxati serverdan yuklangach —
 	// aks holda History'larning folderKnown() false bo'lib, keraksiz
-	// dialog-so'rovlar toshqini bo'lardi. rpl::take(1): faqat bir marta.
+	// dialog-so'rovlar toshqini bo'lardi.
+	//
+	// MUHIM: filter take(1) dan OLDIN. Bu oqim arxiv papkasi uchun ham
+	// otiladi (folder != nullptr); agar avval take(1) qo'yilsa va birinchi
+	// hodisa arxivniki bo'lsa, obuna o'sha yerda tugab, asosiy ro'yxat
+	// hodisasi umuman kelmasdi. Shu tartib kodbazadagi boshqa
+	// chatsListLoadedEvents obunachilariga ham mos (peer_list_controllers).
 	data().chatsListLoadedEvents(
-	) | rpl::take(1) | rpl::on_next([=](Data::Folder *folder) {
-		if (!folder) { // faqat asosiy ro'yxat (arxiv papkasi emas)
-			CustomArchive::RestoreDeletedChats(this);
-		}
+	) | rpl::filter([](Data::Folder *folder) {
+		return !folder; // faqat asosiy ro'yxat (arxiv papkasi emas)
+	}) | rpl::take(1) | rpl::on_next([=] {
+		CustomArchive::RestoreDeletedChats(this);
 	}, lifetime());
 
 	_api->requestTermsUpdate();

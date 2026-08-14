@@ -51,6 +51,18 @@ static QSet<QString> gLoadedPeers;
 static QHash<QString, QHash<QString, QString>> gActivityLatestCache;
 static QSet<QString> gActivityLoadedPeers;
 
+// A13/perf: qaysi peer'larda UMUMAN 'deleted' yozuvi bor. Bitta DISTINCT
+// so'rov bilan bir marta to'ldiriladi (idx_am_peer_type indeksidan foydalanadi).
+//
+// Nima uchun: GetDeletedMessages() History::loadDeletedMessages() dan
+// chaqiriladi, u esa addOlderSlice/addNewerSlice ichida — ya'ni har bir
+// scroll bo'lagida. Chatlarning aksariyatida o'chirilgan xabar yo'q, lekin
+// har safar baribir SQLite so'rovi ketardi. Bu to'plam "ehtimol bor" filtri:
+// peer bu yerda bo'lmasa, so'rov aniq bo'sh qaytadi — demak bemalol
+// o'tkazib yuborsa bo'ladi.
+static QSet<QString> gPeersWithDeleted;
+static bool gPeersWithDeletedLoaded = false;
+
 // Batch write queue: SaveMessage() enqueues here; FlushPendingWrites() commits all at once.
 static QVector<ActionedMessage> gPendingWrites;
 static QTimer *gFlushTimer = nullptr;
@@ -299,6 +311,38 @@ void LoadRestoreCache() {
     gLoadedPeers.clear();
     gActivityLatestCache.clear();
     gActivityLoadedPeers.clear();
+    gPeersWithDeleted.clear();
+    gPeersWithDeletedLoaded = false;
+}
+
+// A13/perf: gPeersWithDeleted ni bir marta to'ldiradi. EnsurePeerCacheLoaded
+// bilan bir xil naqsh — DB o'qish qulfsiz, so'ng qulflab yozish.
+static void EnsurePeersWithDeletedLoaded() {
+    {
+        QMutexLocker locker(&gCacheMutex);
+        if (gPeersWithDeletedLoaded) return;
+    }
+    Init();
+    QSet<QString> peers;
+    if (gDb) {
+        sqlite3_stmt *stmt = nullptr;
+        if (sqlite3_prepare_v2(gDb,
+                "SELECT DISTINCT peer_id FROM actioned_messages "
+                "WHERE type = 'deleted'",
+                -1, &stmt, nullptr) == SQLITE_OK) {
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                const auto peerId = colText(stmt, 0);
+                if (!peerId.isEmpty()) {
+                    peers.insert(peerId);
+                }
+            }
+            sqlite3_finalize(stmt);
+        }
+    }
+    QMutexLocker locker(&gCacheMutex);
+    // unite() — o'qish davomida MarkDeleted() qo'shgan peer yo'qolmasin.
+    gPeersWithDeleted.unite(peers);
+    gPeersWithDeletedLoaded = true;
 }
 
 // Loads one peer's deleted/edited records from DB into the caches, unless
@@ -473,6 +517,9 @@ void MarkDeleted(
     {
         QMutexLocker locker(&gCacheMutex);
         gDeletedCache[peerId].insert(msgId);
+        // A13/perf: quyidagi UPDATE yo'li SaveActionedMessage() ga
+        // bormasligi mumkin — filtrni shu yerda ham yangilab qo'yamiz.
+        gPeersWithDeleted.insert(peerId);
     }
 
     // Sprint 5: simplified UPDATE-first pattern — eliminates the extra SELECT.
@@ -527,6 +574,14 @@ QVector<DeletedMessage> GetDeletedMessages(const QString &peerId) {
     Init();
     QVector<DeletedMessage> result;
     if (!gDb) return result;
+
+    // A13/perf: bu peer'da o'chirilgan xabar umuman bo'lmasa, SQLite'ga
+    // bormaymiz. Bu issiq yo'l — har bir scroll bo'lagida chaqiriladi.
+    EnsurePeersWithDeletedLoaded();
+    {
+        QMutexLocker locker(&gCacheMutex);
+        if (!gPeersWithDeleted.contains(peerId)) return result;
+    }
 
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
@@ -684,6 +739,14 @@ void SaveActionedMessage(const ActionedMessage &msg) {
     Init();
     if (!gDb) return;
 
+    // A13/perf: 'deleted' yozuvlarning YAGONA insert nuqtasi shu yer
+    // (MarkDeleted ham shu orqali o'tadi) — filtr to'plamini shu yerda
+    // yangilaymiz, aks holda yangi o'chirilgan xabar o'qilmay qolardi.
+    if (msg.type == "deleted" && !msg.peerId.isEmpty()) {
+        QMutexLocker locker(&gCacheMutex);
+        gPeersWithDeleted.insert(msg.peerId);
+    }
+
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
             "INSERT INTO actioned_messages "
@@ -826,21 +889,14 @@ void PruneStaleCachedText(int days) {
 }
 
 QVector<QString> GetPeersWithDeletedMessages() {
-    Init();
+    // A13/perf: aynan shu ro'yxat gPeersWithDeleted filtrini to'ldiradi —
+    // takroriy DISTINCT so'rov o'rniga o'sha keshni qaytaramiz.
+    EnsurePeersWithDeletedLoaded();
+    QMutexLocker locker(&gCacheMutex);
     QVector<QString> result;
-    if (!gDb) return result;
-    sqlite3_stmt *stmt = nullptr;
-    if (sqlite3_prepare_v2(gDb,
-            "SELECT DISTINCT peer_id FROM actioned_messages "
-            "WHERE type = 'deleted'",
-            -1, &stmt, nullptr) == SQLITE_OK) {
-        while (sqlite3_step(stmt) == SQLITE_ROW) {
-            const auto peerId = colText(stmt, 0);
-            if (!peerId.isEmpty()) {
-                result.append(peerId);
-            }
-        }
-        sqlite3_finalize(stmt);
+    result.reserve(gPeersWithDeleted.size());
+    for (const auto &peerId : gPeersWithDeleted) {
+        result.append(peerId);
     }
     return result;
 }
@@ -1685,6 +1741,7 @@ void ClearDeletedArchive() {
     {
         QMutexLocker locker(&gCacheMutex);
         gDeletedCache.clear();
+        gPeersWithDeleted.clear(); // endi hech kimda 'deleted' yo'q
     }
 }
 
@@ -1704,6 +1761,7 @@ void ClearAllArchive() {
         QMutexLocker locker(&gCacheMutex);
         gDeletedCache.clear();
         gEditedCache.clear();
+        gPeersWithDeleted.clear(); // endi hech kimda 'deleted' yo'q
     }
 }
 

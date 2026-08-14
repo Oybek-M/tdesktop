@@ -54,13 +54,40 @@ void RunCheck(std::function<void(CheckResult)> callback, bool notifyIfNewer) {
 	auto request = QNetworkRequest(
 		QUrl(QString::fromUtf8(kGithubLatestReleaseUrl)));
 	request.setRawHeader("User-Agent", "CustomMod-tdesktop-UpstreamChecker");
+
+	// A9/Qt6: HTTP/2 ni ATAYIN o'chiramiz.
+	//
+	// Qt5'da Http2AllowedAttribute standart holda `false` edi, Qt6'da esa
+	// `true`. Qt6'ga o'tgach bu tekshiruv "Connection closed"
+	// (RemoteHostClosedError) bilan yiqila boshladi — ya'ni TCP+TLS o'rnatildi,
+	// so'ng server ulanishni yopdi. Bu TLS backend yo'qligining alomati EMAS
+	// (u holda "TLS initialization failed" bo'lardi va build'da OpenSSL
+	// `-openssl-linked` bilan ulangan) — bu ALPN orqali kelishilgan h2
+	// seansining uzilishi. GitHub API HTTP/1.1 ni to'liq qo'llab-quvvatlaydi,
+	// shuning uchun uni majburlash xavfsiz va yo'qotishsiz.
+	request.setAttribute(QNetworkRequest::Http2AllowedAttribute, false);
+
+	// Javob kelmay qolsa QNetworkAccessManager cheksiz kutardi va `manager`
+	// hech qachon o'chirilmasdi (finished otilmaydi) — 20 soniyalik chegara.
+	request.setTransferTimeout(20 * 1000);
+
 	const auto reply = manager->get(request);
 
 	QObject::connect(reply, &QNetworkReply::finished, [=]() mutable {
 		result.checkedAt = QDateTime::currentDateTime();
 
 		if (reply->error() != QNetworkReply::NoError) {
-			result.error = reply->errorString();
+			// Diagnostika: qayta yiqilsa, matnning o'zi sababni ko'rsatsin —
+			// xato kodi va (agar javob kelgan bo'lsa) HTTP statusi bilan.
+			const auto status = reply->attribute(
+				QNetworkRequest::HttpStatusCodeAttribute);
+			result.error = reply->errorString()
+				+ u" [kod "_q
+				+ QString::number(int(reply->error()))
+				+ (status.isValid()
+					? (u", HTTP "_q + QString::number(status.toInt()))
+					: QString())
+				+ u"]"_q;
 		} else {
 			const auto data = reply->readAll();
 			const auto obj = QJsonDocument::fromJson(data).object();
