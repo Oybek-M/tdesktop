@@ -106,7 +106,75 @@ ochilmagan katta faylni oldindan yuklash.
 
 ---
 
-## 🔵 NAVBATDAGI ISH: Katta media backup (spec YOZILMAGAN)
+## 🟡 QOLGAN ISHLAR: Story bo'limi (2 ta, ikkalasi ham story bilan bog'liq)
+
+### S1. Story viewer UI bug (= eski "1-muammo")
+
+**Alomat:** story ko'rayotganda orqa fon blur ↔ shaffof holat o'rtasida
+juda tez almashadi (miltillaydi).
+
+**Ma'lum:** Qt5 build'da bunday bo'lmagan — ya'ni Qt6 regressiyasi.
+Ehtimol RHI/OpenGL render yo'lidagi farq. Hech qanday tekshiruv hali
+o'tkazilmagan, gipoteza ham yo'q.
+
+**Boshlash nuqtasi:** `media/stories/` ostidagi fon chizish kodi va
+`media_view_overlay_opengl.cpp` / `media_view_overlay_rhi.cpp` dagi Qt6
+farqlari. Avval `log.txt` ni tekshirish kerak — miltillash paytida
+render warning'lari chiqayotgan bo'lishi mumkin.
+
+### S2. A11 story avtomatik yuklab olish — SINALMAGAN
+
+Story media backup (`CustomActivityHistory::MaybeBackupStoryMedia`)
+implement qilingan, lekin **hech qachon real sinovdan o'tkazilmagan**
+(TaskList'dagi "A11 Task 6" hamon pending).
+
+**Diqqat — 2026-08-14 da o'zgardi:** shu funksiyaga ham 10 MB chegarasi
+qo'yildi (crash tuzatishi bilan birga, `custom_activity_history.cpp`).
+Ya'ni **10 MB dan katta story videolari endi backup qilinmaydi**.
+Sinovda buni hisobga oling — kichik story ishlashi, katta story esa
+jimgina o'tkazib yuborilishi kerak (crash EMAS).
+
+Sinov: `~/customizationMainFolder/medias/` ostida story fayllari
+paydo bo'ladimi; Custom Window'dagi "Story media backup" toggle'i
+haqiqatan ta'sir qiladimi.
+
+**Bog'liqlik:** katta story'larni ham saqlash — bu quyidagi "Katta media
+backup" ishining bir qismi (bir xil muammo, bir xil yechim: haqiqiy
+maqsad fayl yo'li). Ikkalasini birga rejalashtirish mantiqiy.
+
+---
+
+## ✅ Katta media backup — KOD YOZILDI (2026-08-14 kechqurun)
+
+Spec: `docs/superpowers/specs/2026-08-14-media-backup-and-export-design.md`
+Reja: `docs/superpowers/plans/2026-08-14-media-backup-and-export-plan.md`
+
+**14 ta koddagi vazifa bajarildi, 9 ta commit. BUILD QILINMAGAN.**
+Qolgan yagona ish — Vazifa 15: build + T1–T16 qo'lda sinov.
+
+Muhim qarorlar va tuzoqlar uchun commit xabarlarini o'qing — har biri
+nima uchun shunday qilinganini tushuntiradi.
+
+Eng muhim uchtasi:
+1. `ShouldMediaBackup()` ATAYLAB `ShouldAntiDelete()` zanjiriga
+   ergashmaydi (global bayroq → 981 peer xavfi).
+2. Indeks holati `finishLoad()` da tasdiqlanadi — `save()` yuklashni
+   faqat boshlaydi, shuning uchun darhol `present` yozish indeksni
+   yolg'onchi qilardi va bu Track C ga tarqalardi.
+3. Eksport formati umumlashtirildi: `settings.json` + `index.json`
+   (platformadan mustaqil), PowerShell bog'liqligi `ZipDirectory()` da
+   yakkalandi.
+
+### Yo'l-yo'lakay topilgan va tuzatilgan HAQIQIY xato
+
+`IsInBlocklist()` kategoriya tekshiruvi aniq White List yozuvini bosib
+ketardi. Foydalanuvchining 5 ta kanali White List'da, Black List'da esa
+"Kanallar" kategoriyasi yoqilgan → **o'sha kanallarda AntiDelete amalda
+o'chiq edi**. Endi aniq yozuv kategoriyadan ustun (T15 shuni sinaydi).
+
+---
+
+## 🔵 Eski reja matni (ma'lumot uchun)
 
 Yuqoridagi scope kamayishini yopish uchun. **User bilan kelishilgan
 qarorlar** (spec shu asosda yoziladi):
