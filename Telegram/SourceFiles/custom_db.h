@@ -2,6 +2,8 @@
 
 #include <QtCore/QString>
 #include <QtCore/QDateTime>
+#include <QtCore/QJsonArray>
+#include <QtCore/QVector>
 #include <functional>
 
 class HistoryItem;
@@ -199,15 +201,52 @@ void ImportDatabase(const QString &sourcePath);
 // safety if they pass one.
 using ExportProgressCallback = std::function<void(const QString &stage, int percent)>;
 
-// Full backup: copies DB + entire media folder into targetDir.
-// Returns the path of the exported directory on success, empty string on failure.
+// ── Eksport formati v3 (2026-08-14) ─────────────────────────────────────
+//
+// Format boshqa ilovalarimizda va serverda ham ishlatilishi kerak,
+// shuning uchun ikkita PLATFORMADAN MUSTAQIL artefakt qo'shildi:
+//
+//   settings.json  — barcha sozlamalar (kanonik). settings.reg Windows
+//                    registry dump'i bo'lib, serverda o'qib bo'lmaydi;
+//                    u faqat orqaga moslik uchun saqlanadi.
+//   index.json     — media indeksi JSON'da. Server SQLite drayveri va
+//                    bizning ichki sxemamizni bilishi shart bo'lmasin.
+//
+// Chiqish IKKITA alohida arxiv:
+//   CustomModBackup_<stamp>.zip — baza + sozlamalar + indeks (MB'lar)
+//   CustomModMedia_<stamp>.zip  — media fayllar (GB'lar), ixtiyoriy
+//
+// Nima uchun ikkita: ZIP yaratilgach unga qo'shib bo'lmaydi. Ajratish
+// bilan asosiy arxiv soniyalarda tayyor bo'ladi va darhol ishlatsa
+// bo'ladi, media esa fonda davom etadi. Track C uchun ham shu bo'linish
+// kerak — indeks doim sinxronlanadi, bloblar alohida.
+struct ExportOptions {
+	// true  — barcha media eksport qilinadi (mediaPeerIds e'tiborsiz)
+	// false — faqat mediaPeerIds dagi chatlar media'si
+	// false + bo'sh ro'yxat — media umuman yo'q, faqat indeks
+	bool includeAllMedia = false;
+	QVector<QString> mediaPeerIds;
+};
+
+struct ExportResult {
+	QString mainZipPath;   // bo'sh = muvaffaqiyatsiz
+	QString mediaZipPath;  // bo'sh = media eksport qilinmadi
+	long long mediaBytes = 0;
+};
+
 // Synchronous — does real disk I/O and shells out to PowerShell to zip the
 // result, which can take seconds to tens of seconds for large archives.
 // Prefer ExportFullBackupAsync() from UI code; this is kept for callers
 // that already run off the main thread (e.g. the async wrapper itself).
-QString ExportFullBackup(
+ExportResult ExportFullBackup(
 	const QString &targetDir,
+	const ExportOptions &options = ExportOptions(),
 	const ExportProgressCallback &onProgress = nullptr);
+
+// Media indeksini JSON massiv sifatida qaytaradi (index.json mazmuni).
+// Alohida ochiq, chunki server/boshqa ilovalar uni to'g'ridan-to'g'ri
+// so'rashi mumkin.
+[[nodiscard]] QJsonArray MediaIndexToJson();
 
 // Full restore: imports DB + media from a previously exported backup.
 // sourcePath may be a .zip file produced by ExportFullBackup(), or a plain folder.
@@ -227,9 +266,10 @@ bool ImportFullBackup(const QString &sourcePath, bool fullReplace = false);
 // (crl::async) and deliver the result back on the main thread (crl::on_main),
 // so callers never block the UI thread. Safe to call from the UI thread.
 // onProgress (export only) is marshaled to the main thread automatically.
-using ExportResultCallback = std::function<void(const QString &resultPathOrEmpty)>;
+using ExportResultCallback = std::function<void(const ExportResult &result)>;
 void ExportFullBackupAsync(
 	const QString &targetDir,
+	const ExportOptions &options,
 	ExportResultCallback callback,
 	const ExportProgressCallback &onProgress = nullptr);
 
@@ -237,6 +277,14 @@ using ImportResultCallback = std::function<void(bool success)>;
 void ImportFullBackupAsync(
 	const QString &sourcePath,
 	bool fullReplace,
+	ImportResultCallback callback);
+
+// Media arxivini alohida, asosiy import'dan KEYIN istalgan vaqtda
+// tiklaydi. Fayllarni joyiga qo'yadi, so'ng ReconcileMediaIndex() orqali
+// media_index yozuvlarini 'present' ga qaytaradi.
+bool ImportMediaArchive(const QString &zipPath);
+void ImportMediaArchiveAsync(
+	const QString &zipPath,
 	ImportResultCallback callback);
 
 QString SaveMediaFile(const QString &sourcePath, const QString &type); // "image", "video", "voice", "file"

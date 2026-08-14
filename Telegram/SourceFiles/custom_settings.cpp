@@ -473,6 +473,49 @@ bool ShouldMediaBackup(const QString &peerId) {
     return MediaBackupForPeer(peerId);
 }
 
+// ── Platformadan mustaqil sozlama almashinuvi (2026-08-14) ───────────────
+
+QJsonObject ExportToJson() {
+    if (!gInitialized) Init();
+    QSettings settings("CustomMod", "TelegramDesktop");
+    QJsonObject obj;
+    // allKeys() guruhlarni ham "Guruh/kalit" ko'rinishida qaytaradi, ya'ni
+    // per-peer override'lar (AntiDeletePerPeer/... , MediaBackupPerPeer/...)
+    // ham avtomatik tushadi. Qo'lda ro'yxat yuritilmaydi — yangi sozlama
+    // qo'shilganda bu yerni yangilash esdan chiqmaydi.
+    for (const QString &key : settings.allKeys()) {
+        const auto value = settings.value(key);
+        const auto json = QJsonValue::fromVariant(value);
+        if (!json.isUndefined()) {
+            obj.insert(key, json);
+        }
+    }
+    return obj;
+}
+
+void ImportFromJson(const QJsonObject &json) {
+    {
+        QSettings settings("CustomMod", "TelegramDesktop");
+        for (auto it = json.constBegin(); it != json.constEnd(); ++it) {
+            // Noma'lum kalitlar ham yoziladi — kelajakdagi versiyada
+            // yaratilgan zaxira eski build'da ochilsa, ma'lumot
+            // yo'qolmasin (o'sha kalit shunchaki ishlatilmaydi).
+            settings.setValue(it.key(), it.value().toVariant());
+        }
+        settings.sync();
+    }
+    // Xotiradagi keshlarni yangilash uchun to'liq qayta o'qish.
+    // gWhitelist/gBlocklist ATAYLAB tozalanmaydi — ular QSettings'da
+    // emas, peer_lists.json faylida saqlanadi va uni ImportFullBackup()
+    // alohida tiklaydi. Init() o'sha fayldan qayta o'qiydi.
+    gInitialized = false;
+    gAntiDeletePerPeer.clear();
+    gAntiEditPerPeer.clear();
+    gGhostPerPeer.clear();
+    gMediaBackupPerPeer.clear();
+    Init();
+}
+
 // ── Whitelist ─────────────────────────────────────────────────────────────
 
 void AddToWhitelist(const QString &peerId, const QString &displayName) {

@@ -2459,6 +2459,137 @@ void fillAboutTab(
 			st::customModHintLabel),
 		st::defaultSubsectionTitlePadding);
 
+	// ── Media eksport tanlovi (2026-08-14) ──────────────────────────────
+	//
+	// Ro'yxat media_index dan tuziladi — ya'ni faqat HAQIQATAN media'si
+	// bor chatlar ko'rinadi (odatda 3-7 qator, yuzlab emas), har birida
+	// hajmi bilan. Shunda "bu 8 GB, keyingi safar" deb qaror qilish
+	// mumkin. Bu "Individual sozlamalar"dan olinmaydi: u toggle
+	// ARXIVLASHNI boshqaradi, EKSPORTNI emas — 10 ta chatni arxivlab
+	// ulardan 2 tasini eksport qilish mutlaqo normal.
+	Ui::AddSkip(content, 8);
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(u"Media eksporti"_q),
+			st::customModHintLabel),
+		st::defaultSubsectionTitlePadding);
+
+	struct MediaExportState {
+		bool includeAll = false;
+		// QStringList (QVector<QString> emas) — join() kerak. Qt6'da
+		// QVector = QList, shuning uchun ExportOptions::mediaPeerIds ga
+		// to'g'ridan-to'g'ri berish mumkin.
+		QStringList selected;
+		long long allBytes = 0;
+		Ui::FlatLabel *totalLabel = nullptr;
+	};
+	const auto mediaState = content->lifetime()
+		.make_state<MediaExportState>();
+
+	const auto summaries = CustomDB::GetMediaPeerSummaries();
+	for (const auto &s : summaries) {
+		mediaState->allBytes += s.totalBytes;
+	}
+	const auto formatSize = [](long long bytes) {
+		if (bytes >= 1024LL * 1024 * 1024) {
+			return QString::number(
+				double(bytes) / (1024.0 * 1024 * 1024), 'f', 1) + u" GB"_q;
+		}
+		return QString::number(
+			double(bytes) / (1024.0 * 1024), 'f', 1) + u" MB"_q;
+	};
+
+	// Oxirgi tanlovni eslab qolamiz — takroriy eksport bir bosishda.
+	{
+		QSettings s("CustomMod", "TelegramDesktop");
+		mediaState->includeAll = s.value("mediaExportIncludeAll", false).toBool();
+		const auto saved = s.value("mediaExportPeers", QString()).toString();
+		if (!saved.isEmpty()) {
+			mediaState->selected = saved.split(u',', Qt::SkipEmptyParts);
+		}
+	}
+	const auto saveSelection = [=] {
+		QSettings s("CustomMod", "TelegramDesktop");
+		s.setValue("mediaExportIncludeAll", mediaState->includeAll);
+		s.setValue("mediaExportPeers", mediaState->selected.join(u','));
+	};
+
+	const auto selectedBytes = [=] {
+		if (mediaState->includeAll) return mediaState->allBytes;
+		auto total = 0LL;
+		for (const auto &s : summaries) {
+			if (mediaState->selected.contains(s.peerId)) total += s.totalBytes;
+		}
+		return total;
+	};
+
+	if (summaries.isEmpty()) {
+		content->add(
+			object_ptr<Ui::FlatLabel>(
+				content,
+				rpl::single(u"Arxivda media fayllar yo'q — eksport faqat "
+					"indeks va sozlamalarni oladi."_q),
+				st::customModHintLabel),
+			st::boxRowPadding);
+	} else {
+		const auto totalLabel = content->add(
+			object_ptr<Ui::FlatLabel>(
+				content,
+				rpl::single(QString()),
+				st::customModHintLabel),
+			st::boxRowPadding);
+		mediaState->totalLabel = totalLabel;
+		const auto refreshTotal = [=] {
+			const auto bytes = selectedBytes();
+			totalLabel->setText(bytes > 0
+				? (u"Tanlangan: "_q + formatSize(bytes))
+				: u"Tanlangan: yo'q — faqat indeks eksport qilinadi"_q);
+		};
+		refreshTotal();
+
+		const auto allBtn = content->add(
+			object_ptr<Ui::SettingsButton>(
+				content,
+				rpl::single(u"Hammasi ("_q
+					+ formatSize(mediaState->allBytes) + u")"_q),
+				st::settingsButtonNoIcon));
+		allBtn->toggleOn(rpl::single(mediaState->includeAll));
+		allBtn->toggledValue()
+			| rpl::skip(1)
+			| rpl::on_next([=](bool on) {
+				mediaState->includeAll = on;
+				saveSelection();
+				refreshTotal();
+			}, allBtn->lifetime());
+
+		for (const auto &summary : summaries) {
+			auto name = CustomSettings::GetPeerDisplayName(summary.peerId);
+			if (name.isEmpty()) {
+				name = u"ID "_q + summary.peerId;
+			}
+			const auto btn = content->add(
+				object_ptr<Ui::SettingsButton>(
+					content,
+					rpl::single(name
+						+ u"  —  "_q + formatSize(summary.totalBytes)
+						+ u" ("_q + QString::number(summary.fileCount)
+						+ u" fayl)"_q),
+					st::settingsButtonNoIcon));
+			const auto peerId = summary.peerId;
+			btn->toggleOn(rpl::single(mediaState->selected.contains(peerId)));
+			btn->toggledValue()
+				| rpl::skip(1)
+				| rpl::on_next([=](bool on) {
+					mediaState->selected.removeAll(peerId);
+					if (on) mediaState->selected.append(peerId);
+					saveSelection();
+					refreshTotal();
+				}, btn->lifetime());
+		}
+	}
+	Ui::AddSkip(content, 8);
+
 	const auto exportBtn = content->add(
 		object_ptr<Ui::RoundButton>(
 			content,
@@ -2476,16 +2607,28 @@ void fillAboutTab(
 		exportBtn->setDisabled(true);
 		Ui::Toast::Show(u"Zaxira nusxa olinmoqda, biroz kuting..."_q);
 
+		auto options = CustomDB::ExportOptions();
+		options.includeAllMedia = mediaState->includeAll;
+		if (!mediaState->includeAll) {
+			options.mediaPeerIds = mediaState->selected;
+		}
+
 		const auto weak = base::make_weak(content);
 		CustomDB::ExportFullBackupAsync(
 			dir,
-			[=](const QString &result) {
+			options,
+			[=](const CustomDB::ExportResult &result) {
 				if (!weak) return; // Oyna yopilgan bo'lishi mumkin.
 				exportBtn->setDisabled(false);
-				if (result.isEmpty()) {
+				if (result.mainZipPath.isEmpty()) {
 					Ui::Toast::Show(u"Eksport amalga oshmadi."_q);
+				} else if (result.mediaZipPath.isEmpty()) {
+					Ui::Toast::Show(u"Eksport saqlandi (media'siz): "_q
+						+ result.mainZipPath);
 				} else {
-					Ui::Toast::Show(u"Eksport saqlandi: "_q + result);
+					Ui::Toast::Show(u"Eksport saqlandi: "_q
+						+ result.mainZipPath
+						+ u"\n+ media: "_q + result.mediaZipPath);
 				}
 			},
 			[=](const QString &stage, int percent) {

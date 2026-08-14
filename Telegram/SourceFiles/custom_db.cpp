@@ -1,4 +1,5 @@
 #include "custom_db.h"
+#include "custom_settings.h"
 #include "sqlite3.h"
 #include <QtCore/QStandardPaths>
 #include <QtCore/QDir>
@@ -1517,11 +1518,73 @@ static void MergePeerListsJson(const QString &srcPath, const QString &dstPath) {
     }
 }
 
-QString ExportFullBackup(
+QJsonArray MediaIndexToJson() {
+    Init();
+    QJsonArray array;
+    if (!gDb) return array;
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "SELECT peer_id, msg_id, kind, file_name, rel_path, size, "
+            "       sha256, msg_date, archived_at, layer, status, reason "
+            "FROM media_index ORDER BY peer_id, msg_id",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            QJsonObject o;
+            o["peerId"] = colText(stmt, 0);
+            // msgId JSON'da STRING — 64-bitli qiymat JSON number'da
+            // aniqlikni yo'qotishi mumkin (JavaScript 2^53 chegarasi),
+            // server tomoni ham shu formatni kutadi.
+            o["msgId"] = QString::number(sqlite3_column_int64(stmt, 1));
+            o["kind"] = colText(stmt, 2);
+            o["fileName"] = colText(stmt, 3);
+            o["relPath"] = colText(stmt, 4);
+            o["size"] = QString::number(sqlite3_column_int64(stmt, 5));
+            o["sha256"] = colText(stmt, 6);
+            o["msgDate"] = double(sqlite3_column_int64(stmt, 7));
+            o["archivedAt"] = double(sqlite3_column_int64(stmt, 8));
+            o["layer"] = colText(stmt, 9);
+            o["status"] = colText(stmt, 10);
+            o["reason"] = colText(stmt, 11);
+            array.append(o);
+        }
+        sqlite3_finalize(stmt);
+    }
+    return array;
+}
+
+namespace {
+
+// ZIP qilish — PowerShell'ga bog'liqlik ATAYLAB shu yagona funksiyada
+// yakkalangan. Format boshqa platformaga yoki server tomoniga
+// ko'chirilganda faqat shu joyni almashtirish kifoya; qolgan eksport
+// mantig'i platformadan mustaqil.
+[[nodiscard]] bool ZipDirectory(
+        const QString &sourceDir,
+        const QString &zipPath) {
+    const QString psCmd = QString(
+        "Compress-Archive -Path '%1\\*' -DestinationPath '%2' -Force"
+    ).arg(QDir::toNativeSeparators(sourceDir), QDir::toNativeSeparators(zipPath));
+    QProcess ps;
+    ps.start("powershell.exe", {"-NonInteractive", "-Command", psCmd});
+    // Media arxivi GB'lar bo'lishi mumkin — 30 soniya yetmaydi.
+    ps.waitForFinished(30 * 60 * 1000);
+    if (ps.exitCode() != 0 || !QFile::exists(zipPath)) {
+        qDebug() << "ZipDirectory: PowerShell compress failed:"
+                 << ps.readAllStandardError();
+        return false;
+    }
+    return true;
+}
+
+} // namespace
+
+ExportResult ExportFullBackup(
         const QString &targetDir,
+        const ExportOptions &options,
         const ExportProgressCallback &onProgress) {
     Init();
-    if (!gDb) return {};
+    ExportResult result;
+    if (!gDb) return result;
     FlushPendingWrites();
 
     const auto reportProgress = [&](const QString &stage, int percent) {
@@ -1532,29 +1595,21 @@ QString ExportFullBackup(
     const QString stamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
     const QString zipPath = targetDir + "/CustomModBackup_" + stamp + ".zip";
     const QString stageDir = targetDir + "/CustomModBackup_" + stamp + "_tmp";
-    if (!QDir().mkpath(stageDir)) return {};
+    if (!QDir().mkpath(stageDir)) return result;
 
     // Checkpoint WAL so the DB file on disk is complete.
     sqlite3_wal_checkpoint_v2(gDb, nullptr, SQLITE_CHECKPOINT_TRUNCATE, nullptr, nullptr);
 
-    // 1) DB (asosiy arxiv).
+    // ── BOSQICH 1: asosiy arxiv (media YO'Q, shuning uchun tez) ──────────
+
+    // 1) DB.
     reportProgress(u"Baza nusxalanmoqda"_q, 10);
     if (!QFile::copy(dbFilePath(), stageDir + "/actioned_messages.db")) {
         QDir(stageDir).removeRecursively();
-        return {};
+        return result;
     }
 
-    // 2) Media papkasi.
-    reportProgress(u"Media fayllar nusxalanmoqda"_q, 25);
-    const QString mediaSrc = QDir::homePath() + "/customizationMainFolder";
-    if (QDir(mediaSrc).exists()) {
-        if (!CopyDirRecursive(mediaSrc, stageDir + "/customizationMainFolder")) {
-            QDir(stageDir).removeRecursively();
-            return {};
-        }
-    }
-
-    // 3) JSON sozlamalar fayllari (mavjud bo'lsa).
+    // 2) JSON sozlamalar fayllari (mavjud bo'lsa).
     reportProgress(u"Sozlamalar saqlanmoqda"_q, 60);
     const QString appDataCustom = QStandardPaths::writableLocation(
         QStandardPaths::AppDataLocation) + "/CustomMod";
@@ -1567,8 +1622,36 @@ QString ExportFullBackup(
         QFile::copy(brandingSrc, stageDir + "/branding.json");
     }
 
-    // 4) Registry export (Ghost/AntiDelete/AntiEdit togglelar + per-peer overrides).
-    //    Windows-specific — boshqa platformalarda o'tkazib yuboriladi.
+    // 3) settings.json — KANONIK sozlamalar shakli (2026-08-14).
+    //    Quyidagi settings.reg Windows registry dump'i bo'lib, Linux/macOS
+    //    va server tomonida o'qib bo'lmaydi. Format boshqa ilovalarimizda
+    //    ham ishlatilgani uchun platformadan mustaqil shakl kerak.
+    //    Import shu faylni afzal ko'radi; .reg faqat orqaga moslik uchun.
+    reportProgress(u"Sozlamalar (JSON) yozilmoqda"_q, 45);
+    {
+        QFile f(stageDir + "/settings.json");
+        if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            f.write(QJsonDocument(CustomSettings::ExportToJson())
+                .toJson(QJsonDocument::Indented));
+        }
+    }
+
+    // 4) index.json — media indeksi (2026-08-14).
+    //    Baza ichida ham bor, lekin JSON shakli server/boshqa ilovalar
+    //    uchun: ular SQLite drayveri va bizning ichki sxemamizni bilishi
+    //    shart bo'lmasin. Media fayllarsiz eksportda ham SHU FAYL bo'ladi
+    //    — "qanday media bor edi" ma'lumoti har doim uzatiladi.
+    reportProgress(u"Media indeksi yozilmoqda"_q, 55);
+    {
+        QFile f(stageDir + "/index.json");
+        if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            f.write(QJsonDocument(MediaIndexToJson())
+                .toJson(QJsonDocument::Indented));
+        }
+    }
+
+    // 5) Registry export — Windows-specific, ORQAGA MOSLIK uchun.
+    //    Yangi import yo'li settings.json ni ishlatadi.
     reportProgress(u"Registry eksport qilinmoqda"_q, 70);
     #ifdef Q_OS_WIN
     {
@@ -1587,34 +1670,103 @@ QString ExportFullBackup(
     }
     #endif
 
-    // 5) Manifest fayli — backup metadata.
-    reportProgress(u"Manifest yaratilmoqda"_q, 80);
+    // ── BOSQICH 2: media fayllarni tanlab yig'ish ───────────────────────
+    //
+    // Tanlangan chatlar fayllari media_index dagi rel_path bo'yicha
+    // topiladi. ALOHIDA staging papkasi — asosiy arxiv media'siz
+    // bo'lishi kerak (ZIP yaratilgach unga qo'shib bo'lmaydi, shuning
+    // uchun bo'linish).
+    const QString mediaStageDir = targetDir
+        + "/CustomModMedia_" + stamp + "_tmp";
+    const QString mediaZipPath = targetDir
+        + "/CustomModMedia_" + stamp + ".zip";
+    const auto archiveRoot = QDir::homePath() + "/customizationMainFolder";
+    auto mediaFileCount = 0;
+
+    const auto wantsMedia = options.includeAllMedia
+        || !options.mediaPeerIds.isEmpty();
+    if (wantsMedia) {
+        reportProgress(u"Media fayllar tanlanmoqda"_q, 78);
+        const auto selected = QSet<QString>(
+            options.mediaPeerIds.begin(),
+            options.mediaPeerIds.end());
+        sqlite3_stmt *stmt = nullptr;
+        if (sqlite3_prepare_v2(gDb,
+                "SELECT peer_id, rel_path FROM media_index "
+                "WHERE status = 'present' AND LENGTH(rel_path) > 0",
+                -1, &stmt, nullptr) == SQLITE_OK) {
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                const auto peerId = colText(stmt, 0);
+                if (!options.includeAllMedia && !selected.contains(peerId)) {
+                    continue;
+                }
+                const auto relPath = colText(stmt, 1);
+                const auto src = archiveRoot + "/" + relPath;
+                if (!QFile::exists(src)) {
+                    continue; // ReconcileMediaIndex keyinroq 'missing' qiladi
+                }
+                const auto dst = mediaStageDir + "/" + relPath;
+                QDir().mkpath(QFileInfo(dst).absolutePath());
+                if (QFile::copy(src, dst)) {
+                    result.mediaBytes += QFileInfo(src).size();
+                    ++mediaFileCount;
+                }
+            }
+            sqlite3_finalize(stmt);
+        }
+    }
+
+    // 6) Manifest — backup metadata (v3).
+    reportProgress(u"Manifest yaratilmoqda"_q, 84);
     {
         QJsonObject manifest;
-        manifest["version"] = 2;
+        manifest["version"] = 3;
         manifest["createdAt"] = QDateTime::currentDateTime().toString(Qt::ISODate);
         manifest["sourceHost"] = QSysInfo::machineHostName();
         manifest["os"] = QSysInfo::prettyProductName();
         manifest["hasRegistry"] = QFile::exists(stageDir + "/settings.reg");
+        manifest["hasSettingsJson"] = QFile::exists(stageDir + "/settings.json");
+        manifest["hasIndexJson"] = QFile::exists(stageDir + "/index.json");
         manifest["hasPeerLists"] = QFile::exists(stageDir + "/peer_lists.json");
         manifest["hasBranding"] = QFile::exists(stageDir + "/branding.json");
-        const QString mediaStageDir = stageDir + "/customizationMainFolder";
-        manifest["hasMedia"] = QDir(mediaStageDir).exists();
 
-        // Vazifa 4.1: media/archive counts — surfaced to the user in the
-        // restore success toast (see ImportFullBackup callers) instead of
-        // a generic "success" message.
-        const auto countFiles = [](const QString &dir) {
-            return QDir(dir).entryList(QDir::Files).count();
-        };
+        // v2 dagi `hasMedia` "media yo'q edi" va "media ataylab chiqarib
+        // tashlandi" holatlarini AJRATA OLMASDI. v3 da ikkita alohida
+        // maydon: nima so'ralgani va nima chiqqani.
+        manifest["mediaRequested"] = wantsMedia;
+        manifest["mediaIncluded"] = (mediaFileCount > 0);
+        manifest["mediaArchive"] = (mediaFileCount > 0)
+            ? QFileInfo(mediaZipPath).fileName()
+            : QString();
+        manifest["mediaTotalBytes"] = double(result.mediaBytes);
+        manifest["mediaFileCount"] = mediaFileCount;
+        // Media qaysi chatlar uchun so'ralgani — import tomoni nima
+        // kutishini bilsin.
+        if (!options.includeAllMedia && !options.mediaPeerIds.isEmpty()) {
+            QJsonArray peers;
+            for (const auto &id : options.mediaPeerIds) peers.append(id);
+            manifest["mediaPeerIds"] = peers;
+        }
+
         QJsonObject counts;
         const auto stats = GetArchiveStats();
         counts["deleted"] = stats.deletedCount;
         counts["edited"] = stats.editedCount;
-        counts["images"] = countFiles(mediaStageDir + "/medias/images");
-        counts["videos"] = countFiles(mediaStageDir + "/medias/videos");
-        counts["voices"] = countFiles(mediaStageDir + "/medias/voices");
-        counts["files"] = countFiles(mediaStageDir + "/medias/files");
+        const auto indexCount = [](const char *status) {
+            auto n = 0;
+            sqlite3_stmt *s = nullptr;
+            if (sqlite3_prepare_v2(gDb,
+                    "SELECT COUNT(*) FROM media_index WHERE status = ?",
+                    -1, &s, nullptr) == SQLITE_OK) {
+                sqlite3_bind_text(s, 1, status, -1, SQLITE_STATIC);
+                if (sqlite3_step(s) == SQLITE_ROW) n = sqlite3_column_int(s, 0);
+                sqlite3_finalize(s);
+            }
+            return n;
+        };
+        counts["indexPresent"] = indexCount("present");
+        counts["indexPending"] = indexCount("pending");
+        counts["indexMissing"] = indexCount("missing");
         manifest["counts"] = counts;
 
         QFile mf(stageDir + "/manifest.json");
@@ -1623,25 +1775,28 @@ QString ExportFullBackup(
         }
     }
 
-    // 6) ZIP qilish.
-    reportProgress(u"ZIP arxiv yaratilmoqda"_q, 90);
-    const QString psCmd = QString(
-        "Compress-Archive -Path '%1\\*' -DestinationPath '%2' -Force"
-    ).arg(QDir::toNativeSeparators(stageDir), QDir::toNativeSeparators(zipPath));
-
-    QProcess ps;
-    ps.start("powershell.exe", {"-NonInteractive", "-Command", psCmd});
-    ps.waitForFinished(30000);
-
+    // 7) ZIP: avval ASOSIY arxiv (tez), so'ng media (uzoq).
+    reportProgress(u"Asosiy arxiv yaratilmoqda"_q, 88);
+    const auto mainOk = ZipDirectory(stageDir, zipPath);
     QDir(stageDir).removeRecursively();
-
-    if (ps.exitCode() != 0 || !QFile::exists(zipPath)) {
-        qDebug() << "ExportFullBackup: PowerShell compress failed:" << ps.readAllStandardError();
-        return {};
+    if (!mainOk) {
+        QDir(mediaStageDir).removeRecursively();
+        return result;
     }
+    result.mainZipPath = zipPath;
+
+    if (mediaFileCount > 0) {
+        reportProgress(u"Media arxivi yaratilmoqda"_q, 94);
+        if (ZipDirectory(mediaStageDir, mediaZipPath)) {
+            result.mediaZipPath = mediaZipPath;
+        }
+        // Media ZIP muvaffaqiyatsiz bo'lsa ham asosiy arxiv haqiqiy —
+        // shuning uchun result.mainZipPath saqlanadi.
+    }
+    QDir(mediaStageDir).removeRecursively();
 
     reportProgress(u"Tayyor"_q, 100);
-    return zipPath;
+    return result;
 }
 
 bool ImportFullBackup(const QString &sourcePath, bool fullReplace) {
@@ -1837,9 +1992,29 @@ bool ImportFullBackup(const QString &sourcePath, bool fullReplace) {
         MergePeerListsJson(srcPeerLists, appDataCustom + "/peer_lists.json");
     }
 
-    // Registry import (Windows-specific).
-    #ifdef Q_OS_WIN
+    // Sozlamalar. settings.json KANONIK (platformadan mustaqil, v3+);
+    // settings.reg faqat u yo'q bo'lganda — ya'ni v2 va undan eski
+    // zaxiralar uchun. Ikkalasi ham qo'llanmaydi: JSON bor bo'lsa .reg
+    // o'tkazib yuboriladi, aks holda registry qiymatlari JSON'nikini
+    // ustidan yozib, natija manbaga bog'liq bo'lib qolardi.
+    auto settingsRestored = false;
     {
+        const QString srcJson = sourceDir + "/settings.json";
+        if (QFile::exists(srcJson)) {
+            QFile f(srcJson);
+            if (f.open(QIODevice::ReadOnly)) {
+                const auto doc = QJsonDocument::fromJson(f.readAll());
+                if (doc.isObject()) {
+                    CustomSettings::ImportFromJson(doc.object());
+                    settingsRestored = true;
+                }
+            }
+        }
+    }
+
+    // Registry import (Windows-specific, orqaga moslik).
+    #ifdef Q_OS_WIN
+    if (!settingsRestored) {
         const QString srcReg = sourceDir + "/settings.reg";
         if (QFile::exists(srcReg)) {
             const QString regCmd = QString(
@@ -1864,6 +2039,13 @@ bool ImportFullBackup(const QString &sourcePath, bool fullReplace) {
     // Refresh in-memory caches.
     LoadRestoreCache();
 
+    // Media indeksini fayl tizimi bilan moslashtirish. Import qilingan
+    // bazada yozuvlar 'present' bo'lishi mumkin, lekin bu qurilmada
+    // fayllar yo'q (media arxivi alohida va ixtiyoriy) — ular 'missing'
+    // ga o'tadi. Aks holda indeks yolg'on gapirardi va bu Track C
+    // sinxronizatsiyasida tarqalardi.
+    ReconcileMediaIndex(QDir::homePath() + "/customizationMainFolder");
+
     // Note: the reload callback (refreshing open history views) is NOT
     // invoked here. It used to fire via QTimer::singleShot(0, ...), which
     // only works when called from a thread with a running Qt event loop.
@@ -1881,11 +2063,13 @@ bool ImportFullBackup(const QString &sourcePath, bool fullReplace) {
 
 void ExportFullBackupAsync(
         const QString &targetDir,
+        const ExportOptions &options,
         ExportResultCallback callback,
         const ExportProgressCallback &onProgress) {
-    crl::async([targetDir, callback, onProgress] {
-        const QString result = ExportFullBackup(
+    crl::async([targetDir, options, callback, onProgress] {
+        const auto result = ExportFullBackup(
             targetDir,
+            options,
             [onProgress](const QString &stage, int percent) {
                 if (!onProgress) return;
                 crl::on_main([onProgress, stage, percent] {
@@ -1894,6 +2078,49 @@ void ExportFullBackupAsync(
             });
         crl::on_main([result, callback] {
             if (callback) callback(result);
+        });
+    });
+}
+
+bool ImportMediaArchive(const QString &zipPath) {
+    Init();
+    if (zipPath.isEmpty() || !QFile::exists(zipPath)) return false;
+
+    const auto archiveRoot = QDir::homePath() + "/customizationMainFolder";
+    QDir().mkpath(archiveRoot);
+
+    // Media arxivi ichidagi yo'llar arxiv ildizidan NISBIY (medias/...),
+    // shuning uchun to'g'ridan-to'g'ri arxiv ildiziga ochamiz.
+    const QString psCmd = QString(
+        "Expand-Archive -Path '%1' -DestinationPath '%2' -Force"
+    ).arg(
+        QDir::toNativeSeparators(zipPath),
+        QDir::toNativeSeparators(archiveRoot));
+    QProcess ps;
+    ps.start("powershell.exe", {"-NonInteractive", "-Command", psCmd});
+    ps.waitForFinished(30 * 60 * 1000);
+    if (ps.exitCode() != 0) {
+        qDebug() << "ImportMediaArchive: expand failed:"
+                 << ps.readAllStandardError();
+        return false;
+    }
+
+    // Endi fayllar joyida — indeksdagi 'pending' yozuvlar 'present' ga
+    // qaytadi (ReconcileMediaIndex ikki tomonlama ishlaydi).
+    ReconcileMediaIndex(archiveRoot);
+    return true;
+}
+
+void ImportMediaArchiveAsync(
+        const QString &zipPath,
+        ImportResultCallback callback) {
+    crl::async([zipPath, callback] {
+        const bool ok = ImportMediaArchive(zipPath);
+        crl::on_main([ok, callback] {
+            if (ok && gReloadCallback) {
+                gReloadCallback();
+            }
+            if (callback) callback(ok);
         });
     });
 }

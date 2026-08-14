@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QtCore/QJsonObject>
 #include <QtCore/QString>
 #include <QtCore/QVector>
 
@@ -126,6 +127,20 @@ void RemovePerPeerOverride(const QString &peerId);
 void ClearAllPerPeerOverrides();
 [[nodiscard]] bool HasPerPeerOverride(const QString &peerId);
 [[nodiscard]] QVector<PerPeerEntry> GetPerPeerOverrides();
+
+// ── Platformadan mustaqil sozlama almashinuvi (2026-08-14) ───────────────
+// Eksport/import formati boshqa ilovalarimizda va serverda ham
+// ishlatilishi kerak. Windows registry dump (settings.reg) u yerda
+// o'qilmaydi, shuning uchun JSON kanonik shakl bo'ladi.
+//
+// Maydonlar ro'yxati QO'LDA yuritilmaydi — butun QSettings daraxti
+// (allKeys) dump qilinadi. Aks holda har yangi sozlama qo'shilganda bu
+// yerni yangilash esdan chiqib, eksport jimgina to'liqsiz bo'lib qolardi.
+[[nodiscard]] QJsonObject ExportToJson();
+
+// JSON dan tiklaydi va Init() ni qayta ishga tushiradi.
+// Noma'lum kalitlar saqlanadi (kelajakdagi versiya bilan moslik uchun).
+void ImportFromJson(const QJsonObject &json);
 
 // ── Unified Peer Whitelist ────────────────────────────────────────────────
 // Peers in this list: Ghost + AntiDelete + AntiEdit are ALWAYS ON,
