@@ -2363,6 +2363,13 @@ if (MSVC)
     target_link_libraries(Telegram
     PRIVATE
         delayimp
+        # CUSTOM (Qt6): Qt6Network ichidagi qdnslookup_win.cpp DnsQueryEx,
+        # DnsWriteQuestionToBuffer_W va DnsExtractRecordsFromMessage_W ni
+        # chaqiradi — bu funksiyalar dnsapi.lib da. Statik kutubxonadan
+        # obyekt fayl faqat undagi belgi kerak bo'lgandagina tortiladi,
+        # shuning uchun kamchilik uzoq vaqt ko'rinmay turdi va faqat o'sha
+        # obyekt link'ga tortilganda LNK2019 bo'lib chiqdi.
+        dnsapi
     )
     target_link_options(Telegram
     PRIVATE
