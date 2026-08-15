@@ -1,6 +1,8 @@
 #include "custom_activity_history.h"
 
+#include "custom_archive.h"     // MediaExtensionFor
 #include "custom_db.h"
+#include "custom_media_quota.h" // kvota tekshiruvi
 #include "custom_settings.h"
 #include "base/unixtime.h"
 #include "data/data_changes.h"
@@ -22,6 +24,7 @@
 #include "base/flat_set.h"
 #include <QtCore/QStandardPaths>
 #include <QtCore/QDir>
+#include <QtCore/QFileInfo>
 
 namespace CustomActivityHistory {
 namespace {
@@ -30,6 +33,11 @@ struct PendingStoryMedia {
 	PhotoData *photo = nullptr;
 	DocumentData *document = nullptr;
 	std::shared_ptr<Data::PhotoMedia> photoMedia; // photo bo'lsa, media view'ni tirik saqlaydi
+	// 2026-08-15: hujjat to'g'ridan-to'g'ri arxivga yuklanadi, shuning
+	// uchun tugagach media_index ni yangilash uchun kerak.
+	QString relPath;
+	QString peerId;
+	long long storyId = 0;
 };
 
 std::vector<PendingStoryMedia> gPendingStoryMedia;
@@ -51,7 +59,32 @@ void CheckPendingStoryMedia() {
 		if (it->document) {
 			const auto path = it->document->filepath(true);
 			if (!path.isEmpty()) {
-				CustomDB::SaveMediaFile(path, u"video"_q);
+				// Fayl allaqachon arxiv ichiga yuklandi (yuqoriga qarang),
+				// shuning uchun nusxalash SHART EMAS — faqat indeksga
+				// yozamiz. Story'lar uchun finishLoad() hook'i ishlamaydi:
+				// u FileOriginMessage kutadi, story esa FileOriginStory.
+				//
+				// msgId MANFIY: story ID'lari xabar ID'lari bilan bir xil
+				// fazoda emas, manfiy qiymat ularni ajratib turadi (skaner
+				// ham noma'lum fayllar uchun shu usulni ishlatadi).
+				if (!it->relPath.isEmpty()) {
+					auto entry = CustomDB::MediaIndexEntry();
+					entry.peerId = it->peerId;
+					entry.msgId = -it->storyId;
+					entry.kind = u"story"_q;
+					entry.relPath = it->relPath;
+					entry.fileName = it->relPath.mid(
+						it->relPath.lastIndexOf(u'/') + 1);
+					entry.size = it->document->size;
+					entry.archivedAt = static_cast<unsigned int>(
+						QDateTime::currentSecsSinceEpoch());
+					entry.layer = u"story"_q;
+					entry.status = u"present"_q;
+					CustomDB::UpsertMediaIndex(entry);
+					CustomMediaQuota::AddBytes(it->document->size);
+				} else {
+					CustomDB::SaveMediaFile(path, u"video"_q); // eski yo'l
+				}
 				done = true;
 			}
 		} else if (it->photo && it->photoMedia) {
@@ -89,17 +122,40 @@ void MaybeBackupStoryMedia(
 		// elsewhere in this codebase, e.g. data_document.cpp's own
 		// finishLoad() hook) — safe to assume it outlives this pending
 		// download.
-		// KRITIK (2026-08-14 crash): save() ga bo'sh nom berish "xotiraga
-		// yukla" degani va FileLoader konstruktori uni 10 MB bilan cheklaydi
-		// (file_download.cpp:114 Expects). Chegaradan oshsa ilova darhol
-		// yiqiladi. Story videolari bemalol shu hajmdan oshadi, shuning
-		// uchun bu yerda ham CustomArchive::MaybeDownloadMedia() dagidek
-		// himoya kerak.
-		if (document->size > Storage::kMaxFileInMemory) {
+		// 2026-08-15: L2 mexanizmiga o'tkazildi.
+		//
+		// Ilgari bu yerda `save(origin, QString())` — bo'sh nom — ishlatilardi
+		// va u "faylni xotiraga yukla" degani. FileLoader uni 10 MB bilan
+		// cheklaydi (file_download.cpp:114 Expects), shuning uchun 2026-08-14
+		// da 10 MB chegarasi qo'yilgan edi. Natijada katta story videolari
+		// UMUMAN saqlanmasdi.
+		//
+		// Endi xuddi CustomArchive'ning L2 qatlami kabi HAQIQIY maqsad yo'li
+		// beriladi, ya'ni chegara foydalanuvchi sozlamasidan olinadi
+		// (default 100 MB) va kvota hisobga olinadi.
+		const auto maxBytes = qint64(
+			CustomSettings::MediaBackupMaxFileMb()) * 1024 * 1024;
+		if (document->size > maxBytes || CustomMediaQuota::IsFull()) {
 			return;
 		}
-		document->save(origin, QString());
-		gPendingStoryMedia.push_back({ nullptr, document, nullptr });
+		// Kengaytma CustomArchive'dagi yagona mantiqdan (haqiqiy nom ->
+		// MIME -> tur), shuning uchun kengaytmasiz fayl chiqmaydi.
+		const auto relPath = u"medias/stories/"_q
+			+ QString::number(story->peer()->id.value)
+			+ u"_"_q
+			+ QString::number(story->id())
+			+ u"."_q
+			+ CustomArchive::MediaExtensionFor(document);
+		const auto fullPath = CustomSettings::ArchiveRoot() + u"/"_q + relPath;
+		QDir().mkpath(QFileInfo(fullPath).absolutePath());
+		document->save(origin, fullPath);
+		gPendingStoryMedia.push_back({
+			nullptr,
+			document,
+			nullptr,
+			relPath,
+			QString::number(story->peer()->id.value),
+			static_cast<long long>(story->id()) });
 	}
 }
 

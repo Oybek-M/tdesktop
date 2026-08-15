@@ -2829,6 +2829,18 @@ void fillAboutTab(
 						+ u" ("_q + QString::number(summary.fileCount)
 						+ u" fayl)"_q),
 					st::settingsButtonNoIcon));
+			// Ikkinchi qator: ID kichik shriftda, nom ostida.
+			// SettingsButton bir qatorli, shuning uchun alohida label —
+			// bu to'liq custom widget yozishdan ancha arzon va vizual
+			// natija bir xil.
+			if (summary.peerId != u"0"_q) {
+				content->add(
+					object_ptr<Ui::FlatLabel>(
+						content,
+						rpl::single(u"ID: "_q + summary.peerId),
+						st::customModHintLabel),
+					st::boxRowPadding);
+			}
 			const auto peerId = summary.peerId;
 			btn->toggleOn(rpl::single(mediaState->selected.contains(peerId)));
 			btn->toggledValue()
