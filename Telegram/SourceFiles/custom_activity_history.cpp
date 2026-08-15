@@ -38,6 +38,9 @@ struct PendingStoryMedia {
 	QString relPath;
 	QString peerId;
 	long long storyId = 0;
+	// 2026-08-15: profil rasmi uchun — to'liq maqsad yo'li. Bo'sh bo'lsa
+	// eski story-rasm yo'li ishlaydi.
+	QString targetPath;
 };
 
 std::vector<PendingStoryMedia> gPendingStoryMedia;
@@ -93,7 +96,27 @@ void CheckPendingStoryMedia() {
 						Data::PhotoSize::Large)) {
 					const auto qimg = image->original();
 					if (!qimg.isNull()) {
-						SaveStoryImage(qimg, it->photo->id);
+						if (it->targetPath.isEmpty()) {
+							SaveStoryImage(qimg, it->photo->id);
+						} else if (qimg.save(it->targetPath, "JPEG", 92)) {
+							// Profil rasmi — indeksga ham yozamiz, shunda
+							// eksportga tushadi. msgId MANFIY: bu xabar
+							// emas (story'lar bilan bir xil yondashuv).
+							auto entry = CustomDB::MediaIndexEntry();
+							entry.peerId = it->peerId;
+							entry.msgId = -it->storyId; // = -photoId
+							entry.kind = u"avatar"_q;
+							entry.relPath = it->relPath;
+							entry.fileName = it->relPath.mid(
+								it->relPath.lastIndexOf(u'/') + 1);
+							entry.size = QFileInfo(it->targetPath).size();
+							entry.archivedAt = static_cast<unsigned int>(
+								QDateTime::currentSecsSinceEpoch());
+							entry.layer = u"avatar"_q;
+							entry.status = u"present"_q;
+							CustomDB::UpsertMediaIndex(entry);
+							CustomMediaQuota::AddBytes(entry.size);
+						}
 					}
 				}
 				done = true;
@@ -157,6 +180,51 @@ void MaybeBackupStoryMedia(
 			QString::number(story->peer()->id.value),
 			static_cast<long long>(story->id()) });
 	}
+}
+
+// 2026-08-15: profil rasmini SAQLASH.
+//
+// Ilgari faqat rasm ID'si yozilardi ("photo" maydoni) — ya'ni "rasm
+// o'zgardi" ma'lumoti bor edi, lekin ESKI RASMNING O'ZI yo'q edi.
+// Kontakt rasmini almashtirsa yoki o'chirsa, avvalgisi butunlay
+// yo'qolardi.
+//
+// Endi har bir yangi profil rasmi arxivga tushadi va eksport qilinadi.
+// Avatarlar kichik (~100-300 KB), shuning uchun hajm chegarasi
+// qo'llanmaydi — faqat kvota tekshiriladi.
+void MaybeBackupUserpic(not_null<UserData*> user) {
+	if (!user->hasUserpic() || CustomMediaQuota::IsFull()) {
+		return;
+	}
+	const auto photoId = user->userpicPhotoId();
+	if (!photoId) {
+		return;
+	}
+	const auto peerIdStr = QString::number(user->id.value);
+	const auto relPath = u"medias/avatars/"_q
+		+ peerIdStr + u"_"_q + QString::number(photoId) + u".jpg"_q;
+	const auto targetPath = CustomSettings::ArchiveRoot() + u"/"_q + relPath;
+	if (QFile::exists(targetPath)) {
+		return; // bu rasm allaqachon saqlangan
+	}
+
+	// owner().photo() not_null qaytaradi, shuning uchun null tekshiruvi
+	// kerak emas (yo'q bo'lsa bo'sh PhotoData yaratiladi va yuklanadi).
+	const auto photo = user->owner().photo(photoId);
+	QDir().mkpath(QFileInfo(targetPath).absolutePath());
+
+	auto media = photo->createMediaView();
+	photo->load(
+		Data::PhotoSize::Large,
+		Data::FileOriginUserPhoto(peerToUser(user->id), photoId));
+	gPendingStoryMedia.push_back({
+		photo,
+		nullptr,
+		std::move(media),
+		relPath,
+		peerIdStr,
+		static_cast<long long>(photoId),
+		targetPath });
 }
 
 void RecordField(
@@ -264,6 +332,9 @@ void Init(not_null<Main::Session*> session) {
 				? QString::number(user->userpicPhotoId())
 				: u"empty"_q;
 			RecordField(peerId, u"photo"_q, value, now);
+			// Rasm ID'sining o'zi yetarli emas — eski rasm
+			// almashtirilsa yo'qoladi. Rasmning O'ZINI ham saqlaymiz.
+			MaybeBackupUserpic(user);
 		}
 		if (update.flags & Flag::OnlineStatus) {
 			RecordField(

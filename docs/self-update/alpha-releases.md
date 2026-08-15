@@ -59,10 +59,27 @@ Ya'ni alpha reliz alpha raqami bo'yicha solishtiriladi. `7000009002 >
 
 ## ⚠️ Ikkita muhim natija
 
-**1. Alpha'dan orqaga qaytib bo'lmaydi.** `validVersion` sharti
-`cAlphaVersion() != 0` ni talab qiladi — ya'ni alpha bo'lmagan build
-alpha yangilanishlarni umuman KO'RMAYDI. Bir marta alpha'ga o'tgach,
-barcha qurilmalar alpha'da qolishi kerak.
+**1. Alpha'dan qaytish MUMKIN, lekin faqat bazaviy versiyani
+KO'TARIB.** Shartni to'liq o'qiymiz:
+
+| Klient | Mavjud reliz | `validVersion` | Natija |
+|---|---|---|---|
+| oddiy (`cAlpha=0`) | alpha | `(0 \|\| false)` = false | ❌ ko'rmaydi |
+| oddiy | oddiy | `(0 \|\| true)` = true | ✅ `AppVersion` bo'yicha |
+| alpha | alpha | true | ✅ `AlphaVersion` bo'yicha |
+| **alpha** | **oddiy** | **true** | ✅ **`AppVersion` bo'yicha** |
+
+Ya'ni alpha klient oddiy relizni ham ko'radi va unga o'ta oladi —
+sharti: yangi relizning `AppVersion` i kattaroq bo'lishi kerak.
+
+Amalda bu shuni bildiradi: `7.0.9.1 … 7.0.9.N` alphalaridan keyin
+`7.0.9` ni qayta chiqarish YORDAM BERMAYDI (teng, katta emas). Lekin
+upstream sync qilib `7.1.0` ga o'tganimizda oddiy reliz chiqaramiz va
+barcha alpha klientlar unga normal tarzda ko'chadi hamda alpha
+bo'lmagan holatga qaytadi.
+
+Xulosa: bu tuzoq emas, **keyingi upstream sync'da o'zi yechiladi**.
+Faqat bir xil bazaviy versiya ichida orqaga qaytib bo'lmaydi.
 
 **2. Alpha relizlar imzo talab qiladi.**
 `countAlphaVersionSignature()` maxfiy kalitdan foydalanadi
