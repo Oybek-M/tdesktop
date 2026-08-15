@@ -146,7 +146,41 @@ maqsad fayl yo'li). Ikkalasini birga rejalashtirish mantiqiy.
 
 ## ⏭️ ERTAGA SHU YERDAN BOSHLANG (2026-08-15)
 
-## 🔵 NAVBATDAGI ISH — 2026-08-15 kechqurun sinovidan chiqqan reja
+## ✅ 2026-08-15 kech — R1, R2, R2b, A11, versiyalash BAJARILDI
+
+Kod tayyor, **BUILD QILINMAGAN**. Bitta build'da sinaladi.
+
+| Ish | Natija |
+|---|---|
+| R1 | `RepairArchiveMedia()` — mazmundan MIME (MatchContent), kengaytma qo'shish, papka tuzatish, indeks yangilash. UI'da **dry-run + tasdiq**. |
+| R2 | Shaxsiy chat nomlari sessiyadan olinadi |
+| R2b | Eksport ro'yxatida ID nom ostida kichik shriftda |
+| A11 | Story backup L2 ga o'tkazildi — endi katta story'lar ham saqlanadi, indeksga tushadi va eksport qilinadi |
+| Versiya | **Kod kerak emas edi** — mexanizm mavjud. `docs/self-update/alpha-releases.md`. About tab'da to'liq versiya ko'rsatiladi. |
+
+### S1 — Story fon bug'i: KEYINGI QADAM ANIQ
+
+Kodni qidirish to'xtatildi — bu **kuzatuv talab qiladigan** diagnostika,
+ko'r-ko'rona gipoteza tuzish tokenni behuda sarflaydi.
+
+**Birinchi va eng arzon tajriba:** tdesktop Settings → Advanced →
+apparat tezlashtirish (OpenGL) toggle'ini **o'chirib**, story'ni qayta
+ko'ring.
+
+- Miltillash **to'xtasa** → muammo GL/RHI render yo'lida. Qidiruv
+  maydoni `media_view_overlay_opengl.cpp` / `_rhi.cpp` gacha
+  toraydi — bu juda katta yutuq.
+- Miltillash **qolsa** → muammo umumiy chizish mantig'ida
+  (`media/stories/`), GL bilan bog'liq emas.
+
+Ikkinchi qadam: miltillash paytida `log.txt` da render ogohlantirishlari
+chiqayotganini tekshirish.
+
+Bu ikki dalilsiz kodga kirishmang.
+
+---
+
+## 🔵 Eski reja (R1/R2/R3 tavsifi)
 
 Build 18:15 da 0 xato bilan o'tdi, arxiv ildizi konsolidatsiyasi
 **ishladi** (baza/config/backups/bombmedia `customizationMainFolder` ga
