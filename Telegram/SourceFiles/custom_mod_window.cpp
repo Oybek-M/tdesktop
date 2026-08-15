@@ -2,6 +2,7 @@
 
 #include "base/weak_ptr.h"
 #include "core/application.h" // Core::Restart() (Import dan keyin)
+#include "core/version.h"     // AppVersionStr / AppAlphaVersion
 #include "custom_branding.h"
 #include "custom_db.h"
 #include "custom_activity_history_box.h"
@@ -2430,6 +2431,21 @@ void fillAboutTab(
 		not_null<Ui::VerticalLayout*> content,
 		QWidget *dialogParent,
 		Fn<void()> onArchiveChanged) {
+	// 2026-08-15: alpha build'da AppVersionStr rasmiy raqam bo'lib
+	// qolaveradi ("7.0.9"), ya'ni ikkita custom build'ni ajratib
+	// bo'lmaydi. Alpha raqami aynan shu uchun ko'rsatiladi.
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(AppAlphaVersion
+				? (u"CustomMod %1 · alpha %2"_q
+					.arg(QString::fromUtf8(AppVersionStr))
+					.arg(int(AppAlphaVersion % 1000)))
+				: (u"CustomMod %1"_q
+					.arg(QString::fromUtf8(AppVersionStr)))),
+			st::customModHintLabel),
+		st::boxRowPadding);
+
 	const auto stats0 = CustomDB::GetArchiveStats();
 	const auto statsLabel = content->add(
 		object_ptr<Ui::FlatLabel>(
