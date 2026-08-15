@@ -3206,27 +3206,19 @@ void HistoryItem::setDeletedLocally() {
 		// --- Document (voice, video, file, animation) ---
 		if (const auto doc = m->document()) {
 			QString cachePath = doc->filepath(true);
+			// 2026-08-15: kengaytma va tur endi CustomArchive'da —
+			// yagona manba. Ilgari bu mantiq uch joyda takrorlangan va
+			// uchalasida ham yumaloq video "voice" deb tasniflanardi.
 			QString fileName = doc->filename();
 			if (fileName.isEmpty()) {
-				if (doc->isVideoMessage() || doc->isAnimation()) {
-					fileName = QString::number(doc->id) + ".mp4";
-				} else if (doc->isVoiceMessage()) {
-					fileName = QString::number(doc->id) + ".ogg";
-				} else if (doc->isVideoFile()) {
-					fileName = QString::number(doc->id) + ".mp4";
-				} else {
-					fileName = QString::number(doc->id) + ".bin";
-				}
+				fileName = QString::number(doc->id)
+					+ u"."_q + CustomArchive::MediaExtensionFor(doc);
 			}
 
 			if (!cachePath.isEmpty() && QFile::exists(cachePath)) {
-				QString mediaType = "files";
-				if (doc->isVoiceMessage() || doc->isVideoMessage()) {
-					mediaType = "voice";
-				} else if (doc->isVideoFile() || doc->isAnimation()) {
-					mediaType = "video";
-				}
-				destPath = CustomDB::SaveMediaFile(cachePath, mediaType);
+				destPath = CustomDB::SaveMediaFile(
+					cachePath,
+					CustomArchive::MediaKindOf(doc));
 				if (destPath.isEmpty()) {
 					const QString baseDir =
 						QStandardPaths::writableLocation(QStandardPaths::HomeLocation)

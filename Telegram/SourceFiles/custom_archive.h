@@ -3,6 +3,7 @@
 #include <QtCore/QString>
 
 class HistoryItem;
+class DocumentData;
 
 namespace Main {
 class Session;
@@ -37,6 +38,26 @@ void EndBatch();
 // o'chirgach, tiklangan tarix faqat foydalanuvchi o'sha chatni qidiruvdan
 // topib ochgandagina paydo bo'lardi — asosiy ro'yxatda ko'rinmasdi.
 void RestoreDeletedChats(not_null<Main::Session*> session);
+
+// ── Media turi va kengaytmasi — YAGONA manba (2026-08-15) ────────────────
+//
+// Ilgari bu mantiq uch joyda takrorlangan edi (custom_archive.cpp,
+// data_document.cpp::save, history_item.cpp::setDeletedLocally) va
+// uchalasida ham bir xil xato bor edi: `isVideoMessage()` (YUMALOQ VIDEO)
+// "voice" deb tasniflanardi. Natijada yumaloq videolar `medias/voices/`
+// papkasiga tushib, audio sifatida qaralardi.
+//
+// Endi ikkala funksiya ham shu yerda, barcha chaqiruvchilar shuni
+// ishlatadi — xato bir joyda tuzatilsa hamma joyda tuzaladi.
+
+// Papka bucket'i: "image" | "video" | "voice" | "file".
+[[nodiscard]] QString MediaKindOf(not_null<DocumentData*> document);
+
+// Fayl kengaytmasi (nuqtasiz, kichik harflarda). Ustuvorlik:
+//   1. Haqiqiy fayl nomidagi kengaytma — eng ishonchli
+//   2. MIME turi — Telegram uni to'g'ri yuboradi
+//   3. Hujjat turiga qarab universal kengaytma — oxirgi chora
+[[nodiscard]] QString MediaExtensionFor(not_null<DocumentData*> document);
 
 // L3 (2026-08-14): xabar o'chirilganda, agar media hali arxivda bo'lmasa —
 // yuklashga urinib ko'radi. Bu OXIRGI IMKONIYAT, kafolat emas: xabar

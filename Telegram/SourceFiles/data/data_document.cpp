@@ -1268,11 +1268,11 @@ void DocumentData::save(
 			? CustomSettings::AntiDelete()
 			: CustomSettings::ShouldAntiDelete(peerIdStr);
 		if (shouldSave) {
-			QString type = "file";
-			if (isVideoMessage()) type = "voice";
-			else if (isVoiceMessage()) type = "voice";
-			else if (isVideoFile()) type = "video";
-			CustomDB::SaveMediaFile(toFile, type);
+			// 2026-08-15: ilgari bu yerda `isVideoMessage()` (YUMALOQ
+			// VIDEO) "voice" deb tasniflanardi va yumaloq videolar
+			// medias/voices/ ga tushardi. Tasniflash endi yagona joyda —
+			// CustomArchive::MediaKindOf().
+			CustomDB::SaveMediaFile(toFile, CustomArchive::MediaKindOf(this));
 		}
 	}
 	if (const auto media = activeMediaView(); media && media->loaded(true)) {

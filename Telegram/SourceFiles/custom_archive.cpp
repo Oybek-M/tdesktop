@@ -17,6 +17,8 @@
 #include <QtCore/QDateTime>
 #include <QtCore/QDir>
 #include <QtCore/QFileInfo>
+#include <QtCore/QHash>
+#include <QtCore/QMimeDatabase>
 #include <QtCore/QTimer>
 #include <vector>
 
@@ -55,17 +57,6 @@ void WriteRow(const PendingRow &row) {
 		true); // archived = true → PruneStaleCachedText tegmaydi (D4)
 }
 
-// Media turini SaveMediaFile() kutgan nomlar bilan bir xil aniqlaydi
-// (data_document.cpp:1233 dagi mantiq bilan mos).
-[[nodiscard]] QString MediaKindOf(not_null<DocumentData*> document) {
-	if (document->isVideoMessage() || document->isVoiceMessage()) {
-		return u"voice"_q;
-	} else if (document->isVideoFile()) {
-		return u"video"_q;
-	}
-	return u"file"_q;
-}
-
 [[nodiscard]] QString KindSubDir(const QString &kind) {
 	if (kind == u"voice"_q) return u"medias/voices"_q;
 	if (kind == u"video"_q) return u"medias/videos"_q;
@@ -81,26 +72,23 @@ void WriteRow(const PendingRow &row) {
 		not_null<HistoryItem*> item,
 		not_null<DocumentData*> document,
 		const QString &kind) {
+	// 2026-08-15 (sinovda topildi): document->filename() MEDIA sifatida
+	// yuborilgan fayllar uchun bo'sh bo'ladi — video, ovozli xabar,
+	// animatsiya. Ilgari bu yerda oddiy "file" qo'yilardi va natijada
+	// eksportda kengaytmasiz, ikki marta bosib ochib bo'lmaydigan
+	// fayllar chiqardi (34 ta videodan ko'pchiligi, 14 ta ovozli
+	// xabarning HAMMASI).
 	auto name = document->filename();
 	if (name.isEmpty()) {
-		// 2026-08-15 (sinovda topildi): document->filename() MEDIA sifatida
-		// yuborilgan fayllar uchun bo'sh bo'ladi — video, ovozli xabar,
-		// animatsiya. Ilgari bu yerda oddiy "file" qo'yilardi va natijada
-		// eksport qilingan arxivda kengaytmasiz, ikki marta bosib
-		// ochib bo'lmaydigan fayllar chiqardi (34 ta videodan ko'pchiligi
-		// va 14 ta ovozli xabarning HAMMASI shunday edi).
-		//
-		// Qoida history_item.cpp dagi setDeletedLocally() bilan bir xil —
-		// o'sha yerda bu muammo allaqachon hal qilingan edi.
-		if (document->isVideoMessage() || document->isAnimation()) {
-			name = u"video.mp4"_q;
-		} else if (document->isVoiceMessage()) {
-			name = u"voice.ogg"_q;
-		} else if (document->isVideoFile()) {
-			name = u"video.mp4"_q;
-		} else {
-			name = u"file.bin"_q;
-		}
+		name = u"media"_q;
+	}
+	// MediaExtensionFor() avval HAQIQIY nomdagi kengaytmani qaytaradi,
+	// shuning uchun nomda to'g'ri kengaytma bo'lsa quyidagi shart
+	// bajarilmaydi va nom o'zgarishsiz qoladi. Mavjud kengaytma hech
+	// qachon almashtirilmaydi — faqat yo'q bo'lsa qo'shiladi.
+	const auto ext = MediaExtensionFor(document);
+	if (!ext.isEmpty() && QFileInfo(name).suffix().toLower() != ext) {
+		name += u"."_q + ext;
 	}
 	// SaveMediaFile() dagi bilan bir xil xavfsizlik qoidalari + Windows'da
 	// taqiqlangan belgilar.
@@ -260,6 +248,101 @@ void FlushPending() {
 }
 
 } // namespace
+
+QString MediaKindOf(not_null<DocumentData*> document) {
+	// 🔴 isVideoMessage() — bu YUMALOQ VIDEO (video note), audio EMAS.
+	// 2026-08-15 gacha u `isVoiceMessage()` bilan birga "voice" deb
+	// tasniflanardi va yumaloq videolar `medias/voices/` papkasiga
+	// tushardi. Xato uch joyda takrorlangan edi; endi mantiq faqat
+	// shu yerda.
+	if (document->isVideoMessage()
+		|| document->isVideoFile()
+		|| document->isAnimation()
+		|| document->isGifv()) {
+		return u"video"_q;
+	} else if (document->isVoiceMessage()) {
+		return u"voice"_q;
+	} else if (document->isImage()) {
+		return u"image"_q;
+	}
+	// Musiqa fayllari ataylab "file" — ularda deyarli har doim haqiqiy
+	// fayl nomi bo'ladi va "voices" papkasi ovozli XABARLAR uchun.
+	return u"file"_q;
+}
+
+QString MediaExtensionFor(not_null<DocumentData*> document) {
+	// 1) Haqiqiy fayl nomidagi kengaytma — eng ishonchli manba.
+	//    Foydalanuvchi talabi: "native holatdagi file qanday extension
+	//    bilan bo'lsa aynan o'zinikiga qaytara olsak zo'r bo'lardi".
+	const auto name = document->filename();
+	if (!name.isEmpty()) {
+		const auto suffix = QFileInfo(name).suffix().toLower();
+		// Uzun "kengaytma" — aslida nuqtali fayl nomi, ishonmaymiz.
+		if (!suffix.isEmpty() && suffix.length() <= 8) {
+			return suffix;
+		}
+	}
+
+	// 2) MIME turi. Telegram uni to'g'ri yuboradi, shuning uchun bu
+	//    hujjat turiga qarab TAXMIN qilishdan ancha ishonchli.
+	const auto mime = document->mimeString().trimmed().toLower();
+	if (!mime.isEmpty()) {
+		// Qo'lda jadval — QMimeDatabase ba'zan kutilmagan variantni
+		// beradi (masalan audio/ogg -> "oga", image/jpeg -> "jpeg"),
+		// bu yerda esa keng tarqalgan shakl kerak.
+		static const auto kKnown = QHash<QString, QString>{
+			{ u"audio/ogg"_q,          u"ogg"_q },
+			{ u"audio/opus"_q,         u"ogg"_q },
+			{ u"application/ogg"_q,    u"ogg"_q },
+			{ u"audio/mpeg"_q,         u"mp3"_q },
+			{ u"audio/mp4"_q,          u"m4a"_q },
+			{ u"audio/x-wav"_q,        u"wav"_q },
+			{ u"audio/wav"_q,          u"wav"_q },
+			{ u"audio/flac"_q,         u"flac"_q },
+			{ u"video/mp4"_q,          u"mp4"_q },
+			{ u"video/quicktime"_q,    u"mov"_q },
+			{ u"video/webm"_q,         u"webm"_q },
+			{ u"video/x-matroska"_q,   u"mkv"_q },
+			{ u"video/x-msvideo"_q,    u"avi"_q },
+			{ u"image/jpeg"_q,         u"jpg"_q },
+			{ u"image/png"_q,          u"png"_q },
+			{ u"image/gif"_q,          u"gif"_q },
+			{ u"image/webp"_q,         u"webp"_q },
+			{ u"image/heic"_q,         u"heic"_q },
+			{ u"application/pdf"_q,    u"pdf"_q },
+			{ u"application/x-tgsticker"_q, u"tgs"_q },
+		};
+		const auto known = kKnown.constFind(mime);
+		if (known != kKnown.constEnd()) {
+			return known.value();
+		}
+		// Jadvalda yo'q bo'lsa — Qt'ning MIME bazasi.
+		const auto type = QMimeDatabase().mimeTypeForName(mime);
+		const auto preferred = type.preferredSuffix().toLower();
+		if (!preferred.isEmpty()) {
+			return preferred;
+		}
+	}
+
+	// 3) Oxirgi chora — hujjat turiga qarab. Faqat shu yerda taxmin
+	//    qilamiz, va faqat keng tarqalgan konteynerlardan.
+	if (document->isVideoMessage()
+		|| document->isVideoFile()
+		|| document->isAnimation()
+		|| document->isGifv()) {
+		return u"mp4"_q;
+	} else if (document->isVoiceMessage()) {
+		// DIQQAT: ovozli xabar .mp3 EMAS. Telegram uni OGG/Opus
+		// konteynerida yuboradi — .mp3 deb nomlash faylni buzmaydi,
+		// lekin pleyerlar ochmay qo'yishi mumkin. Native format ustun.
+		return u"ogg"_q;
+	} else if (document->isSong() || document->isAudioFile()) {
+		return u"mp3"_q;
+	} else if (document->isImage()) {
+		return u"jpg"_q;
+	}
+	return u"bin"_q;
+}
 
 void MaybeArchiveItem(not_null<HistoryItem*> item) {
 	if (!item->isRegular()) {
