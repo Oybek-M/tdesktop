@@ -158,7 +158,35 @@ Kod tayyor, **BUILD QILINMAGAN**. Bitta build'da sinaladi.
 | A11 | Story backup L2 ga o'tkazildi — endi katta story'lar ham saqlanadi, indeksga tushadi va eksport qilinadi |
 | Versiya | **Kod kerak emas edi** — mexanizm mavjud. `docs/self-update/alpha-releases.md`. About tab'da to'liq versiya ko'rsatiladi. |
 
-### S1 — Story fon bug'i: KEYINGI QADAM ANIQ
+### S1 — LOKALLASHTIRILDI (2026-08-15, foydalanuvchi sinovi)
+
+**Natija: OpenGL o'chirilganda miltillash BUTUNLAY yo'qoladi.**
+
+Bu bug'ni **GL/RHI render yo'liga** qamab qo'yadi. Umumiy chizish
+mantig'i (`media/stories/`) sof — u har ikkala yo'lda ham bir xil
+ishlaydi va rasterda muammo yo'q.
+
+**Qidiruv maydoni:**
+- `media/view/media_view_overlay_opengl.cpp`
+- `media/view/media_view_overlay_rhi.cpp`
+- (`media_view_overlay_raster.cpp` — SOG'LOM, solishtirish uchun etalon)
+
+**Ish gipotezasi (hali tekshirilmagan):** "shaffof" holat GL kadri
+fonni umuman chizmaganini bildiradi. Qt6'ga o'tishda
+`QOpenGLWidget`/RHI ning kadrlararo bufer saqlash semantikasi
+o'zgargan — tdesktop qisman qayta chizishga tayanayotgan bo'lsa,
+ba'zi kadrlar tozalangan buferda qolib ketadi.
+
+**Keyingi qadam:** raster va GL yo'llarida fon chizish ketma-ketligini
+solishtirish — GL yo'lida fon har kadrda chiziladimi yoki faqat
+"o'zgardi" bo'lganda.
+
+**Vaqtinchalik yechim mavjud:** OpenGL ni o'chirish. Ya'ni S1 hech
+narsani BLOKLAMAYDI — build va tarqatish undan mustaqil davom etadi.
+
+---
+
+### S1 — eski yozuv (diagnostika qadami, BAJARILDI)
 
 Kodni qidirish to'xtatildi — bu **kuzatuv talab qiladigan** diagnostika,
 ko'r-ko'rona gipoteza tuzish tokenni behuda sarflaydi.
