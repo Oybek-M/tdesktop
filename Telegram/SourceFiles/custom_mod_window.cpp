@@ -2964,9 +2964,8 @@ Mavjud maʼlumotlarni yangi papkaga "
 		st::boxRowPadding)
 	->addClickHandler([=] {
 		const auto bombDir =
-			QStandardPaths::writableLocation(
-				QStandardPaths::AppDataLocation)
-			+ u"/CustomMod/BombMedia/"_q;
+			CustomSettings::ArchiveRoot()
+			+ u"/bombmedia/"_q; // 2026-08-15: yagona arxiv ildizi ostida
 		QDir().mkpath(bombDir);
 		QDesktopServices::openUrl(QUrl::fromLocalFile(bombDir));
 	});

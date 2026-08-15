@@ -1,6 +1,7 @@
 #include "custom_settings.h"
 #include "custom_db.h"
 #include <algorithm> // std::clamp
+#include <utility>   // std::pair (arxiv layout migratsiyasi)
 #include <QtCore/QDir>
 #include <QtCore/QFile>
 #include <QtCore/QHash>
@@ -600,7 +601,8 @@ void EnsureArchiveLayout() {
         settings.remove("archiveRootPendingMoveFrom");
         settings.sync();
     }
-    for (const auto &sub : { "/medias", "/db", "/config", "/backups" }) {
+    for (const auto &sub : {
+            "/medias", "/db", "/config", "/backups", "/bombmedia" }) {
         QDir().mkpath(root + QString::fromLatin1(sub));
     }
 
@@ -638,15 +640,24 @@ void EnsureArchiveLayout() {
         legacyAppData + "/branding.json",
         root + "/config/branding.json");
 
-    // Avtomatik zaxiralar — papka, shuning uchun fayllab ko'chiramiz.
-    auto legacyBackups = QDir(legacyAppData + "/AutoBackups");
-    if (legacyBackups.exists()) {
-        const auto target = root + "/backups";
-        for (const auto &info : legacyBackups.entryInfoList(
+    // Papkalar — fayllab ko'chiramiz.
+    //   AutoBackups  -> backups/
+    //   BombMedia    -> bombmedia/   (o'z-o'zini yo'q qiluvchi media)
+    const auto movedFolders = {
+        std::pair{ QString("/AutoBackups"), QString("/backups") },
+        std::pair{ QString("/BombMedia"),   QString("/bombmedia") },
+    };
+    for (const auto &[legacyName, targetName] : movedFolders) {
+        auto legacyDir = QDir(legacyAppData + legacyName);
+        if (!legacyDir.exists()) {
+            continue;
+        }
+        const auto target = root + targetName;
+        for (const auto &info : legacyDir.entryInfoList(
                 QDir::Files | QDir::NoDotAndDotDot)) {
             moveIfNeeded(info.absoluteFilePath(), target + "/" + info.fileName());
         }
-        legacyBackups.removeRecursively(); // bo'sh qolgan bo'lsa
+        legacyDir.removeRecursively(); // bo'shab qolgan bo'lsa
     }
 }
 

@@ -1788,9 +1788,8 @@ void HistoryItem::markMediaAndMentionRead() {
 				const auto peerIdStr = QString::number(
 					_history->peer->id.value);
 				const auto bombDir =
-					QStandardPaths::writableLocation(
-						QStandardPaths::AppDataLocation)
-					+ u"/CustomMod/BombMedia/"_q;
+					CustomSettings::ArchiveRoot()
+					+ u"/bombmedia/"_q; // 2026-08-15: yagona arxiv ildizi
 				QDir().mkpath(bombDir);
 				const auto base = QString::number(id.bare)
 					+ u"_"_q + peerIdStr;
