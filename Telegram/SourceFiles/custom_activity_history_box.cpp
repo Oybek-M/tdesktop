@@ -2,8 +2,10 @@
 
 #include "custom_activity_history.h"
 #include "custom_db.h"
+#include "custom_settings.h" // ArchiveRoot (saqlangan avatar yo'li)
 #include "main/main_session.h"
 #include "ui/layers/generic_box.h"
+#include "ui/widgets/buttons.h" // Ui::LinkButton
 #include "ui/widgets/labels.h"
 #include "ui/wrap/vertical_layout.h"
 #include "ui/widgets/scroll_area.h"
@@ -12,9 +14,26 @@
 #include "styles/style_settings.h"
 #include "lang/lang_keys.h"
 #include <QtCore/QDateTime>
+#include <QtCore/QFile>
+#include <QtCore/QUrl>
+#include <QtGui/QDesktopServices>
 
 namespace CustomActivityHistory {
 namespace {
+
+// 2026-08-15: arxivda saqlangan profil rasmining yo'li (yo'q bo'lsa bo'sh).
+// Nom sxemasi custom_activity_history.cpp dagi MaybeBackupUserpic() bilan
+// bir xil bo'lishi SHART.
+[[nodiscard]] QString ArchivedAvatarPath(
+		const QString &peerId,
+		const QString &photoIdValue) {
+	if (photoIdValue.isEmpty() || photoIdValue == u"empty"_q) {
+		return QString(); // rasm o'chirilgan — saqlanadigan narsa yo'q
+	}
+	const auto path = CustomSettings::ArchiveRoot()
+		+ u"/medias/avatars/"_q + peerId + u"_"_q + photoIdValue + u".jpg"_q;
+	return QFile::exists(path) ? path : QString();
+}
 
 QString FormatEntryLine(const CustomDB::ActivityHistoryEntry &entry) {
 	const auto when = QDateTime::fromSecsSinceEpoch(entry.observedAt)
@@ -182,6 +201,25 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 					rpl::single(FormatEntryLine(e)),
 					st::boxLabel),
 				st::boxRowPadding);
+
+			// 2026-08-15: rasm o'zgarishida SAQLANGAN rasmni ochish
+			// imkoni. Ilgari avatar faqat diskda yotardi va uni faqat
+			// papkani qo'lda ochib ko'rish mumkin edi.
+			if (e.field != u"photo"_q) {
+				continue;
+			}
+			const auto path = ArchivedAvatarPath(peerId, e.newValue);
+			if (path.isEmpty()) {
+				continue;
+			}
+			const auto open = content->add(
+				object_ptr<Ui::LinkButton>(
+					content,
+					u"🖼 Saqlangan rasmni ochish"_q),
+				st::boxRowPadding);
+			open->setClickedCallback([=] {
+				QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+			});
 		}
 
 		box->addButton(tr::lng_close(), [=] { box->closeBox(); });
