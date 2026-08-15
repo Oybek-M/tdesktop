@@ -146,12 +146,83 @@ maqsad fayl yo'li). Ikkalasini birga rejalashtirish mantiqiy.
 
 ## ⏭️ ERTAGA SHU YERDAN BOSHLANG (2026-08-15)
 
-✅ **BUILD TUGADI** — barcha o'zgarishlar (backfill skaneri ham) 0 xato
-bilan kompilyatsiya qilindi. Qolgan yagona ish — **HAQIQIY SINOV**,
-u hali umuman boshlanmagan.
+## 🔵 NAVBATDAGI ISH — 2026-08-15 kechqurun sinovidan chiqqan reja
 
-1. `out\Release\Telegram.exe` → `C:\Users\Oybek\Pictures\Release\` ga
-   ko'chirish (avval ilovadan to'liq chiqish).
+Build 18:15 da 0 xato bilan o'tdi, arxiv ildizi konsolidatsiyasi
+**ishladi** (baza/config/backups/bombmedia `customizationMainFolder` ga
+ko'chdi, AppData bo'shadi). Quyidagilar QOLDI:
+
+### R1 (KRITIK) — Mavjud fayllarning kengaytmasi va papkasi noto'g'ri
+
+**Dalil:** `medias/voices/` da 30 tadan 19 tasi, `medias/videos/` da
+68 tadan 43 tasi `<peerId>_<msgId>_file` ko'rinishida — kengaytmasiz.
+`files/` toza (52/52).
+
+**Sabab (aniqlangan, taxmin emas):** 2026-08-15 dagi tuzatish faqat
+YANGI arxivlanadigan fayllarga ta'sir qiladi. Diskdagi eski fayllar
+o'z nomi bilan qoladi va eksport ularni shundayligicha nusxalaydi.
+Ya'ni xato "qaytmagan" — u hech qachon ketmagan.
+
+Bundan tashqari `voices/` ichida VIDEO fayllar ham bor (eski
+`isVideoMessage() -> "voice"` tasnifi qoldig'i).
+
+**Yechim — TUZATISH (repair) bosqichi.** Eski fayllar uchun
+`DocumentData` endi mavjud emas, shuning uchun tur fayl NOMIDAN emas,
+**MAZMUNIDAN** aniqlanadi:
+
+```cpp
+QMimeDatabase().mimeTypeForFile(path, QMimeDatabase::MatchContent)
+```
+
+Bu magic-byte'lar bo'yicha sniffing qiladi — nom qanday bo'lishidan
+qat'i nazar mp4/ogg/webm/jpeg ni to'g'ri aniqlaydi.
+
+Har bir fayl uchun:
+1. Mazmundan MIME aniqlanadi
+2. Kengaytma yo'q yoki MIME ga zid bo'lsa → to'g'ri kengaytma bilan
+   qayta nomlanadi (`MediaExtensionFor()` dagi jadval qayta ishlatiladi
+   — uni MIME'dan kengaytmaga aylantiruvchi qismini alohida funksiyaga
+   ajratish kerak)
+3. MIME turi papkaga zid bo'lsa (video `voices/` da) → to'g'ri
+   sub-papkaga KO'CHIRILADI
+4. `media_index` dagi `rel_path` va `file_name` yangilanadi
+
+Mavjud "🔍 Eski media fayllarni indekslash" tugmasiga qo'shiladi —
+skaner + tuzatish bitta amal. Tugma matni ham yangilanadi.
+
+⚠️ Fayl qayta nomlanganda indeks YANGILANISHI SHART, aks holda
+`ReconcileMediaIndex()` ularni `missing` deb belgilab qo'yadi.
+
+### R2 — Eksport ro'yxatida shaxsiy chatlar ID bilan chiqmoqda
+
+`GetPeerDisplayName()` faqat White/Black List va per-peer nomlarga
+qaraydi. Ro'yxatda bo'lmagan shaxsiy chatlar uchun nom yo'q →
+"ID 620565940" ko'rinadi (3 ta shunday).
+
+**Yechim:** nomni `Data::Session` dan olish (Custom Window'da sessiya
+mavjud). Foydalanuvchi so'ragan ko'rinish: nom tepada, ostida kichik
+shriftda ID. `Ui::SettingsButton` bir qatorli — ikki qatorli ko'rinish
+uchun alohida widget kerak bo'ladi; agar qimmat bo'lsa, birinchi
+bosqichda nomni to'g'ri chiqarish yetarli.
+
+### R3 — Ildizni o'zgartirishni sinash (hali sinalmagan)
+
+Kod yozilgan, lekin foydalanuvchi sinamagan. Sinashdan OLDIN to'liq
+zaxira olish tavsiya etiladi. Ko'chirish mantig'i: faqat maqsadda
+mavjud BO'LMAGAN fayllar ko'chiriladi, manba esa faqat muvaffaqiyatli
+nusxadan keyin o'chiriladi.
+
+---
+
+⚠️ **2026-08-15 da aniqlandi: backfill skaneri build'ga TUSHMAGAN.**
+`Telegram.exe` 00:15 da qurilgan, skaner commit'i esa 00:40 da yozilgan.
+Ya'ni 00:15 dagi "0 xato" build undan OLDINGI holatniki.
+
+1. **Avval BUILD** (Release/x64) — 2 ta fayl qayta kompilyatsiya
+   bo'ladi: `custom_db.cpp`, `custom_mod_window.cpp`.
+2. `out\Release\Telegram.exe` → `C:\Users\Oybek\Pictures\Release\` ga
+   ko'chirish (avval ilovadan to'liq chiqish). Sinovdan oldin exe
+   vaqti oxirgi commit'dan KEYIN ekanini tekshiring.
 2. Sinov — birinchi navbatda shu uchtasi:
    - **T15:** 5 ta whitelist kanalda AntiDelete endi ishlaydimi
      (kategoriya xatosi tuzatilgan)
