@@ -2480,13 +2480,11 @@ void fillAboutTab(
 	content->add(
 		object_ptr<Ui::FlatLabel>(
 			content,
-			rpl::single(u"Barcha saqlanadigan ma'lumotlar shu yerda:
-"_q
+			rpl::single(u"Barcha saqlanadigan ma'lumotlar shu yerda: "_q
 				+ CustomSettings::ArchiveRoot()
-				+ u"
-
-Ichida: medias/ (fayllar), db/ (baza), "
-				  "config/ (sozlamalar), backups/ (avtomatik zaxiralar)."_q),
+				+ u"  —  ichida: medias/ (fayllar), db/ (baza), "
+				  "config/ (sozlamalar), backups/ (avtomatik zaxiralar), "
+				  "bombmedia/."_q),
 			st::customModHintLabel),
 		st::boxRowPadding);
 	content->add(
@@ -2510,11 +2508,8 @@ Ichida: medias/ (fayllar), db/ (baza), "
 		moveBox.setWindowTitle(u"Arxiv papkasini o‘zgartirish"_q);
 		moveBox.setText(
 			u"Eski: "_q + current
-			+ u"
-Yangi: "_q + QDir::cleanPath(chosen)
-			+ u"
-
-Mavjud maʼlumotlarni yangi papkaga "
+			+ u"\nYangi: "_q + QDir::cleanPath(chosen)
+			+ u"\n\nMavjud maʼlumotlarni yangi papkaga "
 			  "ko‘chiraymi?"_q);
 		const auto moveBtn = moveBox.addButton(
 			u"📦 Ko‘chirish"_q, QMessageBox::AcceptRole);

@@ -59,6 +59,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "custom_archive.h"
 #include "custom_db.h"
 #include "custom_media_quota.h"
+#include "custom_settings.h"
 #include "lang/lang_keys.h"
 #include "core/application.h"
 #include "ui/text/text_utilities.h"
