@@ -59,6 +59,16 @@ void RestoreDeletedChats(not_null<Main::Session*> session);
 //   3. Hujjat turiga qarab universal kengaytma — oxirgi chora
 [[nodiscard]] QString MediaExtensionFor(not_null<DocumentData*> document);
 
+// MIME turidan kengaytma (nuqtasiz, kichik harflarda). Topilmasa bo'sh.
+// Alohida ochiq, chunki DISKDAGI eski fayllarni tuzatishda ham kerak —
+// u yerda DocumentData yo'q va tur fayl MAZMUNIDAN aniqlanadi
+// (QMimeDatabase::MatchContent).
+[[nodiscard]] QString ExtensionForMime(const QString &mime);
+
+// MIME turidan papka bucket'i: "image" | "video" | "voice" | "file".
+// Bo'sh qaytsa — tur noaniq, faylga TEGMASLIK kerak.
+[[nodiscard]] QString KindForMime(const QString &mime);
+
 // L3 (2026-08-14): xabar o'chirilganda, agar media hali arxivda bo'lmasa —
 // yuklashga urinib ko'radi. Bu OXIRGI IMKONIYAT, kafolat emas: xabar
 // o'chirilgach `file_reference` tez orada yaroqsiz bo'ladi va server

@@ -1,6 +1,8 @@
 #include "custom_db.h"
+#include "custom_archive.h" // ExtensionForMime / KindForMime (tuzatish)
 #include "custom_settings.h"
 #include "sqlite3.h"
+#include <QtCore/QMimeDatabase>
 #include <QtCore/QStandardPaths>
 #include <QtCore/QDir>
 #include <QtCore/QFile>
@@ -1232,6 +1234,137 @@ int ScanArchiveMedia(const QString &archiveRoot) {
     }
     execSql("COMMIT");
     return added;
+}
+
+RepairReport RepairArchiveMedia(const QString &archiveRoot, bool dryRun) {
+    Init();
+    RepairReport report;
+    if (!gDb) return report;
+
+    const auto mediaRoot = archiveRoot + "/medias";
+    if (!QDir(mediaRoot).exists()) return report;
+
+    // Fayllar ro'yxatini AVVAL to'liq yig'amiz — iteratsiya davomida
+    // qayta nomlash/ko'chirish daraxtni o'zgartiradi va QDirIterator
+    // xatti-harakati aniqlanmagan bo'lib qoladi.
+    QVector<QString> files;
+    {
+        QDirIterator it(
+            mediaRoot,
+            QDir::Files | QDir::NoSymLinks,
+            QDirIterator::Subdirectories);
+        while (it.hasNext()) {
+            files.append(it.next());
+        }
+    }
+
+    const auto subDirOf = [](const QString &kind) {
+        if (kind == "voice") return QStringLiteral("voices");
+        if (kind == "video") return QStringLiteral("videos");
+        if (kind == "image") return QStringLiteral("images");
+        return QStringLiteral("files");
+    };
+
+    QMimeDatabase mimeDb;
+    if (!dryRun) execSql("BEGIN");
+
+    for (const auto &absPath : files) {
+        ++report.scanned;
+        const QFileInfo info(absPath);
+        const auto currentDir = info.dir().dirName();
+
+        // 🔴 MatchContent — magic-byte'lar bo'yicha. Nomga QARAMAYDI,
+        // aynan shuning uchun kengaytmasiz fayllarni ham aniqlaydi.
+        const auto mime = mimeDb.mimeTypeForFile(
+            absPath,
+            QMimeDatabase::MatchContent).name();
+        const auto ext = CustomArchive::ExtensionForMime(mime);
+        const auto kind = CustomArchive::KindForMime(mime);
+        if (ext.isEmpty() && kind.isEmpty()) {
+            ++report.unknown; // taxmin qilmaymiz
+            continue;
+        }
+
+        // Nom: kengaytma FAQAT yo'q bo'lsa qo'shiladi.
+        auto newName = info.fileName();
+        auto nameChanged = false;
+        if (info.suffix().isEmpty() && !ext.isEmpty()) {
+            newName += "." + ext;
+            nameChanged = true;
+        }
+
+        // Papka: faqat TURLANGAN papkadan (images/videos/voices)
+        // noto'g'ri turdagi fayl ko'chiriladi. files/ — umumiy bucket,
+        // undan chiqarmaymiz (PDF, sticker va h.k. joyida qolsin).
+        auto newDir = currentDir;
+        auto dirChanged = false;
+        const auto isTypedDir = (currentDir == "images"
+            || currentDir == "videos"
+            || currentDir == "voices");
+        if (isTypedDir && !kind.isEmpty()) {
+            const auto want = subDirOf(kind);
+            if (want != currentDir) {
+                newDir = want;
+                dirChanged = true;
+            }
+        }
+
+        if (!nameChanged && !dirChanged) {
+            continue;
+        }
+        if (dryRun) {
+            if (nameChanged) ++report.extensionAdded;
+            if (dirChanged) ++report.movedFolder;
+            continue;
+        }
+
+        const auto newAbs = mediaRoot + "/" + newDir + "/" + newName;
+        if (QFile::exists(newAbs)) {
+            ++report.failed; // nom to'qnashuvi — tegmaymiz
+            continue;
+        }
+        QDir().mkpath(mediaRoot + "/" + newDir);
+        if (!QFile::rename(absPath, newAbs)) {
+            ++report.failed;
+            continue;
+        }
+        if (nameChanged) ++report.extensionAdded;
+        if (dirChanged) ++report.movedFolder;
+
+        // Indeksni yangilash SHART: aks holda ReconcileMediaIndex()
+        // fayllarni topolmay 'missing' deb belgilab qo'yadi.
+        const auto oldRel = QDir(archiveRoot).relativeFilePath(absPath);
+        const auto newRel = QDir(archiveRoot).relativeFilePath(newAbs);
+        sqlite3_stmt *stmt = nullptr;
+        if (sqlite3_prepare_v2(gDb,
+                "UPDATE media_index SET rel_path = ?, file_name = ?, "
+                "       kind = CASE WHEN LENGTH(?) > 0 THEN ? ELSE kind END "
+                "WHERE rel_path = ?",
+                -1, &stmt, nullptr) == SQLITE_OK) {
+            bindText(stmt, 1, newRel);
+            bindText(stmt, 2, newName);
+            bindText(stmt, 3, kind);
+            bindText(stmt, 4, kind);
+            bindText(stmt, 5, oldRel);
+            sqlite3_step(stmt);
+            sqlite3_finalize(stmt);
+        }
+    }
+
+    if (!dryRun) execSql("COMMIT");
+    return report;
+}
+
+void RepairArchiveMediaAsync(
+        bool dryRun,
+        std::function<void(RepairReport)> callback) {
+    const auto root = CustomSettings::ArchiveRoot();
+    crl::async([root, dryRun, callback] {
+        const auto report = RepairArchiveMedia(root, dryRun);
+        crl::on_main([report, callback] {
+            if (callback) callback(report);
+        });
+    });
 }
 
 void ScanArchiveMediaAsync(std::function<void(int added)> callback) {

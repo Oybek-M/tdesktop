@@ -270,6 +270,67 @@ QString MediaKindOf(not_null<DocumentData*> document) {
 	return u"file"_q;
 }
 
+QString ExtensionForMime(const QString &mimeRaw) {
+	const auto mime = mimeRaw.trimmed().toLower();
+	if (mime.isEmpty()
+		|| mime == u"application/octet-stream"_q) {
+		return QString(); // noaniq — taxmin qilmaymiz
+	}
+	// Qo'lda jadval — QMimeDatabase ba'zan kam tarqalgan variantni beradi
+	// (audio/ogg -> "oga", image/jpeg -> "jpeg"), bu yerda esa keng
+	// tarqalgan shakl kerak.
+	static const auto kKnown = QHash<QString, QString>{
+		{ u"audio/ogg"_q,          u"ogg"_q },
+		{ u"audio/opus"_q,         u"ogg"_q },
+		{ u"audio/x-opus+ogg"_q,   u"ogg"_q },
+		{ u"application/ogg"_q,    u"ogg"_q },
+		{ u"audio/mpeg"_q,         u"mp3"_q },
+		{ u"audio/mp4"_q,          u"m4a"_q },
+		{ u"audio/x-m4a"_q,        u"m4a"_q },
+		{ u"audio/x-wav"_q,        u"wav"_q },
+		{ u"audio/wav"_q,          u"wav"_q },
+		{ u"audio/flac"_q,         u"flac"_q },
+		{ u"audio/x-flac"_q,       u"flac"_q },
+		{ u"video/mp4"_q,          u"mp4"_q },
+		{ u"video/quicktime"_q,    u"mov"_q },
+		{ u"video/webm"_q,         u"webm"_q },
+		{ u"video/x-matroska"_q,   u"mkv"_q },
+		{ u"video/x-msvideo"_q,    u"avi"_q },
+		{ u"video/3gpp"_q,         u"3gp"_q },
+		{ u"image/jpeg"_q,         u"jpg"_q },
+		{ u"image/png"_q,          u"png"_q },
+		{ u"image/gif"_q,          u"gif"_q },
+		{ u"image/webp"_q,         u"webp"_q },
+		{ u"image/heic"_q,         u"heic"_q },
+		{ u"application/pdf"_q,    u"pdf"_q },
+		{ u"application/x-tgsticker"_q, u"tgs"_q },
+	};
+	const auto known = kKnown.constFind(mime);
+	if (known != kKnown.constEnd()) {
+		return known.value();
+	}
+	// Jadvalda yo'q bo'lsa — Qt'ning MIME bazasi.
+	return QMimeDatabase()
+		.mimeTypeForName(mime)
+		.preferredSuffix()
+		.toLower();
+}
+
+QString KindForMime(const QString &mimeRaw) {
+	const auto mime = mimeRaw.trimmed().toLower();
+	if (mime.startsWith(u"video/"_q)) {
+		return u"video"_q;
+	} else if (mime.startsWith(u"audio/"_q)) {
+		return u"voice"_q;
+	} else if (mime.startsWith(u"image/"_q)) {
+		return u"image"_q;
+	}
+	// Boshqa hamma narsa (hujjat, arxiv, noaniq) — "file" emas, BO'SH.
+	// Bo'sh qiymat "papkasini o'zgartirma" degani: files/ ichida turgan
+	// PDF yoki sticker joyida qolishi kerak.
+	return QString();
+}
+
 QString MediaExtensionFor(not_null<DocumentData*> document) {
 	// 1) Haqiqiy fayl nomidagi kengaytma — eng ishonchli manba.
 	//    Foydalanuvchi talabi: "native holatdagi file qanday extension
@@ -285,43 +346,9 @@ QString MediaExtensionFor(not_null<DocumentData*> document) {
 
 	// 2) MIME turi. Telegram uni to'g'ri yuboradi, shuning uchun bu
 	//    hujjat turiga qarab TAXMIN qilishdan ancha ishonchli.
-	const auto mime = document->mimeString().trimmed().toLower();
-	if (!mime.isEmpty()) {
-		// Qo'lda jadval — QMimeDatabase ba'zan kutilmagan variantni
-		// beradi (masalan audio/ogg -> "oga", image/jpeg -> "jpeg"),
-		// bu yerda esa keng tarqalgan shakl kerak.
-		static const auto kKnown = QHash<QString, QString>{
-			{ u"audio/ogg"_q,          u"ogg"_q },
-			{ u"audio/opus"_q,         u"ogg"_q },
-			{ u"application/ogg"_q,    u"ogg"_q },
-			{ u"audio/mpeg"_q,         u"mp3"_q },
-			{ u"audio/mp4"_q,          u"m4a"_q },
-			{ u"audio/x-wav"_q,        u"wav"_q },
-			{ u"audio/wav"_q,          u"wav"_q },
-			{ u"audio/flac"_q,         u"flac"_q },
-			{ u"video/mp4"_q,          u"mp4"_q },
-			{ u"video/quicktime"_q,    u"mov"_q },
-			{ u"video/webm"_q,         u"webm"_q },
-			{ u"video/x-matroska"_q,   u"mkv"_q },
-			{ u"video/x-msvideo"_q,    u"avi"_q },
-			{ u"image/jpeg"_q,         u"jpg"_q },
-			{ u"image/png"_q,          u"png"_q },
-			{ u"image/gif"_q,          u"gif"_q },
-			{ u"image/webp"_q,         u"webp"_q },
-			{ u"image/heic"_q,         u"heic"_q },
-			{ u"application/pdf"_q,    u"pdf"_q },
-			{ u"application/x-tgsticker"_q, u"tgs"_q },
-		};
-		const auto known = kKnown.constFind(mime);
-		if (known != kKnown.constEnd()) {
-			return known.value();
-		}
-		// Jadvalda yo'q bo'lsa — Qt'ning MIME bazasi.
-		const auto type = QMimeDatabase().mimeTypeForName(mime);
-		const auto preferred = type.preferredSuffix().toLower();
-		if (!preferred.isEmpty()) {
-			return preferred;
-		}
+	const auto byMime = ExtensionForMime(document->mimeString());
+	if (!byMime.isEmpty()) {
+		return byMime;
 	}
 
 	// 3) Oxirgi chora — hujjat turiga qarab. Faqat shu yerda taxmin

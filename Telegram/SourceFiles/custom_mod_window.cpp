@@ -20,7 +20,9 @@
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/scroll_area.h"
+#include "ui/boxes/confirm_box.h" // media tuzatish tasdiqlash oynasi
 #include "ui/layers/layer_manager.h"
+#include "window/window_controller.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/themes/window_theme.h"
@@ -2622,20 +2624,67 @@ void fillAboutTab(
 		const auto scanBtn = content->add(
 			object_ptr<Ui::RoundButton>(
 				content,
-				rpl::single(u"🔍 Eski media fayllarni indekslash"_q),
+				rpl::single(u"🔍 Eski media fayllarni indekslash va tuzatish"_q),
 				st::defaultBoxButton),
 			st::boxRowPadding);
 		scanBtn->addClickHandler([=] {
 			scanBtn->setDisabled(true);
 			Ui::Toast::Show(u"Skanerlanmoqda, biroz kuting..."_q);
 			const auto weak = base::make_weak(content);
+
+			// 1-bosqich: indeksga yetishmayotgan fayllarni qo'shish.
 			CustomDB::ScanArchiveMediaAsync([=](int added) {
 				if (!weak) return;
-				scanBtn->setDisabled(false);
-				Ui::Toast::Show(added > 0
-					? (u"%1 ta fayl indeksga qoʻshildi. Roʻyxat yangilanishi "
-						"uchun oynani yopib qayta oching."_q).arg(added)
-					: u"Yangi fayl topilmadi — hammasi allaqachon indeksda."_q);
+
+				// 2-bosqich: TUZATISHNI avval quruq (dry-run) chopamiz.
+				// Fayllarni qayta nomlash va ko'chirish qaytarib
+				// bo'lmaydigan amal, shuning uchun foydalanuvchi avval
+				// nima o'zgarishini KO'RADI va o'zi tasdiqlaydi.
+				CustomDB::RepairArchiveMediaAsync(true, [=](
+						CustomDB::RepairReport preview) {
+					if (!weak) return;
+					scanBtn->setDisabled(false);
+
+					const auto indexed = (added > 0)
+						? (u"%1 ta fayl indeksga qoʻshildi.\n\n"_q).arg(added)
+						: u"Indeksga yangi fayl qoʻshilmadi.\n\n"_q;
+					const auto toFix = preview.extensionAdded
+						+ preview.movedFolder;
+					if (!toFix) {
+						Ui::Toast::Show(indexed
+							+ u"Tuzatishga muhtoj fayl topilmadi."_q);
+						return;
+					}
+					const auto window = Core::App().activeWindow();
+					if (!window) return;
+					window->show(Ui::MakeConfirmBox({
+						.text = indexed
+							+ u"Tuzatish kerak boʻlgan fayllar:\n"_q
+							+ u"• kengaytma qoʻshiladi: "_q
+							+ QString::number(preview.extensionAdded)
+							+ u"\n• toʻgʻri papkaga koʻchiriladi: "_q
+							+ QString::number(preview.movedFolder)
+							+ u"\n• turi aniqlanmadi (tegilmaydi): "_q
+							+ QString::number(preview.unknown)
+							+ u"\n\nTur fayl MAZMUNIDAN aniqlanadi. "
+							  "Mavjud kengaytma hech qachon "
+							  "almashtirilmaydi. Davom etamizmi?"_q,
+						.confirmed = [=](Fn<void()> close) {
+							close();
+							Ui::Toast::Show(u"Tuzatilmoqda..."_q);
+							CustomDB::RepairArchiveMediaAsync(false, [=](
+									CustomDB::RepairReport done) {
+								Ui::Toast::Show(
+									u"Tuzatildi: %1 kengaytma, %2 koʻchirildi"
+									", %3 xato."_q
+										.arg(done.extensionAdded)
+										.arg(done.movedFolder)
+										.arg(done.failed));
+							});
+						},
+						.confirmText = u"Tuzatish"_q,
+					}));
+				});
 			});
 		});
 	}
@@ -2751,7 +2800,26 @@ void fillAboutTab(
 				// fayllar shu guruhda. Ular ham eksport qilinishi kerak.
 				name = u"Noma'lum (eski fayllar)"_q;
 			} else if (name.isEmpty()) {
-				name = u"ID "_q + summary.peerId;
+				// 2026-08-15: GetPeerDisplayName() faqat White/Black List
+				// va per-chat ro'yxatlariga qaraydi, shuning uchun oddiy
+				// shaxsiy chatlar "ID 620565940" bo'lib chiqardi.
+				// Haqiqiy nomni sessiyadan olamiz.
+				auto ok = false;
+				const auto rawId = summary.peerId.toULongLong(&ok);
+				if (ok && rawId) {
+					if (const auto window = Core::App().activeWindow()) {
+						if (const auto c = window->sessionController()) {
+							const auto peer = c->session().data().peerLoaded(
+								PeerId(rawId));
+							if (peer) {
+								name = peer->name();
+							}
+						}
+					}
+				}
+				if (name.isEmpty()) {
+					name = u"ID "_q + summary.peerId; // hali yuklanmagan
+				}
 			}
 			const auto btn = content->add(
 				object_ptr<Ui::SettingsButton>(

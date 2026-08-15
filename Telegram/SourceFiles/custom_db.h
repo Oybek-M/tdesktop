@@ -183,6 +183,36 @@ int ReconcileMediaIndex(const QString &archiveRoot);
 int ScanArchiveMedia(const QString &archiveRoot);
 void ScanArchiveMediaAsync(std::function<void(int added)> callback);
 
+// ── Eski fayllarni TUZATISH (2026-08-15) ─────────────────────────────────
+//
+// 2026-08-15 dagi kengaytma tuzatishi faqat YANGI arxivlanadigan
+// fayllarga ta'sir qiladi. Diskda esa `<peerId>_<msgId>_file` ko'rinishida,
+// kengaytmasiz fayllar qolgan, va bir qismi noto'g'ri papkada
+// (yumaloq videolar medias/voices/ da — eski `isVideoMessage() -> "voice"`
+// tasnifi qoldig'i). Eksport diskdan nusxalagani uchun bu buzuqlik
+// zaxiralarga ham o'tadi.
+//
+// Bu funksiya turni fayl NOMIDAN emas, MAZMUNIDAN aniqlaydi
+// (QMimeDatabase::MatchContent — magic-byte sniffing), chunki eski
+// fayllar uchun DocumentData endi mavjud emas.
+//
+// Mavjud kengaytma HECH QACHON almashtirilmaydi — faqat yo'q bo'lsa
+// qo'shiladi. Mazmuni aniqlanmagan fayllarga TEGILMAYDI.
+struct RepairReport {
+    int scanned = 0;
+    int extensionAdded = 0;  // kengaytma qo'shildi
+    int movedFolder = 0;     // to'g'ri papkaga ko'chirildi
+    int unknown = 0;         // mazmuni aniqlanmadi — tegilmadi
+    int failed = 0;          // fayl tizimi xatosi
+};
+
+// dryRun = true bo'lsa hech narsa o'zgarmaydi, faqat hisobot qaytadi.
+// Foydalanuvchiga avval shu hisobot ko'rsatiladi.
+RepairReport RepairArchiveMedia(const QString &archiveRoot, bool dryRun);
+void RepairArchiveMediaAsync(
+    bool dryRun,
+    std::function<void(RepairReport)> callback);
+
 // C11: per-message edit history — all recorded versions across all chats.
 struct EditRecord {
     QString peerId;
