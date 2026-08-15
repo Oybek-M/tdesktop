@@ -83,7 +83,24 @@ void WriteRow(const PendingRow &row) {
 		const QString &kind) {
 	auto name = document->filename();
 	if (name.isEmpty()) {
-		name = u"file"_q;
+		// 2026-08-15 (sinovda topildi): document->filename() MEDIA sifatida
+		// yuborilgan fayllar uchun bo'sh bo'ladi — video, ovozli xabar,
+		// animatsiya. Ilgari bu yerda oddiy "file" qo'yilardi va natijada
+		// eksport qilingan arxivda kengaytmasiz, ikki marta bosib
+		// ochib bo'lmaydigan fayllar chiqardi (34 ta videodan ko'pchiligi
+		// va 14 ta ovozli xabarning HAMMASI shunday edi).
+		//
+		// Qoida history_item.cpp dagi setDeletedLocally() bilan bir xil —
+		// o'sha yerda bu muammo allaqachon hal qilingan edi.
+		if (document->isVideoMessage() || document->isAnimation()) {
+			name = u"video.mp4"_q;
+		} else if (document->isVoiceMessage()) {
+			name = u"voice.ogg"_q;
+		} else if (document->isVideoFile()) {
+			name = u"video.mp4"_q;
+		} else {
+			name = u"file.bin"_q;
+		}
 	}
 	// SaveMediaFile() dagi bilan bir xil xavfsizlik qoidalari + Windows'da
 	// taqiqlangan belgilar.

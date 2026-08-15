@@ -33,6 +33,7 @@
 #include "styles/style_settings.h"
 
 #include <algorithm>
+#include <cmath> // std::lround (kvota GB -> MB)
 #include <QtCore/QDateTime>
 #include <QtCore/QDir>
 #include <QtCore/QFileInfo>
@@ -2494,15 +2495,18 @@ void fillAboutTab(
 			object_ptr<Ui::InputField>(
 				content,
 				st::defaultInputField,
-				rpl::single(u"Bitta fayl chegarasi, MB (10–2048)"_q),
+				rpl::single(u"Bitta fayl chegarasi, MB (10–4096)"_q),
 				QString::number(CustomSettings::MediaBackupMaxFileMb())),
 			st::boxRowPadding);
+		// Kvota ichkarida MB'da saqlanadi, UI'da esa GB — shuning uchun
+		// "5.5" kabi kasrli qiymat kiritish mumkin.
 		const auto quotaInput = content->add(
 			object_ptr<Ui::InputField>(
 				content,
 				st::defaultInputField,
-				rpl::single(u"Umumiy kvota, GB (1–500)"_q),
-				QString::number(CustomSettings::MediaBackupQuotaGb())),
+				rpl::single(u"Umumiy kvota, GB (1–500, kasr mumkin: 5.5)"_q),
+				QString::number(
+					CustomSettings::MediaBackupQuotaMb() / 1024.0, 'f', 1)),
 			st::boxRowPadding);
 		content->add(
 			object_ptr<Ui::RoundButton>(
@@ -2517,14 +2521,22 @@ void fillAboutTab(
 				// Chegaralar CustomSettings::UpdateInt() da qisiladi.
 				CustomSettings::SetInt(u"mediaBackupMaxFileMb"_q, maxMb);
 			}
-			const auto quotaGb = quotaInput->getLastText().trimmed().toInt(&ok);
-			if (ok) {
-				CustomSettings::SetInt(u"mediaBackupQuotaGb"_q, quotaGb);
+			// Kasrli GB qabul qilamiz ("5.5"), MB'ga aylantirib saqlaymiz.
+			// Vergul ham ishlaydi — klaviatura tilida nuqta o'rniga
+			// vergul chiqishi odatiy hol.
+			auto quotaText = quotaInput->getLastText().trimmed();
+			quotaText.replace(u',', u'.');
+			const auto quotaGb = quotaText.toDouble(&ok);
+			if (ok && quotaGb > 0) {
+				CustomSettings::SetInt(
+					u"mediaBackupQuotaMb"_q,
+					int(std::lround(quotaGb * 1024)));
 			}
 			maxInput->setText(
 				QString::number(CustomSettings::MediaBackupMaxFileMb()));
 			quotaInput->setText(
-				QString::number(CustomSettings::MediaBackupQuotaGb()));
+				QString::number(
+					CustomSettings::MediaBackupQuotaMb() / 1024.0, 'f', 1));
 			Ui::Toast::Show(u"Saqlandi ✓"_q);
 		});
 

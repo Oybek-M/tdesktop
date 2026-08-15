@@ -192,9 +192,11 @@ void UpdateInt(const QString &id, int value) {
     // qiymat qaysi yo'ldan kelishidan qat'i nazar — UI, Init(), yoki
     // qo'lda tahrirlangan registry — xavfsiz oraliqda qoladi.
     else if (id == "mediaBackupMaxFileMb") {
-        gValues.mediaBackupMaxFileMb = std::clamp(value, 10, 2048);
-    } else if (id == "mediaBackupQuotaGb") {
-        gValues.mediaBackupQuotaGb = std::clamp(value, 1, 500);
+        // 4096 — Telegram Premium'ning 4 GB yuklash chegarasi; undan
+        // katta fayl Telegram'da umuman bo'lmaydi.
+        gValues.mediaBackupMaxFileMb = std::clamp(value, 10, 4096);
+    } else if (id == "mediaBackupQuotaMb") {
+        gValues.mediaBackupQuotaMb = std::clamp(value, 1024, 512000);
     }
 }
 
@@ -275,8 +277,17 @@ void Init() {
     // tahrirlangan bo'lsa ham xavfsiz qiymat olamiz).
     UpdateInt("mediaBackupMaxFileMb",
         settings.value("mediaBackupMaxFileMb", 100).toInt());
-    UpdateInt("mediaBackupQuotaGb",
-        settings.value("mediaBackupQuotaGb", 10).toInt());
+    // Kvota 2026-08-15 da GB'dan MB'ga o'tkazildi (kasrli qiymat uchun).
+    // Eski kalit bor bo'lsa bir marta ko'chiramiz, aks holda foydalanuvchi
+    // sozlagan qiymat jimgina standartga qaytib qolardi.
+    if (settings.contains("mediaBackupQuotaMb")) {
+        UpdateInt("mediaBackupQuotaMb",
+            settings.value("mediaBackupQuotaMb").toInt());
+    } else {
+        const auto legacyGb = settings.value("mediaBackupQuotaGb", 10).toInt();
+        UpdateInt("mediaBackupQuotaMb", legacyGb * 1024);
+        settings.setValue("mediaBackupQuotaMb", gValues.mediaBackupQuotaMb);
+    }
 
     // Per-peer ghost overrides
     settings.beginGroup("GhostModePerPeer");

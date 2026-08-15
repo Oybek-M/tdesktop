@@ -76,8 +76,8 @@ long long UsedBytes() {
 long long LimitBytes() {
     // Har chaqiruvda sozlamadan o'qiymiz — foydalanuvchi kvotani
     // Custom Window'da o'zgartirsa, qayta ishga tushirmasdan amal qilsin.
-    return static_cast<long long>(CustomSettings::MediaBackupQuotaGb())
-        * 1024 * 1024 * 1024;
+    return static_cast<long long>(CustomSettings::MediaBackupQuotaMb())
+        * 1024 * 1024;
 }
 
 bool IsFull() {

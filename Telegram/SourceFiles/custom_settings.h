@@ -53,8 +53,13 @@ struct Values {
 
     // Katta media backup (2026-08-14). Ikkalasi ham Custom Window'da
     // o'zgartiriladi; chegaralar UpdateInt() da qisiladi.
-    int mediaBackupMaxFileMb = 100;   // 10 – 2048
-    int mediaBackupQuotaGb = 10;      // 1 – 500
+    //
+    // Yuqori chegara 4096 MB — Telegram Premium 4 GB gacha fayl
+    // yuborishga ruxsat beradi, ya'ni undan kattasi bo'lishi mumkin emas.
+    int mediaBackupMaxFileMb = 100;     // 10 – 4096
+    // Kvota MB'da saqlanadi (GB'da emas) — foydalanuvchi 5.5 GB kabi
+    // kasrli qiymat kirita olishi uchun. UI GB'da ko'rsatadi.
+    int mediaBackupQuotaMb = 10240;    // 1024 – 512000 (1 GB – 500 GB)
     QString upstreamLastKnownVersion;         // oxirgi FOYDALANUVCHIGA bildirilgan versiya
     qint64 upstreamLastCheckedAt = 0;         // unix timestamp (soniya)
     // ── Story media zaxirasi (A11) ───────────────────────────────────────
@@ -96,7 +101,7 @@ inline bool ActivityHistoryTrackAllContacts() { return Get().activityHistoryTrac
 inline bool    UpstreamCheckEnabled()          { return Get().upstreamCheckEnabled; }
 inline int     UpstreamCheckIntervalMinutes()  { return Get().upstreamCheckIntervalMinutes; }
 inline int     MediaBackupMaxFileMb()          { return Get().mediaBackupMaxFileMb; }
-inline int     MediaBackupQuotaGb()            { return Get().mediaBackupQuotaGb; }
+inline int     MediaBackupQuotaMb()            { return Get().mediaBackupQuotaMb; }
 inline QString UpstreamLastKnownVersion()      { return Get().upstreamLastKnownVersion; }
 inline qint64  UpstreamLastCheckedAt()         { return Get().upstreamLastCheckedAt; }
 inline bool    StoryMediaBackupEnabled()       { return Get().storyMediaBackupEnabled; }
