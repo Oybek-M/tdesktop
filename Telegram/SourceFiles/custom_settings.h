@@ -133,6 +133,46 @@ void ClearAllPerPeerOverrides();
 [[nodiscard]] bool HasPerPeerOverride(const QString &peerId);
 [[nodiscard]] QVector<PerPeerEntry> GetPerPeerOverrides();
 
+// ── Arxiv ildizi — YAGONA manba (2026-08-15) ─────────────────────────────
+//
+// Ilgari yo'llar 14 xil joyda alohida hisoblanardi va ikkita ildizga
+// bo'linib ketgan edi (~/customizationMainFolder va %APPDATA%/CustomMod).
+// Endi AntiDelete va zaxira uchun saqlanadigan HAMMA narsa bitta ildiz
+// ostida:
+//
+//   <ildiz>/medias/{images,videos,voices,files}
+//   <ildiz>/db/actioned_messages.db
+//   <ildiz>/config/{peer_lists.json, branding.json}
+//   <ildiz>/backups/
+//
+// Standart ildiz — ~/customizationMainFolder. Foydalanuvchi uni Custom
+// Window orqali o'zgartirishi mumkin.
+//
+// DIQQAT: ArchiveRoot() Init() ni TALAB QILMAYDI — u faqat QSettings'ga
+// qaraydi. Aks holda CustomDB::Init() -> ArchiveRoot() ->
+// CustomSettings::Init() zanjirida rekursiya xavfi tug'ilardi.
+[[nodiscard]] QString ArchiveRoot();
+[[nodiscard]] QString DefaultArchiveRoot();
+[[nodiscard]] QString ArchiveMediasDir();   // <ildiz>/medias
+[[nodiscard]] QString ArchiveDbDir();       // <ildiz>/db
+[[nodiscard]] QString ArchiveConfigDir();   // <ildiz>/config
+[[nodiscard]] QString ArchiveBackupsDir();  // <ildiz>/backups
+
+// Ildizni o'zgartiradi (fayllarni KO'CHIRMAYDI — buni chaqiruvchi
+// MoveArchiveRoot() orqali qiladi). Bo'sh qiymat standartga qaytaradi.
+void SetArchiveRoot(const QString &path);
+
+// Ildiz o'zgartirilganda mavjud ma'lumotlarni ko'chirishni belgilaydi.
+// Ko'chirishning O'ZI keyingi ishga tushishda, baza OCHILMASDAN OLDIN
+// bajariladi (EnsureArchiveLayout) — ilova ishlayotganda SQLite fayli
+// ochiq bo'lgani uchun ko'chirish xavfli.
+void ScheduleArchiveRootMove(const QString &fromPath);
+
+// Kerakli sub-papkalarni yaratadi va eski joylashuvdan (AppData'dagi
+// baza/sozlama/zaxiralar) bir marta ko'chiradi. Baza OCHILMASDAN OLDIN
+// chaqirilishi shart. Takroriy chaqiruv zararsiz.
+void EnsureArchiveLayout();
+
 // ── Platformadan mustaqil sozlama almashinuvi (2026-08-14) ───────────────
 // Eksport/import formati boshqa ilovalarimizda va serverda ham
 // ishlatilishi kerak. Windows registry dump (settings.reg) u yerda

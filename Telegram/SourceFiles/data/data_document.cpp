@@ -1086,7 +1086,7 @@ void DocumentData::finishLoad() {
 	// bo'ladi. Tekshiruvsiz SaveMediaFile() uni o'ziga nusxalashga
 	// urinardi.
 	const auto alreadyInArchive = !cachePath.isEmpty()
-		&& cachePath.startsWith(CustomMediaQuota::ArchiveRoot());
+		&& cachePath.startsWith(CustomSettings::ArchiveRoot());
 
 	if (alreadyInArchive) {
 		// L2/L3 boshlagan yuklash endi TUGADI — media indeksidagi

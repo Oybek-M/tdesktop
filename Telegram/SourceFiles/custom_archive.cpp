@@ -185,7 +185,7 @@ void MaybeDownloadMedia(not_null<HistoryItem*> item) {
 				return;
 			}
 			const auto relPath = ArchiveRelPath(item, document, kind);
-			const auto fullPath = CustomMediaQuota::ArchiveRoot()
+			const auto fullPath = CustomSettings::ArchiveRoot()
 				+ u"/"_q + relPath;
 			QDir().mkpath(QFileInfo(fullPath).absolutePath());
 
@@ -492,7 +492,7 @@ void TryRescueMedia(not_null<HistoryItem*> item) {
 	}
 
 	const auto relPath = ArchiveRelPath(item, document, kind);
-	const auto fullPath = CustomMediaQuota::ArchiveRoot() + u"/"_q + relPath;
+	const auto fullPath = CustomSettings::ArchiveRoot() + u"/"_q + relPath;
 	QDir().mkpath(QFileInfo(fullPath).absolutePath());
 	document->save(Data::FileOriginMessage(item->fullId()), fullPath);
 

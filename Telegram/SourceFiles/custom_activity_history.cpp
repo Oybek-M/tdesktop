@@ -36,9 +36,9 @@ std::vector<PendingStoryMedia> gPendingStoryMedia;
 base::flat_set<FullStoryId> gProcessedStoryMedia;
 
 QString SaveStoryImage(const QImage &image, PhotoId id) {
-	const auto baseDir = QStandardPaths::writableLocation(
-		QStandardPaths::HomeLocation)
-		+ u"/customizationMainFolder/medias/images"_q;
+	// 2026-08-15: arxiv ildizi endi sozlanadi — yagona manba
+	// CustomSettings::ArchiveMediasDir().
+	const auto baseDir = CustomSettings::ArchiveMediasDir() + u"/images"_q;
 	QDir().mkpath(baseDir);
 	const auto path = baseDir + u"/story_"_q + QString::number(id) + u".jpg"_q;
 	image.save(path, "JPEG");

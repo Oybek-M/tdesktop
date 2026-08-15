@@ -202,7 +202,7 @@ Session::Session(
 		CustomArchive::RestoreDeletedChats(this);
 		// Indeksni fayl tizimi bilan moslashtirish: import'dan keyin
 		// yo'q fayllar 'missing' ga, tugagan yuklashlar 'present' ga.
-		CustomDB::ReconcileMediaIndex(CustomMediaQuota::ArchiveRoot());
+		CustomDB::ReconcileMediaIndex(CustomSettings::ArchiveRoot());
 		// Kvota ogohlantirishi shu yerda — konstruktorda hali oyna yo'q.
 		CustomMediaQuota::ShowQuotaAlertIfNeeded();
 	}, lifetime());

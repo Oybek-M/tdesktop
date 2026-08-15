@@ -3220,9 +3220,9 @@ void HistoryItem::setDeletedLocally() {
 					cachePath,
 					CustomArchive::MediaKindOf(doc));
 				if (destPath.isEmpty()) {
+					// 2026-08-15: arxiv ildizi sozlanadi.
 					const QString baseDir =
-						QStandardPaths::writableLocation(QStandardPaths::HomeLocation)
-						+ "/customizationMainFolder/medias/files/";
+						CustomSettings::ArchiveMediasDir() + "/files/";
 					QDir().mkpath(baseDir);
 					destPath = baseDir + QString::number(id.bare) + "_" + fileName;
 					QFile::copy(cachePath, destPath);
@@ -3243,9 +3243,9 @@ void HistoryItem::setDeletedLocally() {
 		else if (const auto photo = m->photo()) {
 			if (const auto photoMedia = photo->activeMediaView()) {
 				if (photoMedia->loaded()) {
+					// 2026-08-15: arxiv ildizi sozlanadi.
 					const QString imgDir =
-						QStandardPaths::writableLocation(QStandardPaths::HomeLocation)
-						+ "/customizationMainFolder/medias/images/";
+						CustomSettings::ArchiveMediasDir() + "/images/";
 					QDir().mkpath(imgDir);
 					const QString imgPath = imgDir
 						+ QString::number(photo->id) + "_" + QString::number(id.bare) + ".jpg";

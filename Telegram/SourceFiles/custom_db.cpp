@@ -83,8 +83,10 @@ static QSet<QPair<QString, long long>> gUserDeletePending;
 // ---------------------------------------------------------------------------
 
 static QString dbFilePath() {
-    return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
-           + "/CustomMod/actioned_messages.db";
+    // 2026-08-15: AppData/CustomMod dan <arxiv ildizi>/db ga ko'chdi.
+    // EnsureArchiveLayout() eski faylni (WAL/SHM bilan) bir marta
+    // ko'chirib beradi va u baza OCHILMASDAN OLDIN chaqiriladi.
+    return CustomSettings::ArchiveDbDir() + "/actioned_messages.db";
 }
 
 // Execute a SQL statement with no results expected. Returns true on success.
@@ -129,8 +131,9 @@ static QDateTime strToDt(const QString &s) {
 void Init() {
     if (gInitialized && gDb) return;
 
-    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/CustomMod";
-    QDir().mkpath(dir);
+    // Sub-papkalarni yaratadi va eski joylashuvdan ko'chiradi. Baza
+    // ochilishidan OLDIN bo'lishi shart.
+    CustomSettings::EnsureArchiveLayout();
 
     const QByteArray pathUtf8 = dbFilePath().toUtf8();
     const int rc = sqlite3_open_v2(
@@ -1232,7 +1235,7 @@ int ScanArchiveMedia(const QString &archiveRoot) {
 }
 
 void ScanArchiveMediaAsync(std::function<void(int added)> callback) {
-    const auto root = QDir::homePath() + "/customizationMainFolder";
+    const auto root = CustomSettings::ArchiveRoot();
     crl::async([root, callback] {
         const auto added = ScanArchiveMedia(root);
         crl::on_main([added, callback] {
@@ -1740,10 +1743,9 @@ ExportResult ExportFullBackup(
 
     // 2) JSON sozlamalar fayllari (mavjud bo'lsa).
     reportProgress(u"Sozlamalar saqlanmoqda"_q, 60);
-    const QString appDataCustom = QStandardPaths::writableLocation(
-        QStandardPaths::AppDataLocation) + "/CustomMod";
-    const QString peerListsSrc = appDataCustom + "/peer_lists.json";
-    const QString brandingSrc = appDataCustom + "/branding.json";
+    const QString configDir = CustomSettings::ArchiveConfigDir();
+    const QString peerListsSrc = configDir + "/peer_lists.json";
+    const QString brandingSrc = configDir + "/branding.json";
     if (QFile::exists(peerListsSrc)) {
         QFile::copy(peerListsSrc, stageDir + "/peer_lists.json");
     }
@@ -1809,7 +1811,7 @@ ExportResult ExportFullBackup(
         + "/CustomModMedia_" + stamp + "_tmp";
     const QString mediaZipPath = targetDir
         + "/CustomModMedia_" + stamp + ".zip";
-    const auto archiveRoot = QDir::homePath() + "/customizationMainFolder";
+    const auto archiveRoot = CustomSettings::ArchiveRoot();
     auto mediaFileCount = 0;
 
     const auto wantsMedia = options.includeAllMedia
@@ -2102,7 +2104,7 @@ bool ImportFullBackup(const QString &sourcePath, bool fullReplace) {
     // (see MergeDirRecursive doc comment) instead of wiping the local tree.
     const QString srcMedia = sourceDir + "/customizationMainFolder";
     if (QDir(srcMedia).exists()) {
-        const QString dstMedia = QDir::homePath() + "/customizationMainFolder";
+        const QString dstMedia = CustomSettings::ArchiveRoot();
         if (!MergeDirRecursive(srcMedia, dstMedia)) {
             qDebug() << "ImportFullBackup: media merge failed (non-fatal)";
         }
@@ -2113,8 +2115,7 @@ bool ImportFullBackup(const QString &sourcePath, bool fullReplace) {
     // on this device would be lost. branding.json (device name/icon spoof)
     // is a single-device display preference, not accumulated data, so it's
     // intentionally left as this device's own value rather than imported.
-    const QString appDataCustom = QStandardPaths::writableLocation(
-        QStandardPaths::AppDataLocation) + "/CustomMod";
+    const QString appDataCustom = CustomSettings::ArchiveConfigDir();
     QDir().mkpath(appDataCustom);
     const QString srcPeerLists = sourceDir + "/peer_lists.json";
     if (QFile::exists(srcPeerLists)) {
@@ -2173,7 +2174,7 @@ bool ImportFullBackup(const QString &sourcePath, bool fullReplace) {
     // fayllar yo'q (media arxivi alohida va ixtiyoriy) — ular 'missing'
     // ga o'tadi. Aks holda indeks yolg'on gapirardi va bu Track C
     // sinxronizatsiyasida tarqalardi.
-    ReconcileMediaIndex(QDir::homePath() + "/customizationMainFolder");
+    ReconcileMediaIndex(CustomSettings::ArchiveRoot());
 
     // Note: the reload callback (refreshing open history views) is NOT
     // invoked here. It used to fire via QTimer::singleShot(0, ...), which
@@ -2215,7 +2216,7 @@ bool ImportMediaArchive(const QString &zipPath) {
     Init();
     if (zipPath.isEmpty() || !QFile::exists(zipPath)) return false;
 
-    const auto archiveRoot = QDir::homePath() + "/customizationMainFolder";
+    const auto archiveRoot = CustomSettings::ArchiveRoot();
     QDir().mkpath(archiveRoot);
 
     // Media arxivi ichidagi yo'llar arxiv ildizidan NISBIY (medias/...),
@@ -2498,7 +2499,7 @@ QString SaveMediaFile(const QString &sourcePath, const QString &type) {
             + (ext.isEmpty() ? QString() : u"."_q + ext);
     }
 
-    QString baseDir = QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + "/customizationMainFolder";
+    QString baseDir = CustomSettings::ArchiveRoot();
     QString subDir = "medias/files";
     if (type == "image")      subDir = "medias/images";
     else if (type == "video") subDir = "medias/videos";
@@ -2524,8 +2525,7 @@ QString SaveMediaFile(const QString &sourcePath, const QString &type) {
 // ---------------------------------------------------------------------------
 
 static void RunAutoBackup() {
-    const QString backupRoot = QStandardPaths::writableLocation(
-        QStandardPaths::AppDataLocation) + "/CustomMod/AutoBackups";
+    const QString backupRoot = CustomSettings::ArchiveBackupsDir();
     QDir().mkpath(backupRoot);
 
     // Async: this runs 5s after startup and then every 24h, and used to

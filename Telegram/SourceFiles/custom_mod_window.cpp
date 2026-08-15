@@ -2466,6 +2466,86 @@ void fillAboutTab(
 			st::customModHintLabel),
 		st::defaultSubsectionTitlePadding);
 
+	// ── Arxiv papkasi (2026-08-15) ─────────────────────────────
+	// AntiDelete va zaxira uchun saqlanadigan HAMMA narsa shu ildiz
+	// ostida: medias/, db/, config/, backups/. Ilgari ular ikkiga
+	// bo'lingan edi (~/customizationMainFolder va %APPDATA%/CustomMod).
+	Ui::AddSkip(content, 8);
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(u"Arxiv papkasi"_q),
+			st::defaultSubsectionTitle),
+		st::defaultSubsectionTitlePadding);
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(u"Barcha saqlanadigan ma'lumotlar shu yerda:
+"_q
+				+ CustomSettings::ArchiveRoot()
+				+ u"
+
+Ichida: medias/ (fayllar), db/ (baza), "
+				  "config/ (sozlamalar), backups/ (avtomatik zaxiralar)."_q),
+			st::customModHintLabel),
+		st::boxRowPadding);
+	content->add(
+		object_ptr<Ui::RoundButton>(
+			content,
+			rpl::single(u"📁 Papkani o‘zgartirish"_q),
+			st::defaultBoxButton),
+		st::boxRowPadding
+	)->addClickHandler([=] {
+		const auto current = CustomSettings::ArchiveRoot();
+		const auto chosen = QFileDialog::getExistingDirectory(
+			dialogParent,
+			u"Arxiv uchun papka tanlang"_q,
+			current);
+		if (chosen.isEmpty()
+			|| QDir::cleanPath(chosen) == QDir::cleanPath(current)) {
+			return;
+		}
+
+		QMessageBox moveBox(dialogParent);
+		moveBox.setWindowTitle(u"Arxiv papkasini o‘zgartirish"_q);
+		moveBox.setText(
+			u"Eski: "_q + current
+			+ u"
+Yangi: "_q + QDir::cleanPath(chosen)
+			+ u"
+
+Mavjud maʼlumotlarni yangi papkaga "
+			  "ko‘chiraymi?"_q);
+		const auto moveBtn = moveBox.addButton(
+			u"📦 Ko‘chirish"_q, QMessageBox::AcceptRole);
+		moveBox.addButton(
+			u"Ko‘chirmasdan, yangi joydan boshlansin"_q,
+			QMessageBox::DestructiveRole);
+		moveBox.addButton(QMessageBox::Cancel);
+		moveBox.setDefaultButton(moveBtn);
+		moveBox.exec();
+
+		const auto role = moveBox.buttonRole(moveBox.clickedButton());
+		if (role != QMessageBox::AcceptRole
+			&& role != QMessageBox::DestructiveRole) {
+			return; // Cancel
+		}
+		if (role == QMessageBox::AcceptRole) {
+			// Ko'chirishning O'ZI keyingi ishga tushishda bajariladi:
+			// hozir baza ochiq va uni ko'chirish xavfli bo'lardi.
+			CustomSettings::ScheduleArchiveRootMove(current);
+		}
+		CustomSettings::SetArchiveRoot(chosen);
+		Ui::Toast::Show(
+			(role == QMessageBox::AcceptRole)
+				? u"Papka o‘zgartirildi. Maʼlumotlar qayta ishga "
+				  "tushganda ko‘chiriladi. Dastur 3 soniyada qayta "
+				  "yuklanadi..."_q
+				: u"Papka o‘zgartirildi. Dastur 3 soniyada qayta "
+				  "yuklanadi..."_q);
+		QTimer::singleShot(3000, [] { Core::Restart(); });
+	});
+
 	// ── Katta media backup sozlamalari (2026-08-14) ─────────────────────
 	Ui::AddSkip(content, 8);
 	content->add(

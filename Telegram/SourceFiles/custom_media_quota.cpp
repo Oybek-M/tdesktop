@@ -35,10 +35,6 @@ bool gInitialized = false;
 
 } // namespace
 
-QString ArchiveRoot() {
-    return QDir::homePath() + "/customizationMainFolder";
-}
-
 void Init() {
     if (gInitialized) {
         return;
@@ -52,7 +48,7 @@ void Init() {
     //    undan oldin arxivlangan fayllar indeksda yo'q — ular faqat
     //    skanerdan chiqadi. Skaner UI oqimida qilinsa ishga tushish
     //    sekinlashardi (o'n minglab fayl), shuning uchun crl::async.
-    const auto mediaDir = ArchiveRoot() + "/medias";
+    const auto mediaDir = CustomSettings::ArchiveMediasDir();
     crl::async([mediaDir] {
         if (!QDir(mediaDir).exists()) {
             return;

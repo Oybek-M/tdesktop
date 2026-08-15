@@ -49,11 +49,12 @@ QHash<QString, QString> gActivityExclude;
 // }
 
 [[nodiscard]] QString PeerListsFilePath() {
-    const auto dir = QStandardPaths::writableLocation(
-        QStandardPaths::AppDataLocation)
-        + QStringLiteral("/CustomMod/");
+    // 2026-08-15: AppData/CustomMod dan <arxiv ildizi>/config ga ko'chdi.
+    // EnsureArchiveLayout() eski faylni bir marta ko'chirib beradi.
+    EnsureArchiveLayout();
+    const auto dir = ArchiveConfigDir();
     QDir().mkpath(dir);
-    return dir + QStringLiteral("peer_lists.json");
+    return dir + QStringLiteral("/peer_lists.json");
 }
 
 void SavePeerLists() {
@@ -482,6 +483,171 @@ bool ShouldMediaBackup(const QString &peerId) {
     if (IsInBlocklist(peerId)) return false;
     if (IsInWhitelist(peerId)) return true;
     return MediaBackupForPeer(peerId);
+}
+
+// ── Arxiv ildizi (2026-08-15) ────────────────────────────────────────────
+
+namespace {
+
+// ArchiveRoot() media arxivlash yo'lida chaqiriladi, shuning uchun har
+// safar QSettings ochmaymiz. SetArchiveRoot() keshni bekor qiladi.
+QString gCachedArchiveRoot;
+
+} // namespace
+
+QString DefaultArchiveRoot() {
+    return QDir::homePath() + "/customizationMainFolder";
+}
+
+QString ArchiveRoot() {
+    if (!gCachedArchiveRoot.isEmpty()) {
+        return gCachedArchiveRoot;
+    }
+    // ATAYLAB Init() siz — rekursiya xavfi uchun (izoh .h faylida).
+    QSettings settings("CustomMod", "TelegramDesktop");
+    const auto custom = settings.value(
+        "archiveRootPath", QString()).toString().trimmed();
+    gCachedArchiveRoot = custom.isEmpty()
+        ? DefaultArchiveRoot()
+        : QDir::cleanPath(custom);
+    return gCachedArchiveRoot;
+}
+
+QString ArchiveMediasDir()  { return ArchiveRoot() + "/medias"; }
+QString ArchiveDbDir()      { return ArchiveRoot() + "/db"; }
+QString ArchiveConfigDir()  { return ArchiveRoot() + "/config"; }
+QString ArchiveBackupsDir() { return ArchiveRoot() + "/backups"; }
+
+void SetArchiveRoot(const QString &path) {
+    const auto clean = path.trimmed();
+    {
+        QSettings settings("CustomMod", "TelegramDesktop");
+        if (clean.isEmpty() || QDir::cleanPath(clean) == DefaultArchiveRoot()) {
+            settings.remove("archiveRootPath");
+        } else {
+            settings.setValue("archiveRootPath", QDir::cleanPath(clean));
+        }
+        settings.sync();
+    }
+    gCachedArchiveRoot.clear();
+}
+
+void ScheduleArchiveRootMove(const QString &fromPath) {
+    QSettings settings("CustomMod", "TelegramDesktop");
+    settings.setValue(
+        "archiveRootPendingMoveFrom",
+        QDir::cleanPath(fromPath.trimmed()));
+    settings.sync();
+}
+
+namespace {
+
+// Papkani rekursiv ko'chiradi (rename ishlamasa nusxalab, so'ng o'chiradi
+// — boshqa diskka ko'chirishda rename ishlamaydi).
+bool MoveTree(const QString &from, const QString &to) {
+    QDir src(from);
+    if (!src.exists()) {
+        return true; // ko'chiradigan narsa yo'q
+    }
+    QDir().mkpath(to);
+    auto ok = true;
+    for (const auto &info : src.entryInfoList(
+            QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::Hidden)) {
+        const auto target = to + "/" + info.fileName();
+        if (info.isDir()) {
+            ok = MoveTree(info.absoluteFilePath(), target) && ok;
+        } else if (!QFile::exists(target)) {
+            if (!QFile::rename(info.absoluteFilePath(), target)) {
+                if (QFile::copy(info.absoluteFilePath(), target)) {
+                    QFile::remove(info.absoluteFilePath());
+                } else {
+                    ok = false;
+                }
+            }
+        }
+    }
+    src.rmdir(from); // bo'shab qolgan bo'lsa
+    return ok;
+}
+
+} // namespace
+
+void EnsureArchiveLayout() {
+    static auto done = false;
+    if (done) {
+        return;
+    }
+    done = true;
+
+    const auto root = ArchiveRoot();
+
+    // Kutilayotgan ko'chirish (foydalanuvchi ildizni o'zgartirgan va
+    // "ma'lumotlarni ko'chir" degan).
+    //
+    // Ko'chirish ATAYLAB ishga tushishda, baza OCHILMASDAN OLDIN
+    // bajariladi. Ilova ishlayotgan paytda ko'chirish SQLite fayli
+    // ochiq bo'lgani uchun xavfli bo'lardi — shuning uchun UI faqat
+    // bayroq qo'yadi va qayta ishga tushirishni so'raydi.
+    {
+        QSettings settings("CustomMod", "TelegramDesktop");
+        const auto pendingFrom = settings.value(
+            "archiveRootPendingMoveFrom", QString()).toString();
+        if (!pendingFrom.isEmpty()
+            && QDir(pendingFrom).exists()
+            && QDir::cleanPath(pendingFrom) != QDir::cleanPath(root)) {
+            MoveTree(pendingFrom, root);
+        }
+        settings.remove("archiveRootPendingMoveFrom");
+        settings.sync();
+    }
+    for (const auto &sub : { "/medias", "/db", "/config", "/backups" }) {
+        QDir().mkpath(root + QString::fromLatin1(sub));
+    }
+
+    // Eski joylashuvdan bir martalik ko'chirish. Manba mavjud VA maqsad
+    // hali yo'q bo'lgandagina ko'chiramiz — shunda takroriy chaqiruv
+    // ma'lumot ustiga yozmaydi.
+    const auto legacyAppData = QStandardPaths::writableLocation(
+        QStandardPaths::AppDataLocation) + "/CustomMod";
+    const auto moveIfNeeded = [](const QString &from, const QString &to) {
+        if (QFile::exists(from) && !QFile::exists(to)) {
+            if (!QFile::rename(from, to)) {
+                // Boshqa diskda bo'lsa rename ishlamaydi — nusxalab,
+                // so'ng manbani o'chiramiz.
+                if (QFile::copy(from, to)) {
+                    QFile::remove(from);
+                }
+            }
+        }
+    };
+
+    // Baza (WAL/SHM bilan birga — ular yonida turishi SHART).
+    // Bu funksiya baza OCHILMASDAN OLDIN chaqiriladi, shuning uchun
+    // fayllar band emas.
+    for (const auto &suffix : { "", "-wal", "-shm" }) {
+        const auto name = QString("/actioned_messages.db")
+            + QString::fromLatin1(suffix);
+        moveIfNeeded(legacyAppData + name, root + "/db" + name);
+    }
+
+    // Sozlama JSON'lari.
+    moveIfNeeded(
+        legacyAppData + "/peer_lists.json",
+        root + "/config/peer_lists.json");
+    moveIfNeeded(
+        legacyAppData + "/branding.json",
+        root + "/config/branding.json");
+
+    // Avtomatik zaxiralar — papka, shuning uchun fayllab ko'chiramiz.
+    auto legacyBackups = QDir(legacyAppData + "/AutoBackups");
+    if (legacyBackups.exists()) {
+        const auto target = root + "/backups";
+        for (const auto &info : legacyBackups.entryInfoList(
+                QDir::Files | QDir::NoDotAndDotDot)) {
+            moveIfNeeded(info.absoluteFilePath(), target + "/" + info.fileName());
+        }
+        legacyBackups.removeRecursively(); // bo'sh qolgan bo'lsa
+    }
 }
 
 // ── Platformadan mustaqil sozlama almashinuvi (2026-08-14) ───────────────

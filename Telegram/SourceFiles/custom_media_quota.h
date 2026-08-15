@@ -32,10 +32,6 @@ void Init();
 // skanerlamaslik uchun.
 void AddBytes(long long bytes);
 
-// ~/customizationMainFolder — arxiv ildizi. Bir nechta modul shu yo'lni
-// hisoblaydi, shuning uchun yagona joyda.
-[[nodiscard]] QString ArchiveRoot();
-
 // Kvota to'lgan bo'lsa ogohlantirish oynasini ko'rsatadi.
 //
 // Toast EMAS, balki tasdiqlash talab qiladigan box — foydalanuvchi
