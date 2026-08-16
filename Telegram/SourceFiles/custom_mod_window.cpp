@@ -2597,9 +2597,9 @@ void fillAboutTab(
 			object_ptr<Ui::InputField>(
 				content,
 				st::defaultInputField,
-				rpl::single(u"Umumiy kvota, GB (1–500, kasr mumkin: 5.5)"_q),
+				rpl::single(u"Umumiy kvota, GB (0.1–500, kasr mumkin: 5.5)"_q),
 				QString::number(
-					CustomSettings::MediaBackupQuotaMb() / 1024.0, 'f', 1)),
+					CustomSettings::MediaBackupQuotaMb() / 1024.0, 'f', 2)),
 			st::boxRowPadding);
 		content->add(
 			object_ptr<Ui::RoundButton>(
@@ -2629,7 +2629,7 @@ void fillAboutTab(
 				QString::number(CustomSettings::MediaBackupMaxFileMb()));
 			quotaInput->setText(
 				QString::number(
-					CustomSettings::MediaBackupQuotaMb() / 1024.0, 'f', 1));
+					CustomSettings::MediaBackupQuotaMb() / 1024.0, 'f', 2));
 			Ui::Toast::Show(u"Saqlandi ✓"_q);
 		});
 

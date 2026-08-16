@@ -187,7 +187,11 @@ void UpdateString(const QString &id, const QString &value) {
     else if (id == "upstreamLastKnownVersion") gValues.upstreamLastKnownVersion = value;
 }
 
-void UpdateInt(const QString &id, int value) {
+// Saqlangan (qisilgandan keyingi) qiymatni qaytaradi — SetInt() aynan
+// shuni registry'ga yozadi. Ilgari xom qiymat yozilardi va bu registry
+// bilan xotirani ajratib yuborardi (masalan registry'da 307, xotirada
+// 1024) — foydalanuvchi uchun "saqlandi, lekin o'zgarmadi" ko'rinardi.
+int UpdateInt(const QString &id, int value) {
     if (id == "spoofDeviceType") gValues.spoofDeviceType = value;
     else if (id == "upstreamCheckIntervalMinutes") gValues.upstreamCheckIntervalMinutes = value;
     // Chegaralar aynan SHU YERDA qisiladi (SetInt() da emas), shunda
@@ -197,9 +201,18 @@ void UpdateInt(const QString &id, int value) {
         // 4096 — Telegram Premium'ning 4 GB yuklash chegarasi; undan
         // katta fayl Telegram'da umuman bo'lmaydi.
         gValues.mediaBackupMaxFileMb = std::clamp(value, 10, 4096);
+        return gValues.mediaBackupMaxFileMb;
     } else if (id == "mediaBackupQuotaMb") {
-        gValues.mediaBackupQuotaMb = std::clamp(value, 1024, 512000);
+        // Pastki chegara 100 MB (0.1 GB), 1 GB EMAS. Ilgari 1024 edi va bu
+        // jimgina xatoga olib kelardi: foydalanuvchi 0.3 GB kiritsa
+        // registry'ga 307 yozilar, lekin xotiradagi qiymat 1024 ga qisilib,
+        // UI qayta "1.0" ko'rsatardi va kvota hech qachon to'lmasdi.
+        // Kichik qiymat sinov uchun ham kerak (arxiv hajmidan past qo'yib
+        // ogohlantirishni tekshirish).
+        gValues.mediaBackupQuotaMb = std::clamp(value, 100, 512000);
+        return gValues.mediaBackupQuotaMb;
     }
+    return value;
 }
 
 } // namespace
@@ -359,9 +372,9 @@ void SetString(const QString &id, const QString &value) {
 }
 
 void SetInt(const QString &id, int value) {
-    UpdateInt(id, value);
+    const auto stored = UpdateInt(id, value);
     QSettings settings("CustomMod", "TelegramDesktop");
-    settings.setValue(id, value);
+    settings.setValue(id, stored);
 }
 
 void SetUpstreamLastCheckedAt(qint64 timestamp) {

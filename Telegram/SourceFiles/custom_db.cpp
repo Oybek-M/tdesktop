@@ -1320,7 +1320,32 @@ RepairReport RepairArchiveMedia(const QString &archiveRoot, bool dryRun) {
 
         const auto newAbs = mediaRoot + "/" + newDir + "/" + newName;
         if (QFile::exists(newAbs)) {
-            ++report.failed; // nom to'qnashuvi — tegmaymiz
+            // 2026-08-16: to'qnashuvlarning aksariyati AYNAN BIR XIL
+            // faylning ikki nusxasi. Sabab: tasnif tuzatilgandan keyin
+            // yangi kod faylni to'g'ri papkaga (videos/) yozdi, eski
+            // noto'g'ri nusxa esa voices/ da qolib ketdi. Diskda 8 ta
+            // shunday juftlik topildi — hammasi bayt-hajmi bir xil.
+            //
+            // Shunday holatda manba nusxasini O'CHIRAMIZ: maqsad fayl
+            // joyida turibdi, ma'lumot yo'qolmaydi.
+            const auto sameSize = (QFileInfo(absPath).size()
+                == QFileInfo(newAbs).size());
+            if (!sameSize || !QFile::remove(absPath)) {
+                ++report.failed; // haqiqiy to'qnashuv — tegmaymiz
+                continue;
+            }
+            // Indeksdan eski yo'lni olib tashlaymiz, aks holda
+            // ReconcileMediaIndex() uni 'missing' deb belgilaydi.
+            const auto staleRel = QDir(archiveRoot).relativeFilePath(absPath);
+            sqlite3_stmt *del = nullptr;
+            if (sqlite3_prepare_v2(gDb,
+                    "DELETE FROM media_index WHERE rel_path = ?",
+                    -1, &del, nullptr) == SQLITE_OK) {
+                bindText(del, 1, staleRel);
+                sqlite3_step(del);
+                sqlite3_finalize(del);
+            }
+            if (dirChanged) ++report.movedFolder;
             continue;
         }
         QDir().mkpath(mediaRoot + "/" + newDir);

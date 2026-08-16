@@ -46,6 +46,34 @@ struct PendingStoryMedia {
 std::vector<PendingStoryMedia> gPendingStoryMedia;
 base::flat_set<FullStoryId> gProcessedStoryMedia;
 
+// 2026-08-16: profil rasmi PhotoData orqali EMAS, userpic orqali olinadi.
+//
+// Ilgari `owner().photo(userpicPhotoId())` ishlatilardi va bu jimgina
+// ishlamasdi: `Data::Session::photo(id)` noma'lum ID uchun BO'SH PhotoData
+// yaratadi — unda fayl joylashuvi yo'q, ya'ni `load()` hech narsa
+// yuklamaydi va `loaded()` hech qachon true bo'lmaydi. To'liq PhotoData
+// faqat profil rasmi ochilgan yoki UserFull kelgan bo'lsa mavjud bo'ladi.
+// Diskdagi dalil: `medias/avatars/` yaratilgan, lekin BO'SH.
+//
+// `PeerData::userpicCloudImage(view)` esa aynan ilova ko'rsatayotgan
+// rasmni beradi va kerak bo'lsa yuklashni o'zi boshlaydi.
+struct PendingUserpic {
+	UserData *user = nullptr;
+	Ui::PeerUserpicView view;
+	QString relPath;
+	QString peerId;
+	QString targetPath;
+	long long photoId = 0;
+	int attempts = 0;
+};
+
+// Yuklab bo'lmaydigan rasm ro'yxatda abadiy qolmasligi uchun. Har bir
+// urinish `downloaderTaskFinished` da bo'ladi, ya'ni ~30 ta yuklash
+// hodisasi — amalda bir necha daqiqa.
+constexpr auto kUserpicMaxAttempts = 30;
+
+std::vector<PendingUserpic> gPendingUserpics;
+
 QString SaveStoryImage(const QImage &image, PhotoId id) {
 	// 2026-08-15: arxiv ildizi endi sozlanadi — yagona manba
 	// CustomSettings::ArchiveMediasDir().
@@ -125,6 +153,40 @@ void CheckPendingStoryMedia() {
 			done = true; // noto'g'ri holat, ro'yxatdan chiqarish
 		}
 		it = done ? gPendingStoryMedia.erase(it) : std::next(it);
+	}
+}
+
+// Kutilayotgan profil rasmlarini tekshiradi: rasm tayyor bo'lsa diskka
+// yozadi va indeksga qo'shadi.
+void CheckPendingUserpics() {
+	for (auto it = gPendingUserpics.begin(); it != gPendingUserpics.end();) {
+		auto done = false;
+		if (!it->user) {
+			done = true;
+		} else if (const auto image = it->user->userpicCloudImage(it->view)) {
+			if (!image->isNull() && image->save(it->targetPath, "JPEG", 92)) {
+				auto entry = CustomDB::MediaIndexEntry();
+				entry.peerId = it->peerId;
+				// msgId MANFIY: bu xabar emas (story'lar bilan bir xil
+				// yondashuv, skaner ham shu usulni ishlatadi).
+				entry.msgId = -it->photoId;
+				entry.kind = u"avatar"_q;
+				entry.relPath = it->relPath;
+				entry.fileName = it->relPath.mid(
+					it->relPath.lastIndexOf(u'/') + 1);
+				entry.size = QFileInfo(it->targetPath).size();
+				entry.archivedAt = static_cast<unsigned int>(
+					QDateTime::currentSecsSinceEpoch());
+				entry.layer = u"avatar"_q;
+				entry.status = u"present"_q;
+				CustomDB::UpsertMediaIndex(entry);
+				CustomMediaQuota::AddBytes(entry.size);
+			}
+			done = true;
+		} else if (++it->attempts >= kUserpicMaxAttempts) {
+			done = true; // yuklab bo'lmadi — taslim bo'lamiz
+		}
+		it = done ? gPendingUserpics.erase(it) : std::next(it);
 	}
 }
 
@@ -208,23 +270,24 @@ void MaybeBackupUserpic(not_null<UserData*> user) {
 		return; // bu rasm allaqachon saqlangan
 	}
 
-	// owner().photo() not_null qaytaradi, shuning uchun null tekshiruvi
-	// kerak emas (yo'q bo'lsa bo'sh PhotoData yaratiladi va yuklanadi).
-	const auto photo = user->owner().photo(photoId);
 	QDir().mkpath(QFileInfo(targetPath).absolutePath());
 
-	auto media = photo->createMediaView();
-	photo->load(
-		Data::PhotoSize::Large,
-		Data::FileOriginUserPhoto(peerToUser(user->id), photoId));
-	gPendingStoryMedia.push_back({
-		photo,
-		nullptr,
-		std::move(media),
-		relPath,
-		peerIdStr,
-		static_cast<long long>(photoId),
-		targetPath });
+	// createUserpicView() + userpicCloudImage() — yuklashni ham SHU
+	// juftlik boshlaydi (data_peer.cpp:436 dagi `_userpic.load()`).
+	auto pending = PendingUserpic();
+	pending.user = user;
+	pending.view = user->createUserpicView();
+	pending.relPath = relPath;
+	pending.peerId = peerIdStr;
+	pending.targetPath = targetPath;
+	pending.photoId = static_cast<long long>(photoId);
+	gPendingUserpics.push_back(std::move(pending));
+
+	// Rasm ko'pincha ALLAQACHON keshda bo'ladi (ilova uni ro'yxatda
+	// ko'rsatib turibdi) — u holda yangi yuklash boshlanmaydi va
+	// `downloaderTaskFinished` hech qachon otilmaydi. Shu sabab darhol
+	// bir marta tekshiramiz.
+	CheckPendingUserpics();
 }
 
 void RecordField(
@@ -392,6 +455,7 @@ void Init(not_null<Main::Session*> session) {
 	session->downloaderTaskFinished(
 	) | rpl::on_next([=] {
 		CheckPendingStoryMedia();
+		CheckPendingUserpics();
 	}, session->lifetime());
 }
 
