@@ -158,6 +158,78 @@ Kod tayyor, **BUILD QILINMAGAN**. Bitta build'da sinaladi.
 | A11 | Story backup L2 ga o'tkazildi — endi katta story'lar ham saqlanadi, indeksga tushadi va eksport qilinadi |
 | Versiya | **Kod kerak emas edi** — mexanizm mavjud. `docs/self-update/alpha-releases.md`. About tab'da to'liq versiya ko'rsatiladi. |
 
+## 🧪 2026-08-16 BUILD SINOVI — natijalar va topilgan 3 ta xato
+
+Build teg: `build-2026-08-16-media-backup`. 27 commit `origin/Oybek` ga
+push qilindi.
+
+| Sinov | Natija |
+|---|---|
+| T4, T5, T8, T9, T10, T15 | ✅ |
+| T1 | ✅ (ehtimol, avvalgi sinovdan eslab qolingan) |
+| R1, R2, R3 | ✅ (R1 90%, R2 95%) |
+| T2, T6, T7 | ⏸️ T6 bloklagan (kvota xatosi, pastga qarang) |
+| T11, T12, T13, T14, T16 | ❓ sinash usuli noaniq edi — quyida tushuntirildi |
+| Avatar backup | ❌ umuman ishlamadi |
+
+### Topilgan va TUZATILGAN 3 ta xato (`4038803f62`, build kutilmoqda)
+
+**1. Kvota (T6 ni bloklagan).** `UpdateInt()` kvotani 1024 MB ga
+qisardi. Foydalanuvchi 0.3 GB kiritsa registry'ga `307` yozilar, lekin
+xotirada `1024` qolardi → UI qayta "1.0" ko'rsatardi va ogohlantirish
+hech qachon chiqmasdi (0.3 GB ishlatilgan < 1 GB kvota). Dalil:
+registry'da `mediaBackupQuotaMb = 307`, UI'da 1.0.
+
+Pastki chegara **100 MB** ga tushirildi. Qo'shimcha: `SetInt()` endi
+qisilgan qiymatni yozadi — registry bilan xotira ajralib ketmaydi.
+
+**2. Avatar backup — noto'g'ri API.** `owner().photo(id)` noma'lum ID
+uchun **bo'sh `PhotoData`** yaratadi (fayl joylashuvisiz), ya'ni
+`load()` hech narsa yuklamaydi va `loaded()` hech qachon `true`
+bo'lmaydi. To'liq `PhotoData` faqat profil rasmi ochilgan yoki
+`UserFull` kelgan bo'lsa mavjud. **Diskdagi dalil:**
+`medias/avatars/` yaratilgan, lekin **bo'sh** (0 fayl).
+
+Endi `PeerData::userpicCloudImage(view)` ishlatiladi — ilova
+ko'rsatayotgan rasmning aynan o'zi, yuklashni ham o'zi boshlaydi.
+Rasm ko'pincha allaqachon keshda bo'ladi, shuning uchun darhol bir
+marta tekshiriladi (aks holda `downloaderTaskFinished` otilmasdi).
+
+**3. R1 to'qnashuvi — 8 ta yolg'on "xato".** `voices/` da 8 ta video
+qolgan edi; diskni tekshirish ko'rsatdiki **hammasi `videos/` dagi
+nusxaning ayni o'zi** (bayt-hajmi teng). Sabab: tasnif tuzatilgach
+yangi kod faylni to'g'ri papkaga yozdi, eski nusxa esa joyida qoldi;
+R1 esa nom to'qnashuvida faylga tegmasdi. Endi hajmlar teng bo'lsa
+manba nusxasi o'chiriladi va indeksdan olib tashlanadi.
+
+> "Turi aniqlanmadi: 5" — bu **xato emas**. `files/` dagi `.tgs`
+> (gzip) va `.xlsx` (zip) kabi fayllar; R1 `files/` ga ataylab
+> tegmaydi. Diskda tekshirilgan: `voices/`/`videos/`/`images/` da
+> aniqlanmagan fayl **yo'q**.
+
+### T3 — bu xato EMAS, ataylab qilingan
+
+White List'da bo'lmagan chatda global AntiDelete yoqiq bo'lsa ham media
+oldindan yuklanmaydi. `ShouldMediaBackup()` **ataylab**
+`ShouldAntiDelete()` zanjiriga ergashmaydi: global bayroq yoqilsa
+**981 ta peer** (asosan botlar va kanallar) media yuklay boshlardi va
+kvota bir necha soatda to'lardi. Media backup — qimmat amal, AntiDelete
+esa arzon (faqat matn), shuning uchun ular alohida boshqariladi.
+
+O'zgartirish kerak bo'lsa: chatni White List'ga qo'shing yoki o'sha
+chatning "Media Backup" toggle'ini yoqing.
+
+### Sinash usuli noaniq bo'lganlar — qanday tekshiriladi
+
+| № | Qanday sinaladi |
+|---|---|
+| T11/T12 | Eksport (Hammasi yoqiq) → 2 ta ZIP. Avval **faqat asosiy** ZIP'ni import → Archive tab'da yozuvlar bor, lekin fayllar `missing`. Keyin **media ZIP**'ni import → o'sha yozuvlar `present` ga qaytadi. |
+| T13 | White List chatda **ochilmagan** video yonidan scroll (L2 yuklaydi), keyin o'sha videoni **ochish** (L1 hook). `medias/videos/` da fayl **bitta** bo'lishi kerak, ikkita emas. |
+| T14 | Global AntiDelete'ni **o'chiring**, chat White List'da qolsin, o'sha chatda media **oching**. Arxivga tushishi kerak. |
+| T16 | "Story media backup" toggle'ini yoqing, kuzatilayotgan kontakt story qo'yguncha kuting. `medias/stories/` da fayl paydo bo'ladi. Kutish talab qiladi — sinov navbatning oxirida turishi mantiqiy. |
+
+---
+
 ### S1 — LOKALLASHTIRILDI (2026-08-15, foydalanuvchi sinovi)
 
 **Natija: OpenGL o'chirilganda miltillash BUTUNLAY yo'qoladi.**
