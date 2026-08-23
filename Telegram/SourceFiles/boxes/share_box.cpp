@@ -470,7 +470,7 @@ void ShareBox::peopleDone(
 	if (_peopleRequest == requestId) {
 		switch (result.type()) {
 		case mtpc_contacts_found: {
-			auto &found = result.c_contacts_found();
+			const auto &found = result.c_contacts_found();
 			_descriptor.session->data().processUsers(found.vusers());
 			_descriptor.session->data().processChats(found.vchats());
 			_inner->peopleReceived(
@@ -1793,6 +1793,7 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 	struct State final {
 		base::flat_set<mtpRequestId> requests;
 		mtpRequestId nextRequestKey = 0;
+		bool failed = false;
 	};
 	const auto state = std::make_shared<State>();
 	return [=](
@@ -1804,6 +1805,7 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 		if (!state->requests.empty()) {
 			return; // Share clicked already.
 		}
+		state->failed = false;
 
 		const auto items = history->owner().idsToItems(msgIds);
 		const auto existingIds = history->owner().itemsToIds(items);
@@ -1830,7 +1832,7 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 		// Split items: protected ones go through bypass, rest through MTP.
 		const bool bypassOn = CustomSettings::BypassRestrictions();
 		std::vector<not_null<HistoryItem*>> protectedItems;
-		QVector<FullMsgId> normalIds;
+		std::vector<not_null<HistoryItem*>> normalItems;
 		for (const auto item : items) {
 			bool isProtected = item->hasNoForwardsFlag();
 			if (!isProtected) {
@@ -1852,7 +1854,7 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 			if (bypassOn && isProtected) {
 				protectedItems.push_back(item);
 			} else {
-				normalIds.push_back(item->fullId());
+				normalItems.push_back(item);
 			}
 		}
 
@@ -1872,10 +1874,12 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 			| (videoTimestamp.has_value()
 				? Flag::f_video_timestamp
 				: Flag(0));
-		auto mtpMsgIds = QVector<MTPint>();
-		mtpMsgIds.reserve(normalIds.size());
-		for (const auto &fullId : normalIds) {
-			mtpMsgIds.push_back(MTP_int(fullId.msg));
+		// CUSTOM: himoyalangan xabarlar MTP forward'idan chetlatiladi —
+		// ular quyida yangi xabar sifatida qayta yuboriladi (bypass).
+		// Shu sabab ranges FAQAT normalItems'dan tuziladi.
+		const auto ranges = CollectForwardRanges(normalItems);
+		if (ranges.empty() && protectedItems.empty()) {
+			return;
 		}
 		auto &api = history->session().api();
 		auto &histories = history->owner().histories();
@@ -1944,76 +1948,11 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 				}
 			}
 
-			// Nothing left to forward via MTP — skip the request.
-			if (mtpMsgIds.isEmpty()) {
-				continue;
-			}
-
 			const auto topicRootId = effectiveThread->topicRootId();
 			const auto sublistPeer = needNewTopic
 				? nullptr
 				: thread->maybeSublistPeer();
 			const auto fromPeer = history->peer;
-			const auto msgCount = int(normalIds.size());
-			const auto starsPaid = std::min(
-				peer->starsPerMessageChecked(),
-				options.starsApproved);
-			if (starsPaid) {
-				options.starsApproved -= starsPaid;
-			}
-			const auto sendFlags = commonSendFlags
-				| (ShouldSendSilent(peer, options)
-					? Flag::f_silent
-					: Flag(0))
-				| (options.shortcutId
-					? Flag::f_quick_reply_shortcut
-					: Flag(0))
-				| (starsPaid ? Flag::f_allow_paid_stars : Flag())
-				| (sublistPeer ? Flag::f_reply_to : Flag())
-				| (options.suggest ? Flag::f_suggested_post : Flag())
-				| (options.effectId ? Flag::f_effect : Flag());
-			auto buildMessage = [=](
-					not_null<History*> history,
-					FullReplyTo replyTo)
-				-> Data::Histories::PreparedMessage {
-				const auto kGeneralId
-					= Data::ForumTopic::kGeneralId;
-				const auto realTopMsgId
-					= (replyTo.topicRootId == kGeneralId)
-					? MsgId(0)
-					: replyTo.topicRootId;
-				auto flags = sendFlags;
-				if (realTopMsgId) {
-					flags |= Flag::f_top_msg_id;
-				} else {
-					flags &= ~Flag::f_top_msg_id;
-				}
-				auto randoms = QVector<MTPlong>(msgCount);
-				for (auto &value : randoms) {
-					value = base::RandomValue<MTPlong>();
-				}
-				return MTPmessages_ForwardMessages(
-					MTP_flags(flags),
-					fromPeer->input(),
-					MTP_vector<MTPint>(mtpMsgIds),
-					MTP_vector<MTPlong>(randoms),
-					history->peer->input(),
-					MTP_int(realTopMsgId),
-					(sublistPeer
-						? MTP_inputReplyToMonoForum(
-							sublistPeer->input())
-						: MTPInputReplyTo()),
-					MTP_int(options.scheduled),
-					MTP_int(options.scheduleRepeatPeriod),
-					MTP_inputPeerEmpty(),
-					Data::ShortcutIdToMTP(
-						&history->session(),
-						options.shortcutId),
-					MTP_long(options.effectId),
-					MTP_int(videoTimestamp.value_or(0)),
-					MTP_long(starsPaid),
-					Api::SuggestToMTP(options.suggest));
-			};
 			const auto requestDone = [=](
 					const MTPUpdates &updates,
 					mtpRequestId requestKey) {
@@ -2028,16 +1967,19 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 				if (state->requests.empty()) {
 					if (show->valid()) {
 						show->hideLayer();
-						ShowForwardedMessageToast(
-							show,
-							&history->session(),
-							donePhraseArgs);
+						if (!state->failed) {
+							ShowForwardedMessageToast(
+								show,
+								&history->session(),
+								donePhraseArgs);
+						}
 					}
 				}
 			};
 			const auto requestFail = [=](
 					const MTP::Error &error,
 					mtpRequestId requestKey) {
+				state->failed = true;
 				const auto type = error.type();
 				if (type.startsWith(
 						u"ALLOW_PAYMENT_REQUIRED_"_q)) {
@@ -2059,21 +2001,92 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 					}
 				}
 			};
-			const auto requestKey = ++state->nextRequestKey;
-			state->requests.insert(requestKey);
-			histories.sendPreparedMessage(
-				threadHistory,
-				FullReplyTo{ .topicRootId = topicRootId },
-				uint64(0),
-				std::move(buildMessage),
-				[=](const MTPUpdates &updates,
-						const MTP::Response &) {
-					requestDone(updates, requestKey);
-				},
-				[=](const MTP::Error &error,
-						const MTP::Response &) {
-					requestFail(error, requestKey);
-				});
+			for (const auto &range : ranges) {
+				const auto mtpMsgIds = ForwardRangeIds(
+					&history->session(),
+					range);
+				if (mtpMsgIds.isEmpty()) {
+					continue;
+				}
+				const auto msgCount = int(mtpMsgIds.size());
+				const auto starsPaid = std::min(
+					options.starsApproved,
+					msgCount * peer->starsPerMessageChecked());
+				if (starsPaid) {
+					options.starsApproved -= starsPaid;
+				}
+				const auto sendFlags = commonSendFlags
+					| (ShouldSendSilent(peer, options)
+						? Flag::f_silent
+						: Flag(0))
+					| (options.shortcutId
+						? Flag::f_quick_reply_shortcut
+						: Flag(0))
+					| (starsPaid ? Flag::f_allow_paid_stars : Flag())
+					| (sublistPeer ? Flag::f_reply_to : Flag())
+					| (options.suggest ? Flag::f_suggested_post : Flag())
+					| (options.effectId ? Flag::f_effect : Flag())
+					| (range.fromEphemeral
+						? Flag::f_from_ephemeral
+						: Flag(0));
+				auto buildMessage = [=](
+						not_null<History*> history,
+						FullReplyTo replyTo)
+					-> Data::Histories::PreparedMessage {
+					const auto kGeneralId
+						= Data::ForumTopic::kGeneralId;
+					const auto realTopMsgId
+						= (replyTo.topicRootId == kGeneralId)
+						? MsgId(0)
+						: replyTo.topicRootId;
+					auto flags = sendFlags;
+					if (realTopMsgId) {
+						flags |= Flag::f_top_msg_id;
+					} else {
+						flags &= ~Flag::f_top_msg_id;
+					}
+					auto randoms = QVector<MTPlong>(msgCount);
+					for (auto &value : randoms) {
+						value = base::RandomValue<MTPlong>();
+					}
+					return MTPmessages_ForwardMessages(
+						MTP_flags(flags),
+						fromPeer->input(),
+						MTP_vector<MTPint>(mtpMsgIds),
+						MTP_vector<MTPlong>(randoms),
+						history->peer->input(),
+						MTP_int(realTopMsgId),
+						(sublistPeer
+							? MTP_inputReplyToMonoForum(
+								sublistPeer->input())
+							: MTPInputReplyTo()),
+						MTP_int(options.scheduled),
+						MTP_int(options.scheduleRepeatPeriod),
+						MTP_inputPeerEmpty(),
+						Data::ShortcutIdToMTP(
+							&history->session(),
+							options.shortcutId),
+						MTP_long(options.effectId),
+						MTP_int(videoTimestamp.value_or(0)),
+						MTP_long(starsPaid),
+						Api::SuggestToMTP(options.suggest));
+				};
+				const auto requestKey = ++state->nextRequestKey;
+				state->requests.insert(requestKey);
+				histories.sendPreparedMessage(
+					threadHistory,
+					FullReplyTo{ .topicRootId = topicRootId },
+					uint64(0),
+					std::move(buildMessage),
+					[=](const MTPUpdates &updates,
+							const MTP::Response &) {
+						requestDone(updates, requestKey);
+					},
+					[=](const MTP::Error &error,
+							const MTP::Response &) {
+						requestFail(error, requestKey);
+					});
+			}
 		}
 		if (state->requests.empty()) {
 			if (show->valid()) {
