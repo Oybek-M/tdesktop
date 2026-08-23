@@ -158,6 +158,32 @@ Kod tayyor, **BUILD QILINMAGAN**. Bitta build'da sinaladi.
 | A11 | Story backup L2 ga o'tkazildi — endi katta story'lar ham saqlanadi, indeksga tushadi va eksport qilinadi |
 | Versiya | **Kod kerak emas edi** — mexanizm mavjud. `docs/self-update/alpha-releases.md`. About tab'da to'liq versiya ko'rsatiladi. |
 
+## ✅ 2026-08-23 — 13:14 build'i bir haftalik real foydalanishda tasdiqlandi
+
+Diskdagi dalil (`Pictures/customizationMainFolder/medias`, jami 1022 MB):
+
+| Papka | Fayl | Xulosa |
+|---|---|---|
+| `avatars/` | **312** | ✅ Avatar tuzatishi ishlaydi (ilgari **0** edi) |
+| `stories/` | **21** | ✅ A11 story backup ishlaydi (T16 amalda tasdiqlandi) |
+| `videos/` | 245 | ✅ |
+| `voices/` | 311 | ⚠️ ichida hamon **8 ta video** — o'sha eski 8 talik |
+
+⚠️ **R1 tuzatishi build ichida, lekin tugma hech qachon bosilmagan.**
+`voices/` dagi 8 ta video (752, 769, 774, 775, 776, 777, 782, 783)
+2026-08-16 dagilarning aynan o'zi. About tab →
+"🔍 Eski media fayllarni indekslash va tuzatish" bosilishi kerak.
+
+**Sinov natijasi kelmagan bandlar:** T2, T6 (kvota alerti), T7,
+T11–T14, kvota input'ining saqlanishi.
+
+**Yangi kuzatuv (tekshirilmagan):** About tab 11:55 da "0.3 GB
+ishlatilgan" ko'rsatgan edi, diskda esa o'sha payt 925 MB bor edi.
+Agar hisoblagich hamon diskdagidan sezilarli kam ko'rsatsa — bu
+alohida xato (indeksda yo'q fayllar sanalmayapti).
+
+---
+
 ## 🧪 2026-08-16 BUILD SINOVI — natijalar va topilgan 3 ta xato
 
 Build teg: `build-2026-08-16-media-backup`. 27 commit `origin/Oybek` ga
