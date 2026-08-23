@@ -2243,16 +2243,35 @@ void History::loadDeletedMessages() {
 
 		// Build display text: marker + original text (if any).
 		// Past-6: media xabar matnsiz bo'lishi mumkin — alohida placeholder.
+		// 2026-08-23: mazmuni umuman yo'q yozuvni KO'RSATMAYMIZ.
+		//
+		// Bunday yozuvlar 2026-05..07 oralig'ida paydo bo'lgan: o'sha
+		// paytda text_cache faqat real-vaqtda kelgan Unread xabarlarga
+		// yozilardi, ya'ni ilova yopiq turganda kelib keyin o'chirilgan
+		// xabar hech qachon arxivlanmasdi — natijada faqat "o'chirildi"
+		// belgisi qolardi. Ildiz sabab A13 scrollback hook'lari bilan
+		// yopilgan (2026-08-13). DB dalili: 2026-08 da 1388 ta o'chirish,
+		// bo'sh yozuv 0 ta (05-oyda 11.5% edi).
+		//
+		// Eski 11 ta qoldiq yozuv esa hech qanday ma'lumot bermaydi —
+		// chatda faqat shovqin bo'lib turadi. DB'da qoladi (statistika
+		// uchun), lekin chatga qo'yilmaydi.
+		const auto hasMedia = msg.isMedia || !msg.mediaPath.isEmpty();
+		if (msg.text.isEmpty() && !hasMedia) {
+			continue;
+		}
+
 		TextWithEntities displayText;
 		displayText.append(marker + "\n\n");
 		if (!msg.text.isEmpty()) {
 			displayText.append(TextWithEntities{ msg.text });
-		} else if (msg.isMedia) {
+		} else {
+			// isMedia bayrog'i v5 da qo'shilgan — undan oldingi yozuvlarda
+			// u 0, lekin mediaPath to'lgan bo'lishi mumkin. Shuning uchun
+			// ikkalasiga ham qaraymiz, aks holda haqiqiy media xabar
+			// "matn saqlanmagan" bo'lib ko'rinardi.
 			displayText.append(TextWithEntities{
 				u"(media xabar)"_q });
-		} else {
-			displayText.append(TextWithEntities{
-				u"(matn saqlanmagan)"_q });
 		}
 
 		// Past-4: guruhda haqiqiy yuboruvchini ko'rsatamiz. DB da sender_id bo'lsa

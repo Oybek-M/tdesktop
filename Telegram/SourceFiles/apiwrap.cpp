@@ -3893,14 +3893,19 @@ void ApiWrap::bypassForwardItem(
 			}
 		}
 
-		QString info = u"\n\n\xF0\x9F\x93\x8C Manba: "_q + peerName;
+		// 2026-08-23: emoji'lar ilgari UTF-8 baytlari sifatida yozilgan edi
+		// (\xF0\x9F\x93\x8C), lekin u"..." — UTF-16 literal. Natijada har bir
+		// bayt alohida belgiga aylanardi: \xF0 -> U+00F0 = 'ð', qolgan uchtasi
+		// ko'rinmas boshqaruv belgilari. Foydalanuvchi qatorlar boshida "ð"
+		// ko'rardi. Endi emoji to'g'ridan-to'g'ri yoziladi (/utf-8 yoqilgan).
+		QString info = u"\n\n📌 Manba: "_q + peerName;
 		if (!handle.isEmpty()) {
 			info += u" ("_q + handle + u")"_q;
 		}
-		info += u"\n\xF0\x9F\x95\x90 Vaqt: "_q + dateStr;
-		info += u"\n\xF0\x9F\x94\x91 Peer ID: "_q + srcPeerIdStr;
+		info += u"\n🕐 Vaqt: "_q + dateStr;
+		info += u"\n🔑 Peer ID: "_q + srcPeerIdStr;
 		if (!msgLink.isEmpty()) {
-			info += u"\n\xF0\x9F\x94\x97 Link: "_q + msgLink;
+			info += u"\n🔗 Link: "_q + msgLink;
 		}
 		return info;
 	};

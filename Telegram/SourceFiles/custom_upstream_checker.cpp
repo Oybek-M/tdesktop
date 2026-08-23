@@ -67,6 +67,15 @@ void RunCheck(std::function<void(CheckResult)> callback, bool notifyIfNewer) {
 	// shuning uchun uni majburlash xavfsiz va yo'qotishsiz.
 	request.setAttribute(QNetworkRequest::Http2AllowedAttribute, false);
 
+	// 2026-08-23: shartli so'rov (ETag). GitHub REST API'da 304 javob
+	// rate-limit'dan HISOBLANMAYDI, ya'ni reliz o'zgarmagan bo'lsa
+	// tekshiruv butunlay tekin bo'ladi. Ilgari har tekshiruv to'liq
+	// so'rov edi va limitni behuda yeyardi.
+	const auto etag = CustomSettings::UpstreamEtag();
+	if (!etag.isEmpty()) {
+		request.setRawHeader("If-None-Match", etag.toUtf8());
+	}
+
 	// Javob kelmay qolsa QNetworkAccessManager cheksiz kutardi va `manager`
 	// hech qachon o'chirilmasdi (finished otilmaydi) — 20 soniyalik chegara.
 	request.setTransferTimeout(20 * 1000);
@@ -76,18 +85,54 @@ void RunCheck(std::function<void(CheckResult)> callback, bool notifyIfNewer) {
 	QObject::connect(reply, &QNetworkReply::finished, [=]() mutable {
 		result.checkedAt = QDateTime::currentDateTime();
 
-		if (reply->error() != QNetworkReply::NoError) {
-			// Diagnostika: qayta yiqilsa, matnning o'zi sababni ko'rsatsin —
-			// xato kodi va (agar javob kelgan bo'lsa) HTTP statusi bilan.
-			const auto status = reply->attribute(
-				QNetworkRequest::HttpStatusCodeAttribute);
-			result.error = reply->errorString()
-				+ u" [kod "_q
-				+ QString::number(int(reply->error()))
-				+ (status.isValid()
-					? (u", HTTP "_q + QString::number(status.toInt()))
-					: QString())
-				+ u"]"_q;
+		const auto status = reply->attribute(
+			QNetworkRequest::HttpStatusCodeAttribute);
+		const auto httpCode = status.isValid() ? status.toInt() : 0;
+
+		if (httpCode == 304) {
+			// Reliz o'zgarmagan — oxirgi ma'lum qiymat baribir to'g'ri.
+			// Bu javob rate-limit'dan hisoblanmaydi.
+			result.checked = true;
+			result.latestVersion = CustomSettings::UpstreamLastKnownVersion();
+			const auto latestCode = ParseVersionCode(result.latestVersion);
+			const auto localCode = ParseVersionCode(result.localVersion);
+			result.hasNewer = (latestCode && localCode
+				&& *latestCode > *localCode);
+			CustomSettings::SetUpstreamLastCheckedAt(
+				result.checkedAt.toSecsSinceEpoch());
+		} else if (reply->error() != QNetworkReply::NoError) {
+			// GitHub'ning soatlik limiti (autentifikatsiyasiz IP uchun 60 ta)
+			// tugaganda 403 qaytadi. Bu SINIQ emas — vaqtinchalik holat,
+			// shuning uchun alohida, tushunarli matn beramiz va limit
+			// qachon tiklanishini ko'rsatamiz.
+			const auto remaining = reply->rawHeader("X-RateLimit-Remaining");
+			const auto rateLimited = (httpCode == 403 || httpCode == 429)
+				&& (remaining == "0" || remaining.isEmpty());
+			if (rateLimited) {
+				const auto resetAt = reply->rawHeader("X-RateLimit-Reset")
+					.toLongLong();
+				result.error = u"GitHub so'rov limiti tugadi"_q
+					+ (resetAt > 0
+						? (u" — "_q
+							+ QDateTime::fromSecsSinceEpoch(resetAt)
+								.toString(u"HH:mm"_q)
+							+ u" da tiklanadi"_q)
+						: QString())
+					+ (CustomSettings::UpstreamLastKnownVersion().isEmpty()
+						? QString()
+						: (u". Oxirgi ma'lum: "_q
+							+ CustomSettings::UpstreamLastKnownVersion()));
+			} else {
+				// Diagnostika: qayta yiqilsa, matnning o'zi sababni ko'rsatsin —
+				// xato kodi va (agar javob kelgan bo'lsa) HTTP statusi bilan.
+				result.error = reply->errorString()
+					+ u" [kod "_q
+					+ QString::number(int(reply->error()))
+					+ (httpCode
+						? (u", HTTP "_q + QString::number(httpCode))
+						: QString())
+					+ u"]"_q;
+			}
 		} else {
 			const auto data = reply->readAll();
 			const auto obj = QJsonDocument::fromJson(data).object();
@@ -106,15 +151,31 @@ void RunCheck(std::function<void(CheckResult)> callback, bool notifyIfNewer) {
 				result.releaseUrl = url;
 				result.hasNewer = (*latestCode > *localCode);
 
+				// Keyingi tekshiruv shartli (If-None-Match) bo'lsin —
+				// o'zgarish bo'lmasa 304 keladi va limitdan yeyilmaydi.
+				const auto newEtag = QString::fromUtf8(
+					reply->rawHeader("ETag"));
+				if (!newEtag.isEmpty()) {
+					CustomSettings::SetString(u"upstreamEtag"_q, newEtag);
+				}
+				// DIQQAT — tartib muhim: `known` ni yozishdan OLDIN
+				// o'qib olamiz. Aks holda "bu versiya haqida allaqachon
+				// xabar berilganmi" tekshiruvi doim rost bo'lib qolardi
+				// va bildirishnoma hech qachon chiqmasdi.
+				const auto known = CustomSettings::UpstreamLastKnownVersion();
+
+				// 304 yo'li oxirgi ma'lum versiyaga tayanadi, shuning uchun
+				// uni HAR muvaffaqiyatli javobda yangilab turamiz (ilgari
+				// faqat yangi versiya topilganda yozilardi).
+				CustomSettings::SetString(
+					u"upstreamLastKnownVersion"_q,
+					result.latestVersion);
+
 				CustomSettings::SetUpstreamLastCheckedAt(
 					result.checkedAt.toSecsSinceEpoch());
 
 				if (result.hasNewer && notifyIfNewer) {
-					const auto known = CustomSettings::UpstreamLastKnownVersion();
 					if (known != result.latestVersion) {
-						CustomSettings::SetString(
-							u"upstreamLastKnownVersion"_q,
-							result.latestVersion);
 						Ui::Toast::Show(
 							u"Rasmiy Telegram Desktop "_q
 								+ result.latestVersion

@@ -185,6 +185,7 @@ void UpdateString(const QString &id, const QString &value) {
     else if (id == "mutualContactProfileEmoji") gValues.mutualContactProfileEmoji = value;
     else if (id == "mutualContactMembersListEmoji") gValues.mutualContactMembersListEmoji = value;
     else if (id == "upstreamLastKnownVersion") gValues.upstreamLastKnownVersion = value;
+    else if (id == "upstreamEtag") gValues.upstreamEtag = value;
 }
 
 // Saqlangan (qisilgandan keyingi) qiymatni qaytaradi — SetInt() aynan
@@ -282,6 +283,8 @@ void Init() {
         "upstreamCheckIntervalMinutes", 1440).toInt();
     gValues.upstreamLastKnownVersion = settings.value(
         "upstreamLastKnownVersion", QString()).toString();
+    gValues.upstreamEtag = settings.value(
+        "upstreamEtag", QString()).toString();
     gValues.upstreamLastCheckedAt = settings.value(
         "upstreamLastCheckedAt", qint64(0)).toLongLong();
 

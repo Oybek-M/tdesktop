@@ -61,6 +61,7 @@ struct Values {
     // kasrli qiymat kirita olishi uchun. UI GB'da ko'rsatadi.
     int mediaBackupQuotaMb = 10240;    // 1024 – 512000 (1 GB – 500 GB)
     QString upstreamLastKnownVersion;         // oxirgi FOYDALANUVCHIGA bildirilgan versiya
+    QString upstreamEtag;                     // GitHub ETag — shartli so'rov uchun (304 limitdan yeyilmaydi)
     qint64 upstreamLastCheckedAt = 0;         // unix timestamp (soniya)
     // ── Story media zaxirasi (A11) ───────────────────────────────────────
     // Story vaqt-kuzatuvidan MUSTAQIL, alohida tugma — disk-sarflovchi
@@ -103,6 +104,7 @@ inline int     UpstreamCheckIntervalMinutes()  { return Get().upstreamCheckInter
 inline int     MediaBackupMaxFileMb()          { return Get().mediaBackupMaxFileMb; }
 inline int     MediaBackupQuotaMb()            { return Get().mediaBackupQuotaMb; }
 inline QString UpstreamLastKnownVersion()      { return Get().upstreamLastKnownVersion; }
+inline QString UpstreamEtag()                  { return Get().upstreamEtag; }
 inline qint64  UpstreamLastCheckedAt()         { return Get().upstreamLastCheckedAt; }
 inline bool    StoryMediaBackupEnabled()       { return Get().storyMediaBackupEnabled; }
 // qint64 generic Set/SetInt(int) orqali saqlanolmaydi (32-bit chegara) —
