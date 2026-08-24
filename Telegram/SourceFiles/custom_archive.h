@@ -92,4 +92,10 @@ void NoteArchivedDownloadFinished(
 // bir marta chaqiriladi.
 void StartMaintenance();
 
+// 2026-08-24: yuklanishi tugagan rasmlarni arxivga yozadi.
+// PhotoData'da DocumentData'dagi kabi finishLoad() hook'i yo'q, shuning
+// uchun yuklanishni o'zimiz kuzatishimiz kerak. main_session.cpp dagi
+// downloaderTaskFinished() dan chaqiriladi.
+void CheckPendingPhotos();
+
 } // namespace CustomArchive

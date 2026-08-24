@@ -9,6 +9,7 @@
 #include "data/data_histories.h"
 #include "data/data_peer.h"
 #include "data/data_photo.h"
+#include "data/data_photo_media.h" // imageBytes() — rasmni arxivga yozish
 #include "data/data_session.h"
 #include "history/history.h"
 #include "history/history_item.h"
@@ -16,6 +17,7 @@
 #include "storage/file_download.h" // Storage::kMaxFileInMemory
 #include <QtCore/QDateTime>
 #include <QtCore/QDir>
+#include <QtCore/QFile>
 #include <QtCore/QFileInfo>
 #include <QtCore/QHash>
 #include <QtCore/QMimeDatabase>
@@ -137,6 +139,13 @@ void RecordIndex(
 	entry.layer = layer;
 	entry.status = status;
 	entry.reason = reason;
+	// 2026-08-24: nomni SHU YERDA ham eslab qolamiz. MaybeArchiveItem()
+	// dagi chaqiruv faqat ShouldBackgroundCache() rost bo'lgan chatlarni
+	// qamraydi; media esa boshqa yo'llardan ham indekslanadi va o'shanda
+	// eksport ro'yxatida "ID 7472003734" ko'rinardi.
+	CustomSettings::RememberPeerName(
+		entry.peerId,
+		item->history()->peer->name());
 	CustomDB::UpsertMediaIndex(entry);
 }
 
@@ -149,6 +158,54 @@ void RecordIndex(
 //     yuklanadi (haqiqiy maqsad yo'li), hajm chegarasi va kvota bilan.
 //   * Boshqa chatlar    — eski xatti-harakat: bo'sh nom bilan keshga,
 //     faqat 10 MB gacha (undan kattasi crash beradi, pastga qarang).
+// 2026-08-24: rasm arxivi. Hujjatlardan farqi — DocumentData'da
+// `filepath()` va `finishLoad()` hook'i bor, PhotoData'da esa yo'q.
+// Shuning uchun yuklanishini o'zimiz kuzatamiz va baytlarni o'zimiz
+// yozamiz. `imageBytes()` ASL JPEG baytlarini beradi, ya'ni QImage
+// orqali qayta kodlash va sifat yo'qotish yo'q.
+struct PendingPhoto {
+	PhotoData *photo = nullptr;
+	std::shared_ptr<Data::PhotoMedia> view;
+	QString relPath;
+	QString fullPath;
+	QString peerId;
+	long long msgId = 0;
+	unsigned int msgDate = 0;
+};
+std::vector<PendingPhoto> gPendingPhotos;
+
+void RecordPhotoIndex(
+		not_null<HistoryItem*> item,
+		not_null<PhotoData*> photo,
+		const QString &status,
+		const QString &reason,
+		const QString &relPath,
+		long long size) {
+	auto entry = CustomDB::MediaIndexEntry();
+	entry.peerId = QString::number(item->history()->peer->id.value);
+	entry.msgId = static_cast<long long>(item->id.bare);
+	entry.kind = u"image"_q;
+	entry.relPath = relPath;
+	entry.fileName = relPath.isEmpty()
+		? QString()
+		: relPath.mid(relPath.lastIndexOf(u'/') + 1);
+	entry.size = size;
+	entry.msgDate = static_cast<unsigned int>(item->date());
+	entry.archivedAt = static_cast<unsigned int>(
+		QDateTime::currentSecsSinceEpoch());
+	entry.layer = u"l2"_q;
+	entry.status = status;
+	entry.reason = reason;
+	// 2026-08-24: nomni SHU YERDA ham eslab qolamiz. MaybeArchiveItem()
+	// dagi chaqiruv faqat ShouldBackgroundCache() rost bo'lgan chatlarni
+	// qamraydi; media esa boshqa yo'llardan ham indekslanadi va o'shanda
+	// eksport ro'yxatida "ID 7472003734" ko'rinardi.
+	CustomSettings::RememberPeerName(
+		entry.peerId,
+		item->history()->peer->name());
+	CustomDB::UpsertMediaIndex(entry);
+}
+
 void MaybeDownloadMedia(not_null<HistoryItem*> item) {
 	const auto media = item->media();
 	if (!media) {
@@ -230,9 +287,97 @@ void MaybeDownloadMedia(not_null<HistoryItem*> item) {
 		}
 		document->save(origin, QString());
 	} else if (const auto photo = media->photo()) {
+		// 2026-08-24: RASMLAR ILGARI UMUMAN ARXIVLANMASDI.
+		//
+		// Bu yerda faqat `photo->load()` bor edi — u faylni Telegram'ning
+		// O'Z keshiga yuklaydi, bizning arxivga EMAS, va media_index ga
+		// hech narsa yozmasdi. Hujjatlar uchun butun L2 mantig'i bor edi,
+		// rasmlar esa chetda qolgan.
+		//
+		// Natija: rasm ko'rinishidagi post o'chirilsa, "(media xabar)"
+		// yozuvi qolar, faylning o'zi esa yo'qolardi. Diskdagi dalil:
+		// bitta kanalda o'chirilgan 8 ta xabardan 7 tasi (hammasi rasm)
+		// media_index da umuman yo'q edi.
+		if (!CustomSettings::ShouldMediaBackup(peerIdStr)) {
+			photo->load(Data::PhotoSize::Large, origin); // eski yo'l
+			return;
+		}
+		if (CustomMediaQuota::IsFull()) {
+			RecordPhotoIndex(item, photo, u"pending"_q, u"quota_full"_q,
+				QString(), 0);
+			return;
+		}
+		const auto relPath = u"medias/images/"_q + peerIdStr + u"_"_q
+			+ QString::number(item->id.bare) + u".jpg"_q;
+		const auto fullPath = CustomSettings::ArchiveRoot() + u"/"_q + relPath;
+		if (QFile::exists(fullPath)) {
+			return; // allaqachon saqlangan
+		}
+		QDir().mkpath(QFileInfo(fullPath).absolutePath());
+
+		auto view = photo->createMediaView();
 		photo->load(Data::PhotoSize::Large, origin);
+		gPendingPhotos.push_back({
+			photo,
+			std::move(view),
+			relPath,
+			fullPath,
+			peerIdStr,
+			static_cast<long long>(item->id.bare),
+			static_cast<unsigned int>(item->date()) });
+		RecordPhotoIndex(item, photo, u"pending"_q, u"downloading"_q,
+			relPath, 0);
+		// Rasm ko'pincha allaqachon keshda bo'ladi — darhol tekshiramiz,
+		// aks holda yangi yuklash boshlanmay `downloaderTaskFinished`
+		// hech qachon otilmaydi.
+		CheckPendingPhotos();
 	}
 }
+
+} // namespace
+
+// Yuklanishi tugagan rasmlarni arxivga yozadi. main_session.cpp dagi
+// downloaderTaskFinished() dan chaqiriladi.
+void CheckPendingPhotos() {
+	for (auto it = gPendingPhotos.begin(); it != gPendingPhotos.end();) {
+		auto done = false;
+		if (!it->photo || !it->view) {
+			done = true;
+		} else if (it->view->loaded()) {
+			// ASL baytlar — QImage orqali qayta kodlash yo'q.
+			auto bytes = it->view->imageBytes(Data::PhotoSize::Large);
+			if (bytes.isEmpty()) {
+				bytes = it->view->imageBytes(Data::PhotoSize::Thumbnail);
+			}
+			if (!bytes.isEmpty()) {
+				QFile f(it->fullPath);
+				if (f.open(QIODevice::WriteOnly)) {
+					f.write(bytes);
+					f.close();
+					auto entry = CustomDB::MediaIndexEntry();
+					entry.peerId = it->peerId;
+					entry.msgId = it->msgId;
+					entry.kind = u"image"_q;
+					entry.relPath = it->relPath;
+					entry.fileName = it->relPath.mid(
+						it->relPath.lastIndexOf(u'/') + 1);
+					entry.size = bytes.size();
+					entry.msgDate = it->msgDate;
+					entry.archivedAt = static_cast<unsigned int>(
+						QDateTime::currentSecsSinceEpoch());
+					entry.layer = u"l2"_q;
+					entry.status = u"present"_q;
+					CustomDB::UpsertMediaIndex(entry);
+					CustomMediaQuota::AddBytes(bytes.size());
+				}
+			}
+			done = true;
+		}
+		it = done ? gPendingPhotos.erase(it) : std::next(it);
+	}
+}
+
+namespace {
 
 void FlushPending() {
 	if (gPending.empty()) {

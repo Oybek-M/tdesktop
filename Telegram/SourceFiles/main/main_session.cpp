@@ -220,6 +220,13 @@ Session::Session(
 		CustomDB::CompactActivityHistoryAsync();
 	}, lifetime());
 
+	// 2026-08-24: rasm arxivi. PhotoData'da finishLoad() hook'i yo'q,
+	// shuning uchun yuklanish tugaganini o'zimiz kuzatamiz.
+	downloaderTaskFinished(
+	) | rpl::on_next([=] {
+		CustomArchive::CheckPendingPhotos();
+	}, lifetime());
+
 	_api->requestTermsUpdate();
 	_api->requestFullPeer(_user);
 
