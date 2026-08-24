@@ -48,6 +48,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "custom_db.h"
 #include "custom_media_quota.h"
 #include "custom_settings.h"
+#include <QtCore/QDateTime> // arxiv indeksi uchun vaqt tamg'asi
 
 #include <QtCore/QBuffer>
 #include <QtCore/QMimeType>
@@ -1086,8 +1087,17 @@ void DocumentData::finishLoad() {
 	auto shouldSave = CustomSettings::AntiDelete();
 	if (fromMessage) {
 		const auto &msg = v::get<Data::FileOriginMessage>(fileOrigin.data);
-		shouldSave = CustomSettings::ShouldAntiDelete(
-			QString::number(msg.peer.value));
+		const auto peerIdStr = QString::number(msg.peer.value);
+		// 2026-08-25: IKKALA qoida ham hisobga olinadi.
+		//
+		// Ilgari faqat ShouldAntiDelete() tekshirilardi. Lekin
+		// ShouldMediaBackup() ATAYLAB boshqa zanjirdan boradi (global
+		// bayroqqa ergashmaydi) — natijada "Media Backup" yoqilgan,
+		// lekin AntiDelete qamrovidan tashqaridagi chatda QO'LDA
+		// yuklangan media umuman arxivlanmasdi. Avtomatik yuklangani
+		// (L2) esa arxivlanardi — foydalanuvchi uchun tushunarsiz farq.
+		shouldSave = CustomSettings::ShouldAntiDelete(peerIdStr)
+			|| CustomSettings::ShouldMediaBackup(peerIdStr);
 	}
 	// Origin xabarga bog'liq bo'lmasa (avatar, sticker set va h.k.)
 	// global bayroq o'z kuchida qoladi.
@@ -1113,7 +1123,36 @@ void DocumentData::finishLoad() {
 				size);
 		}
 	} else if (!cachePath.isEmpty() && shouldSave) {
-		CustomDB::SaveMediaFile(cachePath, "file");
+		// 2026-08-25: tur endi "file" deb qotirilmaydi — aks holda
+		// video ham medias/files/ ga tushardi.
+		const auto saved = CustomDB::SaveMediaFile(
+			cachePath,
+			CustomArchive::MediaKindOf(this));
+		// 2026-08-25: INDEKSGA ham yozamiz.
+		//
+		// SaveMediaFile() faylni saqlaydi, lekin media_index ga hech
+		// narsa yozmaydi va fayl nomida peer/msg ma'lumoti yo'q. Ya'ni
+		// qo'lda yuklangan media diskda bo'lsa ham, uni (peerId, msgId)
+		// bo'yicha topib bo'lmasdi — bypass-forward aynan shu sababdan
+		// faqat matn yuborardi.
+		if (fromMessage && !saved.isEmpty()) {
+			const auto &msg = v::get<Data::FileOriginMessage>(fileOrigin.data);
+			const auto root = CustomSettings::ArchiveRoot();
+			auto entry = CustomDB::MediaIndexEntry();
+			entry.peerId = QString::number(msg.peer.value);
+			entry.msgId = static_cast<long long>(msg.msg.bare);
+			entry.kind = CustomArchive::MediaKindOf(this);
+			entry.relPath = saved.startsWith(root)
+				? saved.mid(root.size() + 1)
+				: saved;
+			entry.fileName = QFileInfo(saved).fileName();
+			entry.size = size;
+			entry.archivedAt = static_cast<unsigned int>(
+				QDateTime::currentSecsSinceEpoch());
+			entry.layer = u"l1"_q;
+			entry.status = u"present"_q;
+			CustomDB::UpsertMediaIndex(entry);
+		}
 	}
 
 	setLocation(Core::FileLocation(_loader->fileName()));
