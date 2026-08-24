@@ -158,6 +158,68 @@ Kod tayyor, **BUILD QILINMAGAN**. Bitta build'da sinaladi.
 | A11 | Story backup L2 ga o'tkazildi — endi katta story'lar ham saqlanadi, indeksga tushadi va eksport qilinadi |
 | Versiya | **Kod kerak emas edi** — mexanizm mavjud. `docs/self-update/alpha-releases.md`. About tab'da to'liq versiya ko'rsatiladi. |
 
+## 🚀 2026-08-23 — upstream v7.1.1 ga o'tildi, build va 1-guruh sinovi o'tdi
+
+**670 commit** merge qilindi (`v7.0.9` → **`v7.1.1`**), 10 ta konflikt hal
+qilindi. Xavfsiz qaytish nuqtasi: `pre-merge-7.1.1` tegi.
+Build: 16:53, `Telegram.exe` 234.8 MB, **57 succeeded / 0 failed**.
+
+### 🔴 Yo'lda qilingan JIDDIY xato — dars
+
+Merge'dan keyin `git add -A` ishlatildi. Git submodule ko'rsatkichlarini
+hal qilinmagan qoldirgan edi, `add -A` esa **12 tasining hammasini**
+jimgina merge-oldi holatda muzlatdi. Natijada manba kod v7.1.1 niki,
+kutubxonalar esa v7.0.9 davridan bo'lib qoldi.
+
+Build 1000+ xato bilan yiqildi. Chalg'ituvchi tomoni: `git submodule
+update` "sinxron" deb ko'rsatardi — indeks va ish daraxti mos edi,
+lekin **ikkalasi ham noto'g'ri** edi.
+
+**Dars: merge'dan keyin `git add -A` ISHLATMANG.** Submodule holatini
+`git ls-tree -r HEAD | grep ^160000` bilan tegga solishtirib tekshiring.
+
+Ikkinchi dars: 1083 qatorlik xato ro'yxatida haqiqiy sabab **2-3
+qatorlarda** edi (`Custom build ... exited with code 1` +
+`struct 'CallButton' already defined`). Qolgani kaskad. Error List esa
+faqat bitta IntelliSense (`E0070`) xatosini ko'rsatardi — **doim
+Output'ga qarang, Error List'ga emas.**
+
+### ✅ 1-guruh sinovi (merge konfliktlari) — 6/6
+
+| Sinov | Natija |
+|---|---|
+| T-M1 bypass forward | ✅ **avvalgidan yaxshi** — ilgari ko'p holatda `pending` da qotardi |
+| T-M2 aralash forward | ✅ |
+| T-M3 oddiy forward (bypass o'chiq) | ✅ upstream'ning sof yo'li buzilmagan |
+| T-M4 AntiEdit | ✅ |
+| T-M5 AntiDelete ko'rsatish | ✅ |
+| T-M6 Ghost Mode | ✅ |
+
+### Topilgan va tuzatilgan 3 ta muammo (`679ecb7ba8`, BUILD KUTILMOQDA)
+
+1. **Bypass izohida `ð`** — emoji UTF-8 baytlari sifatida `u"..."`
+   (UTF-16) literaliga yozilgan edi. Tuzatildi; butun daraxt
+   skanerlandi, bizning kodda boshqa shunday joy yo'q.
+2. **GitHub rate limit (HTTP 403)** — ETag + `If-None-Match` qo'shildi
+   (304 javob GitHub limitidan hisoblanmaydi), 403/429 uchun tushunarli
+   matn. Tuzoq: `upstreamLastKnownVersion` endi har javobda yoziladi,
+   shuning uchun bildirishnoma sharti uchun eski qiymat **yozishdan
+   oldin** o'qiladi.
+3. **Bo'sh AntiDelete xabari** — ildiz sabab DB dalili bilan aniqlandi
+   va u **allaqachon yopilgan** (A13, 2026-08-13). Oyma-oy bo'sh yozuv
+   ulushi: 05 → 11.5%, 06 → 5.3%, 07 → 0.13%, **08 → 0** (1388 tadan).
+   Ko'rinayotgani — 11 ta eski qoldiq. Tuzatish ko'rsatish darajasida.
+
+### Build muhiti
+
+`MaxConcurrentBuilds = 8` (VS registry), `/MP6`
+(`cmake/options_win.cmake` — **lokal o'zgarish**, submodule yangilansa
+yo'qoladi). `/MP6 → /MP8` keyingi rejalashtirilgan to'liq build'da
+qilinadi: `/MP` kompilyator bayrog'i, uni o'zgartirish barcha `.obj`
+larni bekor qiladi.
+
+---
+
 ## ✅ 2026-08-23 — 13:14 build'i bir haftalik real foydalanishda tasdiqlandi
 
 Diskdagi dalil (`Pictures/customizationMainFolder/medias`, jami 1022 MB):
