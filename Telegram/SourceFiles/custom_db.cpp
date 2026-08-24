@@ -694,6 +694,41 @@ QString GetSavedMediaPath(const QString &peerId, long long msgId) {
     return result;
 }
 
+// 2026-08-25: ARXIVDAN media yo'lini olish.
+//
+// GetSavedMediaPath() faqat actioned_messages (type='deleted') ga
+// qaraydi, ya'ni butun L2 arxivimizni (media_index) ko'rmaydi.
+// Natijada bypass-forward media'si faqat Telegram'ning O'Z keshida
+// fayl bo'lsagina ishlardi — yangi o'rnatilgan klientda esa matn
+// ketardi. Bu har bir foydalanuvchida takrorlanadi.
+//
+// Bu yerda arxivdagi HAQIQATAN mavjud fayl qaytariladi.
+QString GetArchivedMediaPath(const QString &peerId, long long msgId) {
+    Init();
+    if (!gDb) return {};
+
+    QString rel;
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "SELECT rel_path FROM media_index "
+            "WHERE peer_id = ? AND msg_id = ? AND status = 'present' "
+            "LIMIT 1",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        bindText(stmt, 1, peerId);
+        sqlite3_bind_int64(stmt, 2, msgId);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            rel = colText(stmt, 0);
+        }
+        sqlite3_finalize(stmt);
+    }
+    if (rel.isEmpty()) return {};
+
+    const auto full = CustomSettings::ArchiveRoot() + "/" + rel;
+    // Indeks yolg'on gapirishi mumkin (fayl qo'lda o'chirilgan bo'lsa),
+    // shuning uchun mavjudligini tekshiramiz.
+    return QFile::exists(full) ? full : QString();
+}
+
 QVector<DeletedMessageWithPeer> GetAllDeletedMessages(int limit) {
     Init();
     QVector<DeletedMessageWithPeer> result;

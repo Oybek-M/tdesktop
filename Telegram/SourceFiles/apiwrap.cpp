@@ -3925,6 +3925,19 @@ void ApiWrap::bypassForwardItem(
 				localPath = CustomDB::GetSavedMediaPath(
 					srcPeerIdStr, srcMsgId);
 			}
+			// 2026-08-25: L2 ARXIVI ham manba.
+			//
+			// Ilgari zanjir faqat (a) Telegram'ning o'z fayli va
+			// (b) O'CHIRILGAN xabar media'si bilan cheklangan edi.
+			// Butun media arxivimiz (media_index) e'tibordan chetda
+			// qolgan. Natijada media allaqachon arxivda bo'lsa ham,
+			// Telegram keshida bo'lmasa — faqat matn yuborilardi.
+			// Bu har bir foydalanuvchida takrorlanadi: yangi
+			// o'rnatilgan klientda kesh bo'sh bo'ladi.
+			if (localPath.isEmpty()) {
+				localPath = CustomDB::GetArchivedMediaPath(
+					srcPeerIdStr, srcMsgId);
+			}
 			if (!localPath.isEmpty() && QFile::exists(localPath)) {
 				// Fresh upload — never gets stuck.
 				_fileLoader->addTask(
@@ -3952,6 +3965,11 @@ void ApiWrap::bypassForwardItem(
 				if (!saved.isEmpty() && QFile::exists(saved)) {
 					localPath = saved;
 				}
+			}
+			// L2 arxivi — yuqoridagi rasm shoxidagi izohga qarang.
+			if (localPath.isEmpty()) {
+				localPath = CustomDB::GetArchivedMediaPath(
+					srcPeerIdStr, srcMsgId);
 			}
 			if (!localPath.isEmpty()) {
 				// Fresh upload from local file — no file-reference issues.

@@ -109,6 +109,13 @@ struct DeletedMessageWithPeer {
 };
 QVector<DeletedMessageWithPeer> GetAllDeletedMessages(int limit = 300);
 
+// Arxivdagi (media_index) faylning to'liq yo'li, yoki bo'sh.
+// GetSavedMediaPath() dan farqi — u faqat O'CHIRILGAN xabarlarga
+// qaraydi, bu esa butun L2 arxivini qamrab oladi.
+[[nodiscard]] QString GetArchivedMediaPath(
+    const QString &peerId,
+    long long msgId);
+
 // A13/K1b: arxivda o'chirilgan xabari bor peer'lar ro'yxati (faqat ID lar).
 // Ishga tushishda chat ro'yxatini tiklash uchun — matn/media yuklamaydi,
 // shuning uchun startup'da arzon.
