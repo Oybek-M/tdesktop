@@ -158,6 +158,51 @@ Kod tayyor, **BUILD QILINMAGAN**. Bitta build'da sinaladi.
 | A11 | Story backup L2 ga o'tkazildi — endi katta story'lar ham saqlanadi, indeksga tushadi va eksport qilinadi |
 | Versiya | **Kod kerak emas edi** — mexanizm mavjud. `docs/self-update/alpha-releases.md`. About tab'da to'liq versiya ko'rsatiladi. |
 
+## ✅ 2026-08-24 — kod bosqichi TUGADI, reliz kutilmoqda
+
+Build 19:01 (`build-2026-08-24-photos`). Barcha sinovlar o'tdi.
+
+### Sinov natijalari
+
+| Sinov | Natija |
+|---|---|
+| Fon tozalashi | ✅ 82 043 qator o'chdi, schema v8, 2 ta indeks yaratildi |
+| Faollik tarixi | ✅ tez ochiladi, qisqa ulanishlar guruhlangan |
+| Bo'sh AntiDelete yozuvi | ✅ yo'qoldi |
+| Bypass forward emoji | ✅ `ð` o'rniga 📌🕐🔑🔗 |
+| Rasm arxivi | ✅ `medias/images/` 31 → 50 fayl, indeksda 49 `present` |
+| Rasmiy versiya tekshiruvi | ✅ |
+| Eksport ro'yxatida nomlar | ✅ (yangi indekslanganlar uchun) |
+
+### 🔴 YANGI TASK — startup 14.55 soniya
+
+Foydalanuvchi sekundomer bilan o'lchadi: **lokal parol O'CHIRILGAN**
+holatda, Enter bosilgandan chatga kira olishgacha **14.55 soniya**.
+
+⚠️ **Claude'ning dastlabki xulosasi NOTO'G'RI edi.** Log'da 2s va 14s
+oralig'ida hech narsa yo'q edi va men buni "parol kutilmoqda" deb
+izohladim. Parol olib tashlangach ham vaqt o'zgarmadi — demak sabab
+boshqa. Log 1 soniyalik aniqlikda yozgani chalg'itdi.
+
+**Ma'lum:** ilovaning o'z init'i ~2s (font, RHI, sozlamalar), keyin
+12 soniyalik JIM bo'shliq, undan keyin hamma narsa bir soniyada.
+Bo'shliq ichida bironta log yozuvi yo'q.
+
+**Keyingi qadam:** bu bo'shliqda nima ishlayotganini aniqlash kerak.
+Log yordam bermaydi — profiler yoki bosqichma-bosqich vaqt o'lchash
+kodi kerak. Ko'r-ko'rona gipoteza tuzmang.
+
+### Reliz uchun tayyorgarlik (tekshirilgan)
+
+Kalitlar, `Packer.exe`, `Updater.exe`, SSH host, `gh` auth — hammasi
+joyida. Packer 08-08 dan bo'lsa ham **muammo emas**: `publish.ps1`
+versiyani `version.h` dan o'zi o'qib `-version` argumenti sifatida
+beradi (compile-time emas).
+
+Tartib: `.\tools\publish\release.ps1 -DryRun` → so'ng argumentsiz.
+
+---
+
 ## 🚀 2026-08-23 — upstream v7.1.1 ga o'tildi, build va 1-guruh sinovi o'tdi
 
 **670 commit** merge qilindi (`v7.0.9` → **`v7.1.1`**), 10 ta konflikt hal
