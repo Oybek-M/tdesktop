@@ -25,6 +25,7 @@
 #include <QtCore/QStandardPaths>
 #include <QtCore/QDir>
 #include <QtCore/QFileInfo>
+#include <cstdlib> // std::llabs (last-seen shovqin filtri)
 
 namespace CustomActivityHistory {
 namespace {
@@ -290,16 +291,61 @@ void MaybeBackupUserpic(not_null<UserData*> user) {
 	CheckPendingUserpics();
 }
 
+// "online:<vaqt>" / "offline:<vaqt>" dan holat qismini ajratadi.
+[[nodiscard]] QString StatusState(const QString &value) {
+	const auto colon = value.indexOf(u':');
+	return (colon > 0) ? value.left(colon) : value;
+}
+
+// Qiymat ichidagi vaqtni "necha soniya oldin" ga aylantiradi.
+// -1 — vaqt yo'q (masalan "recently").
+[[nodiscard]] qint64 StatusAge(const QString &value, qint64 observedAt) {
+	const auto colon = value.indexOf(u':');
+	if (colon <= 0) return -1;
+	auto ok = false;
+	const auto ts = QStringView(value).mid(colon + 1).toLongLong(&ok);
+	return ok ? (observedAt - ts) : -1;
+}
+
 void RecordField(
 		const QString &peerId,
 		const QString &field,
 		const QString &newValue,
 		qint64 observedAt) {
+	// Kesh hali yuklanmagan bo'lsa yozmaymiz: "eski qiymat yo'q" degan
+	// noto'g'ri xulosa chiqib, har kontaktga soxta "kuzatish boshlandi"
+	// yozuvi qo'shilardi. Bir necha soniyalik yo'qotish zararsiz.
+	if (!CustomDB::IsActivityCacheReady()) {
+		return;
+	}
 	QString oldValue;
 	const auto hadPrevious = CustomDB::GetLatestActivityHistoryValue(
 		peerId, field, oldValue);
 	if (hadPrevious && oldValue == newValue) {
 		return; // haqiqiy o'zgarish yo'q — qayta yozmaymiz
+	}
+	// 2026-08-24: last-seen SHOVQIN filtri.
+	//
+	// Telegram offline holatdagi kontakt uchun ham "oxirgi ko'rilgan"
+	// vaqtini davriy ravishda yangilab turadi. Qiymat ichidagi vaqt
+	// o'zgargani uchun yuqoridagi tenglik tekshiruvi ishlamaydi va har
+	// safar yangi qator yozilardi — holat esa aslida o'zgarmagan.
+	//
+	// Dalil (haqiqiy DB): shunday qatorlar 47 027 ta = status
+	// yozuvlarining 13.6%. Namuna: "offline:...479 -> offline:...689",
+	// ikkalasida ham "yoshi" 1 soniya, ya'ni hech qanday ma'lumot yo'q.
+	//
+	// Qoida: holat bir xil VA "necha soniya oldin ko'rilgan" farqi
+	// 60 soniyadan kam bo'lsa — yozmaymiz.
+	if (hadPrevious && field == u"status"_q) {
+		if (StatusState(oldValue) == StatusState(newValue)) {
+			const auto newAge = StatusAge(newValue, observedAt);
+			const auto oldAge = StatusAge(oldValue, observedAt);
+			if (newAge >= 0 && oldAge >= 0
+					&& std::llabs(newAge - oldAge) < 60) {
+				return;
+			}
+		}
 	}
 	CustomDB::SaveActivityHistoryEntry(
 		peerId, field, hadPrevious, oldValue, newValue, observedAt);

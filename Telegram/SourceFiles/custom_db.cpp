@@ -55,6 +55,7 @@ static QHash<QString, QHash<QString, QString>> gActivityLatestCache;
 static QSet<QString> gActivityLoadedPeers;
 // 2026-08-24: butun activity keshi bir marta yuklanadi (peer-bo'yicha emas).
 static bool gActivityCacheLoadedAll = false;
+static bool gActivityCacheLoading = false;
 
 // A13/perf: qaysi peer'larda UMUMAN 'deleted' yozuvi bor. Bitta DISTINCT
 // so'rov bilan bir marta to'ldiriladi (idx_am_peer_type indeksidan foydalanadi).
@@ -378,6 +379,7 @@ void LoadRestoreCache() {
     gActivityLatestCache.clear();
     gActivityLoadedPeers.clear();
     gActivityCacheLoadedAll = false; // keyingi murojaatda qayta yuklansin
+    gActivityCacheLoading = false;
     gPeersWithDeleted.clear();
     gPeersWithDeletedLoaded = false;
 }
@@ -2538,124 +2540,63 @@ void ClearAllArchive() {
 //   yangi: bitta so'rov     = 128 ms (bir marta)
 //
 // idx_ah_peer_field (v8) bu so'rovni qoplama indeks qiladi.
-static void EnsureActivityCacheLoaded(const QString &peerId) {
+// Keshni FON oqimida bir marta yuklaydi. Bloklamaydi: tayyor bo'lmaguncha
+// GetLatestActivityHistoryValue() "ma'lumot yo'q" emas, "hali TAYYOR EMAS"
+// deb qaytaradi va chaqiruvchi yozishni o'tkazib yuboradi. Aks holda
+// startup'da har kontakt uchun soxta "kuzatish boshlandi" yozuvi paydo
+// bo'lardi.
+static void StartActivityCacheLoad() {
     {
         QMutexLocker locker(&gCacheMutex);
-        if (gActivityCacheLoadedAll) return;
+        if (gActivityCacheLoadedAll || gActivityCacheLoading) return;
+        gActivityCacheLoading = true;
     }
-    Init();
-    if (!gDb) return;
-
-    QHash<QString, QHash<QString, QString>> all;
-    sqlite3_stmt *stmt = nullptr;
-    if (sqlite3_prepare_v2(gDb,
-            "SELECT peer_id, field, new_value FROM activity_history "
-            "WHERE id IN (SELECT MAX(id) FROM activity_history "
-            "             GROUP BY peer_id, field)",
-            -1, &stmt, nullptr) == SQLITE_OK) {
-        while (sqlite3_step(stmt) == SQLITE_ROW) {
-            all[colText(stmt, 0)][colText(stmt, 1)] = colText(stmt, 2);
+    crl::async([] {
+        Init();
+        if (!gDb) {
+            QMutexLocker locker(&gCacheMutex);
+            gActivityCacheLoading = false;
+            return;
         }
-        sqlite3_finalize(stmt);
-    }
-
-    QMutexLocker locker(&gCacheMutex);
-    if (gActivityCacheLoadedAll) return; // race guard
-    // Yuklash paytida SaveActivityHistoryEntry() yozgan bo'lishi mumkin —
-    // u qiymatlar YANGIROQ, shuning uchun ustidan yozmaymiz.
-    for (auto it = all.constBegin(); it != all.constEnd(); ++it) {
-        auto &target = gActivityLatestCache[it.key()];
-        for (auto f = it->constBegin(); f != it->constEnd(); ++f) {
-            if (!target.contains(f.key())) {
-                target[f.key()] = f.value();
+        QHash<QString, QHash<QString, QString>> all;
+        sqlite3_stmt *stmt = nullptr;
+        if (sqlite3_prepare_v2(gDb,
+                "SELECT peer_id, field, new_value FROM activity_history "
+                "WHERE id IN (SELECT MAX(id) FROM activity_history "
+                "             GROUP BY peer_id, field)",
+                -1, &stmt, nullptr) == SQLITE_OK) {
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                all[colText(stmt, 0)][colText(stmt, 1)] = colText(stmt, 2);
+            }
+            sqlite3_finalize(stmt);
+        }
+        QMutexLocker locker(&gCacheMutex);
+        // Yuklash davomida yozilgan qiymatlar YANGIROQ — ustidan yozmaymiz.
+        for (auto it = all.constBegin(); it != all.constEnd(); ++it) {
+            auto &target = gActivityLatestCache[it.key()];
+            for (auto f = it->constBegin(); f != it->constEnd(); ++f) {
+                if (!target.contains(f.key())) target[f.key()] = f.value();
             }
         }
-    }
-    gActivityCacheLoadedAll = true;
+        gActivityCacheLoadedAll = true;
+        gActivityCacheLoading = false;
+    });
 }
 
-void SaveActivityHistoryEntry(
-        const QString &peerId,
-        const QString &field,
-        bool hasOldValue,
-        const QString &oldValue,
-        const QString &newValue,
-        qint64 observedAt) {
-    Init();
-    // 2026-08-24: ilgari har 50-yozuvda tozalanardi. Last-seen yozuvlari
-    // kuniga ~10 600 ta — ya'ni kuniga ~210 marta tozalash. Saqlash muddati
-    // 365 kun, ma'lumot esa 34 kunlik bo'lgani uchun ularning HAMMASI 0 ta
-    // qator o'chirib, faqat vaqt yeb turardi.
-    //
-    // Endi soatiga bir marta. v8 indeksi bilan bu amal 0.32 ms oladi, ya'ni
-    // chastota kamaytirilmasa ham og'ir emas — lekin bekorga ishlash
-    // ma'nosiz, muddat esa kunlar bilan o'lchanadi.
-    static qint64 sLastPruneAt = 0;
-    const auto nowSecs = QDateTime::currentSecsSinceEpoch();
-    if (nowSecs - sLastPruneAt > 3600) {
-        sLastPruneAt = nowSecs;
-        PruneStaleActivityHistory();
-    }
-    if (!gDb) return;
-
-    sqlite3_stmt *stmt = nullptr;
-    if (sqlite3_prepare_v2(gDb,
-            "INSERT INTO activity_history "
-            "(peer_id, field, old_value, new_value, observed_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            -1, &stmt, nullptr) == SQLITE_OK) {
-        bindText(stmt, 1, peerId);
-        bindText(stmt, 2, field);
-        if (hasOldValue) {
-            bindText(stmt, 3, oldValue);
-        } else {
-            sqlite3_bind_null(stmt, 3);
-        }
-        bindText(stmt, 4, newValue);
-        sqlite3_bind_int64(stmt, 5, observedAt);
-        sqlite3_step(stmt);
-        sqlite3_finalize(stmt);
-    }
-
-    // Keep the in-memory cache in sync so repeat lookups this session see
-    // the new value without another SQLite round-trip.
-    {
-        QMutexLocker locker(&gCacheMutex);
-        gActivityLatestCache[peerId][field] = newValue;
-        gActivityLoadedPeers.insert(peerId);
-    }
+bool IsActivityCacheReady() {
+    QMutexLocker locker(&gCacheMutex);
+    return gActivityCacheLoadedAll;
 }
 
-// Delete activity_history entries older than |days| days. Same pattern as
-// PruneStaleGhostReads, but observed_at is a unix-timestamp INTEGER column
-// (not a formatted TEXT timestamp like ghost_reads.timestamp), so the
-// cutoff is computed and bound as an int64 instead of a string.
-void PruneStaleActivityHistory(int days) {
-    Init();
-    if (!gDb) return;
-
-    const qint64 cutoff =
-        QDateTime::currentDateTime().addDays(-days).toSecsSinceEpoch();
-    sqlite3_stmt *stmt = nullptr;
-    if (sqlite3_prepare_v2(gDb,
-            "DELETE FROM activity_history WHERE observed_at < ?",
-            -1, &stmt, nullptr) == SQLITE_OK) {
-        sqlite3_bind_int64(stmt, 1, cutoff);
-        sqlite3_step(stmt);
-        const int removed = sqlite3_changes(gDb);
-        sqlite3_finalize(stmt);
-        if (removed > 0) {
-            qDebug() << "PruneStaleActivityHistory: removed" << removed
-                     << "entries older than" << days << "days.";
-        }
-    }
+void WarmActivityCache() {
+    StartActivityCacheLoad();
 }
 
 bool GetLatestActivityHistoryValue(
         const QString &peerId,
         const QString &field,
         QString &outValue) {
-    EnsureActivityCacheLoaded(peerId);
+    StartActivityCacheLoad(); // tayyor bo'lsa darhol qaytadi
     QMutexLocker locker(&gCacheMutex);
     const auto peerIt = gActivityLatestCache.constFind(peerId);
     if (peerIt == gActivityLatestCache.constEnd()) return false;

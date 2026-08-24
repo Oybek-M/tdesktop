@@ -470,4 +470,11 @@ bool GetLatestActivityHistoryValue(
 // 30 kunda ~320 ming qatorda barqarorlashadi.
 void PruneStaleActivityHistory(int days = 30);
 
+// 2026-08-24: faollik keshi FON oqimida yuklanadi — startup'ni bloklamaydi.
+// Tayyor bo'lmaguncha RecordField() status yozuvini o'tkazib yuborishi
+// SHART, aks holda har kontakt uchun soxta "kuzatish boshlandi" yozuvi
+// paydo bo'ladi (kesh bo'sh ko'ringani uchun).
+[[nodiscard]] bool IsActivityCacheReady();
+void WarmActivityCache();
+
 } // namespace CustomDB

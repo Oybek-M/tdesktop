@@ -25,6 +25,13 @@ namespace {
 // uchun cheklov SHART: eng faol kontaktda 12 000 dan ortiq yozuv bor edi.
 constexpr auto kActivityHistoryLimit = 300;
 
+// Telefon Telegram'ga davriy ulanib-uziladi va bu har safar qisqa
+// "online" davr sifatida ko'rinadi. Haqiqiy DB o'lchovi: barcha
+// 72 470 ta davrdan 43.7% — 10 soniyadan kam, 75% — 1 daqiqadan kam.
+// Ular odamning faolligi emas, qurilma shovqini. Standart holda
+// yashiramiz, lekin nechtasi yashirilgani aytiladi.
+constexpr auto kMinMeaningfulOnlineSeconds = 60;
+
 // 2026-08-15: arxivda saqlangan profil rasmining yo'li (yo'q bo'lsa bo'sh).
 // Nom sxemasi custom_activity_history.cpp dagi MaybeBackupUserpic() bilan
 // bir xil bo'lishi SHART.
@@ -157,7 +164,24 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 				rpl::single(u"Online bo'lgan davrlar:"_q),
 				st::defaultSubsectionTitle),
 			st::defaultSubsectionTitlePadding);
-		const auto periods = ReconstructOnlinePeriods(entries);
+		const auto allPeriods = ReconstructOnlinePeriods(entries);
+		auto periods = QVector<OnlinePeriod>();
+		for (const auto &p : allPeriods) {
+			if (p.to - p.from >= kMinMeaningfulOnlineSeconds) {
+				periods.append(p);
+			}
+		}
+		const auto hiddenShort = int(allPeriods.size() - periods.size());
+		if (hiddenShort > 0) {
+			content->add(
+				object_ptr<Ui::FlatLabel>(
+					content,
+					rpl::single(QString::number(hiddenShort)
+						+ u" ta qisqa ulanish yashirildi "_q
+						+ u"(1 daqiqadan kam — qurilma shovqini)"_q),
+					st::boxLabel),
+				st::boxRowPadding);
+		}
 		if (periods.isEmpty()) {
 			content->add(
 				object_ptr<Ui::FlatLabel>(
