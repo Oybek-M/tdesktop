@@ -158,6 +158,52 @@ Kod tayyor, **BUILD QILINMAGAN**. Bitta build'da sinaladi.
 | A11 | Story backup L2 ga o'tkazildi — endi katta story'lar ham saqlanadi, indeksga tushadi va eksport qilinadi |
 | Versiya | **Kod kerak emas edi** — mexanizm mavjud. `docs/self-update/alpha-releases.md`. About tab'da to'liq versiya ko'rsatiladi. |
 
+## 🆕 TRACK C GA QO'SHILDI — reliz yuklashni API ga o'tkazish
+
+**Foydalanuvchi taklifi (2026-08-25).** `customsync-server` ning
+vazifalari ro'yxatiga qo'shildi.
+
+### Muammo (real hodisa, 2026-08-25)
+
+Bitta reliz chiqarish uchun skript IKKI MARTA ishga tushirildi:
+
+  1-yurish: vps-pub OK, github OK, **vps-secure FAILED**
+            (`Connection reset ... scp: Couldn't send packet: Broken pipe`)
+  2-yurish: vps-secure OK, vps-pub OK, **github FAILED** (clone uzildi)
+
+Ikkalasi birga to'liq qamradi, lekin bu tasodif. Skript har yurishda
+faqat O'SHA yurishni biladi — umumiy holatni bilmaydi va "FAILED"
+deb yozadi, holbuki mirror allaqachon to'g'ri bo'lishi mumkin.
+
+### Nega SSH/scp yomon
+
+| Hozirgi | API bilan |
+|---|---|
+| 52 MB bitta scp seansida; uzilsa HAMMASI boshidan | Bo'laklab yuklash, uzilgan joydan davom |
+| SSH kaliti kerak — faqat bitta odam chiqara oladi | Token bilan, ruxsat berilganlar ham |
+| "broken pipe" — sabab noaniq | Aniq HTTP status + xato matni |
+| Mirror holati qo'lda tekshiriladi | `GET /releases` — bir so'rovda |
+| Uchta mirror = uchta alohida mantiq | Bitta API, tarqatishni server bajaradi |
+| Idempotentlik yo'q — qayta yurish hammasini qayta yuklaydi | Checksum bo'yicha "allaqachon bor" javobi |
+
+### Taxminiy shakl
+
+```
+POST /api/releases            reliz yaratish (versiya, platforma)
+PUT  /api/releases/:id/blob   bo'laklab yuklash (resumable)
+POST /api/releases/:id/publish  imzoni tekshirib, mirrorlarga tarqatish
+GET  /api/releases            holat: qaysi mirror qaysi versiyada
+```
+
+**Muhim:** imzo LOKALDA qoladi. Server faqat tayyor, imzolangan
+paketni qabul qiladi va tarqatadi — maxfiy kalit hech qachon
+serverga chiqmaydi (`packer_private.h`, `alpha_private.h`).
+
+Bu A10 (bitta tugmali pipeline) bilan tabiiy birlashadi: A10 ning
+"3 mirror'ga chiqarish" qadami shu API chaqiruviga aylanadi.
+
+---
+
 ## 📋 TRACK C DAVOMIDA tdesktop'da qilinadigan ishlar (5 ta)
 
 Foydalanuvchi qarori: bular Track C ni BLOKLAMAYDI, lekin Track C
@@ -171,6 +217,7 @@ shuning uchun birga qilinadi.
 | 3 | **Priority lazy loader** | Tanlangan chat yuqori prioritetga, chat almashganda prioritet ko'chadi. Hozircha shoshilinch emas — og'ir yuk fonga ko'chirilgan. |
 | 4 | **A10 — bitta tugmali sync+build+publish** | A9 ustiga quriladi. Har upstream sync'da qo'lda 4-5 qadam bajarilmoqda. |
 | 5 | **A14 — o'qilgan vaqt orqali faollik** 🆕 | Pastda batafsil. Foydalanuvchi 2026-08-25 da topdi. |
+| 6 | **Reliz yuklashni API ga o'tkazish** 🆕 | SSH/scp o'rniga `customsync-server` API. Yuqorida batafsil. |
 
 **Qo'shimcha (2026-08-25 da qo'shildi):**
 **Startup 14.55 soniya** — sababi hali NOMA'LUM, log yordam bermaydi
