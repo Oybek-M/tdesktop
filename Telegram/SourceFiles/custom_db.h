@@ -474,6 +474,12 @@ void PruneStaleActivityHistory(int days = 30);
 // Tayyor bo'lmaguncha RecordField() status yozuvini o'tkazib yuborishi
 // SHART, aks holda har kontakt uchun soxta "kuzatish boshlandi" yozuvi
 // paydo bo'ladi (kesh bo'sh ko'ringani uchun).
+// Faollik tarixidan ma'nosiz qatorlarni o'chiradi (last-seen shovqini va
+// 60 soniyadan qisqa online davrlar — qurilma ulanishlari). Nechta qator
+// o'chirilgani qaytadi. ~6 soniya oladi — Async variantini ishlating.
+int CompactActivityHistory();
+void CompactActivityHistoryAsync();
+
 [[nodiscard]] bool IsActivityCacheReady();
 void WarmActivityCache();
 

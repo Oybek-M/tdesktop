@@ -213,10 +213,11 @@ Session::Session(
 		// kuzatiladigan kontakt bo'lmasa eski yozuvlar abadiy qolardi.
 		// v8 indeksi bilan bu amal ~0.3 ms.
 		CustomDB::PruneStaleActivityHistory();
-		// Faollik keshini fon oqimida oldindan isitamiz. Bloklamaydi;
-		// tayyor bo'lmaguncha status yozuvlari o'tkazib yuboriladi
-		// (soxta "kuzatish boshlandi" yozuvlari chiqmasin uchun).
-		CustomDB::WarmActivityCache();
+		// Faollik tarixini ma'nosiz qatorlardan tozalash (fon oqimida,
+		// ~6 soniya). Tugagach keshni O'ZI qayta yuklaydi, shuning uchun
+		// alohida WarmActivityCache() chaqirilmaydi — aks holda kesh ikki
+		// marta yuklanardi.
+		CustomDB::CompactActivityHistoryAsync();
 	}, lifetime());
 
 	_api->requestTermsUpdate();

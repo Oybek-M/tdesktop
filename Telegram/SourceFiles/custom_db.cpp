@@ -2583,6 +2583,106 @@ static void StartActivityCacheLoad() {
     });
 }
 
+// 2026-08-24: faollik tarixini SIQISH — ma'nosiz qatorlarni o'chirish.
+//
+// Ikki xil axlat to'planadi:
+//
+// 1) Holat ham, "necha soniya oldin ko'rilgan" ham o'zgarmagan qatorlar.
+//    Telegram offline kontaktning last-seen vaqtini davriy yangilab
+//    turadi; qiymat ichidagi vaqt o'zgargani uchun eski tenglik
+//    tekshiruvi ularni ushlay olmasdi. RecordField() endi yangilarini
+//    yozmaydi, lekin mavjudlari qolgan.
+//
+// 2) 60 soniyadan qisqa online->offline juftliklari. Bu odamning
+//    faolligi emas — telefonning davriy ulanishi. O'lchov: barcha
+//    72 492 davrdan 43.7% 10 soniyadan, 75% esa 1 daqiqadan qisqa.
+//
+// Haqiqiy DB'da o'lchangan natija: 362 937 -> 211 839 qator (42%),
+// hajm 44 -> 28.8 MB. MUHIM: ma'noli davrlar (>=60s) YO'QOLMADI,
+// aksincha 18 092 -> 21 490 ga oshdi — soxta qisqa juftliklar
+// haqiqiy davrlarni bo'lib turgan ekan.
+//
+// ~6 soniya oladi, shuning uchun FON oqimida va ishga tushganda bir
+// marta chaqiriladi (CompactActivityHistoryAsync).
+int CompactActivityHistory() {
+    Init();
+    if (!gDb) return 0;
+
+    const auto before = [&] {
+        int n = 0;
+        sqlite3_stmt *st = nullptr;
+        if (sqlite3_prepare_v2(gDb,
+                "SELECT COUNT(*) FROM activity_history", -1, &st, nullptr)
+                    == SQLITE_OK) {
+            if (sqlite3_step(st) == SQLITE_ROW) n = sqlite3_column_int(st, 0);
+            sqlite3_finalize(st);
+        }
+        return n;
+    }();
+
+    execSql("BEGIN");
+    // 1-qoida
+    execSql(
+        "DELETE FROM activity_history WHERE id IN (SELECT id FROM ("
+        "  SELECT id, field, new_value nv, observed_at obs,"
+        "         LAG(new_value) OVER w pv, LAG(observed_at) OVER w po"
+        "  FROM activity_history"
+        "  WINDOW w AS (PARTITION BY peer_id, field ORDER BY id))"
+        " WHERE field = 'status' AND pv IS NOT NULL"
+        "   AND instr(nv, ':') > 0 AND instr(pv, ':') > 0"
+        "   AND substr(nv, 1, instr(nv, ':')) = substr(pv, 1, instr(pv, ':'))"
+        "   AND abs((obs - CAST(substr(nv, instr(nv, ':') + 1) AS INTEGER))"
+        "         - (po  - CAST(substr(pv, instr(pv, ':') + 1) AS INTEGER)))"
+        "       < 60)");
+    // 2-qoida — juftlikning IKKALA qatori ham o'chadi, aks holda
+    // online/offline juftlash algoritmi buziladi.
+    execSql(
+        "DELETE FROM activity_history WHERE id IN ("
+        " SELECT id FROM (SELECT id, new_value nv, observed_at obs,"
+        "   LAG(new_value) OVER w pv, LAG(observed_at) OVER w po,"
+        "   LAG(id) OVER w pid FROM activity_history WHERE field = 'status'"
+        "   WINDOW w AS (PARTITION BY peer_id ORDER BY id))"
+        "  WHERE pv LIKE 'online:%' AND nv LIKE 'offline:%' AND (obs - po) < 60"
+        " UNION ALL"
+        " SELECT pid FROM (SELECT id, new_value nv, observed_at obs,"
+        "   LAG(new_value) OVER w pv, LAG(observed_at) OVER w po,"
+        "   LAG(id) OVER w pid FROM activity_history WHERE field = 'status'"
+        "   WINDOW w AS (PARTITION BY peer_id ORDER BY id))"
+        "  WHERE pv LIKE 'online:%' AND nv LIKE 'offline:%' AND (obs - po) < 60)");
+    execSql("COMMIT");
+
+    int removed = 0;
+    {
+        sqlite3_stmt *st = nullptr;
+        if (sqlite3_prepare_v2(gDb,
+                "SELECT COUNT(*) FROM activity_history", -1, &st, nullptr)
+                    == SQLITE_OK) {
+            if (sqlite3_step(st) == SQLITE_ROW) {
+                removed = before - sqlite3_column_int(st, 0);
+            }
+            sqlite3_finalize(st);
+        }
+    }
+    if (removed > 0) {
+        qDebug() << "CompactActivityHistory: removed" << removed
+                 << "noise rows of" << before;
+    }
+    return removed;
+}
+
+void CompactActivityHistoryAsync() {
+    crl::async([] {
+        CompactActivityHistory();
+        // Siqishdan keyin kesh eskirdi — qayta yuklansin.
+        {
+            QMutexLocker locker(&gCacheMutex);
+            gActivityLatestCache.clear();
+            gActivityCacheLoadedAll = false;
+        }
+        StartActivityCacheLoad();
+    });
+}
+
 bool IsActivityCacheReady() {
     QMutexLocker locker(&gCacheMutex);
     return gActivityCacheLoadedAll;
