@@ -4,7 +4,49 @@ Bu fayl qaysi ish **hozir faol**, qaysi biri **to'xtatib qo'yilgan** va
 qaysi biri **hali muhokama bosqichida** ekanini ko'rsatadi. Yangi
 sessiya boshlanganda birinchi shu yerga qarang.
 
-Oxirgi yangilanish: 2026-08-14
+Oxirgi yangilanish: 2026-08-25
+
+# ERTAGA SHU YERDAN BOSHLANG (2026-08-26) — TRACK C
+
+**Track A (tdesktop) YOPILDI.** v7.1.1 chiqarildi, uchala mirror'da,
+self-update ishlaydi va real sinovdan o'tdi.
+
+## Track C — customsync-server
+
+> WARNING: Spec va planlar **2026-07-31** da yozilgan — deyarli BIR OY
+> oldin. O'shandan beri ko'p narsa o'zgardi (Qt6, v7.1.1, media
+> arxivi, media_index, kvota, eksport formati v3). **Implement
+> boshlashdan OLDIN ularni birga qayta ko'rib chiqish kerak** —
+> foydalanuvchi shuni aniq so'radi.
+
+**Hujjatlar:**
+- Spec: `specs/2026-07-29-multi-device-sync-backend-design.md`
+- Index: `plans/2026-07-29-multi-device-sync-00-index.md`
+- 01a backend poydevori / 01b sync yadrosi / 02 tdesktop agenti
+  03 web controller / 04 storage lifecycle / 05 capture service
+
+**Papka (kelishilgan):** `Projects programming\customsync-server`
+— tdesktop repo'sida EMAS.
+
+**Boshlash tartibi:** 01a -> 01b -> 02 -> 03 -> 04 -> 05
+
+## Qayta ko'rib chiqishda albatta hisobga olinadigan yangiliklar
+
+| Nima | Nega Track C ga ta'sir qiladi |
+|---|---|
+| `media_index` (schema v8) | Sync uchun tayyor tuzilma — peer/msg/hajm/holat |
+| Eksport formati v3 | `settings.json` + `index.json`, platformadan mustaqil — ATAYLAB Track C uchun shunday qilingan |
+| Kvota tizimi | Serverga ham kerak bo'ladi |
+| Arxiv ildizi sozlanadi | Sync yo'llari qattiq kodlanmasin |
+| Reliz API g'oyasi | Server vazifalariga qo'shildi (pastga qarang) |
+
+## tdesktop tomonida Track C DAVOMIDA qilinadigan 6 ta ish
+
+Pastdagi "TRACK C DAVOMIDA" bo'limiga qarang. Ular Track C ni
+bloklamaydi, lekin server ishlayotganda tdesktop'da baribir
+o'zgarish kerak bo'ladi — shuning uchun birga qilinadi.
+
+---
 
 > 🚨 **YO'L O'ZGARDI (2026-08-14):** build daraxti
 > `...\Projects programming\Telegram\Telegram\` dan **`C:\TBuild\`** ga
@@ -18,7 +60,10 @@ Oxirgi yangilanish: 2026-08-14
 
 ---
 
-## ⚡ Umumiy ustuvorlik tartibi (2026-08-13 qayta rejalashtirildi)
+## 📚 ARXIV — umumiy ustuvorlik tartibi (2026-08-13)
+
+> ESKIRGAN: 1- va 2-bosqich bajarildi, Track A yopildi.
+> Joriy reja fayl boshida.
 
 Foydalanuvchi limit tugashi sababli bu yerda aniq bosqichlarga bo'lib
 qo'yildi — boshqa Claude sessiyasida ham davom ettirish mumkin bo'lsin
@@ -58,7 +103,9 @@ uchun.
 
 ---
 
-## 🔴 HOZIRGI ISH — Qt6 build'idan keyingi 4 ta muammo (2026-08-14)
+## 📚 ARXIV (2026-08-14) — Qt6 build'idan keyingi 4 ta muammo
+
+> Bu bo'lim TUGAGAN ishning tarixi. Joriy holat yuqorida.
 
 **Qt6 build MUVAFFAQIYATLI** (`Telegram.exe` 219.5 MB, 14.08 13:20,
 `EXIT=0`). Foydalanuvchi uni ishlab turgan nusxaga ko'chirdi
@@ -144,7 +191,9 @@ maqsad fayl yo'li). Ikkalasini birga rejalashtirish mantiqiy.
 
 ---
 
-## ⏭️ ERTAGA SHU YERDAN BOSHLANG (2026-08-15)
+## 📚 ARXIV (2026-08-15) — o'sha kungi boshlanish nuqtasi
+
+> ESKIRGAN. Joriy boshlanish nuqtasi fayl BOSHIDA.
 
 ## ✅ 2026-08-15 kech — R1, R2, R2b, A11, versiyalash BAJARILDI
 
