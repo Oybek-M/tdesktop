@@ -455,13 +455,19 @@ bool GetLatestActivityHistoryValue(
 
 // Shu peer uchun BARCHA maydonlar bo'yicha to'liq jurnal, eng yangisidan
 // boshlab (observed_at DESC). History Viewer Box shu funksiyani ishlatadi.
+// limit — nechta ENG SO'NGGI yozuv qaytarilsin. Cheklov SHART: eng faol
+// kontaktda 13 333 qator bor edi va Faollik tarixi oynasi har qator uchun
+// alohida widget yaratadi. Butun tarix kerak bo'lsa limit oshiriladi.
 [[nodiscard]] QVector<ActivityHistoryEntry> GetActivityHistory(
-    const QString &peerId);
+    const QString &peerId,
+    int limit = 300);
 
-// Delete activity_history entries older than |days| days (default 365 —
-// this table is a long-term history log, unlike ghost_reads/text_cache's
-// 30-day caches, so a much longer retention is used by default). Called
-// automatically by SaveActivityHistoryEntry(); safe to call manually.
-void PruneStaleActivityHistory(int days = 365);
+// Delete activity_history entries older than |days| days.
+// SaveActivityHistoryEntry() soatiga bir marta chaqiradi; ishga tushishda
+// ham bir marta chaqiriladi (main_session.cpp).
+// 2026-08-24: muddat 365 -> 30 kun (foydalanuvchi qarori). Last-seen
+// yozuvlari kuniga ~10 600 ta; 365 kunda jadval ~3.9 mln qatorga yetardi.
+// 30 kunda ~320 ming qatorda barqarorlashadi.
+void PruneStaleActivityHistory(int days = 30);
 
 } // namespace CustomDB

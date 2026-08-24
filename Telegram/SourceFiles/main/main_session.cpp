@@ -208,6 +208,11 @@ Session::Session(
 		CustomDB::ReconcileMediaIndex(CustomSettings::ArchiveRoot());
 		// Kvota ogohlantirishi shu yerda — konstruktorda hali oyna yo'q.
 		CustomMediaQuota::ShowQuotaAlertIfNeeded();
+		// 2026-08-24: faollik tarixini ishga tushishda bir marta tozalash.
+		// Ilgari tozalash FAQAT yangi yozuv kelganda ishlardi — ya'ni
+		// kuzatiladigan kontakt bo'lmasa eski yozuvlar abadiy qolardi.
+		// v8 indeksi bilan bu amal ~0.3 ms.
+		CustomDB::PruneStaleActivityHistory();
 	}, lifetime());
 
 	_api->requestTermsUpdate();

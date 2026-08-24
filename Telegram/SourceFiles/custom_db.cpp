@@ -2594,7 +2594,7 @@ void SaveActivityHistoryEntry(
     const auto nowSecs = QDateTime::currentSecsSinceEpoch();
     if (nowSecs - sLastPruneAt > 3600) {
         sLastPruneAt = nowSecs;
-        PruneStaleActivityHistory(365);
+        PruneStaleActivityHistory();
     }
     if (!gDb) return;
 
@@ -2665,7 +2665,9 @@ bool GetLatestActivityHistoryValue(
     return true;
 }
 
-QVector<ActivityHistoryEntry> GetActivityHistory(const QString &peerId) {
+QVector<ActivityHistoryEntry> GetActivityHistory(
+        const QString &peerId,
+        int limit) {
     Init();
     QVector<ActivityHistoryEntry> result;
     if (!gDb) return result;
@@ -2674,9 +2676,11 @@ QVector<ActivityHistoryEntry> GetActivityHistory(const QString &peerId) {
     if (sqlite3_prepare_v2(gDb,
             "SELECT field, old_value, new_value, observed_at "
             "FROM activity_history WHERE peer_id = ? "
-            "ORDER BY observed_at DESC, id DESC",
+            "ORDER BY observed_at DESC, id DESC "
+            "LIMIT ?",
             -1, &stmt, nullptr) == SQLITE_OK) {
         bindText(stmt, 1, peerId);
+        sqlite3_bind_int(stmt, 2, (limit > 0) ? limit : -1);
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             ActivityHistoryEntry entry;
             entry.field = colText(stmt, 0);

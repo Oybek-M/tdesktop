@@ -21,6 +21,10 @@
 namespace CustomActivityHistory {
 namespace {
 
+// Faollik tarixi oynasi har yozuv uchun alohida widget yaratadi, shuning
+// uchun cheklov SHART: eng faol kontaktda 12 000 dan ortiq yozuv bor edi.
+constexpr auto kActivityHistoryLimit = 300;
+
 // 2026-08-15: arxivda saqlangan profil rasmining yo'li (yo'q bo'lsa bo'sh).
 // Nom sxemasi custom_activity_history.cpp dagi MaybeBackupUserpic() bilan
 // bir xil bo'lishi SHART.
@@ -106,7 +110,9 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 	return Box([=](not_null<Ui::GenericBox*> box) {
 		box->setTitle(rpl::single(u"📜 "_q + displayName + u" — Faollik tarixi"_q));
 
-		const auto entries = CustomDB::GetActivityHistory(peerId);
+		const auto entries = CustomDB::GetActivityHistory(
+			peerId,
+			kActivityHistoryLimit);
 		const auto content = box->verticalLayout();
 
 		// ── 1) Joriy holat + 2) So'nggi ko'ra olgan holatim ─────────
@@ -180,10 +186,19 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 		}
 
 		// ── 4) To'liq o'zgarishlar jurnali ───────────────────────────
+		// 2026-08-24: ro'yxat 300 ta bilan cheklangan. Ilgari cheklov yo'q
+		// edi va eng faol kontaktda 12 000 dan ortiq widget yaratilardi —
+		// oyna ochilishi sekinlashardi. Foydalanuvchi cheklovni bilib
+		// tursin, aks holda "tarix yo'qolibdi" deb o'ylashi mumkin.
+		const auto capped = (entries.size() >= kActivityHistoryLimit);
 		content->add(
 			object_ptr<Ui::FlatLabel>(
 				content,
-				rpl::single(u"To'liq o'zgarishlar jurnali:"_q),
+				rpl::single(capped
+					? (u"O'zgarishlar jurnali (so'nggi "_q
+						+ QString::number(kActivityHistoryLimit)
+						+ u" ta):"_q)
+					: u"To'liq o'zgarishlar jurnali:"_q),
 				st::defaultSubsectionTitle),
 			st::defaultSubsectionTitlePadding);
 		if (entries.isEmpty()) {
