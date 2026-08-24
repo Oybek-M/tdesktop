@@ -25,12 +25,18 @@ namespace {
 // uchun cheklov SHART: eng faol kontaktda 12 000 dan ortiq yozuv bor edi.
 constexpr auto kActivityHistoryLimit = 300;
 
-// Telefon Telegram'ga davriy ulanib-uziladi va bu har safar qisqa
-// "online" davr sifatida ko'rinadi. Haqiqiy DB o'lchovi: barcha
-// 72 470 ta davrdan 43.7% — 10 soniyadan kam, 75% — 1 daqiqadan kam.
-// Ular odamning faolligi emas, qurilma shovqini. Standart holda
-// yashiramiz, lekin nechtasi yashirilgani aytiladi.
+// Qisqa "online" davrlar ikki xil sababdan bo'ladi va ularni ajratib
+// bo'lmaydi:
+//   1) telefonning davriy ulanishi (shovqin),
+//   2) Ghost Mode ishlatadigan klient — odam xabar yuborgan LAHZADA
+//      online bo'ladi va shu zahoti offline (eng qimmatli signal).
+// Shuning uchun ularni YO'QOTMAYMIZ, faqat ketma-ket kelganlarini
+// bitta qatorga guruhlaymiz — ro'yxat o'qilishi oson bo'lsin.
 constexpr auto kMinMeaningfulOnlineSeconds = 60;
+
+// Ketma-ket qisqa ulanishlar shu oraliqdan yaqin bo'lsa bitta guruhga
+// yig'iladi (30 daqiqa).
+constexpr auto kShortGroupGapSeconds = 30 * 60;
 
 // 2026-08-15: arxivda saqlangan profil rasmining yo'li (yo'q bo'lsa bo'sh).
 // Nom sxemasi custom_activity_history.cpp dagi MaybeBackupUserpic() bilan
@@ -164,25 +170,50 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 				rpl::single(u"Online bo'lgan davrlar:"_q),
 				st::defaultSubsectionTitle),
 			st::defaultSubsectionTitlePadding);
+		// Davrlarni chiqarish: uzunlari alohida qator, ketma-ket qisqalari
+		// esa bitta guruh qatoriga yig'iladi. HECH NARSA yo'qolmaydi —
+		// guruh qatori nechta ulanish bo'lganini va oraliqni ko'rsatadi.
 		const auto allPeriods = ReconstructOnlinePeriods(entries);
-		auto periods = QVector<OnlinePeriod>();
+		auto rows = QVector<QString>();
+		auto shortFrom = qint64(0);
+		auto shortTo = qint64(0);
+		auto shortCount = 0;
+		const auto flushShort = [&] {
+			if (!shortCount) return;
+			const auto a = QDateTime::fromSecsSinceEpoch(shortFrom);
+			const auto b = QDateTime::fromSecsSinceEpoch(shortTo);
+			rows.append((shortCount == 1)
+				? (a.toString(u"dd.MM HH:mm:ss"_q)
+					+ u" - qisqa ulanish"_q)
+				: (a.toString(u"dd.MM HH:mm"_q) + u" - "_q
+					+ b.toString(u"HH:mm"_q) + u": "_q
+					+ QString::number(shortCount)
+					+ u" ta qisqa ulanish"_q));
+			shortCount = 0;
+		};
 		for (const auto &p : allPeriods) {
 			if (p.to - p.from >= kMinMeaningfulOnlineSeconds) {
-				periods.append(p);
+				flushShort();
+				const auto from = QDateTime::fromSecsSinceEpoch(p.from);
+				const auto to = QDateTime::fromSecsSinceEpoch(p.to);
+				const auto minutes = std::max<qint64>(0, (p.to - p.from) / 60);
+				rows.append(from.toString(u"dd.MM HH:mm"_q) + u" - "_q
+					+ to.toString(u"HH:mm"_q) + u" ("_q
+					+ QString::number(minutes) + u" daqiqa)"_q);
+				continue;
 			}
+			// Qisqa ulanish — guruhga qo'shamiz.
+			if (shortCount
+					&& (p.from - shortTo) > kShortGroupGapSeconds) {
+				flushShort();
+			}
+			if (!shortCount) shortFrom = p.from;
+			shortTo = p.to;
+			++shortCount;
 		}
-		const auto hiddenShort = int(allPeriods.size() - periods.size());
-		if (hiddenShort > 0) {
-			content->add(
-				object_ptr<Ui::FlatLabel>(
-					content,
-					rpl::single(QString::number(hiddenShort)
-						+ u" ta qisqa ulanish yashirildi "_q
-						+ u"(1 daqiqadan kam — qurilma shovqini)"_q),
-					st::boxLabel),
-				st::boxRowPadding);
-		}
-		if (periods.isEmpty()) {
+		flushShort();
+
+		if (rows.isEmpty()) {
 			content->add(
 				object_ptr<Ui::FlatLabel>(
 					content,
@@ -194,17 +225,11 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 					st::boxLabel),
 				st::boxRowPadding);
 		}
-		for (const auto &p : periods) {
-			const auto from = QDateTime::fromSecsSinceEpoch(p.from);
-			const auto to = QDateTime::fromSecsSinceEpoch(p.to);
-			const auto minutes = std::max<qint64>(0, (p.to - p.from) / 60);
+		for (const auto &line : rows) {
 			content->add(
 				object_ptr<Ui::FlatLabel>(
 					content,
-					rpl::single(
-						from.toString(u"dd.MM HH:mm"_q) + u" - "_q
-						+ to.toString(u"HH:mm"_q) + u" ("_q
-						+ QString::number(minutes) + u" daqiqa)"_q),
+					rpl::single(line),
 					st::boxLabel),
 				st::boxRowPadding);
 		}

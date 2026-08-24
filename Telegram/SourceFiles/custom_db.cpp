@@ -2634,21 +2634,19 @@ int CompactActivityHistory() {
         "   AND abs((obs - CAST(substr(nv, instr(nv, ':') + 1) AS INTEGER))"
         "         - (po  - CAST(substr(pv, instr(pv, ':') + 1) AS INTEGER)))"
         "       < 60)");
-    // 2-qoida — juftlikning IKKALA qatori ham o'chadi, aks holda
-    // online/offline juftlash algoritmi buziladi.
-    execSql(
-        "DELETE FROM activity_history WHERE id IN ("
-        " SELECT id FROM (SELECT id, new_value nv, observed_at obs,"
-        "   LAG(new_value) OVER w pv, LAG(observed_at) OVER w po,"
-        "   LAG(id) OVER w pid FROM activity_history WHERE field = 'status'"
-        "   WINDOW w AS (PARTITION BY peer_id ORDER BY id))"
-        "  WHERE pv LIKE 'online:%' AND nv LIKE 'offline:%' AND (obs - po) < 60"
-        " UNION ALL"
-        " SELECT pid FROM (SELECT id, new_value nv, observed_at obs,"
-        "   LAG(new_value) OVER w pv, LAG(observed_at) OVER w po,"
-        "   LAG(id) OVER w pid FROM activity_history WHERE field = 'status'"
-        "   WINDOW w AS (PARTITION BY peer_id ORDER BY id))"
-        "  WHERE pv LIKE 'online:%' AND nv LIKE 'offline:%' AND (obs - po) < 60)");
+    // 2-QOIDA OLIB TASHLANDI (2026-08-24).
+    //
+    // Dastlab 60 soniyadan qisqa online->offline juftliklari "qurilma
+    // shovqini" deb o'chirilardi. Bu XATO edi: Ghost Mode ishlatadigan
+    // klientlar (Novagram va b.) aynan xabar yuborgan LAHZADA online
+    // bo'lib ko'rinadi va shu zahoti yana offline bo'ladi. Ya'ni qisqa
+    // davr — eng qimmatli signal, chunki u odam yashirmoqchi bo'lgan
+    // faollikni ko'rsatadi.
+    //
+    // Shovqinni ajratish uchun ishonchli mezon yo'q: davomiylik ikkala
+    // holatda ham bir xil. Shuning uchun DISKDA HAMMASI saqlanadi,
+    // ajratish esa faqat KO'RSATISHDA qilinadi (Faollik tarixi oynasi
+    // qisqa ulanishlarni bitta qatorga guruhlaydi, yo'qotmaydi).
     execSql("COMMIT");
 
     int removed = 0;
