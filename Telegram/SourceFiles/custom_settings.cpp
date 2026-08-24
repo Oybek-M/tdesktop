@@ -27,6 +27,9 @@ QHash<QString, bool> gAntiEditPerPeer;
 // Faqat Per-Chat Settings UI orqali qo'shilgan peerlar shu ro'yxatda.
 QHash<QString, QString> gPerPeerNames;
 
+// Arxivlash paytida eslab qolingan peer nomlari (faqat ko'rsatish uchun).
+QHash<QString, QString> gPeerNameCache;
+
 // Unified whitelist: always ON for these peers (lower priority than blocklist).
 QHash<QString, QString> gWhitelist;
 
@@ -336,6 +339,12 @@ void Init() {
     settings.endGroup();
 
     // Per-Chat Settings master list (NEXT-6)
+    settings.beginGroup("PeerNameCache");
+    for (const QString &key : settings.childKeys()) {
+        gPeerNameCache[key] = settings.value(key).toString();
+    }
+    settings.endGroup();
+
     settings.beginGroup("PerPeerNames");
     for (const QString &key : settings.childKeys()) {
         gPerPeerNames[key] = settings.value(key).toString();
@@ -1069,7 +1078,30 @@ QString GetPeerDisplayName(const QString &peerId) {
     if (it != gBlocklist.constEnd() && !it.value().isEmpty()) {
         return it.value();
     }
+    // Per-Chat Settings ro'yxati
+    it = gPerPeerNames.constFind(peerId);
+    if (it != gPerPeerNames.constEnd() && !it.value().isEmpty()) {
+        return it.value();
+    }
+    // Arxivlash paytida eslab qolingan nom (eng keng qamrov)
+    it = gPeerNameCache.constFind(peerId);
+    if (it != gPeerNameCache.constEnd() && !it.value().isEmpty()) {
+        return it.value();
+    }
     return QString();
+}
+
+void RememberPeerName(const QString &peerId, const QString &name) {
+    if (!gInitialized) Init();
+    if (peerId.isEmpty() || name.isEmpty()) return;
+    // Har xabarda registry'ga yozmaslik uchun — o'zgarmagan bo'lsa chiqamiz.
+    const auto it = gPeerNameCache.constFind(peerId);
+    if (it != gPeerNameCache.constEnd() && it.value() == name) return;
+    gPeerNameCache[peerId] = name;
+    QSettings settings("CustomMod", "TelegramDesktop");
+    settings.beginGroup("PeerNameCache");
+    settings.setValue(peerId, name);
+    settings.endGroup();
 }
 
 // ── Activity History Log: Include List ───────────────────────────────────

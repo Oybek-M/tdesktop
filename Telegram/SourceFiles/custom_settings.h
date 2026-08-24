@@ -280,6 +280,18 @@ void ResetMediaBackupForPeer(const QString &peerId);
 // Topilmasa — bo'sh QString qaytadi (caller o'zi peerId ni ishlata oladi).
 [[nodiscard]] QString GetPeerDisplayName(const QString &peerId);
 
+// 2026-08-24: yengil nom keshi. GetPeerDisplayName() ilgari faqat
+// White/Black List'ga qarardi, shuning uchun ro'yxatlarda bo'lmagan
+// oddiy chatlar eksport ro'yxatida "ID 620565940" bo'lib chiqardi.
+// Sessiyadan olish ham har doim ishlamaydi: peerLoaded() faqat shu
+// seansda yuklangan peer'ni topadi.
+//
+// Yechim — nomni ARXIVLASH PAYTIDA eslab qolamiz (o'shanda peer aniq
+// ma'lum) va keyin doim shu keshdan o'qiymiz.
+// AddPerPeerOverride() dan farqi: bu FAQAT nom yozadi, hech qanday
+// per-peer sozlama yaratmaydi.
+void RememberPeerName(const QString &peerId, const QString &name);
+
 // ── Activity History Log: Include/Exclude ro'yxatlari ───────────────────
 // Whitelist/Blocklist bilan bir xil funksiya to'plami va mutual-exclusion
 // xatti-harakati, lekin BUTUNLAY MUSTAQIL QHash'larda saqlanadi — bu

@@ -2829,6 +2829,10 @@ void fillAboutTab(
 								PeerId(rawId));
 							if (peer) {
 								name = peer->name();
+								// Keyingi safar sessiyaga bog'liq
+								// bo'lmasin — nomni saqlab qo'yamiz.
+								CustomSettings::RememberPeerName(
+									summary.peerId, name);
 							}
 						}
 					}

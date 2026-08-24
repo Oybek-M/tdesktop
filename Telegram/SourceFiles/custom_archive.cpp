@@ -382,6 +382,14 @@ void MaybeArchiveItem(not_null<HistoryItem*> item) {
 	if (!CustomSettings::ShouldBackgroundCache(peerIdStr)) {
 		return; // kuzatilmayotgan chat — hech narsa qilmaymiz
 	}
+	// 2026-08-24: peer nomini eslab qolamiz. Keyinchalik eksport
+	// ro'yxatida nom ko'rsatish uchun kerak: u yerda faqat peerId bo'ladi
+	// va peerLoaded() ni yuklanmagan peer uchun ishlatib bo'lmaydi.
+	// RememberPeerName() o'zgarmagan nomda darhol qaytadi, shuning uchun
+	// bu har xabarda registry'ga yozmaydi.
+	CustomSettings::RememberPeerName(
+		peerIdStr,
+		item->history()->peer->name());
 	const auto text = item->originalText().text;
 	const auto isMedia = (item->media() != nullptr);
 	if (text.isEmpty() && !isMedia) {
