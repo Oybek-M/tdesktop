@@ -53,6 +53,8 @@ static QSet<QString> gLoadedPeers;
 // performance regression (repeated per-field SQLite reads with no cache).
 static QHash<QString, QHash<QString, QString>> gActivityLatestCache;
 static QSet<QString> gActivityLoadedPeers;
+// 2026-08-24: butun activity keshi bir marta yuklanadi (peer-bo'yicha emas).
+static bool gActivityCacheLoadedAll = false;
 
 // A13/perf: qaysi peer'larda UMUMAN 'deleted' yozuvi bor. Bitta DISTINCT
 // so'rov bilan bir marta to'ldiriladi (idx_am_peer_type indeksidan foydalanadi).
@@ -324,6 +326,30 @@ void RunMigrations() {
         execSql("CREATE INDEX IF NOT EXISTS idx_mi_peer   ON media_index(peer_id)");
     }
 
+    // v7 → v8: activity_history uchun ikkita YETISHMAYOTGAN indeks.
+    //
+    // Jadval 362 ming qatorga yetgan (95% — last-seen o'zgarishlari) va
+    // ikkita issiq so'rov indekssiz ishlar edi. O'lchangan natijalar
+    // (haqiqiy DB nusxasida):
+    //
+    //   PruneStaleActivityHistory  58.7 ms -> 0.32 ms   (183x)
+    //   kesh yuklash (bitta peer)  83.7 ms -> 5.2 ms    (16x)
+    //
+    // Mavjud idx_activity_history_peer (peer_id, observed_at DESC) faqat
+    // tarixni KO'RSATISH uchun edi; tozalash `observed_at` bo'yicha
+    // yakka o'zi qidiradi, shuning uchun undan foydalana olmasdi.
+    // text_cache va actioned_messages da bu naqsh to'g'ri qo'llangan
+    // (idx_tc_cached_at, idx_am_timestamp) — faqat shu jadval e'tibordan
+    // chetda qolgan.
+    //
+    // Narxi: DB 44 MB -> ~59 MB. Buning evaziga sekinlik yo'qoladi.
+    if (version < 8) {
+        execSql("CREATE INDEX IF NOT EXISTS idx_ah_observed "
+                "ON activity_history(observed_at)");
+        execSql("CREATE INDEX IF NOT EXISTS idx_ah_peer_field "
+                "ON activity_history(peer_id, field, id)");
+    }
+
     // Update version stamp.
     {
         sqlite3_stmt *stmt = nullptr;
@@ -351,6 +377,7 @@ void LoadRestoreCache() {
     gLoadedPeers.clear();
     gActivityLatestCache.clear();
     gActivityLoadedPeers.clear();
+    gActivityCacheLoadedAll = false; // keyingi murojaatda qayta yuklansin
     gPeersWithDeleted.clear();
     gPeersWithDeletedLoaded = false;
 }
@@ -2497,33 +2524,54 @@ void ClearAllArchive() {
 // Loads one peer's latest-value-per-field into gActivityLatestCache on
 // first touch, unless already loaded — mirrors EnsurePeerCacheLoaded()
 // above, applied to the activity_history table.
+// 2026-08-24 (performance): peer-bo'yicha lazy yuklash BITTA umumiy
+// yuklashga almashtirildi.
+//
+// Eski usul har peer uchun o'sha peer'ning BARCHA qatorlarini o'qirdi —
+// atigi 5 ta qiymat (name/username/photo/status/story) olish uchun.
+// Eng faol peer'da bu 13 333 qator degani. 1484 ta kuzatilayotgan peer
+// bo'ylab bu sessiya davomida butun jadvalni bir necha bor o'qishga
+// teng edi.
+//
+// O'lchangan (haqiqiy DB nusxasi, 362 185 qator):
+//   eski:  1484 x 83.7 ms  = ~124 soniya (sessiya bo'ylab tarqoq)
+//   yangi: bitta so'rov     = 128 ms (bir marta)
+//
+// idx_ah_peer_field (v8) bu so'rovni qoplama indeks qiladi.
 static void EnsureActivityCacheLoaded(const QString &peerId) {
     {
         QMutexLocker locker(&gCacheMutex);
-        if (gActivityLoadedPeers.contains(peerId)) return;
+        if (gActivityCacheLoadedAll) return;
     }
     Init();
     if (!gDb) return;
 
-    QHash<QString, QString> latest;
+    QHash<QString, QHash<QString, QString>> all;
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
-            "SELECT field, new_value FROM activity_history "
-            "WHERE peer_id = ? ORDER BY observed_at ASC, id ASC",
+            "SELECT peer_id, field, new_value FROM activity_history "
+            "WHERE id IN (SELECT MAX(id) FROM activity_history "
+            "             GROUP BY peer_id, field)",
             -1, &stmt, nullptr) == SQLITE_OK) {
-        bindText(stmt, 1, peerId);
         while (sqlite3_step(stmt) == SQLITE_ROW) {
-            // ASC tartib — oxirgi yozilgan qator eng yangi qiymat, shuning
-            // uchun hash'ga ustma-ust yozilaveradi va oxiri eng yangisi qoladi.
-            latest[colText(stmt, 0)] = colText(stmt, 1);
+            all[colText(stmt, 0)][colText(stmt, 1)] = colText(stmt, 2);
         }
         sqlite3_finalize(stmt);
     }
 
     QMutexLocker locker(&gCacheMutex);
-    if (gActivityLoadedPeers.contains(peerId)) return; // race guard
-    gActivityLatestCache[peerId] = latest;
-    gActivityLoadedPeers.insert(peerId);
+    if (gActivityCacheLoadedAll) return; // race guard
+    // Yuklash paytida SaveActivityHistoryEntry() yozgan bo'lishi mumkin —
+    // u qiymatlar YANGIROQ, shuning uchun ustidan yozmaymiz.
+    for (auto it = all.constBegin(); it != all.constEnd(); ++it) {
+        auto &target = gActivityLatestCache[it.key()];
+        for (auto f = it->constBegin(); f != it->constEnd(); ++f) {
+            if (!target.contains(f.key())) {
+                target[f.key()] = f.value();
+            }
+        }
+    }
+    gActivityCacheLoadedAll = true;
 }
 
 void SaveActivityHistoryEntry(
@@ -2534,9 +2582,18 @@ void SaveActivityHistoryEntry(
         const QString &newValue,
         qint64 observedAt) {
     Init();
-    // Prune once every 50 saves — same pattern as SaveGhostRead/CacheMessageText.
-    static int sActivitySaveCount = 0;
-    if (++sActivitySaveCount % 50 == 0) {
+    // 2026-08-24: ilgari har 50-yozuvda tozalanardi. Last-seen yozuvlari
+    // kuniga ~10 600 ta — ya'ni kuniga ~210 marta tozalash. Saqlash muddati
+    // 365 kun, ma'lumot esa 34 kunlik bo'lgani uchun ularning HAMMASI 0 ta
+    // qator o'chirib, faqat vaqt yeb turardi.
+    //
+    // Endi soatiga bir marta. v8 indeksi bilan bu amal 0.32 ms oladi, ya'ni
+    // chastota kamaytirilmasa ham og'ir emas — lekin bekorga ishlash
+    // ma'nosiz, muddat esa kunlar bilan o'lchanadi.
+    static qint64 sLastPruneAt = 0;
+    const auto nowSecs = QDateTime::currentSecsSinceEpoch();
+    if (nowSecs - sLastPruneAt > 3600) {
+        sLastPruneAt = nowSecs;
         PruneStaleActivityHistory(365);
     }
     if (!gDb) return;
