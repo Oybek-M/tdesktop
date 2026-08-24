@@ -158,6 +158,91 @@ Kod tayyor, **BUILD QILINMAGAN**. Bitta build'da sinaladi.
 | A11 | Story backup L2 ga o'tkazildi — endi katta story'lar ham saqlanadi, indeksga tushadi va eksport qilinadi |
 | Versiya | **Kod kerak emas edi** — mexanizm mavjud. `docs/self-update/alpha-releases.md`. About tab'da to'liq versiya ko'rsatiladi. |
 
+## 📋 TRACK C DAVOMIDA tdesktop'da qilinadigan ishlar (5 ta)
+
+Foydalanuvchi qarori: bular Track C ni BLOKLAMAYDI, lekin Track C
+ishlayotganda tdesktop tomonida baribir o'zgarish kerak bo'ladi —
+shuning uchun birga qilinadi.
+
+| № | Ish | Holat |
+|---|---|---|
+| 1 | **Custom Window UX qayta dizayni** | Qaror qabul qilingan: mantiqiy guruhlar bo'yicha alohida tablar, barcha bo'limlar `SlideWrap` bilan YOPIQ holatda. 75 ta tushuntirish matni qisqartiriladi. |
+| 2 | **S1 — story fonining miltillashi** | GL/RHI yo'liga qamalgan. Vaqtinchalik yechim bor (OpenGL o'chirish), ya'ni bloklamaydi. Eng noaniq ish. |
+| 3 | **Priority lazy loader** | Tanlangan chat yuqori prioritetga, chat almashganda prioritet ko'chadi. Hozircha shoshilinch emas — og'ir yuk fonga ko'chirilgan. |
+| 4 | **A10 — bitta tugmali sync+build+publish** | A9 ustiga quriladi. Har upstream sync'da qo'lda 4-5 qadam bajarilmoqda. |
+| 5 | **A14 — o'qilgan vaqt orqali faollik** 🆕 | Pastda batafsil. Foydalanuvchi 2026-08-25 da topdi. |
+
+**Qo'shimcha (2026-08-25 da qo'shildi):**
+**Startup 14.55 soniya** — sababi hali NOMA'LUM, log yordam bermaydi
+(2s dan 14s gacha jim bo'shliq). Profiler yoki bosqichma-bosqich
+vaqt o'lchash kodi kerak.
+
+**Strukturaviy qarz:** media arxivi mantig'i UCHTA yo'lda alohida
+yozilgan (L1 `finishLoad`, L2 `MaybeDownloadMedia`, L3
+`TryRescueMedia`). Har tuzatish uchalasiga alohida qo'llanishi
+kerak bo'lyapti va bir necha marta unutilgan. Birlashtirish kerak.
+
+---
+
+## 💡 YANGI G'OYA — o'qilgan vaqt orqali faollikni aniqlash (A14)
+
+**Foydalanuvchi topdi (2026-08-25).** Track C davomida tdesktop
+tomonida qilinadigan ishlar ro'yxatiga **5-band** sifatida qo'shildi.
+
+### Muammo
+
+Kontakt last-seen'ni yashirsa, "Faollik tarixi" faqat bilvosita
+signallarga tayanadi: online/offline o'tishlari va story qo'yilgan
+vaqt. Bu yetarli emas — yashirgan odam ko'pincha umuman ko'rinmaydi.
+
+### Kuzatuv
+
+Bitta kontaktda ikkita MUSTAQIL manba bir-biriga mos kelmadi:
+
+| Manba | Vaqt |
+|---|---|
+| Faollik tarixi (last-seen) | 24.08 **18:31** |
+| Xabar o'qilgan vaqti (kontekst menyu) | 24.08 **19:35** |
+
+Ya'ni odam 19:35 da FAOL bo'lgan, lekin last-seen buni
+ko'rsatmagan. **O'qilgan vaqt — mustaqil va aniqroq signal.**
+
+### Nega bu ishlaydi
+
+O'qilgan vaqt boshqa maxfiylik sozlamasi ostida: foydalanuvchi
+last-seen'ni yashirishi mumkin, lekin o'qilgan vaqt (agar u
+alohida yashirilmagan bo'lsa) ochiq qoladi. Ikkalasi bir xil
+tugma emas.
+
+### Texnik boshlanish nuqtasi
+
+`MTPmessages_GetOutboxReadDate` — `api/api_who_reacted.cpp:290`
+da allaqachon ishlatiladi (kontekst menyudagi "yesterday at 7:35 PM"
+aynan shundan). Ya'ni MTProto so'rovi tayyor, uni faollik tarixiga
+ulash kerak.
+
+### Reja (taxminiy)
+
+1. Kuzatilayotgan kontaktga yuborgan CHIQUVCHI xabarlarimiz uchun
+   `GetOutboxReadDate` so'raladi (kontakt ro'yxatda bo'lsa).
+2. Natija `activity_history` ga yangi `field='read'` sifatida
+   yoziladi — mavjud tuzilma o'zgarmaydi.
+3. Faollik tarixi oynasida alohida qator: "Xabar o'qildi: HH:MM".
+4. Online davrlarni qayta qurishda ham hisobga olinadi — o'qilgan
+   vaqt = o'sha lahzada FAOL bo'lgan.
+
+### Ehtiyot bo'lish kerak bo'lgan joylar
+
+- **So'rov chastotasi.** Har xabar uchun alohida so'rov yubormaslik
+  kerak — flood-limit xavfi. Faqat kuzatilayotgan 8 kishi va faqat
+  yangi o'qilgan xabarlar uchun.
+- **Ghost Mode bilan ziddiyat yo'q** — bu BIZNING xabarimiz qachon
+  o'qilganini so'raydi, biz hech narsani o'qilgan deb belgilamaymiz.
+- **Premium/maxfiylik cheklovi.** Kontakt o'qilgan vaqtni yashirgan
+  bo'lsa so'rov bo'sh qaytadi — bu normal, xato emas.
+
+---
+
 ## 🔍 2026-08-25 — bypass-forward media zanjiri: 4 ta bo'shliq
 
 Sinov ketma-ketligi (foydalanuvchi topdi, har biri oldingisini
