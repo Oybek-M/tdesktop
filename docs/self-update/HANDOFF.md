@@ -201,6 +201,18 @@ keshda `ON` ekanini ko'rsatdi. Tuzatish:
 `-D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF` qo'shildi, qayta konfiguratsiya
 qilindi — ikkalasi ham `v145`da to'g'ri qayta yaratildi.
 
+> 🔴 **2026-08-24: BU XATO TAKRORLANDI.** Qt6 migratsiyasida
+> `configure.bat qt6 ...` bayroqni yana `ON` ga qaytardi va
+> self-update UI'siz 7.1.1 relizi chiqarib yuborildi. Quyidagi
+> ogohlantirish o'qilmagan.
+>
+> **Endi majburiy qadam — reliz'dan OLDIN:**
+> ```bash
+> grep -E "DISABLE_AUTOUPDATE" out/CMakeCache.txt   # OFF bo'lishi SHART
+> ```
+> va build'da Settings -> Advanced -> "Version and updates"
+> bo'limi borligini KO'Z BILAN tekshiring.
+
 **Har safar CMake keshi tozalanganda eslab qolish kerak** — quyidagi
 `-D` flag'lar barchasi kerak, aks holda birortasi standart holatiga
 qaytib, kutilmagan build xatosiga olib keladi:

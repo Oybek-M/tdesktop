@@ -158,6 +158,48 @@ Kod tayyor, **BUILD QILINMAGAN**. Bitta build'da sinaladi.
 | A11 | Story backup L2 ga o'tkazildi — endi katta story'lar ham saqlanadi, indeksga tushadi va eksport qilinadi |
 | Versiya | **Kod kerak emas edi** — mexanizm mavjud. `docs/self-update/alpha-releases.md`. About tab'da to'liq versiya ko'rsatiladi. |
 
+## 🔴 2026-08-24 — DARS: Qt6 configure self-update'ni O'CHIRIB QO'YGAN
+
+Birinchi 7.1.1 relizi chiqarilgach ma'lum bo'ldi: build'da
+**"Check for Updates" bo'limi umuman yo'q** edi. Ya'ni o'sha paketni
+o'rnatgan qurilma boshqa hech qachon o'zi yangilana olmasdi —
+bir tomonlama tuzoq.
+
+Sabab:
+
+```
+DESKTOP_APP_DISABLE_AUTOUPDATE = ON     ← self-update UI o'chiq
+DESKTOP_APP_SPECIAL_TARGET     = ""     ← Packer/Updater qurilmaydi
+```
+
+`configure.bat qt6 ...` bu bayroqlarni standart holatiga qaytargan.
+
+⚠️ **BU XATO IKKINCHI MARTA TAKRORLANDI.**
+`docs/self-update/HANDOFF.md` §2.6 da u allaqachon yozilgan va
+"har safar CMake keshi tozalanganda eslab qolish kerak" deb
+ogohlantirilgan edi. Qt6 migratsiyasida hujjat o'qilmadi.
+
+**Qoida — CMake qayta konfiguratsiya qilinganda HAR SAFAR tekshiring:**
+
+```bash
+grep -E "DISABLE_AUTOUPDATE|API_ID" out/CMakeCache.txt
+# DESKTOP_APP_DISABLE_AUTOUPDATE:BOOL=OFF  <- OFF bo'lishi SHART
+```
+
+Tuzatish (mavjud sozlamalarni saqlab):
+`cmake out -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF`
+
+Natija: `Updater.vcxproj` va `Packer.vcxproj` qayta yaratildi,
+40 daqiqalik build, "Version and updates" bo'limi qaytdi.
+Yangi `Packer.exe` 7 MB -> 21.9 MB (endi Qt6 ga qarshi qurilgan),
+imzo tekshiruvi o'tdi.
+
+**Dars ikkinchisi:** relizni chiqarishdan OLDIN build'da self-update
+UI borligini ko'z bilan tekshirish kerak. Birinchi safar bu qadam
+o'tkazib yuborildi va ishlamaydigan paket tarqatildi.
+
+---
+
 ## ✅ 2026-08-24 — kod bosqichi TUGADI, reliz kutilmoqda
 
 Build 19:01 (`build-2026-08-24-photos`). Barcha sinovlar o'tdi.
