@@ -158,6 +158,51 @@ Kod tayyor, **BUILD QILINMAGAN**. Bitta build'da sinaladi.
 | A11 | Story backup L2 ga o'tkazildi — endi katta story'lar ham saqlanadi, indeksga tushadi va eksport qilinadi |
 | Versiya | **Kod kerak emas edi** — mexanizm mavjud. `docs/self-update/alpha-releases.md`. About tab'da to'liq versiya ko'rsatiladi. |
 
+## 🔍 2026-08-25 — bypass-forward media zanjiri: 4 ta bo'shliq
+
+Sinov ketma-ketligi (foydalanuvchi topdi, har biri oldingisini
+inkor qildi — shuning uchun gipoteza emas, DALIL bilan borildi):
+
+1. "Yangi klientda media ketmadi" → men "Telegram keshida yo'q"
+   dedim. **Noto'g'ri.**
+2. Foydalanuvchi media'ni to'liq ko'rib forward qildi — baribir
+   ketmadi. Demak ko'rish yetarli emas.
+3. DB dalili: forward qilingan xabar (`t.me/mubinam_1/597`)
+   `media_index` da `present`, diskda fayl BOR. Ammo
+   `actioned_messages` da 0 qator.
+
+**1-bo'shliq:** bypass-forward zanjiri arxivni umuman ko'rmasdi.
+Manba faqat (a) Telegram'ning o'z fayli, (b) O'CHIRILGAN xabar
+media'si edi. `GetArchivedMediaPath()` qo'shildi.
+
+Keyingi sinov: avtomatik yuklangan media ishladi, QO'LDA
+yuklangani ishlamadi. `data_document.cpp` `finishLoad()` da yana
+uchta xato:
+
+**2-bo'shliq:** darvoza faqat `ShouldAntiDelete()` ni tekshirardi.
+`ShouldMediaBackup()` ataylab boshqa zanjirdan boradi, ya'ni
+"Media Backup" yoqilgan chat AntiDelete qamrovida bo'lmasa —
+qo'lda yuklangan media arxivlanmasdi.
+
+**3-bo'shliq:** tur `"file"` deb qotirilgan — video
+`medias/files/` ga tushardi. 2026-08-15 tasnif tuzatishi bu
+joyni qamramagan.
+
+**4-bo'shliq:** `SaveMediaFile()` `media_index` ga yozmaydi va
+fayl nomida peer/msg yo'q → `(peerId, msgId)` bo'yicha topib
+bo'lmasdi.
+
+**Dars:** bir xil mantiq (media arxivi) uchta yo'lda — L1
+(`finishLoad`), L2 (`MaybeDownloadMedia`), L3 (`TryRescueMedia`) —
+alohida-alohida yozilgan. Tuzatish bittasiga qo'llanib,
+qolganlari unutilgan. Yangi tuzatish kiritganda **uchalasini ham**
+tekshiring.
+
+Ikkala yo'l ham sinovdan o'tdi. Eski fayllar uchun "Eski media
+fayllarni indekslash" tugmasi bosildi — 60 ta fayl indekslandi.
+
+---
+
 ## 🔴 2026-08-24 — DARS: Qt6 configure self-update'ni O'CHIRIB QO'YGAN
 
 Birinchi 7.1.1 relizi chiqarilgach ma'lum bo'ldi: build'da
