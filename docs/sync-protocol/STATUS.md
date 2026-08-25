@@ -32,6 +32,19 @@ Oxirgi yangilanish: **2026-08-25**
 | `PeerNameCache` | ✅ mavjud (`peer_directory` ning lokal proyeksiyasi) |
 | Retention (activity) | ✅ 30 kun, tozalash ishlaydi |
 
+### tdesktop'da 2026-08-25 da tuzatilgan (Track C ga ta'sir qiladi)
+
+| Xato | Nima uchun protokolga tegishli |
+|---|---|
+| Rasmlar arxivlanmasdi |  da  yozuvlari faqat 08-24 dan bor — undan oldingi rasmlar YO'Q. Sync ularni topa olmaydi |
+| Qo'lda yuklangan media indekslanmasdi | L1 yo'li  ga yozmasdi —  ularni ko'rmasdi |
+| Placeholder qayta arxivlanardi | ASL MATN o'rniga ko'rsatish markeri saqlanardi (12 yozuv). v9 migratsiyasi tozalaydi |
+
+⚠️ **Sync uchun muhim:** eski (2026-08-24 dan oldingi) rasmlar
+arxivda YO'Q. Ular  da ham yo'q, ya'ni sync ularni
+"yo'qolgan" deb ham ko'rsata olmaydi. Bu qabul qilingan
+yo'qotish — tiklab bo'lmaydi.
+
 ### tdesktop'da Track C uchun QOLGAN ishlar
 
 1. **`sha256` hisoblash** — `media_index` ga to'ldirish
