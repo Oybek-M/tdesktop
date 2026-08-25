@@ -14,6 +14,34 @@
 
 ---
 
+> ## ⚠️ REVIZIYA 2026-08-25 — bu planga tegishli o'zgarishlar
+>
+> To'liq ro'yxat: spec **§0**.
+>
+> Capture service ham **oddiy klient** — ya'ni boshqa klientlar
+> uchun amal qiladigan qoidalar unga ham tegishli:
+>
+> | Qoida | Manba |
+> |---|---|
+> | `sha256` — ochiq matn ustidan, shifrlashdan OLDIN | §0.5 |
+> | Manfiy `msg_id` (avatar/story) ishorasi saqlanadi | §0.6 |
+> | Pull'da retention filtri — aks holda cheksiz sikl | §0.3 |
+> | `tombstone` qabul qilinadi | §0.3 |
+> | Media yo'llari kodda saqlanmaydi | §0.8 |
+>
+> ### Task 8 (media siyosati) — `media_index` bilan
+> Service media yuklaganda `media_index` yozuvi ham push qilinadi
+> (§0.4). Bu uning eng katta qiymati: service 24/7 ulangan, ya'ni
+> u **hech kim ko'rmagan** media'ni ham ushlab qoladi va boshqa
+> qurilmalar uni o'sha yerdan oladi.
+>
+> ### Task 9 (xotira) — kvota
+> Service o'z kvotasiga ega bo'lishi kerak (§0.9). To'lganda
+> `pending/quota_full` yoziladi — ma'lumot yo'qolmaydi, faqat fayl
+> keyinroq olinadi.
+
+---
+
 ## Nima uchun alohida jarayon
 
 | Sabab | Foyda |

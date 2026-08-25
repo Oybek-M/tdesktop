@@ -14,6 +14,36 @@
 
 ---
 
+> ## ⚠️ REVIZIYA 2026-08-25 — bu planga tegishli o'zgarishlar
+>
+> To'liq ro'yxat: spec **§0**. Quyida faqat SHU planga tegishlilari.
+>
+> ### Task 2 (`RecordId`) — manfiy `msg_id`
+> `msg_id` **manfiy bo'lishi mumkin** (avatar `-photo_id`, story
+> `-story_id`, skaner topgan fayl `-qHash(rel_path)-1`).
+> `record_id` hisoblashda ishora **saqlanishi shart** — `-42` va `42`
+> turli yozuvlar. Test vektorlariga manfiy holat ham qo'shiladi.
+>
+> ### Task 3 (PostgreSQL sxemasi)
+> `records.msg_id` allaqachon `BIGINT` — manfiy qiymat muammosiz.
+> Qo'shimcha jadval **kerak emas**: `tombstone` ham oddiy `records`
+> qatori (spec §0.3). Server tombstone qabul qilganda `payload`
+> ichidagi `target_record_id` bo'yicha asl qatorni o'chiradi va
+> tombstone'ning o'zini saqlaydi.
+>
+> ### Task 4 (`SettingsService`) — yangi kalitlar
+> | Kalit | Standart | Nima uchun |
+> |---|---|---|
+> | `retention.activity_days` | 90 | Mijozda 30, serverda UZUNROQ (spec §0.3) |
+> | `retention.<kind>_days` | 0 = cheksiz | Kind bo'yicha alohida |
+> | `storage.quota_total_mb` | 0 = cheksiz | Spec §0.9 |
+> | `storage.quota_per_device_mb` | 0 = cheksiz | |
+>
+> 🔴 Serverdagi retention **hech qachon tombstone yaratmaydi** —
+> u lokal tozalash, global o'chirish emas.
+
+---
+
 ## File Structure
 
 ```

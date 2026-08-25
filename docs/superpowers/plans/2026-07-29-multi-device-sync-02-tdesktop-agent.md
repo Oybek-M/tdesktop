@@ -6,11 +6,102 @@
 
 **Architecture:** Yangi kod olti fokusli modulga bo'lingan. Ulardan ikkitasi (`custom_sync_record`, `custom_sync_crypto`) **tdesktop'ga umuman bog'liq emas** — faqat QtCore va OpenSSL. Bu ataylab: shu ikkisi alohida kichik test dasturida sekundlar ichida kompilyatsiya qilinadi va `test-vectors.json` ga qarshi tekshiriladi, 34 daqiqalik to'liq build'ni kutmasdan.
 
-**Tech Stack:** C++20, Qt 5.15.18 (QtCore, QtNetwork), OpenSSL (allaqachon linklangan), SQLite (mavjud `custom_db` ulanishi orqali).
+**Tech Stack:** C++20, Qt 6.11.1 (QtCore, QtNetwork), OpenSSL (allaqachon linklangan), SQLite (mavjud `custom_db` ulanishi orqali).
 
 **Kirish sharti:** [01b](2026-07-29-multi-device-sync-01b-backend-sync.md) tugagan va `docs/sync-protocol/test-vectors.json` mavjud. Ishlaydigan server (lokal yoki VPS) kerak.
 
 **Umumiy qoidalar:** [00-index](2026-07-29-multi-device-sync-00-index.md) dagi K1–K7. Ayniqsa **K5**: sync o'chiq bo'lganda regressiya nolga teng bo'lishi kerak.
+
+---
+
+> ## ⚠️ REVIZIYA 2026-08-25 — bu planga ENG KO'P o'zgarish tegdi
+>
+> To'liq ro'yxat: spec **§0**. Bu plan tdesktop'ga tegishli, tdesktop
+> esa bir oyda ancha o'zgargan — quyidagilarni **implement qilishdan
+> oldin** o'qing.
+>
+> ### YANGI Task 0 — `qtwebsockets` modulini qurish
+>
+> Task 9 "WebSocket (shartli)" deb yozilgan edi, chunki modul bor deb
+> hisoblangan. Amalda **bizning Qt 6.11.1 da u qurilmagan**
+> (`prepare.py:1560` faqat `qtbase qtimageformats qtsvg` ni oladi).
+>
+> Butun Qt qayta qurilmaydi — modul alohida quriladi (spec §0.1):
+>
+> ```
+> git clone --branch v6.11.1 https://code.qt.io/qt/qtwebsockets.git
+> <Qt-6.11.1>/bin/qt-configure-module.bat <qtwebsockets>
+> cmake --build . --parallel && cmake --install .
+> ```
+>
+> ~10-15 daqiqa, ~200 MB. Shundan keyin Task 9 **shartli emas**,
+> oddiy task bo'ladi va `CMakeLists.txt` ga `Qt6::WebSockets`
+> qo'shiladi.
+>
+> ### Task 3 — sxema **v6 emas, v9**
+>
+> Plan yozilganda tdesktop v5 da edi. Hozir **v8**:
+> v6 = `text_cache.is_archived`, v7 = `media_index`,
+> v8 = activity indekslari. Sync migratsiyasi **v9**.
+>
+> ### Task 4 — enqueue nuqtalari: 4 emas, **6 ta**
+>
+> Plan 4 ta nuqta sanaydi. Bir oyda ikkita yangi manba paydo bo'ldi:
+>
+> | Fayl | Funksiya | Kind |
+> |---|---|---|
+> | `custom_db.cpp` | `MarkDeleted()` | `deleted` |
+> | `custom_db.cpp` | `SaveActionedMessage()` (edited) | `edited` |
+> | `custom_db.cpp` | `SaveActivityHistoryEntry()` | `activity` |
+> | `custom_db.cpp` | `SaveGhostRead()` | `ghost_read` |
+> | `custom_db.cpp` | **`UpsertMediaIndex()`** 🆕 | `media_index` |
+> | `custom_settings.cpp` | **`RememberPeerName()`** 🆕 | `peer_directory` |
+>
+> `RememberPeerName()` — spec §0.10: `PeerNameCache` va
+> `peer_directory` bir xil vazifa, ular birlashtiriladi. Kelgan
+> `peer_directory` yozuvi keshga yoziladi.
+>
+> ### Task 7 (pull va merge) — RETENTION FILTRI
+>
+> 🔴 **Busiz sync cheksiz siklga tushadi.** Mijozda activity 30 kun
+> saqlanadi, serverda esa uzoqroq. Filtrsiz: pull eski yozuvni
+> qaytaradi -> mijoz uni yozadi -> tozalash o'chiradi -> keyingi
+> pull yana qaytaradi. **Har 30 soniyada.**
+>
+> Qoida (spec §0.3): kelgan yozuv lokal retention oynasidan tashqarida
+> bo'lsa — **merge qilinmaydi, lekin cursor baribir suriladi**. Bu
+> xato emas, normal "rad etish".
+>
+> Shuningdek `tombstone` qabul qilish: `target_record_id` bo'yicha
+> lokal yozuv o'chiriladi.
+>
+> ### YANGI — `sha256` hisoblash
+>
+> Spec §0.5: media dedup hash'siz ishlamaydi, hozir esa 1543
+> yozuvning hech birida hash yo'q.
+>
+> - Yangi fayllar: arxivlash paytida (`RecordIndex` /
+>   `RecordPhotoIndex` / `finishLoad` — **uchala yo'lda ham**)
+> - Mavjudlar: bir martalik fon skaneri, "Eski media fayllarni
+>   indekslash" tugmasiga qo'shiladi
+>
+> 🔴 Hash **ochiq matn** ustidan, shifrlashdan OLDIN.
+>
+> ⚠️ Media arxivi mantig'i tdesktop'da **uch joyda** takrorlangan
+> (L1 `finishLoad`, L2 `MaybeDownloadMedia`, L3 `TryRescueMedia`).
+> 2026-08-25 da aynan shu sabab ikkita xato yarim tuzatilgan holda
+> qolgan edi. Har o'zgarishni **uchalasiga ham** qo'llang.
+>
+> ### Task 10 (UI) va yo'llar
+>
+> Arxiv ildizi endi sozlanadi (`CustomSettings::ArchiveRoot()`,
+> foydalanuvchi o'zgartira oladi, migratsiya bilan). Sync agenti
+> **hech qanday yo'lni kodda saqlamasin** (spec §0.8).
+>
+> Kvota holati ham UI'da ko'rsatiladi (spec §0.9) — mijoz kvotasi
+> to'lganda `media_index` ga `pending/quota_full` yoziladi va **shu
+> holat sync qilinadi**, boshqa qurilma buni ko'rib faylni o'zi
+> olishi mumkin.
 
 ---
 
@@ -78,7 +169,7 @@ project(sync_selftest CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt5 COMPONENTS Core REQUIRED)
+find_package(Qt6 COMPONENTS Core REQUIRED)
 find_package(OpenSSL REQUIRED)
 
 # Ataylab faqat tdesktop'ga bog'liq bo'lmagan fayllar.
@@ -92,7 +183,7 @@ target_include_directories(sync_selftest PRIVATE
     ../../Telegram/SourceFiles)
 
 target_link_libraries(sync_selftest PRIVATE
-    Qt5::Core OpenSSL::Crypto)
+    Qt6::Core OpenSSL::Crypto)
 ```
 
 `tools/sync-selftest/main.cpp`:
@@ -1361,7 +1452,7 @@ capture keeps running -- locking pauses upload, it never drops data."
 ls "$(qmake -query QT_INSTALL_LIBS)" | grep -i websocket
 ```
 
-**Agar `Qt5WebSockets` mavjud bo'lsa** — Step 2 ga o'ting.
+**Agar `Qt6WebSockets` mavjud bo'lsa** — Step 2 ga o'ting.
 
 **Agar mavjud bo'lmasa** — bu taskni **o'tkazib yuboring**. Tizim
 periodik pull bilan to'liq to'g'ri ishlaydi; WebSocket faqat kechikishni
@@ -1381,7 +1472,7 @@ Uzilsa eksponensial backoff (1s → 60s) bilan qayta ulanish.
 git add -A
 git commit -m "feat: add WebSocket change notifications to the desktop agent
 
-Guarded behind an availability check for Qt5WebSockets: the design treats
+Guarded behind an availability check for Qt6WebSockets: the design treats
 push as an optimisation over polling, so a build without the module simply
 syncs on the 30-second timer instead of hand-rolling RFC 6455 framing."
 ```

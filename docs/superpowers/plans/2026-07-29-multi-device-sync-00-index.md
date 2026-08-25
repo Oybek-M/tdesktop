@@ -10,6 +10,25 @@ o'zidan oldingilariga tayanadi.
 
 ---
 
+> ## ⚠️ REVIZIYA 2026-08-25
+>
+> Spec va planlar 2026-07-29/31 da yozilgan. Bir oy ichida tdesktop
+> ancha o'zgardi (Qt6, v7.1.1, `media_index`, kvota, eksport v3).
+>
+> **11 ta qaror spec §0 da.** Har bir plan boshida ham o'ziga tegishli
+> qismi qisqacha yozilgan.
+>
+> Eng muhim uchtasi:
+> 1. `qtwebsockets` moduli **alohida qurilishi** kerak (Qt qayta
+>    qurilmaydi) — spec §0.1
+> 2. tdesktop sxemasi **v8 -> v9** (plan 02 da v6 deb yozilgan) — §0.2
+> 3. **Retention assimetriyasi** cheksiz siklga olib keladi; mijozda
+>    qabul filtri + serverda uzunroq retention + tombstone — §0.3
+>
+> Plan **06** shu revizyada yozildi.
+
+---
+
 ## Tartib va sabab
 
 | № | Plan | Natija | Fayl |
@@ -20,7 +39,7 @@ o'zidan oldingilariga tayanadi.
 | 3 | `server-controller` web app | Ko'rish, boshqarish, statistika | [03-web-controller](2026-07-29-multi-device-sync-03-web-controller.md) ✅ |
 | 4 | Storage lifecycle manager | Monitoring, retention, arxivlash, xavfsiz o'chirish | [04-storage-lifecycle](2026-07-29-multi-device-sync-04-storage-lifecycle.md) ✅ |
 | 5 | Always-on TDLib capture service | Muammo A hal bo'ladi | [05-capture-service](2026-07-29-multi-device-sync-05-capture-service.md) ✅ |
-| 6 | Release management | Backend CI/CD + boshqaruv panelidan klientlarga reliz chiqarish | ⏳ Hali yozilmagan |
+| 6 | Release management | Backend API orqali reliz yuklash + mirror holati + qurilma versiyalari | [06-release-management](2026-08-25-multi-device-sync-06-release-management.md) ✅ |
 
 **06 nima uchun bu seriyada:** [self-update plani](2026-08-01-self-update-plan.md)
 tdesktop uchun statik mirror'lar bilan boshlanadi va backend'ni kutmaydi.

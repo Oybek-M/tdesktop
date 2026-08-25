@@ -14,6 +14,35 @@
 
 ---
 
+> ## ⚠️ REVIZIYA 2026-08-25 — bu planga tegishli o'zgarishlar
+>
+> To'liq ro'yxat: spec **§0**.
+>
+> ### Task 3 (control plane) — kvota paneli
+> Spec §0.9: server kvotasi `SettingsService` da sozlanadi
+> (`storage.quota_total_mb`, `storage.quota_per_device_mb`).
+> Control plane'da ko'rsatiladi va tahrirlanadi. Kvota to'lganda
+> `PUT /media` 507 qaytaradi — UI'da aniq ogohlantirish.
+>
+> ### Task 7 (arxiv brauzeri) — `media_index` ko'rinishi
+> Yangi `media_index` kind (spec §0.4) alohida ko'rinish beradi:
+> qaysi fayl **qaysi qurilmada bor**. Hozir mijozda 62 ta yozuv
+> `pending/quota_full` — boshqa qurilmada o'sha fayl `present`
+> bo'lishi mumkin. Web app buni ko'rsatishi kerak:
+>
+> | Fayl | Holat |
+> |---|---|
+> | `video 562…_597` | ✅ desktop-pc-01, ❌ telefon (kvota) |
+>
+> Bu spec'ning dastlabki versiyasida umuman yo'q edi.
+>
+> ### Task 9 (peer nomlari)
+> Spec §0.10: `peer_directory` endi mijozdagi `PeerNameCache` bilan
+> birlashtirildi. Web app nomlarni o'sha kind'dan oladi — o'zgarish
+> yo'q, faqat manba endi barcha klientlarda bir xil to'ladi.
+
+---
+
 ## Ikki tekislik (plane)
 
 Bu ajratish butun ilovaning tuzilishini belgilaydi:

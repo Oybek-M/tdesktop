@@ -14,6 +14,51 @@
 
 ---
 
+> ## ⚠️ REVIZIYA 2026-08-25 — bu planga tegishli o'zgarishlar
+>
+> To'liq ro'yxat: spec **§0**. Quyida faqat SHU planga tegishlilari.
+>
+> ### Task 2 (push/pull) — `tombstone` va `media_index`
+>
+> **`tombstone` qabul qilish** (spec §0.3): yozuv kelganda server
+> `payload.target_record_id` bo'yicha asl qatorni o'chiradi va
+> tombstone'ni saqlaydi. Asl qator topilmasa ham tombstone
+> saqlanadi (boshqa qurilma keyinroq push qilishi mumkin —
+> o'shanda darhol o'chiriladi). Bu **idempotent**.
+>
+> **`media_index`** (spec §0.4) — maxsus ishlov TALAB QILMAYDI,
+> u oddiy record. Faqat bitta nozik joy: bir xil `(peer, msg)`
+> uchun `status` turli qurilmalarda turlicha bo'lishi mumkin
+> (`present` / `pending:quota_full`). Bular **turli `occurred_at`**
+> oladi, ya'ni turli `record_id` — ikkalasi ham saqlanadi va
+> joriy qiymat LWW proyeksiyasi bilan tanlanadi (§3.3).
+>
+> ### Task 3 (media saqlash)
+>
+> 🔴 `hash` — **ochiq matn** sha256'si (shifrlashdan OLDIN).
+> Aks holda har qurilmada turli nonce turli hash berardi va
+> `HEAD /media/{hash}` dedup butunlay ishlamasdi.
+>
+> Kvota (spec §0.9): `PUT` kvota to'lganda **507 Insufficient
+> Storage** qaytaradi. Kvota `SettingsService` dan o'qiladi
+> (`storage.quota_total_mb`, `storage.quota_per_device_mb`).
+>
+> ### Task 7 (`.cmx`) — format birlashtiriladi
+>
+> Spec §0.7: `.cmx` va tdesktop eksport v3 **bitta format** bo'ladi.
+> Barcha klientlar shuni o'qiydi va yozadi.
+>
+> Qo'shiladigan a'zolar (v3 dan):
+> - `settings.json` — platformadan mustaqil sozlamalar
+> - `index.json` — media indeksi
+> - media alohida arxivda bo'lishi mumkin (ixtiyoriy, katta)
+>
+> `manifest.json` ga `format` maydoni qo'shiladi. Tashqi qobiq ZIP
+> bo'lib qoladi — foydalanuvchi kerak bo'lsa kengaytmani `.zip` ga
+> o'zgartirib qo'lda ocha oladi (bu ataylab qoldirilgan yo'l).
+
+---
+
 ## File Structure
 
 ```

@@ -14,6 +14,43 @@
 
 ---
 
+> ## ⚠️ REVIZIYA 2026-08-25 — bu planga tegishli o'zgarishlar
+>
+> To'liq ro'yxat: spec **§0**.
+>
+> ### Task 2 (retention siyosatlari) — MIJOZ BILAN MOSLASHTIRISH
+>
+> 🔴 Bu planning eng muhim o'zgarishi.
+>
+> 2026-08-24 da tdesktop'ga **30 kunlik** activity tozalash qo'shildi.
+> Serverda retention undan **UZUNROQ** bo'lishi shart (standart 90
+> kun) — server markaziy arxiv, mijoz esa faqat yaqin tarixni
+> ushlaydi.
+>
+> Agar server mijozdan QISQAROQ saqlasa, mijozdagi ma'lumot
+> serverdan yo'qolib, keyin boshqa qurilmaga ham yetib bormaydi.
+>
+> 🔴 **Serverdagi retention hech qachon `tombstone` YARATMAYDI.**
+> Tombstone — foydalanuvchining ataylab o'chirishi (global).
+> Retention — lokal xotira boshqaruvi. Ikkalasi aralashtirilsa,
+> serverdagi tozalash barcha qurilmalardagi arxivni kesib tashlardi.
+>
+> Sozlamalar (`SettingsService`, plan 01a Task 4):
+> `retention.activity_days` = 90, `retention.<kind>_days` = 0 (cheksiz).
+>
+> ### Task 1 va 6 — kvota bilan bog'lanish
+> Spec §0.9: kvota (`storage.quota_*`) va retention birga ishlaydi.
+> Kvota to'lganda avval retention ishlaydi, keyin arxivlash
+> (Task 3-5), oxirida `PUT /media` 507 qaytaradi.
+>
+> ### `media_index` va xotira prognozi (Task 1)
+> Endi har media fayl uchun indeks yozuvi bor (spec §0.4), ya'ni
+> prognoz aniqroq bo'ladi: `size` yig'indisi `status='present'`
+> bo'yicha. `pending` yozuvlar — kelajakda kelishi mumkin bo'lgan
+> hajm, ular alohida ko'rsatiladi.
+
+---
+
 ## Nima uchun bu plan capture service'dan OLDIN
 
 Always-on capture service (Plan 05) 24/7 hamma narsani yozadi. Bu
