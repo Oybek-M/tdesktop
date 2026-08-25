@@ -29,7 +29,7 @@ struct ActionedMessage {
 // v5: actioned_messages + text_cache ga sender_id va is_media ustunlari qo'shildi.
 // v6 (A13/D4): text_cache ga is_archived ustuni — 1 bo'lsa doimiy arxiv,
 //              PruneStaleCachedText() unga tegmaydi.
-constexpr int kCurrentSchemaVersion = 8;
+constexpr int kCurrentSchemaVersion = 9;
 
 void Init();
 

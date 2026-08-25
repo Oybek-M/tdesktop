@@ -523,6 +523,23 @@ void MaybeArchiveItem(not_null<HistoryItem*> item) {
 		// bizni qaytadan chaqiradi.
 		return;
 	}
+	// 2026-08-25: QO'YILGAN placeholder'ni QAYTA ARXIVLAMAYMIZ.
+	//
+	// `loadDeletedMessages()` o'chirilgan xabarlar o'rniga lokal
+	// placeholder qo'yadi va uning matni "—— O'CHIRILDI ——" markeri
+	// bilan boshlanadi. Chat qayta ochilganda scrollback hook'i uni
+	// oddiy xabar deb qabul qilib, MARKER MATNINI arxivga yozardi —
+	// ya'ni asl matn o'rniga ko'rsatish matni saqlanardi.
+	//
+	// DB dalili: 12 ta shunday yozuv topildi, ba'zilari ikki marta
+	// (msg 393835 — 08-13 da asl matn, 08-23 da marker bilan). Asl
+	// yozuv keyinchalik tozalansa, faqat buzilgani qolardi.
+	//
+	// v3->v4 migratsiyasi bir marta shunday yozuvlarni tozalagan edi
+	// (custom_db.cpp) — demak bu nuqson QAYTALANGAN.
+	if (item->isDeletedLocally()) {
+		return;
+	}
 	const auto peerIdStr = QString::number(item->history()->peer->id.value);
 	if (!CustomSettings::ShouldBackgroundCache(peerIdStr)) {
 		return; // kuzatilmayotgan chat — hech narsa qilmaymiz

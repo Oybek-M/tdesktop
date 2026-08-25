@@ -351,6 +351,32 @@ void RunMigrations() {
                 "ON activity_history(peer_id, field, id)");
     }
 
+    // v8 -> v9: QO'YILGAN placeholder matni saqlanib qolgan yozuvlarni
+    // tozalash.
+    //
+    // `loadDeletedMessages()` o'chirilgan xabar o'rniga lokal placeholder
+    // qo'yadi (matni "—— O'CHIRILDI ——" bilan boshlanadi). Scrollback
+    // hook'i uni oddiy xabar deb qayta arxivlab, ASL MATN o'rniga
+    // ko'rsatish matnini yozib qo'yardi. Sabab custom_archive.cpp da
+    // tuzatildi (isDeletedLocally() tekshiruvi), bu yerda esa mavjud
+    // buzilgan yozuvlar olib tashlanadi.
+    //
+    // DIQQAT: faqat MARKER BILAN BOSHLANADIGAN yozuvlar o'chiriladi.
+    // Matn ICHIDA o'sha so'z uchragan haqiqiy xabarlar tegilmaydi.
+    //
+    // Bu v3 -> v4 da bir marta qilingan edi (TAHRIRLANDI/O'CHIRILDI) —
+    // demak nuqson qaytalangan.
+    if (version < 9) {
+        // char(8212) = U+2014 em-dash. ATAYLAB shunday: C++ manba
+        // faylida UTF-8 baytlarini narrow literal ichiga yozish
+        // 2026-08-24 da mojibake xatosiga olib kelgan edi. SQLite'ning
+        // o'z funksiyasi bu xavfni butunlay yo'q qiladi.
+        execSql("DELETE FROM actioned_messages "
+                "WHERE original_text LIKE char(8212)||char(8212)||'%'");
+        execSql("DELETE FROM text_cache "
+                "WHERE text LIKE char(8212)||char(8212)||'%'");
+    }
+
     // Update version stamp.
     {
         sqlite3_stmt *stmt = nullptr;
