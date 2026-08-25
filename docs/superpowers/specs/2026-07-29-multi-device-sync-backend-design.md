@@ -2,7 +2,192 @@
 
 **Sana:** 2026-07-29
 **Bo'lak:** 1-bo'lak (5 bo'lakli ekotizimning birinchisi)
-**Holat:** User review kutilmoqda
+**Holat:** 2026-08-25 da REVIZIYA qilindi — 0-bo'limga qarang
+
+---
+
+## 0. REVIZIYA — 2026-08-25
+
+Spec 2026-07-29 da yozilgan. O'shandan beri tdesktop tomonida ko'p narsa
+o'zgardi (Qt6, v7.1.1, `media_index`, kvota, eksport v3). Quyidagi
+qarorlar foydalanuvchi bilan kelishildi va **quyidagi bo'limlardan
+USTUN turadi**.
+
+### 0.1 WebSocket — Qt modulini alohida qurish
+
+§8.5 "yangi kutubxona kerak emas" degan edi. Amalda bizning Qt 6.11.1
+da **WebSockets moduli qurilmagan** (`prepare.py:1560` faqat
+`qtbase qtimageformats qtsvg` ni oladi).
+
+**Qaror:** butun Qt qayta qurilmaydi. `qtwebsockets` moduli mavjud Qt
+ustiga alohida quriladi — bu Qt6'ning rasmiy yo'li:
+
+```
+git clone --branch v6.11.1 https://code.qt.io/qt/qtwebsockets.git
+<Qt-6.11.1>/bin/qt-configure-module.bat <qtwebsockets>
+cmake --build . --parallel && cmake --install .
+```
+
+~10-15 daqiqa, ~200 MB. `qt-configure-module.bat` bizning SDK'da mavjud
+(tekshirildi). Build tayyorgarligiga bitta qadam qo'shiladi, spec
+dizayni o'zgarmaydi.
+
+### 0.2 Schema versiyasi: v8 → v9
+
+§8.2 "5 → 6" deb yozgan. Hozirgi holat **v8**:
+v6 = `text_cache.is_archived`, v7 = `media_index`, v8 = activity
+indekslari. Sync migratsiyasi **v9** bo'ladi.
+
+### 0.3 Retention — cheksiz siklning oldini olish
+
+⚠️ Spec bu haqda umuman gapirmagan, lekin 2026-08-24 da mijozga
+**30 kunlik** activity tozalash qo'shildi. Server yozuvni abadiy
+saqlasa, mijoz o'chirgach `pull` uni qaytadan olib keladi → mijoz
+yana o'chiradi → **har 30 soniyada takrorlanadigan cheksiz sikl**.
+
+**Qaror — uchala chora birga:**
+
+1. **Mijozda qabul filtri.** `pull` natijasidagi har yozuv lokal
+   retention oynasiga tushadimi tekshiriladi. Tushmasa — **merge
+   qilinmaydi**, lekin cursor baribir suriladi. Yozuv "rad etildi"
+   deb hisoblanadi, xato emas.
+2. **Serverda ham retention.** `server_settings` da sozlanadi
+   (kind bo'yicha alohida). Standart: `activity` 90 kun, qolganlari
+   cheksiz. Server mijozdan UZUNROQ saqlaydi — u markaziy arxiv.
+3. **Tombstone.** Mijoz yozuvni ATAYLAB o'chirsa (foydalanuvchi
+   buyrug'i bilan, retention emas), `kind='tombstone'` yozuvi
+   push qilinadi. Server asl yozuvni o'chiradi va tombstone'ni
+   saqlaydi, shunda boshqa qurilmalar ham o'chiradi.
+
+🔴 **Retention o'chirishi tombstone YARATMAYDI** — aks holda har
+qurilma bir-birining arxivini kesib tashlardi. Retention lokal
+qaror, tombstone esa global.
+
+`tombstone` payload: `{target_record_id}`. `msg_id` o'rnida
+`SHA256(target_record_id)` ning birinchi 8 bayti.
+
+### 0.4 `media_index` sync'ga to'liq kiritiladi
+
+Spec yozilganda bu jadval yo'q edi. Endi unda 1543 yozuv bor va u
+sync uchun tayyor model. **Yangi kind: `media_index`.**
+
+Payload: `{kind, file_name, rel_path, size, sha256, status, reason,
+layer, msg_date}`. `msg_id` — haqiqiy xabar ID (yoki manfiy, 0.6 ga
+qarang).
+
+**Eng qimmat imkoniyat:** hozir 62 ta yozuv `status=pending`,
+`reason=quota_full`. Boshqa qurilmada o'sha media `present` bo'lishi
+mumkin. Sync buni ko'radi va **fayl qaysi qurilmada borligini**
+aniqlaydi. Bu spec'da umuman ko'zda tutilmagan qobiliyat.
+
+`status` LWW proyeksiyasi bilan hal qilinadi (3.3-bo'limdagi qoida:
+eng katta `occurred_at` g'olib) — status ustuvorligi bo'yicha emas.
+
+### 0.5 `sha256` MAJBURIY bo'ladi
+
+Hozir 1543 yozuvning **hech birida** hash yo'q. Protokol esa media
+dedup'ni `HEAD /api/v1/media/{hash}` bilan qiladi — hash'siz bu
+ishlamaydi.
+
+- **Yangi fayllar:** arxivlash paytida hisoblanadi (fayl baribir
+  yozilmoqda — qo'shimcha diskdan o'qish yo'q).
+- **Mavjud 1543 ta:** bir martalik fon skaneri, mavjud "Eski media
+  fayllarni indekslash" tugmasiga qo'shiladi.
+
+🔴 sha256 — **ochiq matn** ustidan (shifrlashdan OLDIN), aks holda
+turli qurilmalarda turli nonce turli hash berardi va dedup buzilardi.
+
+### 0.6 Yangi kind'lar
+
+§3.2 jadvaliga qo'shiladi:
+
+| kind | msg_id | Payload |
+|---|---|---|
+| `media_index` | xabar id (yoki manfiy) | `{kind, file_name, rel_path, size, sha256, status, reason, layer, msg_date}` |
+| `tombstone` | `SHA256(target_record_id)[0:8]` | `{target_record_id}` |
+
+**Manfiy `msg_id` konvensiyasi** (tdesktop'da allaqachon ishlatiladi):
+
+| Nima | msg_id |
+|---|---|
+| Avatar | `-photo_id` |
+| Story | `-story_id` |
+| Skaner topgan noma'lum fayl | `-qHash(rel_path)-1` |
+
+`record_id` formulasi manfiy son bilan muammosiz ishlaydi (o'nlik
+satr sifatida qo'shiladi), lekin **ishorani saqlash shart** — `-42`
+va `42` turli yozuvlar.
+
+### 0.7 Eksport formati — YAGONA custom format
+
+§7 dagi `.cmx` va tdesktop'dagi eksport v3 **birlashtiriladi**.
+Foydalanuvchi qarori: barcha klientlar (tdesktop, kelajakdagi
+android/ios, customsync-server) **bitta formatni** o'qiydi va yozadi.
+
+**Talablar:**
+1. Format **custom** — faqat bizning ilovalarimiz ochadi.
+2. **Qo'lda ochish yo'li ham qoladi** — foydalanuvchi kerak bo'lganda
+   o'zi ocha olishi shart.
+
+**Yechim:** tashqi qobiq — ZIP, lekin `.cmx` kengaytmasi va
+`manifest.json` da `format` maydoni bilan. Qo'lda ochish uchun
+kengaytmani `.zip` ga o'zgartirish kifoya — bu hujjatda yoziladi.
+Shifrlangan bo'lsa ichidagi `records.jsonl` va media baribir
+shifrlangan qoladi (kalitsiz o'qib bo'lmaydi) — bu ataylab.
+
+**v3 dan olinadigan narsalar:** `settings.json` (platformadan
+mustaqil sozlamalar), `index.json` (media indeksi), ikkita alohida
+arxiv imkoniyati (asosiy + media — media ixtiyoriy va katta).
+
+`ExportFullBackup` (to'liq qurilma zaxirasi) **alohida qoladi** —
+u boshqa maqsad. UI'da ikkalasi aniq ajratiladi.
+
+### 0.8 Arxiv ildizi sozlanadi
+
+`~/customizationMainFolder` endi qattiq emas —
+`CustomSettings::ArchiveRoot()` va foydalanuvchi uni o'zgartira
+oladi (migratsiya bilan). Sync agenti **hech qanday yo'lni
+kodda saqlamasligi kerak**.
+
+### 0.9 Kvota tizimi
+
+Mijozda `CustomMediaQuota` bor (sozlanadigan chegara, to'lganda
+o'chirmaydi, faqat ogohlantiradi). Spec'ga qo'shiladi:
+
+- Server `server_settings` da **o'z kvotasi** (umumiy va qurilma
+  bo'yicha).
+- `PUT /api/v1/media/{hash}` kvota to'lganda **507** qaytaradi;
+  mijoz outbox'da ushlab turadi (§10 da allaqachon shunday).
+- Mijoz kvotasi to'lganda `media_index` ga `status=pending`,
+  `reason=quota_full` yoziladi va **shu holat sync qilinadi** —
+  boshqa qurilma buni ko'rib faylni o'zi olishi mumkin (0.4).
+
+### 0.10 `peer_directory` va `PeerNameCache` birlashtiriladi
+
+2026-08-24 da tdesktop'ga `PeerNameCache` qo'shildi (registry'da
+peerId → nom). Bu §3.2 dagi `peer_directory` kind bilan **bir xil
+vazifa**.
+
+**Qaror:** `PeerNameCache` — `peer_directory` ning lokal
+proyeksiyasi. Nom arxivlash paytida yoziladi (hozirgidek), sync
+paytida `peer_directory` yozuviga aylanadi. Kelgan
+`peer_directory` esa keshga yoziladi. Barcha klientlar bir xil
+ishlaydi.
+
+### 0.11 Plan 06 — reliz boshqaruvi
+
+Yozilishi kerak. 2026-08-24 dagi real hodisa aniq talab beradi:
+bitta reliz uchun skript IKKI MARTA ishga tushirildi, chunki har
+yurishda boshqa mirror yiqildi (SSH `Connection reset` / GitHub
+clone uzilishi).
+
+**API talablari:** bo'laklab (resumable) yuklash, checksum bo'yicha
+idempotentlik, aniq HTTP xato, `GET /releases` bilan mirror holati,
+token bilan avtorizatsiya.
+
+🔴 **Imzo LOKALDA qoladi.** Server faqat tayyor, imzolangan paketni
+qabul qiladi. `packer_private.h` va `alpha_private.h` hech qachon
+serverga chiqmaydi.
 
 ---
 
@@ -147,6 +332,8 @@ Payload — shifrlanishdan oldingi JSON obyekti.
 | `ghost_read` | o'qilgan max id | `{}` (metadata yetarli) |
 | `setting` | 0 | `{key, value}` |
 | `peer_directory` | 0 | `{entries: [{peer_hash, name, username, type}]}` |
+| `media_index` | xabar id (manfiy bo'lishi mumkin) | 0.4 ga qarang |
+| `tombstone` | `SHA256(target_record_id)[0:8]` | `{target_record_id}` |
 
 ### 3.3 Ikki xil semantika — aralashtirmaslik kerak
 
@@ -551,6 +738,8 @@ bitta katalogda juda ko'p fayl to'planmasligi uchun.
 
 ## 7. Almashuv formati (`.cmx`)
 
+> ⚠️ 0.7 ga qarang — bu format tdesktop eksport v3 bilan BIRLASHTIRILADI.
+
 Oddiy ZIP arxiv. Maqsad: qurilma uzoq uzilib qolganda yoki server bilan
 muammo bo'lganda qo'lda ma'lumot ko'chirish.
 
@@ -595,9 +784,11 @@ aniq ajratiladi: *"To'liq zaxira"* va *"Almashuv eksporti"*.
 `Telegram/SourceFiles/custom_sync.h` / `.cpp` — mavjud `custom_db` /
 `custom_settings` pattern'iga mos. `Telegram/CMakeLists.txt` ga qo'shiladi.
 
-### 8.2 Sxema v6 migratsiyasi
+### 8.2 Sxema v9 migratsiyasi
 
-`CustomDB::kCurrentSchemaVersion` 5 → 6. Mavjud `RunMigrations()` mexanizmi
+> 0.2 ga qarang — bu bo'lim yozilganda v5 edi, hozir v8.
+
+`CustomDB::kCurrentSchemaVersion` **8 → 9**. Mavjud `RunMigrations()` mexanizmi
 orqali **2 ta yangi jadval** qo'shiladi. Mavjud jadvallarga ustun
 qo'shilmaydi, mavjud funksiyalar imzosi o'zgarmaydi.
 
@@ -660,7 +851,7 @@ Yangi tashqi kutubxona **kerak emas**:
 | Ehtiyoj | Mavjud |
 |---|---|
 | HTTP | `QNetworkAccessManager` (Qt Network) |
-| WebSocket | `QWebSocket` (Qt WebSockets) |
+| WebSocket | `QWebSocket` — ⚠️ modul ALOHIDA qurilishi kerak, 0.1 ga qarang |
 | AES-256-GCM, PBKDF2, HKDF, HMAC, SHA-256 | OpenSSL (MTProto uchun allaqachon linklangan) |
 | JSON | `QJsonDocument` |
 | OS keystore (Windows) | DPAPI (`Crypt32.lib`) |
