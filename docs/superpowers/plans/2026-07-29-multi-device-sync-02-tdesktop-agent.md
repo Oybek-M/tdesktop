@@ -20,6 +20,17 @@
 > esa bir oyda ancha o'zgargan — quyidagilarni **implement qilishdan
 > oldin** o'qing.
 >
+> ### ~~YANGI Task 0~~ — `qtwebsockets` moduli ✅ QURILDI (2026-08-25)
+>
+> **Bu qadam BAJARILDI.** `Qt6WebSockets.lib` o'rnatildi va minimal
+> loyihada sinovdan o'tdi. Tafsilot va yo'lda chiqqan 3 ta to'siq:
+> [`docs/self-update/qtwebsockets-module.md`](../../self-update/qtwebsockets-module.md)
+>
+> Task 9 endi **shartli emas** — oddiy task. `CMakeLists.txt` ga
+> `Qt6::WebSockets` qo'shish kifoya.
+>
+> <details><summary>Asl matn (tarix uchun)</summary>
+>
 > ### YANGI Task 0 — `qtwebsockets` modulini qurish
 >
 > Task 9 "WebSocket (shartli)" deb yozilgan edi, chunki modul bor deb
@@ -37,6 +48,8 @@
 > ~10-15 daqiqa, ~200 MB. Shundan keyin Task 9 **shartli emas**,
 > oddiy task bo'ladi va `CMakeLists.txt` ga `Qt6::WebSockets`
 > qo'shiladi.
+>
+> </details>
 >
 > ### Task 3 — sxema **v6 emas, v9**
 >
