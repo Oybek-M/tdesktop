@@ -36,12 +36,12 @@ Oxirgi yangilanish: **2026-08-25**
 
 | Xato | Nima uchun protokolga tegishli |
 |---|---|
-| Rasmlar arxivlanmasdi |  da  yozuvlari faqat 08-24 dan bor — undan oldingi rasmlar YO'Q. Sync ularni topa olmaydi |
-| Qo'lda yuklangan media indekslanmasdi | L1 yo'li  ga yozmasdi —  ularni ko'rmasdi |
+| Rasmlar arxivlanmasdi | `media_index` da `image` yozuvlari faqat 08-24 dan bor — undan oldingi rasmlar YO'Q. Sync ularni topa olmaydi |
+| Qo'lda yuklangan media indekslanmasdi | L1 yo'li `media_index` ga yozmasdi — `GetArchivedMediaPath()` ularni ko'rmasdi |
 | Placeholder qayta arxivlanardi | ASL MATN o'rniga ko'rsatish markeri saqlanardi (12 yozuv). v9 migratsiyasi tozalaydi |
 
 ⚠️ **Sync uchun muhim:** eski (2026-08-24 dan oldingi) rasmlar
-arxivda YO'Q. Ular  da ham yo'q, ya'ni sync ularni
+arxivda YO'Q. Ular `media_index` da ham yo'q, ya'ni sync ularni
 "yo'qolgan" deb ham ko'rsata olmaydi. Bu qabul qilingan
 yo'qotish — tiklab bo'lmaydi.
 
