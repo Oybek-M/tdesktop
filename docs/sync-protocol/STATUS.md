@@ -24,7 +24,7 @@ Oxirgi yangilanish: **2026-08-25**
 | Nima | Holat |
 |---|---|
 | `qtwebsockets` moduli | ✅ qurildi va sinovdan o'tdi (2026-08-25) |
-| Sxema versiyasi | **v9** (sync jadvallari HALI YO'Q) |
+| Sxema versiyasi | **v9** — build 2026-08-25 22:37 da qo'llandi va tasdiqlandi |
 | `media_index` jadvali | ✅ mavjud, 1543 yozuv |
 | `sha256` maydoni | ❌ **BO'SH** — hisoblash hali yozilmagan |
 | `sync_outbox` / `sync_state` | ❌ yo'q — plan 02 Task 3 |
@@ -38,7 +38,7 @@ Oxirgi yangilanish: **2026-08-25**
 |---|---|
 | Rasmlar arxivlanmasdi | `media_index` da `image` yozuvlari faqat 08-24 dan bor — undan oldingi rasmlar YO'Q. Sync ularni topa olmaydi |
 | Qo'lda yuklangan media indekslanmasdi | L1 yo'li `media_index` ga yozmasdi — `GetArchivedMediaPath()` ularni ko'rmasdi |
-| Placeholder qayta arxivlanardi | ASL MATN o'rniga ko'rsatish markeri saqlanardi (12 yozuv). v9 migratsiyasi tozalaydi |
+| Placeholder qayta arxivlanardi | ASL MATN o'rniga marker saqlanardi. ✅ TASDIQLANDI: 12 -> 0, haqiqiy 7 ta xabar tegilmadi, chat ochilgach yangi buzilgan paydo bo'lmadi |
 
 ⚠️ **Sync uchun muhim:** eski (2026-08-24 dan oldingi) rasmlar
 arxivda YO'Q. Ular `media_index` da ham yo'q, ya'ni sync ularni
