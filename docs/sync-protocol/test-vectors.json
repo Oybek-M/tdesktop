@@ -14,81 +14,138 @@
     "derived": {
       "customsync-content-v1": "ef4be29ded0e7c37dc2c3c948747e972f9613b40520f8c24d27df02e07e357b9",
       "customsync-media-v1": "7547ea679827403c03b4ccb99ec458370b769176df951aa25d20151b781553e8",
-      "customsync-peer-v1": "b6d7bc756486a457603a2d9980d5588b0f91001882a29ee832335a0f497a3cf6"
+      "customsync-peer-v1": "b6d7bc756486a457603a2d9980d5588b0f91001882a29ee832335a0f497a3cf6",
+      "customsync-account-v1": "8761ba1a1a59d15c378dd674258b99eba3c8749fa17dd48376c77070590e0863"
     }
   },
-  "peer_hash": {
-    "_note": "HMAC-SHA256(peer_key, peer_id)[0..16] -> hex. peer_id — O'NLIK SATR.",
+  "account_hash": {
+    "_note": [
+      "spec §0.12 (2026-08-26). HMAC-SHA256(account_key, account_id)[0..16] -> hex.",
+      "account_id — O'NLIK SATR (tdesktop: session().userId())."
+    ],
     "cases": [
       {
+        "account_id": "111222333",
+        "account_hash": "8ce7fd6f2c871df09e218375ad4bb5c4"
+      },
+      {
+        "account_id": "444555666",
+        "account_hash": "ba9d47f3553e5faf6e96843e7542cad4"
+      },
+      {
+        "account_id": "0",
+        "account_hash": "fb735b535a7363638554f864040aed13"
+      }
+    ]
+  },
+  "peer_hash": {
+    "_note": [
+      "spec §0.12 (2026-08-26). HMAC-SHA256(peer_key, account_id || 0x00 || peer_id)[0..16] -> hex.",
+      "account_id va peer_id — O'NLIK SATR. Eski formula (account_id'siz) ESKIRGAN."
+    ],
+    "cases": [
+      {
+        "account_id": "111222333",
         "peer_id": "7053823996",
-        "peer_hash": "cbcd16f7c84f024ee6791c08453e35e0"
+        "peer_hash": "1c366826957ce2cd3c1ce47ecbe66e46"
       },
       {
+        "account_id": "111222333",
         "peer_id": "562952781246744",
-        "peer_hash": "a9e0fe2a0867e7e157f9655b413faef1"
+        "peer_hash": "b8548a0f43e48ace0d0e4a4567c9452b"
       },
       {
+        "account_id": "111222333",
         "peer_id": "0",
-        "peer_hash": "176abfa087519bd2668f7ebe5ab16d63"
+        "peer_hash": "cbf5f01f07825ceb288c506462b8b3ce"
+      },
+      {
+        "account_id": "444555666",
+        "peer_id": "7053823996",
+        "peer_hash": "8b51c3f873f6d87ef82796bed7136df3"
       }
     ]
   },
   "record_id": {
     "_note": [
-      "SHA256(kind || 0x00 || peer_hash || 0x00 || msg_id_decimal || 0x00 || occurred_at_decimal)",
+      "spec §0.12 (2026-08-26).",
+      "SHA256(kind || 0x00 || account_hash || 0x00 || peer_hash || 0x00 || msg_id_decimal || 0x00 || occurred_at_decimal)",
       "msg_id MANFIY bo'lishi mumkin (avatar -photo_id, story -story_id).",
-      "Ishora SAQLANADI: -42 va 42 turli yozuvlar."
+      "Ishora SAQLANADI: -42 va 42 turli yozuvlar.",
+      "Oxirgi ikkita holat: bir xil kind/peer_hash/msg_id/occurred_at, FAQAT account_hash farq qiladi -- ikkalasi turli record_id berishi SHART (akkaunt ajratmasi tekshiruvi, §0.12)."
     ],
     "cases": [
       {
         "kind": "deleted",
-        "peer_hash": "cbcd16f7c84f024ee6791c08453e35e0",
+        "account_hash": "8ce7fd6f2c871df09e218375ad4bb5c4",
+        "peer_hash": "1c366826957ce2cd3c1ce47ecbe66e46",
         "msg_id": 395278,
         "occurred_at": 1787000000,
-        "record_id": "bfda4a46ca0504f9e3b3034bad1b4f63a817ab4dd5d0442682de80f89d1abac3"
+        "record_id": "0f714101f9cc08595411cc8cd5bd0e4495c68e808e1a38585f6df9931d488340"
       },
       {
         "kind": "edited",
-        "peer_hash": "cbcd16f7c84f024ee6791c08453e35e0",
+        "account_hash": "8ce7fd6f2c871df09e218375ad4bb5c4",
+        "peer_hash": "1c366826957ce2cd3c1ce47ecbe66e46",
         "msg_id": 390234,
         "occurred_at": 1787000001,
-        "record_id": "d7412936ce6daf6f01cef20a01f9d715d2ba291cd9317f0788627f0e9d5a0b32"
+        "record_id": "b0e618c89266665495d2edba2b93df0946cc2988f69de130379803b5d32efdd6"
       },
       {
         "kind": "activity",
-        "peer_hash": "cbcd16f7c84f024ee6791c08453e35e0",
+        "account_hash": "8ce7fd6f2c871df09e218375ad4bb5c4",
+        "peer_hash": "1c366826957ce2cd3c1ce47ecbe66e46",
         "msg_id": 0,
         "occurred_at": 1787000002,
-        "record_id": "6a243cf32b954e13f0acff0ef854bd8c5321c776240daeabb8a9a68694164369"
+        "record_id": "a279c3df9e2c7864e40400caf566c765daa24ca2bc796b515809567dcd0fc01d"
       },
       {
         "kind": "media_index",
-        "peer_hash": "cbcd16f7c84f024ee6791c08453e35e0",
+        "account_hash": "8ce7fd6f2c871df09e218375ad4bb5c4",
+        "peer_hash": "1c366826957ce2cd3c1ce47ecbe66e46",
         "msg_id": 597,
         "occurred_at": 1787000003,
-        "record_id": "b585679185ac7d2f6585f9a19c6fb37461a9b5d788821ebed65051e0313d02ef"
+        "record_id": "c518a9f86d205fa412935dddad91ba63c07329d98e0c7fd2a982a8536dba5335"
       },
       {
         "kind": "media_index",
-        "peer_hash": "cbcd16f7c84f024ee6791c08453e35e0",
+        "account_hash": "8ce7fd6f2c871df09e218375ad4bb5c4",
+        "peer_hash": "1c366826957ce2cd3c1ce47ecbe66e46",
         "msg_id": -5190442718973336697,
         "occurred_at": 1787000004,
-        "record_id": "533a13060b824ac653849f6c47a1bf90e8f679050b3c58f07504873237a5e763"
+        "record_id": "7de51d4afeeb0ab29de24a355ecb570a09f993f1e0fc0b51981df0227a7416ef"
       },
       {
         "kind": "media_index",
-        "peer_hash": "cbcd16f7c84f024ee6791c08453e35e0",
+        "account_hash": "8ce7fd6f2c871df09e218375ad4bb5c4",
+        "peer_hash": "1c366826957ce2cd3c1ce47ecbe66e46",
         "msg_id": -12345,
         "occurred_at": 1787000005,
-        "record_id": "70f08048a8102e599f05cebf47df909c87630b7cb2a504734c1cc50d7a47d3f4"
+        "record_id": "ff3b90dc0f90e4c23eb27828fd5ed3c916090e20fc484c716ab41eb84cbbd8bd"
       },
       {
         "kind": "tombstone",
-        "peer_hash": "cbcd16f7c84f024ee6791c08453e35e0",
+        "account_hash": "8ce7fd6f2c871df09e218375ad4bb5c4",
+        "peer_hash": "1c366826957ce2cd3c1ce47ecbe66e46",
         "msg_id": 0,
         "occurred_at": 1787000006,
-        "record_id": "7dab159bda119f7b92f2a80e5f354ace34a061f15661031830d9ed228eb0d832"
+        "record_id": "61539d624b1e88241ff0fa721f9bb3c00338e145af777136dfac973207058278"
+      },
+      {
+        "kind": "deleted",
+        "account_hash": "8ce7fd6f2c871df09e218375ad4bb5c4",
+        "peer_hash": "1c366826957ce2cd3c1ce47ecbe66e46",
+        "msg_id": 999999,
+        "occurred_at": 1787000100,
+        "record_id": "ea3bdcaf6cf7255802f5a42933f63c4aa27b827949d934e4e8e56180e565ea15"
+      },
+      {
+        "kind": "deleted",
+        "account_hash": "ba9d47f3553e5faf6e96843e7542cad4",
+        "peer_hash": "1c366826957ce2cd3c1ce47ecbe66e46",
+        "msg_id": 999999,
+        "occurred_at": 1787000100,
+        "record_id": "153af09bc6725d0474ae38528b9315b48c196577a3c1a3493558a7d58ea68d90"
       }
     ]
   },

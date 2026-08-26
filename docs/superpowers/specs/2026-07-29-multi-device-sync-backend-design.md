@@ -174,6 +174,21 @@ paytida `peer_directory` yozuviga aylanadi. Kelgan
 `peer_directory` esa keshga yoziladi. Barcha klientlar bir xil
 ishlaydi.
 
+### 0.11 Plan 06 — reliz boshqaruvi
+
+Yozilishi kerak. 2026-08-24 dagi real hodisa aniq talab beradi:
+bitta reliz uchun skript IKKI MARTA ishga tushirildi, chunki har
+yurishda boshqa mirror yiqildi (SSH `Connection reset` / GitHub
+clone uzilishi).
+
+**API talablari:** bo'laklab (resumable) yuklash, checksum bo'yicha
+idempotentlik, aniq HTTP xato, `GET /releases` bilan mirror holati,
+token bilan avtorizatsiya.
+
+🔴 **Imzo LOKALDA qoladi.** Server faqat tayyor, imzolangan paketni
+qabul qiladi. `packer_private.h` va `alpha_private.h` hech qachon
+serverga chiqmaydi.
+
 ### 0.12 Akkaunt ajratmasi — `record_id` va `peer_hash` (2026-08-26)
 
 Tashxis: [`2026-08-26-multi-account-db-isolation-design.md`](2026-08-26-multi-account-db-isolation-design.md)
@@ -256,20 +271,85 @@ protokolga tegishli chiqsa, tegishli bo'lim shu yerga alohida
 qo'shiladi. Bu revizya o'sha muhokamani **kutmaydi** — u mustaqil va
 o'zicha to'liq.
 
-### 0.11 Plan 06 — reliz boshqaruvi
+> 🔴 **YUQORIDAGI OGOHLANTIRISH RO'YOBGA CHIQDI.** O'sha "bog'liq
+> muhokama" aynan shu bo'limga zid chiqdi — `§0.13` ga qarang.
+> `0.12` dagi `peer_hash` formulasi `activity` kind uchun
+> **qo'llanilmaydi**.
 
-Yozilishi kerak. 2026-08-24 dagi real hodisa aniq talab beradi:
-bitta reliz uchun skript IKKI MARTA ishga tushirildi, chunki har
-yurishda boshqa mirror yiqildi (SSH `Connection reset` / GitHub
-clone uzilishi).
+### 0.13 `activity` kind — ataylab BIRLASHTIRILGAN (2026-08-26)
 
-**API talablari:** bo'laklab (resumable) yuklash, checksum bo'yicha
-idempotentlik, aniq HTTP xato, `GET /releases` bilan mirror holati,
-token bilan avtorizatsiya.
+Foydalanuvchi talabi (tdesktop-client sessiyasi, 2026-08-26):
 
-🔴 **Imzo LOKALDA qoladi.** Server faqat tayyor, imzolangan paketni
-qabul qiladi. `packer_private.h` va `alpha_private.h` hech qachon
-serverga chiqmaydi.
+> "account ma'lumotlarini o'zaro ajratsak ham aynan shu qism, tarix
+> kuzatuvi so'nggi faollikni byPass qilib aniqlash ma'lumotlari
+> ulaniq turaverishi kerak"
+
+#### Ziddiyat
+
+`§0.12` `peer_hash` ni akkauntga bog'ladi:
+
+```
+peer_hash = HMAC-SHA256(peer_key, account_id_decimal ‖ 0x00 ‖ peer_id_decimal)[0:16]
+```
+
+Bu `activity` kind uchun funksiyani **buzadi**: bir odamni ikki
+akkauntdan kuzatsak, ikkita turli `peer_hash` chiqadi, yozuvlar
+dedup bo'lmaydi va birlashmaydi. Mijoz "bu odamning butun faollik
+tarixi" so'rovini umuman bera olmaydi — har akkauntning hashini
+alohida bilishi kerak bo'ladi.
+
+Holbuki `activity_history` **kuzatilayotgan odam** haqidagi obyektiv
+fakt (kim qachon online bo'ldi, ismini o'zgartirdi) — bizning
+akkauntimiz haqida hech narsa saqlamaydi. Va ko'p akkaunt bu yerda
+kamchilik emas, **ustunlik**: har biri o'z kuzatuv oynasini beradi,
+birlashganda last-seen yashirgan odamning surati aniqroq bo'ladi.
+Bu bizning bypass mexanizmimizning asosi.
+
+#### Qaror
+
+`activity` kind `§0.12` dan **istisno**:
+
+| Maydon | `activity` kind uchun | Boshqa kind'lar uchun |
+|---|---|---|
+| `peer_hash` | `HMAC-SHA256(peer_key, peer_id_decimal)[0:16]` — **eski, akkauntsiz formula** | `§0.12` dagi akkauntga bog'langan formula |
+| `account_hash` | **bo'sh satr** (`record_id` da o'rni qoladi, ajratuvchilar saqlanadi) | `§0.12` dagi qiymat |
+
+`record_id` formulasi **bitta bo'lib qoladi** — faqat `activity`
+uchun ikkita maydon boshqacha to'ldiriladi:
+
+```
+record_id = SHA256(kind ‖ 0x00 ‖ account_hash ‖ 0x00 ‖ peer_hash ‖ 0x00 ‖
+                    msg_id_decimal ‖ 0x00 ‖ occurred_at_decimal)
+```
+
+Natija: ikki akkaunt bir xil faollikni ko'rsa, ikkalasida ham bir xil
+`record_id` chiqadi va K4 (yozish idempotent) tufayli server tabiiy
+deduplikatsiya qiladi. Qo'shimcha kod kerak emas.
+
+Lokal tomonda ham xuddi shu qoida — `activity_history` o'qishda
+`account_id` bo'yicha **filtrlanmaydi** (tashxis hujjati §4.1).
+
+#### 🔴 Maxfiylik bo'yicha ochiq aytilgan yon ta'sir
+
+`§0.12` ning `peer_hash` ni akkauntga bog'lashdan maqsadi — server
+bir nechta akkaunt bir xil odam bilan bog'langanini **ko'ra
+olmasin**. `activity` kind uchun bu himoya **ataylab olib
+tashlanadi**: server bir necha akkaunt bir xil odamni kuzatayotganini
+ko'ra oladi.
+
+Bu ongli kelishuv, chunki funksiyaning o'zi aynan shu bog'lanishga
+tayanadi — bog'lanishsiz u ishlamaydi. Yumshatuvchi omillar:
+
+- Server `peer_id` ni bilmaydi — faqat `peer_hash` ni ko'radi
+- `old_value`/`new_value` shifrlangan qoladi
+- Bu faqat `activity` kind'ga tegishli; xabarlar, matn keshi va media
+  indeksi to'liq ajratilgan holicha qoladi
+
+⚠️ **`test-vectors.json` uchun:** `peer_hash` bo'limiga akkauntsiz
+variant uchun kamida bitta vektor, `record_id` bo'limiga esa bo'sh
+`account_hash` li kamida bitta `activity` vektori qo'shilishi shart —
+aks holda bu istisno platformalarda jimgina noto'g'ri implement
+qilinadi.
 
 ---
 
