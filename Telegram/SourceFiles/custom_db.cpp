@@ -377,6 +377,45 @@ void RunMigrations() {
                 "WHERE text LIKE char(8212)||char(8212)||'%'");
     }
 
+    // v9 -> v10: akkaunt ajratmasi.
+    //
+    // Nima uchun: tdesktop 12 akkauntni bir vaqtda ishlatadi va FON
+    // akkauntlari ham bazaga yozadi. Kalit (peer_id, msg_id) edi, ya'ni
+    // ikki akkauntning bir odam bilan yozishmasi bitta chelakka
+    // tushardi. 2026-08-26 da Akam chatidagi 218 yozuvdan 201 tasi
+    // boshqa akkauntniki bo'lib chiqdi.
+    //
+    // account_id = 0 -> eski, egasi NOMA'LUM yozuv. Ular O'CHIRILMAYDI
+    // (qaysi akkauntniki ekanini retroaktiv aniqlab bo'lmaydi),
+    // o'qishda esa ID-diapazon tekshiruvidan o'tadi (history.cpp).
+    if (version < 10) {
+        execSql("ALTER TABLE actioned_messages ADD COLUMN account_id INTEGER NOT NULL DEFAULT 0");
+        execSql("ALTER TABLE text_cache        ADD COLUMN account_id INTEGER NOT NULL DEFAULT 0");
+        execSql("ALTER TABLE media_index       ADD COLUMN account_id INTEGER NOT NULL DEFAULT 0");
+        execSql("ALTER TABLE ghost_reads       ADD COLUMN account_id INTEGER NOT NULL DEFAULT 0");
+        // activity_history: ustun PROVENANCE uchun qo'shiladi, lekin
+        // o'qishda FILTRLANMAYDI - spec 0.13 ga qarang. Faollik
+        // kuzatilayotgan odam haqidagi fakt; akkauntlarga bo'lish
+        // last-seen bypass qamrovini buzadi.
+        execSql("ALTER TABLE activity_history  ADD COLUMN account_id INTEGER NOT NULL DEFAULT 0");
+
+        execSql("CREATE INDEX IF NOT EXISTS idx_am_acc_peer_msg "
+                "ON actioned_messages(account_id, peer_id, msg_id)");
+        execSql("CREATE INDEX IF NOT EXISTS idx_tc_acc_peer_msg "
+                "ON text_cache(account_id, peer_id, msg_id)");
+        execSql("CREATE INDEX IF NOT EXISTS idx_mi_acc_peer_msg "
+                "ON media_index(account_id, peer_id, msg_id)");
+
+        // Eski absolyut media yo'llari: arxiv ildizi 2026-08-15 da
+        // ko'chgan (customizationMainFolder -> Pictures\customization
+        // MainFolder), baza yangilanmagan edi - 17 yozuvdan 6 tasi
+        // buzilgan topilgan.
+        execSql("UPDATE actioned_messages "
+                "SET media_path = replace(media_path, "
+                "  'C:/Users/Oybek/customizationMainFolder/', '') "
+                "WHERE media_path LIKE 'C:/Users/Oybek/customizationMainFolder/%'");
+    }
+
     // Update version stamp.
     {
         sqlite3_stmt *stmt = nullptr;
