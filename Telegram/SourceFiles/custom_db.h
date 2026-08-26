@@ -10,6 +10,25 @@ class HistoryItem;
 
 namespace CustomDB {
 
+// Akkaunt + peer juftligi. Nima uchun alohida tur: 12 ta akkaunt
+// bitta bazaga yozadi, fon akkauntlari ham. Bitta QString peerId
+// yetarli emas edi -- 2026-08-26 da aralashuv xatosi shundan chiqqan.
+// Standart qiymat ATAYLAB yo'q: kompilyator har chaqiruv joyini
+// yangilashga majbur qilsin, aks holda unutilgan joy jimgina 0 yozadi.
+struct PeerKey {
+    qint64 accountId = 0;
+    QString peerId;
+
+    [[nodiscard]] bool operator<(const PeerKey &other) const {
+        return (accountId != other.accountId)
+            ? (accountId < other.accountId)
+            : (peerId < other.peerId);
+    }
+    [[nodiscard]] bool operator==(const PeerKey &other) const {
+        return accountId == other.accountId && peerId == other.peerId;
+    }
+};
+
 struct ActionedMessage {
     QString peerId;
     long long msgId = 0;
