@@ -37,7 +37,20 @@ ni `HMAC(key, account_id ‖ peer_id)` qilish — formula o'zgarmaydi.
 **Ta'sirlanadi:** hammasi. `customsync-server` implement'idan OLDIN
 qaror qilinishi shart.
 
-To'liq tashxis: [`../superpowers/specs/2026-08-26-multi-account-db-isolation-design.md`](../superpowers/specs/2026-08-26-multi-account-db-isolation-design.md)
+🔗 **MUHIM istisno — `activity` kind ajratilmaydi.** Ajratish faqat
+*bizning* ma'lumotimizga tegishli (o'chirilgan/tahrirlangan xabarlar,
+matn keshi, media indeksi). `activity_history` esa **kuzatilayotgan
+odam** haqidagi obyektiv fakt — kim kuzatganiga bog'liq emas. Uni
+akkauntlarga bo'lib tashlash last-seen bypass qamrovini buzadi;
+aksincha, har akkaunt o'z kuzatuv oynasini beradi va birlashganda
+surat **aniqroq** bo'ladi.
+
+Bu variant tanlashga bevosita ta'sir qiladi: (a) `record_id` ga
+`account_hash` qo'shish — `activity` uchun bo'sh qoldirish mumkin ✅;
+(b) `peer_hash` ni `HMAC(key, account_id ‖ peer_id)` qilish —
+`activity` ni ham majburan ajratadi ❌. Shu sababli **(a) afzal**.
+
+To'liq tashxis: [`../superpowers/specs/2026-08-26-multi-account-db-isolation-design.md`](../superpowers/specs/2026-08-26-multi-account-db-isolation-design.md) §4.1 va §5.1
 
 ---
 

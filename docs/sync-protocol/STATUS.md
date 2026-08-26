@@ -16,8 +16,8 @@ Oxirgi yangilanish: **2026-08-26**
 
 | Loyiha | Holat | Keyingi qadam |
 |---|---|---|
-| **tdesktop** (CustomMod) | 🟢 v7.1.1 chiqarildi, ishlab turibdi | Sync agenti (plan 02) |
-| **customsync-server** | 🟡 01a: 7 task'dan 3 tasi | Plan 01a Task 4 — `SettingsService` |
+| **tdesktop** (CustomMod) | 🟢 v7.1.1 chiqarildi, ishlab turibdi | 🔴 Sxema v10 (`account_id`), keyin sync agenti (plan 02) |
+| **customsync-server** | 🟡 01a: 7 task'dan 4 tasi | Plan 01a Task 5 — qurilma ro'yxati + JWT (`customsync-server/PROGRESS.md`) |
 | **server-controller** | ⚪ boshlanmagan | 01a/01b tugagach |
 | **tmobile-android** | ⚪ muhokama qilinmagan | — |
 | **tmobile-ios** | ⚪ muhokama qilinmagan | — |
@@ -127,3 +127,8 @@ To'liq matn: spec §0.
 4. **Retention tombstone yaratmaydi.** Lokal tozalash global
    o'chirish emas.
 5. **`sha256` shifrlashdan OLDIN.** Aks holda dedup butunlay buziladi.
+6. **`activity` kind akkauntlar bo'ylab BIRLASHGAN qoladi.** Boshqa
+   hamma narsa akkaunt bo'yicha ajratiladi, lekin faollik tarixi
+   kuzatilayotgan odam haqidagi obyektiv fakt — kim kuzatganiga
+   bog'liq emas. Akkauntlarga bo'lib tashlash last-seen bypass
+   qamrovini **buzadi**; aksincha, ko'p akkaunt uni **yaxshilaydi**.

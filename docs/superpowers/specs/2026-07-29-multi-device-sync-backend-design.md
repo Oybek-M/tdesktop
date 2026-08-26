@@ -174,6 +174,88 @@ paytida `peer_directory` yozuviga aylanadi. Kelgan
 `peer_directory` esa keshga yoziladi. Barcha klientlar bir xil
 ishlaydi.
 
+### 0.12 Akkaunt ajratmasi — `record_id` va `peer_hash` (2026-08-26)
+
+Tashxis: [`2026-08-26-multi-account-db-isolation-design.md`](2026-08-26-multi-account-db-isolation-design.md)
+§5. tdesktop bir vaqtda bir nechta akkauntni ishlatadi (fon akkauntlari
+ham yozadi). `§0.5`/`§3.1` dagi `record_id` formulasida akkaunt yo'q:
+
+```
+record_id = SHA256(kind ‖ 0x00 ‖ peer_hash ‖ 0x00 ‖ msg_id ‖ 0x00 ‖ occurred_at)
+```
+
+12 ta akkaunt bitta serverga sync qilsa `(peer_hash, msg_id)` juftligi
+to'qnashishi mumkin — turli akkauntlarning yozuvlari serverda
+**qaytarib bo'lmaydigan** tarzda bir-birining ustiga yoziladi.
+
+**Qaror (2026-08-26, `customsync-server` sessiyasida tasdiqlandi):**
+ikkala taklif qilingan yechim birlashtiriladi — ichki himoya
+(`peer_hash` akkauntga bog'lanadi) **va** tashqi himoya (`record_id`
+o'z `account_hash` maydonini oladi). Ikkalasi birga: `peer_hash`ga
+tayanadigan eski kod ham to'g'ri ishlaydi, `record_id`ning o'zi ham
+mustaqil tekshiriladi/filtrlanadi (masalan server tomonida
+shifrlashsiz `account_hash` bo'yicha).
+
+**Yangi hosila kalit** (§4.1 kalit ierarxiyasiga qo'shiladi):
+
+```
+account_key = HKDF-SHA256(master_key, salt=32 bayt nol, info="customsync-account-v1")
+```
+
+**`account_hash`** — `peer_hash` bilan bir xil retsept, faqat boshqa
+kalit va kirish:
+
+```
+account_hash = HMAC-SHA256(account_key, account_id_decimal)[0:16] -> hex
+```
+
+`account_id` — tdesktop'dagi `session().userId()`, o'nlik SATR
+sifatida (peer_id kabi).
+
+**`peer_hash` formulasi o'zgaradi** (§3.1/`sync-protocol/README.md`
+eskiradi, shu yer ustun turadi):
+
+```
+peer_hash = HMAC-SHA256(peer_key, account_id_decimal ‖ 0x00 ‖ peer_id_decimal)[0:16] -> hex
+```
+
+**`record_id` formulasi o'zgaradi:**
+
+```
+record_id = SHA256(kind ‖ 0x00 ‖ account_hash ‖ 0x00 ‖ peer_hash ‖ 0x00 ‖
+                    msg_id_decimal ‖ 0x00 ‖ occurred_at_decimal)
+```
+
+`0x00` ajratuvchi barcha maydonlar orasida, xuddi eski formuladagi
+kabi.
+
+🔴 **Bu `test-vectors.json` ni buzadi.** Hech bir platforma hali sync
+kodini implement qilmagan (tdesktop plan 02, server-controller 03,
+mobil — hammasi boshlanmagan), shuning uchun bu o'zgarish uchun eng
+arzon payt — kelajakda, productionga yaqinlashganda, buni core
+qismidan qazib olish ancha qimmatga tushardi. Vektorlar
+`generate-vectors.py` orqali qayta generatsiya qilinadi;
+`account_hash` yangi bo'lim sifatida qo'shiladi, `peer_hash` va
+`record_id` bo'limlari yangi formulaga mos yangilanadi.
+
+**Server hech qachon `account_hash`/`peer_hash` ni hisoblamaydi** —
+bu `master_key` talab qiladi, u serverga hech qachon chiqmaydi
+(qoida: server ishonchli tomon emas). Server faqat mijoz yuborgan
+`account_hash`/`peer_hash`/`kind`/`msg_id`/`occurred_at` ochiq
+maydonlaridan `record_id` ni **qayta hisoblab tekshiradi** — bu
+maxfiy kalit talab qilmaydi, oddiy SHA256 o'zaro moslik tekshiruvi.
+
+**Sxema:** `records` jadvaliga `account_hash` ustuni qo'shiladi
+(`customsync-server` Task 3 dan keyingi migratsiya). `peer_hash`
+allaqachon akkauntga bog'langani uchun mavjud `idx_records_peer`
+o'zgarmaydi; `account_hash` bo'yicha alohida indeks qo'shiladi.
+
+⚠️ **Kelajakdagi bog'liq muhokama:** foydalanuvchi tdesktop-client
+sessiyasida yana bir qo'shimcha ustida ishlamoqda; agar u shu
+protokolga tegishli chiqsa, tegishli bo'lim shu yerga alohida
+qo'shiladi. Bu revizya o'sha muhokamani **kutmaydi** — u mustaqil va
+o'zicha to'liq.
+
 ### 0.11 Plan 06 — reliz boshqaruvi
 
 Yozilishi kerak. 2026-08-24 dagi real hodisa aniq talab beradi:

@@ -178,7 +178,51 @@ ustuni), va uchala media qismi ham.
 
 ### 4.1 Sxema v10 — `account_id`
 
-Beshala jadvalga `account_id INTEGER NOT NULL DEFAULT 0` qo'shiladi.
+Beshala jadvalga `account_id INTEGER NOT NULL DEFAULT 0` qo'shiladi,
+lekin **o'qishda ularning hammasi bir xil muomala qilinmaydi**.
+
+#### 🔴 Muhim farq: ajratish ≠ hamma joyda ajratish
+
+Foydalanuvchi 2026-08-26 da to'g'ri ko'rsatdi: ba'zi ma'lumot **biz
+haqimizda**, ba'zisi esa **kuzatilayotgan odam haqida**. Faqat
+birinchisi akkauntga bog'lanishi kerak.
+
+| Jadval | Ma'lumot kimniki | O'qish qoidasi |
+|---|---|---|
+| `actioned_messages` | bizning ko'rgan xabarlarimiz | 🔒 **ajratiladi** — `account_id = :current` |
+| `text_cache` | bizning ko'rgan xabarlarimiz | 🔒 **ajratiladi** |
+| `media_index` | bizning arxivimiz | 🔒 **ajratiladi** |
+| `ghost_reads` | biz nimani ko'rinmay o'qiganimiz | 🔒 **ajratiladi** |
+| `activity_history` | **kuzatilayotgan odamning faolligi** | 🔗 **BIRLASHTIRILADI** — barcha akkauntlar bo'ylab |
+
+`activity_history` sxemasi (`peer_id, field, old_value, new_value,
+observed_at`) bizning akkauntimiz haqida hech narsa saqlamaydi — u
+faqat "falon odam falon vaqtda online bo'ldi / ismini o'zgartirdi"
+deydi. Bu **obyektiv fakt**, kim kuzatganiga bog'liq emas.
+
+Ustiga-ustak, **ko'p akkaunt bu yerda kamchilik emas — ustunlik.**
+Har bir akkaunt o'z kuzatuv oynasiga ega; ular birlashganda last-seen
+yashirgan odamning faollik surati **aniqroq** bo'ladi. Bu bizning
+bypass mexanizmimizning asosi va uni akkauntlarga bo'lib tashlash
+funksiyani **buzadi**.
+
+Shuning uchun `activity_history` da `account_id` **provenance uchun**
+yoziladi (qaysi akkaunt kuzatganini bilish, deduplikatsiya va
+nosozlikni tuzatish uchun), lekin o'qishda **filtrlanmaydi**:
+
+```sql
+-- to'g'ri
+SELECT ... FROM activity_history WHERE peer_id = ? ORDER BY observed_at;
+
+-- NOTO'G'RI — bypass qamrovini buzadi
+SELECT ... FROM activity_history WHERE peer_id = ? AND account_id = ?;
+```
+
+Deduplikatsiya: ikki akkaunt bir vaqtda bir xil o'zgarishni ko'rsa,
+`(peer_id, field, new_value, observed_at)` bo'yicha yaqin yozuvlar
+birlashtiriladi — aks holda ro'yxat ikkilanadi.
+
+Xuddi shu qoida Track C ga ham ko'chadi — 5-bo'limga qarang.
 
 🔴 **Global o'zgaruvchi ISHLAMAYDI.** tdesktop barcha akkauntlarni bir
 vaqtda ishlatadi va **fon akkauntlari ham bazaga yozadi** — aralashuv
@@ -247,6 +291,33 @@ Hal qilish variantlari (`customsync-server` sessiyasida qaror qilinadi):
 
 ⚠️ Sxema raqami: v10 ilgari `sync_outbox` + `sync_state` uchun band
 edi. Endi v10 = `account_id`, sync jadvallari **v11** ga suriladi.
+
+### 5.1 🔗 `activity_history` serverda ham BIRLASHGAN qoladi
+
+§4.1 dagi farq server tomonida ham saqlanishi shart, aks holda
+last-seen bypass qamrovi buziladi.
+
+| Kind | Server tomonda |
+|---|---|
+| `deleted`, `edited`, `text_cache`, `media_index` | akkaunt bo'yicha ajratiladi |
+| `activity` | **akkauntlar bo'ylab birlashtiriladi** |
+
+Amaliy ta'siri `record_id` ga: `activity` kind uchun akkaunt
+identifikatori formulaga **kirmasligi** kerak, boshqa kind'lar uchun
+esa kirishi kerak. Ya'ni 5-bo'limdagi ikkita variantdan:
+
+- **(a) `record_id` ga `account_hash` qo'shish** — `activity` kind
+  uchun uni bo'sh qoldirish mumkin, formula bitta bo'lib qoladi ✅
+- **(b) `peer_hash` ni `HMAC(key, account_id ‖ peer_id)` qilish** —
+  bu `activity` yozuvlarini ham majburan ajratadi, ya'ni bypass
+  qamrovi buziladi ❌
+
+Shu sababli **(a) variant afzal**. Yakuniy qaror `customsync-server`
+sessiyasida qabul qilinadi, lekin bu cheklov hisobga olinishi shart.
+
+Bir xil faollik ikki akkauntdan kelganda server `record_id` bo'yicha
+tabiiy deduplikatsiya qiladi (K4 — yozish idempotent), chunki
+`account_hash` siz `record_id` ikkalasida bir xil chiqadi.
 
 ---
 

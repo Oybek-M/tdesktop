@@ -267,6 +267,15 @@ shuning uchun birga qilinadi.
 | 4 | **A10 — bitta tugmali sync+build+publish** | A9 ustiga quriladi. Har upstream sync'da qo'lda 4-5 qadam bajarilmoqda. |
 | 5 | **A14 — o'qilgan vaqt orqali faollik** 🆕 | Pastda batafsil. Foydalanuvchi 2026-08-25 da topdi. |
 | 6 | **Reliz yuklashni API ga o'tkazish** 🆕 | SSH/scp o'rniga `customsync-server` API. Yuqorida batafsil. |
+| 7 | **A15 — bot token orqali kirish** 🆕 | Foydalanuvchi 2026-08-26 da so'radi. **v10 dan KEYIN.** Pastda batafsil. |
+
+**Qo'shimcha (2026-08-26 da qo'shildi) — ENG USTUVOR:**
+**Sxema v10 — `account_id`** + 3 ta media tuzatishi. 12 ta akkaunt
+bitta bazaga yozadi, `account_id` ustuni yo'q → bir akkauntning
+o'chirilgan xabarlari boshqasining chatida arvoh bo'lib chiqadi.
+To'liq tashxis va reja:
+`specs/2026-08-26-multi-account-db-isolation-design.md`.
+Track C ga ham tegadi (`record_id` da akkaunt yo'q).
 
 **Qo'shimcha (2026-08-25 da qo'shildi):**
 **Startup 14.55 soniya** — sababi hali NOMA'LUM, log yordam bermaydi
@@ -277,6 +286,87 @@ vaqt o'lchash kodi kerak.
 yozilgan (L1 `finishLoad`, L2 `MaybeDownloadMedia`, L3
 `TryRescueMedia`). Har tuzatish uchalasiga alohida qo'llanishi
 kerak bo'lyapti va bir necha marta unutilgan. Birlashtirish kerak.
+
+---
+
+## 💡 A15 — bot token orqali kirish (2026-08-26)
+
+**Foydalanuvchi so'radi.** Unigram va boshqa ba'zi forklarda mavjud.
+**Tartib qarori: v10 (`account_id`) dan KEYIN** — sababi pastda.
+
+### Holat: tekshirilmagan g'oya, implement qilinmagan
+
+### Nima allaqachon tayyor
+
+MTProto metodi sxemada bor — `mtproto/scheme/api.tl:2298`:
+
+```
+auth.importBotAuthorization#67a3ff2c flags:int api_id:int
+    api_hash:string bot_auth_token:string = auth.Authorization;
+```
+
+Ya'ni `MTPauth_ImportBotAuthorization` allaqachon generatsiya
+qilinadi. Kodbazada **hech qayerda ishlatilmagan**, `self()->isBot()`
+tekshiruvi ham **umuman yo'q**.
+
+### Login qismi arzon
+
+`intro_qr.cpp:496` naqshi tayyor: bitta MTP so'rov →
+`finish(authorization)` → `Step::createSession()`. Yangi
+`BotTokenWidget : Step` shu naqshni takrorlaydi — taxminan **250
+satr** + start ekranida havola. Sessiya yaratish, DC boshqaruvi va
+ko'p akkaunt qo'llab-quvvatlashi umumiy koddan bepul keladi.
+
+### 🔴 Asosiy risk: muammo logindan KEYIN
+
+tdesktop UI'si butunlay "self = odam" taxminiga qurilgan.
+
+**Hal qiluvchi noma'lum:** `messages.getDialogs` bot uchun ishlaydimi.
+Agar ishlamasa — chat ro'yxati **bo'sh** qoladi va "to'liq klient"
+g'oyasi qulaydi. Bu tekshirilmagan.
+
+| Nima | Bot akkauntda |
+|---|---|
+| `messages.getDialogs` | ❓ **NOMA'LUM — birinchi tekshiriladigan narsa** |
+| Tarixiy xabarlar | Bot chatga qo'shilgunga qadar bo'lganini olmaydi |
+| Guruh xabarlari | Privacy mode yoqiq bo'lsa faqat o'ziga murojaatlar |
+| `messages.getMessages` | ✅ ID bo'yicha istalgan xabar (HTTP Bot API'dan ustunligi) |
+| Kontakt, story, last-seen | ❌ yo'q → Ghost Mode, Faollik tarixi, Mutual-contact **ma'nosiz** |
+| AntiDelete / MediaBackup | Nazariy jihatdan bot chatlarida ishlashi mumkin |
+
+### Nima uchun v10 dan KEYIN
+
+Bot login **yana bitta akkaunt** qo'shadi. Baza hozir `account_id`
+siz va 12 akkaunt allaqachon aralashib ketgan
+(`specs/2026-08-26-multi-account-db-isolation-design.md`). Bot
+rejimini v10 dan oldin qo'shsak, muammo kattalashadi.
+
+### Nima uchun Unigram'da bor
+
+Unigram TDLib ustiga qurilgan, TDLib esa
+`checkAuthenticationBotToken` ni tayyor beradi. tdesktop TDLib emas —
+o'zining MTProto qatlamini ishlatadi, shuning uchun bizda qo'lda
+yozish kerak. Plus/Telegraph'da borligi **tasdiqlanmadi** (Android
+forklari, kodi ko'rilmagan).
+
+### Qadamlar
+
+1. v10 tugagach.
+2. **Arzon tekshiruv (~30 daqiqa).** BotFather'dan bir martalik token
+   olib, bot nomidan `messages.getDialogs` va `messages.getHistory`
+   ni chaqirib ko'rish. Bu spekulyatsiyani tugatadi.
+3. Natijaga qarab qaror:
+   - Ishlasa → to'liq "bot akkaunt" rejimi asosli
+   - Ishlamasa → cheklangan rejim (faqat bot chatlari +
+     `getMessages` orqali arxivlash), UI'da ochiq aytilgan holda
+
+### Track C bilan aloqasi
+
+Bot akkaunt ham sync'da **alohida akkaunt** sifatida ko'rinadi
+(`account_id` bo'yicha), lekin `activity_history` unga tegishli emas
+— bot last-seen kuzata olmaydi. Plan 05 (TDLib capture service) bilan
+chalkashtirmaslik kerak: u **foydalanuvchi akkaunti** bilan kiradi,
+bot bilan emas — bot boshqa odamlarning chatlarini ko'ra olmaydi.
 
 ---
 
