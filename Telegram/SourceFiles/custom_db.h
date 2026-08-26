@@ -4,6 +4,7 @@
 #include <QtCore/QDateTime>
 #include <QtCore/QJsonArray>
 #include <QtCore/QVector>
+#include <QtCore/QHashFunctions>
 #include <functional>
 
 class HistoryItem;
@@ -29,7 +30,12 @@ struct PeerKey {
     }
 };
 
+[[nodiscard]] inline size_t qHash(const PeerKey &key, size_t seed = 0) {
+    return qHashMulti(seed, key.accountId, key.peerId);
+}
+
 struct ActionedMessage {
+    qint64 accountId = 0;
     QString peerId;
     long long msgId = 0;
     QString type; // "deleted", "edited", "backup"
@@ -60,26 +66,26 @@ void RunMigrations();
 void LoadRestoreCache();
 
 // Fast O(1) lookups used in HistoryItem constructor
-bool IsDeletedLocally(const QString &peerId, long long msgId);
-QString GetOriginalTextBeforeEdit(const QString &peerId, long long msgId);
+bool IsDeletedLocally(const PeerKey &key, long long msgId);
+QString GetOriginalTextBeforeEdit(const PeerKey &key, long long msgId);
 
 // Returns all saved pre-edit text versions for a message, oldest first.
 // Each entry is the text *before* that edit was applied.
 // Empty if the message was never edited (or not tracked).
-QVector<QString> GetEditHistory(const QString &peerId, long long msgId);
+QVector<QString> GetEditHistory(const PeerKey &key, long long msgId);
 
-void SaveGhostRead(const QString &peerId, long long msgId);
-long long GetGhostRead(const QString &peerId);
+void SaveGhostRead(const PeerKey &key, long long msgId);
+long long GetGhostRead(const PeerKey &key);
 
 // E22: Remove a peer's ghost-read record (call when ghost mode is disabled for that peer).
-void ResetGhostRead(const QString &peerId);
+void ResetGhostRead(const PeerKey &key);
 
 // E22: Delete ghost_reads entries older than |days| days (default 30).
 // Called automatically by SaveGhostRead(); safe to call manually.
 void PruneStaleGhostReads(int days = 30);
 void MarkDeleted(
     long long msgId,
-    const QString &peerId,
+    const PeerKey &key,
     const QString &mediaPath = QString(),
     const QString &originalText = QString(),
     unsigned int msgDate = 0,
@@ -90,16 +96,16 @@ void MarkDeleted(
 // User-initiated delete support:
 // Call before sending delete request to server so the message is truly removed.
 // Removes all DB records for the message and prevents re-saving on server ACK.
-void ScheduleUserDelete(const QString &peerId, long long msgId);
+void ScheduleUserDelete(const PeerKey &key, long long msgId);
 
 // Returns true if the user themselves initiated deletion of this message.
-bool IsUserDeletePending(const QString &peerId, long long msgId);
+bool IsUserDeletePending(const PeerKey &key, long long msgId);
 
 // Clear the pending flag after processMessagesDeleted has handled the message.
-void ClearUserDeletePending(const QString &peerId, long long msgId);
+void ClearUserDeletePending(const PeerKey &key, long long msgId);
 
 // Permanently erase all records for a message from DB + in-memory caches.
-void PermanentlyDeleteMessage(const QString &peerId, long long msgId);
+void PermanentlyDeleteMessage(const PeerKey &key, long long msgId);
 void SaveActionedMessage(const ActionedMessage &msg);
 QString GetMessageHistory(long long msgId, const QString &peerId);
 
@@ -111,8 +117,9 @@ struct DeletedMessage {
     QString text;
     QString senderId;       // v5: guruhda haqiqiy yuboruvchi (bo'sh = noma'lum)
     bool isMedia = false;   // v5: media xabar edi
+    qint64 accountId = 0;   // v10: 0 = egasi noma'lum (v10 dan oldingi yozuv)
 };
-QVector<DeletedMessage> GetDeletedMessages(const QString &peerId);
+QVector<DeletedMessage> GetDeletedMessages(const PeerKey &key);
 
 // Cross-chat deleted messages archive: returns up to |limit| most recent deleted
 // messages across all peers, sorted newest-first. Suitable for the archive viewer.
@@ -132,13 +139,13 @@ QVector<DeletedMessageWithPeer> GetAllDeletedMessages(int limit = 300);
 // GetSavedMediaPath() dan farqi — u faqat O'CHIRILGAN xabarlarga
 // qaraydi, bu esa butun L2 arxivini qamrab oladi.
 [[nodiscard]] QString GetArchivedMediaPath(
-    const QString &peerId,
+    const PeerKey &key,
     long long msgId);
 
 // A13/K1b: arxivda o'chirilgan xabari bor peer'lar ro'yxati (faqat ID lar).
 // Ishga tushishda chat ro'yxatini tiklash uchun — matn/media yuklamaydi,
 // shuning uchun startup'da arzon.
-[[nodiscard]] QVector<QString> GetPeersWithDeletedMessages();
+[[nodiscard]] QVector<QString> GetPeersWithDeletedMessages(qint64 accountId);
 
 // ── Media indeks (schema v7) ─────────────────────────────────────────────
 // Har bir media xabar shu yerda qayd etiladi — hatto fayl yuklanmagan
@@ -163,14 +170,14 @@ struct MediaIndexEntry {
     QString reason;        // too_large | quota_full | reference_expired ...
 };
 
-void UpsertMediaIndex(const MediaIndexEntry &entry);
+void UpsertMediaIndex(const PeerKey &key, const MediaIndexEntry &entry);
 void SetMediaIndexStatus(
-    const QString &peerId,
+    const PeerKey &key,
     long long msgId,
     const QString &status,
     const QString &reason);
 [[nodiscard]] bool HasPresentMediaIndexEntry(
-    const QString &peerId,
+    const PeerKey &key,
     long long msgId);
 
 // Eksport tanlash oynasi uchun: media'si BOR chatlar, hajmi bo'yicha
@@ -376,7 +383,7 @@ QString SaveMediaFile(const QString &sourcePath, const QString &type); // "image
 // PruneStaleCachedText() unga tegmaydi. Standart false — mavjud
 // chaqiruvchilar xatti-harakati o'zgarmaydi.
 void CacheMessageText(
-    const QString &peerId,
+    const PeerKey &key,
     long long msgId,
     const QString &text,
     bool isOut,
@@ -386,13 +393,13 @@ void CacheMessageText(
     bool archived = false);
 
 // Cache dan oldingi matnni qaytaradi (bo'lmasa, bo'sh string).
-QString GetCachedText(const QString &peerId, long long msgId);
+QString GetCachedText(const PeerKey &key, long long msgId);
 
 // Cache dan text + msg_date + sender + media birga qaytaradi.
 // outDate — saqlangan sana (0 bo'lsa topilmagan yoki saqlanmagan).
 // outSenderId / outIsMedia — v5 ustunlari (ixtiyoriy, nullptr o'tkazsa o'qilmaydi).
 QString GetCachedTextAndDate(
-    const QString &peerId,
+    const PeerKey &key,
     long long msgId,
     unsigned int &outDate,
     QString *outSenderId = nullptr,
@@ -403,7 +410,7 @@ QString GetCachedTextAndDate(
 // Cache dan eski matnni o'qib, actioned_messages ga 'edited' yozadi.
 // Qaytarish: true — saqlandi, false — eski matn cache da yo'q.
 bool RecordBackgroundEdit(
-    const QString &peerId,
+    const PeerKey &key,
     long long msgId,
     const QString &newText,
     bool isOut,
@@ -434,7 +441,7 @@ void TryRecordBackgroundDelete(long long msgId);
 // Sprint 4: Return the locally-saved media path for a deleted message (peerId+msgId),
 // or an empty string if no media was saved. Used as a last-resort fallback in
 // forward cascade before sending text-only.
-QString GetSavedMediaPath(const QString &peerId, long long msgId);
+QString GetSavedMediaPath(const PeerKey &key, long long msgId);
 
 // Archive management
 struct ArchiveStats {
@@ -463,8 +470,12 @@ struct ActivityHistoryEntry {
 // Yangi yozuv qo'shadi. hasOldValue=false — bu peer/field juftligi uchun
 // birinchi marta kuzatilayotganini bildiradi (old_value ustuniga SQL NULL
 // yoziladi, "o'zgarish" emas "kuzatish boshlang'ich holati" sifatida).
+// 2026-08-26: PeerKey oladi, lekin faqat account_id ni YOZISH uchun
+// (provenance). O'qish tarafi (Get*) hamon faqat QString peerId oladi va
+// akkaunt bo'yicha FILTRLAMAYDI -- spec 0.13. Faollik tarixi kuzatilayotgan
+// odam haqidagi obyektiv fakt, kim kuzatganiga bog'liq emas.
 void SaveActivityHistoryEntry(
-    const QString &peerId,
+    const PeerKey &key,
     const QString &field,
     bool hasOldValue,
     const QString &oldValue,
