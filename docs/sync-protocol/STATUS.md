@@ -1,6 +1,11 @@
 # Loyihalar holati — HAR SESSIYA SHU YERDAN BOSHLANADI
 
-Oxirgi yangilanish: **2026-08-25**
+Oxirgi yangilanish: **2026-08-26**
+
+> 🔴 **DIQQAT:** 2026-08-26 da ko'p akkauntli aralashuv xatosi topildi.
+> U `record_id` formulasiga ham tegadi va `customsync-server` implement'idan
+> OLDIN hal qilinishi shart. To'liq tashxis:
+> [`../superpowers/specs/2026-08-26-multi-account-db-isolation-design.md`](../superpowers/specs/2026-08-26-multi-account-db-isolation-design.md)
 
 > Bu fayl bir nechta loyiha o'rtasida "kim nimani bajardi" ni
 > ko'rsatadi. Sessiya boshida o'qing, oxirida yangilang.
@@ -12,7 +17,7 @@ Oxirgi yangilanish: **2026-08-25**
 | Loyiha | Holat | Keyingi qadam |
 |---|---|---|
 | **tdesktop** (CustomMod) | 🟢 v7.1.1 chiqarildi, ishlab turibdi | Sync agenti (plan 02) |
-| **customsync-server** | ⚪ boshlanmagan | Plan 01a Task 1 — solution skeleti |
+| **customsync-server** | 🟡 01a: 7 task'dan 3 tasi | Plan 01a Task 4 — `SettingsService` |
 | **server-controller** | ⚪ boshlanmagan | 01a/01b tugagach |
 | **tmobile-android** | ⚪ muhokama qilinmagan | — |
 | **tmobile-ios** | ⚪ muhokama qilinmagan | — |
@@ -25,6 +30,7 @@ Oxirgi yangilanish: **2026-08-25**
 |---|---|
 | `qtwebsockets` moduli | ✅ qurildi va sinovdan o'tdi (2026-08-25) |
 | Sxema versiyasi | **v9** — build 2026-08-25 22:37 da qo'llandi va tasdiqlandi |
+| `account_id` (ko'p akkaunt) | 🔴 **YO'Q** — 5 ta jadvalda ham. v10 rejalashtirilgan |
 | `media_index` jadvali | ✅ mavjud, 1543 yozuv |
 | `sha256` maydoni | ❌ **BO'SH** — hisoblash hali yozilmagan |
 | `sync_outbox` / `sync_state` | ❌ yo'q — plan 02 Task 3 |
@@ -47,22 +53,48 @@ yo'qotish — tiklab bo'lmaydi.
 
 ### tdesktop'da Track C uchun QOLGAN ishlar
 
-1. **`sha256` hisoblash** — `media_index` ga to'ldirish
+1. 🔴 **Sxema v10 — `account_id`** (5 ta jadval) + media tuzatishlari.
+   Batafsil reja:
+   [`../superpowers/specs/2026-08-26-multi-account-db-isolation-design.md`](../superpowers/specs/2026-08-26-multi-account-db-isolation-design.md)
+   §4. Sync'dan OLDIN bajariladi.
+2. **`sha256` hisoblash** — `media_index` ga to'ldirish
    (yangi fayllar + mavjud 1543 ta uchun backfill)
-2. **Sxema v10** — `sync_outbox` + `sync_state`
-   ⚠️ v9 allaqachon band (placeholder tozalash migratsiyasi)
-3. `CustomSync` moduli — plan 02 ning qolgan qismi
+3. **Sxema v11** — `sync_outbox` + `sync_state`
+   ⚠️ v9 band (placeholder tozalash), v10 band (`account_id`)
+4. `CustomSync` moduli — plan 02 ning qolgan qismi
 
 ---
 
-## customsync-server — boshlanish nuqtasi
+## customsync-server — implement holati
 
 **Papka:** `Projects programming\Telegram\customsync-server`
+**Branch:** `Oybek` — 5 ta commit
+
+🔴 **Aniq holat va keyingi qadam shu loyihaning `PROGRESS.md`
+faylida.** Quyidagisi faqat qisqacha.
+
+| Plan 01a task | Holat |
+|---|---|
+| 1 — solution skeleti | ✅ 5 loyiha + `/api/v1/health` |
+| 2 — `RecordId` + kontraktlar | ✅ `test-vectors.json` bilan tekshirilgan |
+| 3 — PostgreSQL sxemasi | ✅ baza yaratildi, 10 jadval |
+| 4-7 | ⚪ |
+
+`dotnet test`: 10 test, hammasi o'tadi.
+
+**Keyingi qadam:** Task 4 — `SettingsService` (runtime konfiguratsiya,
+qoida K1). Muhit tayyor, to'siq yo'q.
 
 **Tartib:** 01a → 01b → 02 → 03 → 04 → 05 → 06
 
-⚠️ **Implement boshlashdan OLDIN** spec **§0 REVIZIYA** ni o'qing —
-11 ta qaror bor va ular asosiy matndan ustun turadi.
+⚠️ **Implement davom ettirishdan OLDIN** spec **§0 REVIZIYA** ni
+o'qing — 11 ta qaror bor va ular asosiy matndan ustun turadi.
+
+### .NET tomonda tasdiqlangan
+
+`RecordId` referens implementatsiyasi (`CustomSync.Core`) vektorlardagi
+7 ta holatni ham aynan qayta hosil qiladi — **ikkita manfiy `msg_id`
+holati ham**. Ya'ni .NET va Python generatori bayt-ma-bayt mos.
 
 ---
 

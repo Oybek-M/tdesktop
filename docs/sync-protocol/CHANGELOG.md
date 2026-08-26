@@ -9,6 +9,38 @@ Format: `## YYYY-MM-DD — sarlavha`
 
 ---
 
+## 2026-08-26 — 🔴 `record_id` da akkaunt yo'q (HAL QILINMAGAN)
+
+**Nima:** tdesktop'da ko'p akkauntli aralashuv xatosi topildi — baza
+`(peer_id, msg_id)` bilan kalitlangan, `account_id` yo'q. 12 ta akkaunt
+bitta bazaga yozadi va bir akkauntning o'chirilgan xabarlari boshqasining
+chatida arvoh bo'lib chiqadi.
+
+**Nima uchun protokolga tegishli:** `record_id` formulasi ham xuddi shu
+kamchilikka ega:
+
+```
+record_id = SHA256(kind ‖ 0x00 ‖ peer_hash ‖ 0x00 ‖ msg_id ‖ 0x00 ‖ occurred_at)
+```
+
+12 akkaunt bitta serverga sync qilsa `(peer_hash, msg_id)` to'qnashadi va
+yozuvlar bir-birining ustiga yoziladi — lokal xatoning aynan o'zi, faqat
+serverda va **qaytarib bo'lmaydigan** shaklda.
+
+**Variantlar:** (a) `record_id` ga `account_hash` qo'shish — formula
+o'zgaradi, `test-vectors.json` qayta generatsiya qilinadi; (b) `peer_hash`
+ni `HMAC(key, account_id ‖ peer_id)` qilish — formula o'zgarmaydi.
+
+⚠️ **Sxema raqami suriladi:** v10 endi `account_id`,
+`sync_outbox` + `sync_state` esa **v11**.
+
+**Ta'sirlanadi:** hammasi. `customsync-server` implement'idan OLDIN
+qaror qilinishi shart.
+
+To'liq tashxis: [`../superpowers/specs/2026-08-26-multi-account-db-isolation-design.md`](../superpowers/specs/2026-08-26-multi-account-db-isolation-design.md)
+
+---
+
 ## 2026-08-25 — `test-vectors.json` yaratildi
 
 **Nima:** Platformalararo test vektorlari birinchi marta
