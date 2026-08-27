@@ -97,6 +97,6 @@ void StartMaintenance();
 // PhotoData'da DocumentData'dagi kabi finishLoad() hook'i yo'q, shuning
 // uchun yuklanishni o'zimiz kuzatishimiz kerak. main_session.cpp dagi
 // downloaderTaskFinished() dan chaqiriladi.
-void CheckPendingPhotos(not_null<Main::Session*> session);
+void CheckPendingPhotos();
 
 } // namespace CustomArchive

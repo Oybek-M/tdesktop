@@ -170,6 +170,7 @@ struct PendingPhoto {
 	std::shared_ptr<Data::PhotoMedia> view;
 	QString relPath;
 	QString fullPath;
+	qint64 accountId = 0;
 	QString peerId;
 	long long msgId = 0;
 	unsigned int msgDate = 0;
@@ -324,6 +325,7 @@ void MaybeDownloadMedia(not_null<HistoryItem*> item) {
 			std::move(view),
 			relPath,
 			fullPath,
+			qint64(item->history()->session().userId().bare),
 			peerIdStr,
 			static_cast<long long>(item->id.bare),
 			static_cast<unsigned int>(item->date()) });
@@ -332,7 +334,7 @@ void MaybeDownloadMedia(not_null<HistoryItem*> item) {
 		// Rasm ko'pincha allaqachon keshda bo'ladi — darhol tekshiramiz,
 		// aks holda yangi yuklash boshlanmay `downloaderTaskFinished`
 		// hech qachon otilmaydi.
-		CheckPendingPhotos(&item->history()->session());
+		CheckPendingPhotos();
 	}
 }
 
@@ -340,7 +342,15 @@ void MaybeDownloadMedia(not_null<HistoryItem*> item) {
 
 // Yuklanishi tugagan rasmlarni arxivga yozadi. main_session.cpp dagi
 // downloaderTaskFinished() dan chaqiriladi.
-void CheckPendingPhotos(not_null<Main::Session*> session) {
+// 2026-08-26: gPendingPhotos AKKAUNTLAR BO'YLAB umumiy ro'yxat (turli
+// sessiyalar navbatga qo'yadi), shuning uchun har entry o'zining
+// accountId'sini olib yuradi -- chaqiruvchi sessiyasidan OLINMAYDI.
+// Avval `session` parametridan foydalanish sinovda edi: bitta
+// akkauntning downloaderTaskFinished() boshqa akkauntning navbatdagi
+// rasmini "tugadi" deb topib, uni chaqiruvchi akkauntga yozib
+// qo'yishi mumkin edi -- aynan shu ishning ildiz sababi bilan bir xil
+// tur xato.
+void CheckPendingPhotos() {
 	for (auto it = gPendingPhotos.begin(); it != gPendingPhotos.end();) {
 		auto done = false;
 		if (!it->photo || !it->view) {
@@ -369,7 +379,7 @@ void CheckPendingPhotos(not_null<Main::Session*> session) {
 						QDateTime::currentSecsSinceEpoch());
 					entry.layer = u"l2"_q;
 					entry.status = u"present"_q;
-					CustomDB::UpsertMediaIndex(CustomDB::PeerKey{qint64(session->userId().bare), it->peerId}, entry);
+					CustomDB::UpsertMediaIndex(CustomDB::PeerKey{it->accountId, it->peerId}, entry);
 					CustomMediaQuota::AddBytes(bytes.size());
 				}
 			}
