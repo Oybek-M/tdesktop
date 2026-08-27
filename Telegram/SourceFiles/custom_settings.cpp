@@ -419,7 +419,7 @@ void SetGhostModeForPeer(const QString &peerId, bool enabled) {
     settings.setValue(peerId, enabled);
     settings.endGroup();
     if (!enabled) {
-        CustomDB::ResetGhostRead(peerId);
+        CustomDB::ResetGhostReadForPeerAllAccounts(peerId);
     }
 }
 
@@ -430,7 +430,7 @@ void ResetGhostModeForPeer(const QString &peerId) {
     settings.beginGroup("GhostModePerPeer");
     settings.remove(peerId);
     settings.endGroup();
-    CustomDB::ResetGhostRead(peerId);
+    CustomDB::ResetGhostReadForPeerAllAccounts(peerId);
 }
 
 // ── Legacy per-peer Anti-Delete (C14) ────────────────────────────────────
@@ -1021,14 +1021,14 @@ void RemovePerPeerOverride(const QString &peerId) {
     removeKey("AntiEditPerPeer");
 
     // Ghost reset: DB ham tozalansin.
-    CustomDB::ResetGhostRead(peerId);
+    CustomDB::ResetGhostReadForPeerAllAccounts(peerId);
 }
 
 void ClearAllPerPeerOverrides() {
     if (!gInitialized) Init();
     // Ghost DB reset — har bir peer uchun
     for (const QString &peerId : gPerPeerNames.keys()) {
-        CustomDB::ResetGhostRead(peerId);
+        CustomDB::ResetGhostReadForPeerAllAccounts(peerId);
     }
     gPerPeerNames.clear();
     gGhostPerPeer.clear();

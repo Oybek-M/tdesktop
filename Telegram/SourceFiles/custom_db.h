@@ -80,6 +80,14 @@ long long GetGhostRead(const PeerKey &key);
 // E22: Remove a peer's ghost-read record (call when ghost mode is disabled for that peer).
 void ResetGhostRead(const PeerKey &key);
 
+// 2026-08-26: custom_settings.cpp dagi "shu peer uchun override'larni
+// butunlay tozalash" amallari hech qanday sessiya/akkaunt konteksti
+// bilan chaqirilmaydi (UI'da akkaunt tanlovchisi yo'q). ResetGhostRead()
+// bo'sh (accountId=0) PeerKey bilan chaqirilsa faqat egasi noma'lum
+// eski qatorlarni tozalaydi -- haqiqiy akkauntlarning yozuvi qolib
+// ketadi. Bu funksiya barcha akkauntlar bo'yicha tozalaydi.
+void ResetGhostReadForPeerAllAccounts(const QString &peerId);
+
 // E22: Delete ghost_reads entries older than |days| days (default 30).
 // Called automatically by SaveGhostRead(); safe to call manually.
 void PruneStaleGhostReads(int days = 30);

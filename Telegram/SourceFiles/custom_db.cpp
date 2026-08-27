@@ -402,8 +402,61 @@ void RunMigrations() {
     // o'qishda esa ID-diapazon tekshiruvidan o'tadi (history.cpp).
     if (version < 10) {
         execSql("ALTER TABLE actioned_messages ADD COLUMN account_id INTEGER NOT NULL DEFAULT 0");
-        execSql("ALTER TABLE text_cache        ADD COLUMN account_id INTEGER NOT NULL DEFAULT 0");
-        execSql("ALTER TABLE media_index       ADD COLUMN account_id INTEGER NOT NULL DEFAULT 0");
+
+        // text_cache va media_index PRIMARY KEY dastlab (peer_id, msg_id)
+        // edi -- xuddi ghost_reads kabi. Oddiy ALTER TABLE ADD COLUMN buni
+        // to'g'irlamaydi: INSERT OR REPLACE / ON CONFLICT hamon eski
+        // 2-ustunli kalitga qarab ishlaydi, ya'ni ikki akkaunt bir xil
+        // (peer_id, msg_id) juftligida bir-birining ustidan yozib
+        // ketaveradi. 2026-08-26: bu ghost_reads bilan bir vaqtda
+        // yozilgan edi, lekin shu ikkita jadval e'tibordan chetda
+        // qolgan -- Gemini davom ettirgan diff'ni tekshirishda topildi.
+        execSql("CREATE TABLE IF NOT EXISTS text_cache_v10 ("
+                "account_id INTEGER NOT NULL DEFAULT 0, "
+                "peer_id TEXT, "
+                "msg_id INTEGER, "
+                "text TEXT, "
+                "is_out INTEGER DEFAULT 0, "
+                "msg_date INTEGER DEFAULT 0, "
+                "cached_at INTEGER, "
+                "sender_id TEXT DEFAULT '', "
+                "is_media INTEGER DEFAULT 0, "
+                "is_archived INTEGER DEFAULT 0, "
+                "PRIMARY KEY(account_id, peer_id, msg_id))");
+        execSql("INSERT INTO text_cache_v10 (account_id, peer_id, msg_id, text, "
+                "is_out, msg_date, cached_at, sender_id, is_media, is_archived) "
+                "SELECT 0, peer_id, msg_id, text, is_out, msg_date, cached_at, "
+                "sender_id, is_media, is_archived FROM text_cache");
+        execSql("DROP TABLE text_cache");
+        execSql("ALTER TABLE text_cache_v10 RENAME TO text_cache");
+        execSql("CREATE INDEX IF NOT EXISTS idx_tc_cached_at ON text_cache(cached_at)");
+
+        execSql("CREATE TABLE IF NOT EXISTS media_index_v10 ("
+                "account_id  INTEGER NOT NULL DEFAULT 0,"
+                "peer_id     TEXT    NOT NULL,"
+                "msg_id      INTEGER NOT NULL,"
+                "kind        TEXT    NOT NULL,"
+                "file_name   TEXT,"
+                "rel_path    TEXT,"
+                "size        INTEGER NOT NULL DEFAULT 0,"
+                "sha256      TEXT,"
+                "msg_date    INTEGER,"
+                "archived_at INTEGER,"
+                "layer       TEXT,"
+                "status      TEXT    NOT NULL,"
+                "reason      TEXT,"
+                "PRIMARY KEY (account_id, peer_id, msg_id))");
+        execSql("INSERT INTO media_index_v10 (account_id, peer_id, msg_id, kind, "
+                "file_name, rel_path, size, sha256, msg_date, archived_at, "
+                "layer, status, reason) "
+                "SELECT 0, peer_id, msg_id, kind, file_name, rel_path, size, "
+                "sha256, msg_date, archived_at, layer, status, reason "
+                "FROM media_index");
+        execSql("DROP TABLE media_index");
+        execSql("ALTER TABLE media_index_v10 RENAME TO media_index");
+        execSql("CREATE INDEX IF NOT EXISTS idx_mi_status ON media_index(status)");
+        execSql("CREATE INDEX IF NOT EXISTS idx_mi_peer   ON media_index(peer_id)");
+
         // ghost_reads PRIMARY KEY dastlab faqat peer_id edi -- oddiy
         // ALTER TABLE ADD COLUMN buni to'g'irlamaydi (ikkita akkaunt bir
         // xil peer_id bilan hamon to'qnashadi). Jadval qayta quriladi.
@@ -425,10 +478,6 @@ void RunMigrations() {
 
         execSql("CREATE INDEX IF NOT EXISTS idx_am_acc_peer_msg "
                 "ON actioned_messages(account_id, peer_id, msg_id)");
-        execSql("CREATE INDEX IF NOT EXISTS idx_tc_acc_peer_msg "
-                "ON text_cache(account_id, peer_id, msg_id)");
-        execSql("CREATE INDEX IF NOT EXISTS idx_mi_acc_peer_msg "
-                "ON media_index(account_id, peer_id, msg_id)");
 
         // Eski absolyut media yo'llari: arxiv ildizi 2026-08-15 da
         // ko'chgan (customizationMainFolder -> Pictures\customization
@@ -640,6 +689,20 @@ void ResetGhostRead(const PeerKey &key) {
             -1, &stmt, nullptr) == SQLITE_OK) {
         bindText(stmt, 1, key.peerId);
         sqlite3_bind_int64(stmt, 2, key.accountId);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+}
+
+void ResetGhostReadForPeerAllAccounts(const QString &peerId) {
+    Init();
+    if (!gDb) return;
+
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "DELETE FROM ghost_reads WHERE peer_id = ?",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        bindText(stmt, 1, peerId);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }
@@ -1154,7 +1217,7 @@ void UpsertMediaIndex(const PeerKey &key, const MediaIndexEntry &entry) {
             "(account_id, peer_id, msg_id, kind, file_name, rel_path, size, sha256, "
             " msg_date, archived_at, layer, status, reason) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
-            "ON CONFLICT(peer_id, msg_id) DO UPDATE SET "
+            "ON CONFLICT(account_id, peer_id, msg_id) DO UPDATE SET "
             "  account_id=excluded.account_id,"
             "  kind=excluded.kind,"
             "  file_name=excluded.file_name,"
