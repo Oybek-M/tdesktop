@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "custom_settings.h"
 #include "custom_db.h"
+#include "custom_peer_key.h"
 #include "api/api_text_entities.h"
 #include "data/business/data_shortcut_messages.h"
 #include "data/components/ephemeral_messages.h"
@@ -773,7 +774,7 @@ void Histories::sendReadRequest(not_null<History*> history, State &state) {
 
 		if (const auto channel = history->peer->asChannel()) {
 			if (CustomSettings::ShouldGhost(QString::number(history->peer->id.value))) {
-				CustomDB::SaveGhostRead(QString::number(history->peer->id.value), (qint64)tillId.bare);
+				CustomDB::SaveGhostRead(CustomDB::Key(session(), history->peer->id), (qint64)tillId.bare);
 				finished();
 				return 0; // return dummy request ID
 			}
@@ -783,7 +784,7 @@ void Histories::sendReadRequest(not_null<History*> history, State &state) {
 			)).done(finished).fail(finished).send();
 		} else {
 			if (CustomSettings::ShouldGhost(QString::number(history->peer->id.value))) {
-				CustomDB::SaveGhostRead(QString::number(history->peer->id.value), (qint64)tillId.bare);
+				CustomDB::SaveGhostRead(CustomDB::Key(session(), history->peer->id), (qint64)tillId.bare);
 				finished();
 				return 0; // return dummy request ID
 			}
@@ -986,14 +987,12 @@ void Histories::deleteMessages(const MessageIdsList &ids, bool revoke) {
 	for (const auto &itemId : ids) {
 		if (const auto item = _owner->message(itemId)) {
 			if (item->isRegular()) {
-				const auto peerId = QString::number(
-					item->history()->peer->id.value);
 				const auto msgId = item->id.bare;
 				// ScheduleUserDelete flags the message as user-initiated AND
 				// calls PermanentlyDeleteMessage internally, so the DB record
 				// is wiped here — before item->destroy() fires — regardless of
 				// whether the server ACK arrives before or after the item is gone.
-				CustomDB::ScheduleUserDelete(peerId, msgId);
+				CustomDB::ScheduleUserDelete(CustomDB::Key(item), msgId);
 			} else if (item->isDeletedLocally()) {
 				// Locally-injected O'CHIRILDI item: created by loadDeletedMessages()
 				// with MessageFlag::Local, so isRegular()=false and no server delete
@@ -1001,10 +1000,8 @@ void Histories::deleteMessages(const MessageIdsList &ids, bool revoke) {
 				// otherwise the next loadDeletedMessages() call (triggered by scroll,
 				// read-receipt, etc.) will find the record and re-inject the item,
 				// making it reappear after the user deleted it.
-				const auto peerId = QString::number(
-					item->history()->peer->id.value);
 				CustomDB::PermanentlyDeleteMessage(
-					peerId, static_cast<long long>(item->id.bare));
+					CustomDB::Key(item), static_cast<long long>(item->id.bare));
 			}
 		}
 	}

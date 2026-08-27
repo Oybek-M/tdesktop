@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QDir>
 #include <QtCore/QFile>
 #include "data/data_document.h"
+#include "custom_peer_key.h"
 
 #include "data/data_document_resolver.h"
 #include "data/data_session.h"
@@ -1151,7 +1152,7 @@ void DocumentData::finishLoad() {
 				QDateTime::currentSecsSinceEpoch());
 			entry.layer = u"l1"_q;
 			entry.status = u"present"_q;
-			CustomDB::UpsertMediaIndex(entry);
+			CustomDB::UpsertMediaIndex(CustomDB::Key(owner().session(), msg.peer), entry);
 		}
 	}
 
