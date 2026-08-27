@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "custom_archive.h"
 #include "custom_db.h"
+#include "custom_peer_key.h"
 #include "custom_settings.h"
 #include <QtCore/QFile>
 #include <QtCore/QTextStream>
@@ -2217,9 +2218,9 @@ void History::loadDeletedMessages() {
 	// bo'sh tarixni o'zi to'g'ri hal qiladi (addNewToBack).
 	if (!_deletedInjectionReady) return;
 
-	const auto peerIdStr = QString::number(peer->id.value);
-	if (!CustomSettings::ShouldAntiDelete(peerIdStr)) return;
-	auto deleted = CustomDB::GetDeletedMessages(peerIdStr);
+	const auto key = CustomDB::Key(session(), peer->id);
+	if (!CustomSettings::ShouldAntiDelete(key.peerId)) return;
+	auto deleted = CustomDB::GetDeletedMessages(key);
 	if (deleted.empty()) return;
 
 	const QString marker = QString::fromUtf8(
@@ -2355,7 +2356,7 @@ void History::applyInboxReadUpdate(
 
 void History::inboxRead(MsgId upTo, std::optional<int> stillUnread) {
 	if (CustomSettings::GhostMode()) {
-		qint64 ghostRead = CustomDB::GetGhostRead(QString::number(peer->id.value));
+		qint64 ghostRead = CustomDB::GetGhostRead(CustomDB::Key(session(), peer->id));
 		if (ghostRead > upTo) {
 			upTo = ghostRead;
 			stillUnread = std::nullopt; // Force local calculation so unread badge disappears
@@ -2420,7 +2421,7 @@ bool History::inboxReadTillKnown() const {
 MsgId History::inboxReadTillId() const {
 	MsgId result = _inboxReadBefore.value_or(1) - 1;
 	if (CustomSettings::GhostMode()) {
-		qint64 ghostRead = CustomDB::GetGhostRead(QString::number(peer->id.value));
+		qint64 ghostRead = CustomDB::GetGhostRead(CustomDB::Key(session(), peer->id));
 		if (ghostRead > result.bare) {
 			return MsgId(ghostRead);
 		}
@@ -3792,7 +3793,7 @@ void History::applyDialogFields(
 	}
 
 	if (CustomSettings::GhostMode()) {
-		_ghostReadTillId = CustomDB::GetGhostRead(QString::number(peer->id.value));
+		_ghostReadTillId = CustomDB::GetGhostRead(CustomDB::Key(session(), peer->id));
 		if (_ghostReadTillId > 0 && _ghostReadTillId >= maxInboxRead.bare) {
 			maxInboxRead = MsgId(_ghostReadTillId);
 			unreadCount = 0;
@@ -3946,7 +3947,7 @@ void History::validateMonoAndForumUnread(MsgId readTillId) {
 
 void History::setInboxReadTill(MsgId upTo) {
 	if (CustomSettings::GhostMode()) {
-		qint64 ghostRead = CustomDB::GetGhostRead(QString::number(peer->id.value));
+		qint64 ghostRead = CustomDB::GetGhostRead(CustomDB::Key(session(), peer->id));
 		if (ghostRead > upTo) upTo = ghostRead;
 	}
 
