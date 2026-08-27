@@ -2285,10 +2285,39 @@ void History::loadDeletedMessages() {
 			continue;
 		}
 
+		// Media placeholder binding (Task 5):
+		QString localPath = msg.mediaPath;
+		DocumentData *document = nullptr;
+		QFileInfo fileInfo;
+		if (!localPath.isEmpty()) {
+			if (QFileInfo(localPath).isRelative()) {
+				localPath = CustomSettings::ArchiveRoot() + u"/"_q + localPath;
+			}
+			fileInfo = QFileInfo(localPath);
+			if (QFile::exists(localPath)) {
+				const auto docId = DocumentId(msg.msgId);
+				document = owner().document(docId);
+				document->setLocation(Core::FileLocation(localPath));
+				document->size = fileInfo.size();
+				
+				QVector<MTPDocumentAttribute> attributes;
+				attributes.push_back(MTP_documentAttributeFilename(MTP_string(fileInfo.fileName())));
+				if (localPath.endsWith(".jpg", Qt::CaseInsensitive) || 
+					localPath.endsWith(".jpeg", Qt::CaseInsensitive) || 
+					localPath.endsWith(".png", Qt::CaseInsensitive)) {
+					attributes.push_back(MTP_documentAttributeImageSize(MTP_int(0), MTP_int(0)));
+				}
+				document->setattributes(attributes);
+			}
+		}
+
 		TextWithEntities displayText;
 		displayText.append(marker + "\n\n");
 		if (!msg.text.isEmpty()) {
 			displayText.append(TextWithEntities{ msg.text });
+		} else if (document) {
+			displayText.append(TextWithEntities{
+				u"📎 Fayl: "_q + fileInfo.fileName() });
 		} else {
 			// isMedia bayrog'i v5 da qo'shilgan — undan oldingi yozuvlarda
 			// u 0, lekin mediaPath to'lgan bo'lishi mumkin. Shuning uchun
@@ -2320,6 +2349,11 @@ void History::loadDeletedMessages() {
 			}),
 			displayText,
 			MTP_messageMediaEmpty());
+
+		if (document) {
+			using Args = Data::MediaFile::Args;
+			item->overrideMedia(std::make_unique<Data::MediaFile>(item, document, Args{}));
+		}
 
 		// Mark as deleted without touching DB again (already there).
 		item->markDeletedLocallyFromDB();
