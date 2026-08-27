@@ -30,8 +30,6 @@
 namespace CustomActivityHistory {
 namespace {
 
-static Main::Session *gSession = nullptr;
-
 struct PendingStoryMedia {
 	PhotoData *photo = nullptr;
 	DocumentData *document = nullptr;
@@ -39,6 +37,7 @@ struct PendingStoryMedia {
 	// 2026-08-15: hujjat to'g'ridan-to'g'ri arxivga yuklanadi, shuning
 	// uchun tugagach media_index ni yangilash uchun kerak.
 	QString relPath;
+	qint64 accountId = 0;
 	QString peerId;
 	long long storyId = 0;
 	// 2026-08-15: profil rasmi uchun — to'liq maqsad yo'li. Bo'sh bo'lsa
@@ -64,6 +63,7 @@ struct PendingUserpic {
 	UserData *user = nullptr;
 	Ui::PeerUserpicView view;
 	QString relPath;
+	qint64 accountId = 0;
 	QString peerId;
 	QString targetPath;
 	long long photoId = 0;
@@ -114,7 +114,7 @@ void CheckPendingStoryMedia() {
 						QDateTime::currentSecsSinceEpoch());
 					entry.layer = u"story"_q;
 					entry.status = u"present"_q;
-					CustomDB::UpsertMediaIndex(CustomDB::PeerKey{qint64(gSession->userId().bare), it->peerId}, entry);
+					CustomDB::UpsertMediaIndex(CustomDB::PeerKey{it->accountId, it->peerId}, entry);
 					CustomMediaQuota::AddBytes(it->document->size);
 				} else {
 					CustomDB::SaveMediaFile(path, u"video"_q); // eski yo'l
@@ -145,7 +145,7 @@ void CheckPendingStoryMedia() {
 								QDateTime::currentSecsSinceEpoch());
 							entry.layer = u"avatar"_q;
 							entry.status = u"present"_q;
-							CustomDB::UpsertMediaIndex(CustomDB::PeerKey{qint64(gSession->userId().bare), it->peerId}, entry);
+							CustomDB::UpsertMediaIndex(CustomDB::PeerKey{it->accountId, it->peerId}, entry);
 							CustomMediaQuota::AddBytes(entry.size);
 						}
 					}
@@ -182,7 +182,7 @@ void CheckPendingUserpics() {
 					QDateTime::currentSecsSinceEpoch());
 				entry.layer = u"avatar"_q;
 				entry.status = u"present"_q;
-				CustomDB::UpsertMediaIndex(CustomDB::PeerKey{qint64(gSession->userId().bare), it->peerId}, entry);
+				CustomDB::UpsertMediaIndex(CustomDB::PeerKey{it->accountId, it->peerId}, entry);
 				CustomMediaQuota::AddBytes(entry.size);
 			}
 			done = true;
@@ -194,15 +194,21 @@ void CheckPendingUserpics() {
 }
 
 void MaybeBackupStoryMedia(
+		not_null<Main::Session*> session,
 		not_null<Data::Story*> story,
 		Data::FileOriginStory origin) {
 	if (!CustomSettings::StoryMediaBackupEnabled()) {
 		return;
 	}
+	const auto accountId = qint64(session->userId().bare);
 	if (const auto photo = story->photo()) {
 		auto media = photo->createMediaView();
 		photo->load(Data::PhotoSize::Large, origin);
-		gPendingStoryMedia.push_back({ photo, nullptr, std::move(media) });
+		auto pending = PendingStoryMedia();
+		pending.photo = photo;
+		pending.photoMedia = std::move(media);
+		pending.accountId = accountId;
+		gPendingStoryMedia.push_back(std::move(pending));
 	} else if (const auto document = story->document()) {
 		// Raw pointer, no keepalive (unlike photo's PhotoMedia shared_ptr
 		// above): Data::Session owns DocumentData objects for the whole
@@ -237,13 +243,13 @@ void MaybeBackupStoryMedia(
 		const auto fullPath = CustomSettings::ArchiveRoot() + u"/"_q + relPath;
 		QDir().mkpath(QFileInfo(fullPath).absolutePath());
 		document->save(origin, fullPath);
-		gPendingStoryMedia.push_back({
-			nullptr,
-			document,
-			nullptr,
-			relPath,
-			QString::number(story->peer()->id.value),
-			static_cast<long long>(story->id()) });
+		auto pending = PendingStoryMedia();
+		pending.document = document;
+		pending.relPath = relPath;
+		pending.accountId = accountId;
+		pending.peerId = QString::number(story->peer()->id.value);
+		pending.storyId = static_cast<long long>(story->id());
+		gPendingStoryMedia.push_back(std::move(pending));
 	}
 }
 
@@ -257,7 +263,7 @@ void MaybeBackupStoryMedia(
 // Endi har bir yangi profil rasmi arxivga tushadi va eksport qilinadi.
 // Avatarlar kichik (~100-300 KB), shuning uchun hajm chegarasi
 // qo'llanmaydi — faqat kvota tekshiriladi.
-void MaybeBackupUserpic(not_null<UserData*> user) {
+void MaybeBackupUserpic(not_null<Main::Session*> session, not_null<UserData*> user) {
 	if (!user->hasUserpic() || CustomMediaQuota::IsFull()) {
 		return;
 	}
@@ -281,6 +287,7 @@ void MaybeBackupUserpic(not_null<UserData*> user) {
 	pending.user = user;
 	pending.view = user->createUserpicView();
 	pending.relPath = relPath;
+	pending.accountId = qint64(session->userId().bare);
 	pending.peerId = peerIdStr;
 	pending.targetPath = targetPath;
 	pending.photoId = static_cast<long long>(photoId);
@@ -310,6 +317,7 @@ void MaybeBackupUserpic(not_null<UserData*> user) {
 }
 
 void RecordField(
+		not_null<Main::Session*> session,
 		const QString &peerId,
 		const QString &field,
 		const QString &newValue,
@@ -350,7 +358,7 @@ void RecordField(
 		}
 	}
 	CustomDB::SaveActivityHistoryEntry(
-		CustomDB::PeerKey{qint64(gSession->userId().bare), peerId}, field, hadPrevious, oldValue, newValue, observedAt);
+		CustomDB::PeerKey{qint64(session->userId().bare), peerId}, field, hadPrevious, oldValue, newValue, observedAt);
 }
 
 } // namespace
@@ -416,7 +424,6 @@ QString DecodeStoryLabel(const QString &encoded) {
 }
 
 void Init(not_null<Main::Session*> session) {
-	gSession = session;
 	using Flag = Data::PeerUpdate::Flag;
 
 	session->changes().peerUpdates(
@@ -434,22 +441,23 @@ void Init(not_null<Main::Session*> session) {
 		const auto now = base::unixtime::now();
 
 		if (update.flags & Flag::Name) {
-			RecordField(peerId, u"name"_q, user->name(), now);
+			RecordField(session, peerId, u"name"_q, user->name(), now);
 		}
 		if (update.flags & Flag::Username) {
-			RecordField(peerId, u"username"_q, user->username(), now);
+			RecordField(session, peerId, u"username"_q, user->username(), now);
 		}
 		if (update.flags & Flag::Photo) {
 			const auto value = user->hasUserpic()
 				? QString::number(user->userpicPhotoId())
 				: u"empty"_q;
-			RecordField(peerId, u"photo"_q, value, now);
+			RecordField(session, peerId, u"photo"_q, value, now);
 			// Rasm ID'sining o'zi yetarli emas — eski rasm
 			// almashtirilsa yo'qoladi. Rasmning O'ZINI ham saqlaymiz.
-			MaybeBackupUserpic(user);
+			MaybeBackupUserpic(session, user);
 		}
 		if (update.flags & Flag::OnlineStatus) {
 			RecordField(
+				session,
 				peerId,
 				u"status"_q,
 				EncodeStatus(user->lastseen(), now),
@@ -489,6 +497,7 @@ void Init(not_null<Main::Session*> session) {
 		const auto now = base::unixtime::now();
 
 		RecordField(
+			session,
 			peerId2,
 			u"story"_q,
 			QString::number(story->date()),
@@ -497,7 +506,7 @@ void Init(not_null<Main::Session*> session) {
 		const auto fullId = FullStoryId{ peerId, latest.id };
 		if (!gProcessedStoryMedia.contains(fullId)) {
 			gProcessedStoryMedia.emplace(fullId);
-			MaybeBackupStoryMedia(story, fullId);
+			MaybeBackupStoryMedia(session, story, fullId);
 		}
 	}, session->lifetime());
 
