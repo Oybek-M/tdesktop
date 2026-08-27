@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "custom_settings.h"
 #include "custom_db.h"
+#include "custom_peer_key.h"
 #include "api/api_transcribes.h"
 #include "history/view/history_view_service_message.h"
 #include "history/view/history_view_message.h"
@@ -2164,7 +2165,7 @@ void Element::validateText() {
 			QString historyText;
 
 			if (CustomSettings::OfflineDb()) {
-				historyText = CustomDB::GetMessageHistory(item->id.bare, QString::number(item->history()->peer->id.value));
+				historyText = CustomDB::GetMessageHistory(item->id.bare, CustomDB::Key(item));
 				if (!historyText.isEmpty()) {
 					// Check if historyText contains special labels like DELETED or ORIGINAL
 					bool hasHistory = historyText.contains(QString::fromUtf8("\xe2\x80\x94\xe2\x80\x94 ORIGINAL"))
