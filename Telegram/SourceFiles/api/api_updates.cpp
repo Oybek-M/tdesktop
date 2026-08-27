@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "custom_settings.h"
 #include "custom_db.h"
+#include "custom_peer_key.h"
 #include "api/api_authorizations.h"
 #include "api/api_user_names.h"
 #include "api/api_chat_participants.h"
@@ -1391,7 +1392,7 @@ void Updates::applyUpdateNoPtsCheck(const MTPUpdate &update) {
 		const auto peer = peerFromMTP(d.vpeer());
 		
 		if (CustomSettings::GhostMode()) {
-			qint64 ghostRead = CustomDB::GetGhostRead(QString::number(peer.value));
+			qint64 ghostRead = CustomDB::GetGhostRead(CustomDB::Key(session(), peer));
 			if (ghostRead >= d.vmax_id().v) {
 				// If we have a local ghost read that is further than server's update, ignore this update
 				break;

@@ -224,7 +224,7 @@ Session::Session(
 	// shuning uchun yuklanish tugaganini o'zimiz kuzatamiz.
 	downloaderTaskFinished(
 	) | rpl::on_next([=] {
-		CustomArchive::CheckPendingPhotos();
+		CustomArchive::CheckPendingPhotos(this);
 	}, lifetime());
 
 	_api->requestTermsUpdate();

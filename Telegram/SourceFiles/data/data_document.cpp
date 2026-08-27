@@ -1119,7 +1119,7 @@ void DocumentData::finishLoad() {
 		if (fromMessage) {
 			const auto &msg = v::get<Data::FileOriginMessage>(fileOrigin.data);
 			CustomArchive::NoteArchivedDownloadFinished(
-				QString::number(msg.peer.value),
+				CustomDB::Key(owner().session(), msg.peer),
 				static_cast<long long>(msg.msg.bare),
 				size);
 		}
