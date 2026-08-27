@@ -51,10 +51,8 @@ struct ActionedMessage {
 
 // E19: Schema version constant — increment when adding new columns/tables.
 // RunMigrations() is called inside Init() automatically.
-// v5: actioned_messages + text_cache ga sender_id va is_media ustunlari qo'shildi.
-// v6 (A13/D4): text_cache ga is_archived ustuni — 1 bo'lsa doimiy arxiv,
-//              PruneStaleCachedText() unga tegmaydi.
-constexpr int kCurrentSchemaVersion = 10;
+// v11 (Vazifa 6): actioned_messages dagi absolyut media_path yo'llarni nisbiy qilish
+constexpr int kCurrentSchemaVersion = 11;
 
 void Init();
 

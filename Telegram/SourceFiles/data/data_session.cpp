@@ -3455,10 +3455,11 @@ void Session::processMessagesDeleted(
 				}
 			}
 			if (msgDate > 0) {
+				const auto mediaPath = CustomDB::GetArchivedMediaPath(key, messageId.v);
 				CustomDB::MarkDeleted(
 					messageId.v,
 					key,
-					QString(),
+					mediaPath,
 					originalText,
 					msgDate,
 					isOut,

@@ -95,6 +95,27 @@ static QString dbFilePath() {
     return CustomSettings::ArchiveDbDir() + "/actioned_messages.db";
 }
 
+static QString toRelativePath(const QString &path) {
+    if (path.isEmpty()) return path;
+    const QString root = CustomSettings::ArchiveRoot();
+    if (QFileInfo(path).isAbsolute() && path.startsWith(root, Qt::CaseInsensitive)) {
+        QString rel = path.mid(root.length());
+        if (rel.startsWith('/') || rel.startsWith('\\')) {
+            rel = rel.mid(1);
+        }
+        return rel;
+    }
+    return path;
+}
+
+static QString toAbsolutePath(const QString &path) {
+    if (path.isEmpty()) return path;
+    if (QFileInfo(path).isRelative()) {
+        return CustomSettings::ArchiveRoot() + "/" + path;
+    }
+    return path;
+}
+
 // Execute a SQL statement with no results expected. Returns true on success.
 static bool execSql(const char *sql) {
     char *errmsg = nullptr;
@@ -489,6 +510,41 @@ void RunMigrations() {
                 "WHERE media_path LIKE 'C:/Users/Oybek/customizationMainFolder/%'");
     }
 
+    // v10 → v11: Dinamik replace migratsiyasi (Vazifa 6.1).
+    if (version < 11) {
+        sqlite3_stmt *stmt = nullptr;
+        if (sqlite3_prepare_v2(gDb, "SELECT rowid, media_path FROM actioned_messages WHERE media_path IS NOT NULL AND media_path != ''", -1, &stmt, nullptr) == SQLITE_OK) {
+            struct ToUpdate {
+                sqlite3_int64 rowId;
+                QString relPath;
+            };
+            QVector<ToUpdate> updates;
+            const QString root = CustomSettings::ArchiveRoot();
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                sqlite3_int64 rowId = sqlite3_column_int64(stmt, 0);
+                QString path = colText(stmt, 1);
+                if (QFileInfo(path).isAbsolute() && path.startsWith(root, Qt::CaseInsensitive)) {
+                    QString rel = path.mid(root.length());
+                    if (rel.startsWith('/') || rel.startsWith('\\')) {
+                        rel = rel.mid(1);
+                    }
+                    updates.push_back({ rowId, rel });
+                }
+            }
+            sqlite3_finalize(stmt);
+
+            for (const auto &upd : updates) {
+                sqlite3_stmt *updStmt = nullptr;
+                if (sqlite3_prepare_v2(gDb, "UPDATE actioned_messages SET media_path = ? WHERE rowid = ?", -1, &updStmt, nullptr) == SQLITE_OK) {
+                    bindText(updStmt, 1, upd.relPath);
+                    sqlite3_bind_int64(updStmt, 2, upd.rowId);
+                    sqlite3_step(updStmt);
+                    sqlite3_finalize(updStmt);
+                }
+            }
+        }
+    }
+
     // Update version stamp.
     {
         sqlite3_stmt *stmt = nullptr;
@@ -774,7 +830,8 @@ void MarkDeleted(
                 "    account_id    = ? "
                 "WHERE peer_id=? AND msg_id=? AND type='deleted' AND account_id IN (0, ?)",
                 -1, &upd, nullptr) == SQLITE_OK) {
-            bindText(upd, 1, mediaPath);    bindText(upd, 2, mediaPath);
+            const QString relPath = toRelativePath(mediaPath);
+            bindText(upd, 1, relPath);      bindText(upd, 2, relPath);
             bindText(upd, 3, originalText); bindText(upd, 4, originalText);
             sqlite3_bind_int(upd, 5, isOut ? 1 : 0);
             sqlite3_bind_int64(upd, 6, msgDate); sqlite3_bind_int64(upd, 7, msgDate);
@@ -796,7 +853,7 @@ void MarkDeleted(
     msg.peerId = key.peerId;
     msg.msgId = msgId;
     msg.type = "deleted";
-    msg.mediaPath = mediaPath;
+    msg.mediaPath = toRelativePath(mediaPath);
     msg.originalText = originalText;
     msg.msgDate = msgDate;
     msg.isOut = isOut;
@@ -839,7 +896,7 @@ QVector<DeletedMessage> GetDeletedMessages(const PeerKey &key) {
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             DeletedMessage dm;
             dm.msgId     = sqlite3_column_int64(stmt, 0);
-            dm.mediaPath = colText(stmt, 1);
+            dm.mediaPath = toAbsolutePath(colText(stmt, 1));
             dm.isOut     = sqlite3_column_int(stmt, 2) != 0;
             dm.date      = static_cast<unsigned int>(sqlite3_column_int64(stmt, 3));
             dm.text      = colText(stmt, 4);
@@ -868,7 +925,7 @@ QString GetSavedMediaPath(const PeerKey &key, long long msgId) {
         sqlite3_bind_int64(stmt, 2, msgId);
         sqlite3_bind_int64(stmt, 3, key.accountId);
         if (sqlite3_step(stmt) == SQLITE_ROW) {
-            result = colText(stmt, 0);
+            result = toAbsolutePath(colText(stmt, 0));
         }
         sqlite3_finalize(stmt);
     }
@@ -930,7 +987,7 @@ QVector<DeletedMessageWithPeer> GetAllDeletedMessages(int limit) {
             dm.peerId    = colText(stmt, 0);
             dm.msgId     = sqlite3_column_int64(stmt, 1);
             dm.text      = colText(stmt, 2);
-            dm.mediaPath = colText(stmt, 3);
+            dm.mediaPath = toAbsolutePath(colText(stmt, 3));
             dm.isOut     = sqlite3_column_int(stmt, 4) != 0;
             dm.date      = static_cast<unsigned int>(sqlite3_column_int64(stmt, 5));
             dm.senderId  = colText(stmt, 6);
@@ -1052,7 +1109,7 @@ void SaveActionedMessage(const ActionedMessage &msg) {
         bindText(stmt, 3, msg.type);
         bindText(stmt, 4, msg.originalText);
         bindText(stmt, 5, msg.newText);
-        bindText(stmt, 6, msg.mediaPath);
+        bindText(stmt, 6, toRelativePath(msg.mediaPath));
         sqlite3_bind_int(stmt, 7, msg.isOut ? 1 : 0);
         sqlite3_bind_int64(stmt, 8, static_cast<sqlite3_int64>(msg.msgDate));
         bindText(stmt, 9, dtToStr(msg.timestamp));
