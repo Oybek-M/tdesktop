@@ -2223,6 +2223,22 @@ void History::loadDeletedMessages() {
 	auto deleted = CustomDB::GetDeletedMessages(key);
 	if (deleted.empty()) return;
 
+	MsgId minReal = 0;
+	unsigned int minRealDate = 0;
+	for (const auto &block : blocks) {
+		for (const auto &view : block->messages) {
+			const auto item = view->data().get();
+			if (item->isRegular() && !item->isLocal()) {
+				const auto msgId = item->id;
+				const auto msgDate = static_cast<unsigned int>(item->date());
+				if (minReal == 0 || msgId < minReal) {
+					minReal = msgId;
+					minRealDate = msgDate;
+				}
+			}
+		}
+	}
+
 	const QString marker = QString::fromUtf8(
 		"\xe2\x80\x94\xe2\x80\x94 O'CHIRILDI \xe2\x80\x94\xe2\x80\x94");
 
@@ -2230,6 +2246,13 @@ void History::loadDeletedMessages() {
 	for (const auto &msg : deleted) {
 		// Skip if already present (loaded from server or already injected).
 		if (owner().message(peer, MsgId(msg.msgId))) continue;
+
+		// Eski yozuvlar uchun ID-diapazon tekshiruvi:
+		if (msg.accountId == 0 && minReal > 0) {
+			if (msg.msgId < minReal.bare && msg.date > minRealDate) {
+				continue;
+			}
+		}
 		// T28 fix: agar date 0 bo'lsa, hozirgi vaqtni ishlatamiz (fallback).
 		// Bu chat ochilmagan paytda kelgan o'chirish update lari uchun
 		// (eski versiyada matn va date saqlanmagan bo'lishi mumkin).
