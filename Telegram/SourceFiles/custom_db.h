@@ -107,7 +107,7 @@ void ClearUserDeletePending(const PeerKey &key, long long msgId);
 // Permanently erase all records for a message from DB + in-memory caches.
 void PermanentlyDeleteMessage(const PeerKey &key, long long msgId);
 void SaveActionedMessage(const ActionedMessage &msg);
-QString GetMessageHistory(long long msgId, const QString &peerId);
+QString GetMessageHistory(long long msgId, const PeerKey &key);
 
 struct DeletedMessage {
     long long msgId;
