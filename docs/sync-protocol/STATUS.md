@@ -16,7 +16,7 @@ Oxirgi yangilanish: **2026-08-26**
 
 | Loyiha | Holat | Keyingi qadam |
 |---|---|---|
-| **tdesktop** (CustomMod) | 🟢 v7.1.1 chiqarildi, ishlab turibdi | 🔴 Sxema v10 (`account_id`), keyin sync agenti (plan 02) |
+| **tdesktop** (CustomMod) | 🟢 v7.1.1 chiqarildi, ishlab turibdi | ✅ Sxema v10 (`account_id`) qurildi — keyin sync agenti (plan 02) |
 | **customsync-server** | 🟡 01a: 7 task'dan 4 tasi | Plan 01a Task 5 — qurilma ro'yxati + JWT (`customsync-server/PROGRESS.md`) |
 | **server-controller** | ⚪ boshlanmagan | 01a/01b tugagach |
 | **tmobile-android** | ⚪ muhokama qilinmagan | — |
@@ -29,8 +29,8 @@ Oxirgi yangilanish: **2026-08-26**
 | Nima | Holat |
 |---|---|
 | `qtwebsockets` moduli | ✅ qurildi va sinovdan o'tdi (2026-08-25) |
-| Sxema versiyasi | **v9** — build 2026-08-25 22:37 da qo'llandi va tasdiqlandi |
-| `account_id` (ko'p akkaunt) | 🔴 **YO'Q** — 5 ta jadvalda ham. v10 rejalashtirilgan |
+| Sxema versiyasi | **v10** — build 2026-08-27 16:24 da muvaffaqiyatli o'tdi; qo'lda sinov kutilmoqda |
+| `account_id` (ko'p akkaunt) | ✅ **BOR** — 5 ta jadvalda. `activity_history` ataylab FILTRLANMAYDI (spec §0.13) |
 | `media_index` jadvali | ✅ mavjud, 1543 yozuv |
 | `sha256` maydoni | ❌ **BO'SH** — hisoblash hali yozilmagan |
 | `sync_outbox` / `sync_state` | ❌ yo'q — plan 02 Task 3 |
@@ -53,7 +53,7 @@ yo'qotish — tiklab bo'lmaydi.
 
 ### tdesktop'da Track C uchun QOLGAN ishlar
 
-1. 🔴 **Sxema v10 — `account_id`** (5 ta jadval) + media tuzatishlari.
+1. ✅ **Sxema v10 — `account_id`** (5 ta jadval) + media tuzatishlari — kod tayyor, build o'tdi.
    Batafsil reja:
    [`../superpowers/specs/2026-08-26-multi-account-db-isolation-design.md`](../superpowers/specs/2026-08-26-multi-account-db-isolation-design.md)
    §4. Sync'dan OLDIN bajariladi.
