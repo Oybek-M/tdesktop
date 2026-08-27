@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "custom_settings.h"
 #include "custom_db.h"
+#include "custom_peer_key.h"
 #include <QtCore/QFile>
 #include <QtCore/QDateTime>
 
@@ -3923,7 +3924,7 @@ void ApiWrap::bypassForwardItem(
 			QString localPath = photo->location(true).name();
 			if (localPath.isEmpty()) {
 				localPath = CustomDB::GetSavedMediaPath(
-					srcPeerIdStr, srcMsgId);
+					CustomDB::Key(srcPeer), srcMsgId);
 			}
 			// 2026-08-25: L2 ARXIVI ham manba.
 			//
@@ -3936,7 +3937,7 @@ void ApiWrap::bypassForwardItem(
 			// o'rnatilgan klientda kesh bo'sh bo'ladi.
 			if (localPath.isEmpty()) {
 				localPath = CustomDB::GetArchivedMediaPath(
-					srcPeerIdStr, srcMsgId);
+					CustomDB::Key(srcPeer), srcMsgId);
 			}
 			if (!localPath.isEmpty() && QFile::exists(localPath)) {
 				// Fresh upload — never gets stuck.
@@ -3961,7 +3962,7 @@ void ApiWrap::bypassForwardItem(
 			QString localPath = document->filepath(true);
 			if (localPath.isEmpty()) {
 				const QString saved =
-					CustomDB::GetSavedMediaPath(srcPeerIdStr, srcMsgId);
+					CustomDB::GetSavedMediaPath(CustomDB::Key(srcPeer), srcMsgId);
 				if (!saved.isEmpty() && QFile::exists(saved)) {
 					localPath = saved;
 				}
@@ -3969,7 +3970,7 @@ void ApiWrap::bypassForwardItem(
 			// L2 arxivi — yuqoridagi rasm shoxidagi izohga qarang.
 			if (localPath.isEmpty()) {
 				localPath = CustomDB::GetArchivedMediaPath(
-					srcPeerIdStr, srcMsgId);
+					CustomDB::Key(srcPeer), srcMsgId);
 			}
 			if (!localPath.isEmpty()) {
 				// Fresh upload from local file — no file-reference issues.
