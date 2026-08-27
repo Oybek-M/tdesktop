@@ -2373,7 +2373,7 @@ void History::loadDeletedMessages() {
 	}
 	if (injectedCount > 0) {
 		qDebug() << "[CustomMod] Injected" << injectedCount
-		         << "deleted messages for peer" << peerIdStr;
+		         << "deleted messages for peer" << peer->id.value;
 	}
 }
 

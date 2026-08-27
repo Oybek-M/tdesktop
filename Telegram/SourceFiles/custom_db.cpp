@@ -1393,20 +1393,31 @@ int ReconcileMediaIndex(const QString &archiveRoot) {
 
     // Avval barcha 'present' yozuvlarni o'qiymiz, so'ng fayl tizimini
     // tekshiramiz — SELECT davomida UPDATE qilish SQLite'da nozik.
-    struct Row { QString peerId; long long msgId; QString relPath; QString status; };
+    // account_id ham o'qiladi: bu funksiya barcha akkauntlarning
+    // yozuvlarini ko'rib chiqadi, shuning uchun UPDATE aynan o'sha
+    // yozuvning egasiga tegishli bo'lishi kerak.
+    struct Row {
+        qint64 accountId;
+        QString peerId;
+        long long msgId;
+        QString relPath;
+        QString status;
+    };
     QVector<Row> rows;
     {
         sqlite3_stmt *stmt = nullptr;
         if (sqlite3_prepare_v2(gDb,
-                "SELECT peer_id, msg_id, rel_path, status FROM media_index "
+                "SELECT account_id, peer_id, msg_id, rel_path, status "
+                "FROM media_index "
                 "WHERE status IN ('present', 'pending')",
                 -1, &stmt, nullptr) == SQLITE_OK) {
             while (sqlite3_step(stmt) == SQLITE_ROW) {
                 rows.append({
-                    colText(stmt, 0),
-                    sqlite3_column_int64(stmt, 1),
-                    colText(stmt, 2),
-                    colText(stmt, 3) });
+                    sqlite3_column_int64(stmt, 0),
+                    colText(stmt, 1),
+                    sqlite3_column_int64(stmt, 2),
+                    colText(stmt, 3),
+                    colText(stmt, 4) });
             }
             sqlite3_finalize(stmt);
         }
@@ -1426,11 +1437,13 @@ int ReconcileMediaIndex(const QString &archiveRoot) {
             && QFile::exists(archiveRoot + "/" + row.relPath);
         if (row.status == "present" && !exists) {
             SetMediaIndexStatus(
-                row.peerId, row.msgId, u"missing"_q, u"file_not_found"_q);
+                PeerKey{ row.accountId, row.peerId },
+                row.msgId, u"missing"_q, u"file_not_found"_q);
             ++changed;
         } else if (row.status == "pending" && exists) {
             SetMediaIndexStatus(
-                row.peerId, row.msgId, u"present"_q, QString());
+                PeerKey{ row.accountId, row.peerId },
+                row.msgId, u"present"_q, QString());
             ++changed;
         }
     }
@@ -1549,7 +1562,11 @@ int ScanArchiveMedia(const QString &archiveRoot) {
         entry.layer = u"scan"_q;
         entry.status = u"present"_q;
         entry.reason = u"backfill"_q;
-        UpsertMediaIndex(entry);
+        // Disk skani: fayl nomidan akkauntni bilib bo'lmaydi, shuning
+        // uchun account_id = 0 (egasi noma'lum). O'qish so'rovlari
+        // `account_id IN (0, ?)` bo'lgani uchun bunday yozuv barcha
+        // akkauntlarga ko'rinadi va keyingi yozuv uni "egallab" oladi.
+        UpsertMediaIndex(PeerKey{ 0, peerId }, entry);
         known.insert(relPath);
         ++added;
     }

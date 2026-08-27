@@ -3924,7 +3924,7 @@ void ApiWrap::bypassForwardItem(
 			QString localPath = photo->location(true).name();
 			if (localPath.isEmpty()) {
 				localPath = CustomDB::GetSavedMediaPath(
-					CustomDB::Key(srcPeer), srcMsgId);
+					CustomDB::Key(item), srcMsgId);
 			}
 			// 2026-08-25: L2 ARXIVI ham manba.
 			//
@@ -3937,7 +3937,7 @@ void ApiWrap::bypassForwardItem(
 			// o'rnatilgan klientda kesh bo'sh bo'ladi.
 			if (localPath.isEmpty()) {
 				localPath = CustomDB::GetArchivedMediaPath(
-					CustomDB::Key(srcPeer), srcMsgId);
+					CustomDB::Key(item), srcMsgId);
 			}
 			if (!localPath.isEmpty() && QFile::exists(localPath)) {
 				// Fresh upload — never gets stuck.
@@ -3962,7 +3962,7 @@ void ApiWrap::bypassForwardItem(
 			QString localPath = document->filepath(true);
 			if (localPath.isEmpty()) {
 				const QString saved =
-					CustomDB::GetSavedMediaPath(CustomDB::Key(srcPeer), srcMsgId);
+					CustomDB::GetSavedMediaPath(CustomDB::Key(item), srcMsgId);
 				if (!saved.isEmpty() && QFile::exists(saved)) {
 					localPath = saved;
 				}
@@ -3970,7 +3970,7 @@ void ApiWrap::bypassForwardItem(
 			// L2 arxivi — yuqoridagi rasm shoxidagi izohga qarang.
 			if (localPath.isEmpty()) {
 				localPath = CustomDB::GetArchivedMediaPath(
-					CustomDB::Key(srcPeer), srcMsgId);
+					CustomDB::Key(item), srcMsgId);
 			}
 			if (!localPath.isEmpty()) {
 				// Fresh upload from local file — no file-reference issues.
