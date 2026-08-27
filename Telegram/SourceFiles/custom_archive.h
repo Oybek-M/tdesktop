@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QtCore/QString>
+#include "custom_db.h"
 
 class HistoryItem;
 class DocumentData;
@@ -83,7 +84,7 @@ void TryRescueMedia(not_null<HistoryItem*> item);
 // o'tadi. L2/L3 faqat yuklashni boshlaydi, natijani bilmaydi — shuning
 // uchun holat aynan shu yerda tasdiqlanadi.
 void NoteArchivedDownloadFinished(
-	const QString &peerId,
+	const CustomDB::PeerKey &key,
 	long long msgId,
 	long long size);
 
@@ -96,6 +97,6 @@ void StartMaintenance();
 // PhotoData'da DocumentData'dagi kabi finishLoad() hook'i yo'q, shuning
 // uchun yuklanishni o'zimiz kuzatishimiz kerak. main_session.cpp dagi
 // downloaderTaskFinished() dan chaqiriladi.
-void CheckPendingPhotos();
+void CheckPendingPhotos(not_null<Main::Session*> session);
 
 } // namespace CustomArchive

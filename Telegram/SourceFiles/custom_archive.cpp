@@ -1,6 +1,7 @@
 #include "custom_archive.h"
 
 #include "custom_db.h"
+#include "custom_peer_key.h"
 #include "custom_media_quota.h"
 #include "custom_settings.h"
 #include "data/data_document.h"
@@ -28,6 +29,7 @@ namespace CustomArchive {
 namespace {
 
 struct PendingRow {
+	qint64 accountId = 0;
 	QString peerId;
 	QString text;
 	QString senderId;
@@ -49,7 +51,7 @@ constexpr auto kCheckpointIntervalMs = 5 * 60 * 1000;
 
 void WriteRow(const PendingRow &row) {
 	CustomDB::CacheMessageText(
-		row.peerId,
+		CustomDB::PeerKey{row.accountId, row.peerId},
 		row.msgId,
 		row.text,
 		row.isOut,
@@ -146,7 +148,7 @@ void RecordIndex(
 	CustomSettings::RememberPeerName(
 		entry.peerId,
 		item->history()->peer->name());
-	CustomDB::UpsertMediaIndex(entry);
+	CustomDB::UpsertMediaIndex(CustomDB::Key(item), entry);
 }
 
 // A13/K4 + 2026-08-14 (L2): kuzatilayotgan chatda media avtomatik yuklab
@@ -203,7 +205,7 @@ void RecordPhotoIndex(
 	CustomSettings::RememberPeerName(
 		entry.peerId,
 		item->history()->peer->name());
-	CustomDB::UpsertMediaIndex(entry);
+	CustomDB::UpsertMediaIndex(CustomDB::Key(item), entry);
 }
 
 void MaybeDownloadMedia(not_null<HistoryItem*> item) {
@@ -330,7 +332,7 @@ void MaybeDownloadMedia(not_null<HistoryItem*> item) {
 		// Rasm ko'pincha allaqachon keshda bo'ladi — darhol tekshiramiz,
 		// aks holda yangi yuklash boshlanmay `downloaderTaskFinished`
 		// hech qachon otilmaydi.
-		CheckPendingPhotos();
+		CheckPendingPhotos(&item->history()->session());
 	}
 }
 
@@ -338,7 +340,7 @@ void MaybeDownloadMedia(not_null<HistoryItem*> item) {
 
 // Yuklanishi tugagan rasmlarni arxivga yozadi. main_session.cpp dagi
 // downloaderTaskFinished() dan chaqiriladi.
-void CheckPendingPhotos() {
+void CheckPendingPhotos(not_null<Main::Session*> session) {
 	for (auto it = gPendingPhotos.begin(); it != gPendingPhotos.end();) {
 		auto done = false;
 		if (!it->photo || !it->view) {
@@ -367,7 +369,7 @@ void CheckPendingPhotos() {
 						QDateTime::currentSecsSinceEpoch());
 					entry.layer = u"l2"_q;
 					entry.status = u"present"_q;
-					CustomDB::UpsertMediaIndex(entry);
+					CustomDB::UpsertMediaIndex(CustomDB::PeerKey{qint64(session->userId().bare), it->peerId}, entry);
 					CustomMediaQuota::AddBytes(bytes.size());
 				}
 			}
@@ -559,6 +561,7 @@ void MaybeArchiveItem(not_null<HistoryItem*> item) {
 	}
 
 	auto row = PendingRow();
+	row.accountId = qint64(item->history()->session().userId().bare);
 	row.peerId = peerIdStr;
 	row.text = text;
 	row.senderId = QString::number(item->from()->id.value);
@@ -596,7 +599,7 @@ void EndBatch() {
 }
 
 void RestoreDeletedChats(not_null<Main::Session*> session) {
-	const auto peers = CustomDB::GetPeersWithDeletedMessages();
+	const auto peers = CustomDB::GetPeersWithDeletedMessages(qint64(session->userId().bare));
 	if (peers.isEmpty()) {
 		return;
 	}
@@ -668,7 +671,7 @@ void TryRescueMedia(not_null<HistoryItem*> item) {
 		return; // yuklanmoqda — aralashmaymiz
 	}
 	const auto msgId = static_cast<long long>(item->id.bare);
-	if (CustomDB::HasPresentMediaIndexEntry(peerIdStr, msgId)) {
+	if (CustomDB::HasPresentMediaIndexEntry(CustomDB::Key(item), msgId)) {
 		return; // allaqachon arxivda
 	}
 
@@ -702,13 +705,13 @@ void TryRescueMedia(not_null<HistoryItem*> item) {
 }
 
 void NoteArchivedDownloadFinished(
-		const QString &peerId,
+		const CustomDB::PeerKey &key,
 		long long msgId,
 		long long size) {
-	if (peerId.isEmpty()) {
+	if (key.peerId.isEmpty()) {
 		return;
 	}
-	CustomDB::SetMediaIndexStatus(peerId, msgId, u"present"_q, QString());
+	CustomDB::SetMediaIndexStatus(key, msgId, u"present"_q, QString());
 	CustomMediaQuota::AddBytes(size);
 }
 
