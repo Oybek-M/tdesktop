@@ -1,4 +1,4 @@
-﻿/*
+/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QFileInfo>
 #include "custom_archive.h"
 #include "custom_db.h"
+#include "custom_peer_key.h"
 #include "custom_settings.h"
 #include "data/data_photo_media.h"
 #include "main/main_session.h"
@@ -3129,7 +3130,7 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 			const auto isOut = d.is_out();
 			const auto msgDate = static_cast<unsigned int>(d.vdate().v);
 			CustomDB::RecordBackgroundEdit(
-				peerIdStr, msgId, newText, isOut, msgDate);
+				CustomDB::Key(session(), peerId), msgId, newText, isOut, msgDate);
 		});
 		Reactions::CheckUnknownForUnread(this, data);
 		return;
@@ -3399,16 +3400,17 @@ void Session::checkFormattedDateUpdates() {
 void Session::processMessagesDeleted(
 		PeerId peerId,
 		const QVector<MTPint> &data) {
-	const auto peerIdStr = QString::number(peerId.value);
+	const auto key = CustomDB::Key(session(), peerId);
+	const auto peerIdStr = key.peerId;
 	// T28: Memory dagi item lardan matn + date olish (chat ochiq bo'lsa).
 	// Bu MarkDeleted ga to'liq ma'lumotni o'tkazadi → restart da loadDeletedMessages()
 	// xabarni qayta tiklay oladi (date>0 bo'lsa).
 	const auto list = messagesList(peerId);
 	for (const auto &messageId : data) {
-		const bool userDelete = CustomDB::IsUserDeletePending(peerIdStr, messageId.v);
-		CustomDB::ClearUserDeletePending(peerIdStr, messageId.v);
+		const bool userDelete = CustomDB::IsUserDeletePending(key, messageId.v);
+		CustomDB::ClearUserDeletePending(key, messageId.v);
 		if (userDelete) {
-			CustomDB::PermanentlyDeleteMessage(peerIdStr, messageId.v);
+			CustomDB::PermanentlyDeleteMessage(key, messageId.v);
 		} else if (::CustomSettings::ShouldAntiDelete(peerIdStr)) {
 			// T28: matn/date/isOut ni olish — memory dan yoki cache dan (T27).
 			// v5: sender_id (guruhda haqiqiy yuboruvchi) va is_media ni ham olamiz.
@@ -3434,7 +3436,7 @@ void Session::processMessagesDeleted(
 				QString cachedSender;
 				bool cachedMedia = false;
 				const QString cachedText = CustomDB::GetCachedTextAndDate(
-					peerIdStr, messageId.v, cachedDate, &cachedSender, &cachedMedia);
+					key, messageId.v, cachedDate, &cachedSender, &cachedMedia);
 				if (cachedDate > 0) {
 					// Cache da to'liq ma'lumot bor — xabar yetib kelgan edi,
 					// lekin chat ochiq emas edi.
@@ -3455,7 +3457,7 @@ void Session::processMessagesDeleted(
 			if (msgDate > 0) {
 				CustomDB::MarkDeleted(
 					messageId.v,
-					peerIdStr,
+					key,
 					QString(),
 					originalText,
 					msgDate,
@@ -3478,7 +3480,7 @@ void Session::processMessagesDeleted(
 		if (list && i != list->end()) {
 			// keepAlive is true only if MarkDeleted was called above (i.e. not a user delete).
 			const bool keepAlive = ::CustomSettings::ShouldAntiDelete(peerIdStr)
-				&& CustomDB::IsDeletedLocally(peerIdStr, messageId.v);
+				&& CustomDB::IsDeletedLocally(key, messageId.v);
 			if (keepAlive) {
 				// FORCE PERSISTENCE: Ignore server delete, keep item in memory.
 				i->second->setDeletedLocally();
@@ -3513,13 +3515,15 @@ void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
 	for (const auto &messageId : data) {
 		const auto item = nonChannelMessage(messageId.v);
 		if (item) {
-			const auto peerIdStr = QString::number(item->history()->peer->id.value);
-			const bool userDelete = CustomDB::IsUserDeletePending(peerIdStr, messageId.v);
-			CustomDB::ClearUserDeletePending(peerIdStr, messageId.v);
+			const auto key = CustomDB::Key(item);
+			const auto peerIdStr = key.peerId;
+			const bool userDelete = CustomDB::IsUserDeletePending(key, messageId.v);
+			CustomDB::ClearUserDeletePending(key, messageId.v);
 			if (::CustomSettings::ShouldAntiDelete(peerIdStr) && !userDelete) {
 				// SAVE TO PERSISTENT DB (v5: sender_id + is_media bilan):
 				CustomDB::ActionedMessage msg;
-				msg.peerId = peerIdStr;
+				msg.accountId = key.accountId;
+				msg.peerId = key.peerId;
 				msg.msgId = item->id.bare;
 				msg.type = "deleted";
 				msg.originalText = item->originalText().text;
@@ -3537,7 +3541,7 @@ void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
 				if (userDelete) {
 					// Wipe any pre-existing anti-delete record so restart
 					// won't resurrect a message the user explicitly removed.
-					CustomDB::PermanentlyDeleteMessage(peerIdStr, messageId.v);
+					CustomDB::PermanentlyDeleteMessage(key, messageId.v);
 				}
 				const auto history = item->history();
 				toDestroy.push_back(item);
