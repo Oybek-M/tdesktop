@@ -16,6 +16,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "custom_settings.h"
 #include "custom_db.h"
+#include "custom_peer_key.h"
 #include "custom_archive.h"
 #include "api/api_premium.h"
 #include "api/api_sensitive_content.h"
@@ -3331,13 +3332,14 @@ bool HistoryItem::hasNoForwardsFlag() const {
 }
 
 void HistoryItem::restoreFromCustomDB() {
-	const auto peerId = QString::number(history()->peer->id.value);
+	const auto key = CustomDB::Key(this);
+	const auto peerId = key.peerId;
 	const long long msgId = id.bare;
 	if (!::CustomSettings::ShouldAntiDelete(peerId) && !::CustomSettings::ShouldAntiEdit(peerId)) {
 		return;
 	}
 
-	if (::CustomSettings::ShouldAntiDelete(peerId) && CustomDB::IsDeletedLocally(peerId, msgId)) {
+	if (::CustomSettings::ShouldAntiDelete(peerId) && CustomDB::IsDeletedLocally(key, msgId)) {
 		_isDeletedLocally = true;
 		const auto marker = QString::fromUtf8(
 			"\xe2\x80\x94\xe2\x80\x94 O'CHIRILDI \xe2\x80\x94\xe2\x80\x94");
@@ -3354,7 +3356,7 @@ void HistoryItem::restoreFromCustomDB() {
 	// We build: old_text → TAHRIRLANDI N → current_text.
 	// Skip if already marked as deleted — deleted state takes priority.
 	if (::CustomSettings::ShouldAntiEdit(peerId) && !_isDeletedLocally) {
-		const auto editVersions = CustomDB::GetEditHistory(peerId, msgId);
+		const auto editVersions = CustomDB::GetEditHistory(key, msgId);
 		if (!editVersions.isEmpty()) {
 			const auto tahrirlandiMarker = QString::fromUtf8(
 				"\xe2\x80\x94\xe2\x80\x94 TAHRIRLANDI");
@@ -3453,7 +3455,7 @@ void HistoryItem::setDeletedLocally() {
 	const QString origText  = _text.text;
 	const auto    origDate  = static_cast<unsigned int>(date());
 	const bool    origOut   = out();
-	CustomDB::MarkDeleted(id.bare, QString::number(history()->peer->id.value), destPath, origText, origDate, origOut);
+	CustomDB::MarkDeleted(id.bare, CustomDB::Key(this), destPath, origText, origDate, origOut);
 
 	// Modifying the text globally so it appears everywhere (chat, replies, recent messages list)
 	const auto deletedMarker = QString::fromUtf8(
