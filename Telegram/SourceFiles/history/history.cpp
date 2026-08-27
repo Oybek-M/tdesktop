@@ -2295,7 +2295,15 @@ void History::loadDeletedMessages() {
 			}
 			fileInfo = QFileInfo(localPath);
 			if (QFile::exists(localPath)) {
-				const auto docId = DocumentId(msg.msgId);
+				// Sun'iy DocumentId. msg.msgId'ni yakka o'zi ishlatib
+				// bo'lmaydi: xabar ID'lari faqat CHAT ichida yagona,
+				// Data::Session::document() esa butun akkaunt bo'yicha
+				// yagona hovuz. Ikki xil chatdagi bir xil ID'li ikki
+				// placeholder bitta DocumentData'ni bo'lishib olardi va
+				// keyingisi oldingisining faylini bosib ketardi.
+				const auto docId = DocumentId(
+					(quint64(peer->id.value) * 0x9E3779B97F4A7C15ULL)
+						^ quint64(msg.msgId));
 				document = owner().document(docId);
 				document->setLocation(Core::FileLocation(localPath));
 				document->size = fileInfo.size();
