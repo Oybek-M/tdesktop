@@ -1123,15 +1123,16 @@ void PruneStaleCachedText(int days) {
     }
 }
 
-QVector<QString> GetPeersWithDeletedMessages() {
+QVector<QString> GetPeersWithDeletedMessages(qint64 accountId) {
     // A13/perf: aynan shu ro'yxat gPeersWithDeleted filtrini to'ldiradi —
     // takroriy DISTINCT so'rov o'rniga o'sha keshni qaytaramiz.
     EnsurePeersWithDeletedLoaded();
     QMutexLocker locker(&gCacheMutex);
     QVector<QString> result;
-    result.reserve(gPeersWithDeleted.size());
-    for (const auto &peerId : gPeersWithDeleted) {
-        result.append(peerId);
+    for (const auto &key : gPeersWithDeleted) {
+        if (key.accountId == accountId || key.accountId == 0) {
+            result.append(key.peerId);
+        }
     }
     return result;
 }
@@ -1143,17 +1144,18 @@ QVector<QString> GetPeersWithDeletedMessages() {
 // Ustun sxemada bor, shuning uchun keyinchalik fonda to'ldirish mumkin
 // (Track C blob identifikatsiyasi kerak bo'lganda).
 
-void UpsertMediaIndex(const MediaIndexEntry &entry) {
+void UpsertMediaIndex(const PeerKey &key, const MediaIndexEntry &entry) {
     Init();
     if (!gDb || entry.peerId.isEmpty()) return;
 
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
             "INSERT INTO media_index "
-            "(peer_id, msg_id, kind, file_name, rel_path, size, sha256, "
+            "(account_id, peer_id, msg_id, kind, file_name, rel_path, size, sha256, "
             " msg_date, archived_at, layer, status, reason) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(peer_id, msg_id) DO UPDATE SET "
+            "  account_id=excluded.account_id,"
             "  kind=excluded.kind,"
             "  file_name=excluded.file_name,"
             "  rel_path=excluded.rel_path,"
@@ -1167,25 +1169,26 @@ void UpsertMediaIndex(const MediaIndexEntry &entry) {
             "  status=excluded.status,"
             "  reason=excluded.reason",
             -1, &stmt, nullptr) == SQLITE_OK) {
-        bindText(stmt, 1, entry.peerId);
-        sqlite3_bind_int64(stmt, 2, entry.msgId);
-        bindText(stmt, 3, entry.kind);
-        bindText(stmt, 4, entry.fileName);
-        bindText(stmt, 5, entry.relPath);
-        sqlite3_bind_int64(stmt, 6, entry.size);
-        bindText(stmt, 7, entry.sha256);
-        sqlite3_bind_int64(stmt, 8, entry.msgDate);
-        sqlite3_bind_int64(stmt, 9, entry.archivedAt);
-        bindText(stmt, 10, entry.layer);
-        bindText(stmt, 11, entry.status);
-        bindText(stmt, 12, entry.reason);
+        sqlite3_bind_int64(stmt, 1, key.accountId);
+        bindText(stmt, 2, entry.peerId);
+        sqlite3_bind_int64(stmt, 3, entry.msgId);
+        bindText(stmt, 4, entry.kind);
+        bindText(stmt, 5, entry.fileName);
+        bindText(stmt, 6, entry.relPath);
+        sqlite3_bind_int64(stmt, 7, entry.size);
+        bindText(stmt, 8, entry.sha256);
+        sqlite3_bind_int64(stmt, 9, entry.msgDate);
+        sqlite3_bind_int64(stmt, 10, entry.archivedAt);
+        bindText(stmt, 11, entry.layer);
+        bindText(stmt, 12, entry.status);
+        bindText(stmt, 13, entry.reason);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }
 }
 
 void SetMediaIndexStatus(
-        const QString &peerId,
+        const PeerKey &key,
         long long msgId,
         const QString &status,
         const QString &reason) {
@@ -1194,28 +1197,31 @@ void SetMediaIndexStatus(
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
             "UPDATE media_index SET status = ?, reason = ? "
-            "WHERE peer_id = ? AND msg_id = ?",
+            "WHERE peer_id = ? AND msg_id = ? AND account_id IN (0, ?)",
             -1, &stmt, nullptr) == SQLITE_OK) {
         bindText(stmt, 1, status);
         bindText(stmt, 2, reason);
-        bindText(stmt, 3, peerId);
+        bindText(stmt, 3, key.peerId);
         sqlite3_bind_int64(stmt, 4, msgId);
+        sqlite3_bind_int64(stmt, 5, key.accountId);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }
 }
 
-bool HasPresentMediaIndexEntry(const QString &peerId, long long msgId) {
+bool HasPresentMediaIndexEntry(const PeerKey &key, long long msgId) {
     Init();
     if (!gDb) return false;
     bool found = false;
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
             "SELECT 1 FROM media_index "
-            "WHERE peer_id = ? AND msg_id = ? AND status = 'present' LIMIT 1",
+            "WHERE peer_id = ? AND msg_id = ? AND status = 'present' "
+            "AND account_id IN (0, ?) LIMIT 1",
             -1, &stmt, nullptr) == SQLITE_OK) {
-        bindText(stmt, 1, peerId);
+        bindText(stmt, 1, key.peerId);
         sqlite3_bind_int64(stmt, 2, msgId);
+        sqlite3_bind_int64(stmt, 3, key.accountId);
         found = (sqlite3_step(stmt) == SQLITE_ROW);
         sqlite3_finalize(stmt);
     }
@@ -1636,7 +1642,7 @@ int ArchivedMessageCount() {
 }
 
 void CacheMessageText(
-        const QString &peerId,
+        const PeerKey &key,
         long long msgId,
         const QString &text,
         bool isOut,
@@ -1645,7 +1651,7 @@ void CacheMessageText(
         bool isMedia,
         bool archived) {
     Init();
-    if (!gDb || peerId.isEmpty() || msgId == 0) return;
+    if (!gDb || key.peerId.isEmpty() || msgId == 0) return;
     // Matn bo'sh: faqat media xabar bo'lsa cache qilamiz (delete ni bilish uchun).
     // Aks holda (na matn, na media) — yozishdan ma'no yo'q.
     if (text.isEmpty() && !isMedia) return;
@@ -1653,19 +1659,20 @@ void CacheMessageText(
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
             "INSERT OR REPLACE INTO text_cache "
-            "(peer_id, msg_id, text, is_out, msg_date, cached_at, "
+            "(account_id, peer_id, msg_id, text, is_out, msg_date, cached_at, "
             "sender_id, is_media, is_archived) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             -1, &stmt, nullptr) == SQLITE_OK) {
-        bindText(stmt, 1, peerId);
-        sqlite3_bind_int64(stmt, 2, msgId);
-        bindText(stmt, 3, text);
-        sqlite3_bind_int(stmt, 4, isOut ? 1 : 0);
-        sqlite3_bind_int64(stmt, 5, static_cast<sqlite3_int64>(msgDate));
-        sqlite3_bind_int64(stmt, 6, QDateTime::currentSecsSinceEpoch());
-        bindText(stmt, 7, senderId);
-        sqlite3_bind_int(stmt, 8, isMedia ? 1 : 0);
-        sqlite3_bind_int(stmt, 9, archived ? 1 : 0);
+        sqlite3_bind_int64(stmt, 1, key.accountId);
+        bindText(stmt, 2, key.peerId);
+        sqlite3_bind_int64(stmt, 3, msgId);
+        bindText(stmt, 4, text);
+        sqlite3_bind_int(stmt, 5, isOut ? 1 : 0);
+        sqlite3_bind_int64(stmt, 6, static_cast<sqlite3_int64>(msgDate));
+        sqlite3_bind_int64(stmt, 7, QDateTime::currentSecsSinceEpoch());
+        bindText(stmt, 8, senderId);
+        sqlite3_bind_int(stmt, 9, isMedia ? 1 : 0);
+        sqlite3_bind_int(stmt, 10, archived ? 1 : 0);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }
@@ -1677,17 +1684,19 @@ void CacheMessageText(
     }
 }
 
-QString GetCachedText(const QString &peerId, long long msgId) {
+QString GetCachedText(const PeerKey &key, long long msgId) {
     Init();
-    if (!gDb || peerId.isEmpty() || msgId == 0) return QString();
+    if (!gDb || key.peerId.isEmpty() || msgId == 0) return QString();
 
     QString result;
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
-            "SELECT text FROM text_cache WHERE peer_id=? AND msg_id=? LIMIT 1",
+            "SELECT text FROM text_cache WHERE peer_id=? AND msg_id=? "
+            "AND account_id IN (0, ?) LIMIT 1",
             -1, &stmt, nullptr) == SQLITE_OK) {
-        bindText(stmt, 1, peerId);
+        bindText(stmt, 1, key.peerId);
         sqlite3_bind_int64(stmt, 2, msgId);
+        sqlite3_bind_int64(stmt, 3, key.accountId);
         if (sqlite3_step(stmt) == SQLITE_ROW) {
             result = colText(stmt, 0);
         }
@@ -1697,7 +1706,7 @@ QString GetCachedText(const QString &peerId, long long msgId) {
 }
 
 QString GetCachedTextAndDate(
-        const QString &peerId,
+        const PeerKey &key,
         long long msgId,
         unsigned int &outDate,
         QString *outSenderId,
@@ -1706,16 +1715,17 @@ QString GetCachedTextAndDate(
     if (outSenderId) *outSenderId = QString();
     if (outIsMedia) *outIsMedia = false;
     Init();
-    if (!gDb || peerId.isEmpty() || msgId == 0) return QString();
+    if (!gDb || key.peerId.isEmpty() || msgId == 0) return QString();
 
     QString result;
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
             "SELECT text, msg_date, sender_id, is_media FROM text_cache "
-            "WHERE peer_id=? AND msg_id=? LIMIT 1",
+            "WHERE peer_id=? AND msg_id=? AND account_id IN (0, ?) LIMIT 1",
             -1, &stmt, nullptr) == SQLITE_OK) {
-        bindText(stmt, 1, peerId);
+        bindText(stmt, 1, key.peerId);
         sqlite3_bind_int64(stmt, 2, msgId);
+        sqlite3_bind_int64(stmt, 3, key.accountId);
         if (sqlite3_step(stmt) == SQLITE_ROW) {
             result   = colText(stmt, 0);
             outDate  = static_cast<unsigned int>(sqlite3_column_int64(stmt, 1));
@@ -1728,13 +1738,13 @@ QString GetCachedTextAndDate(
 }
 
 bool RecordBackgroundEdit(
-        const QString &peerId,
+        const PeerKey &key,
         long long msgId,
         const QString &newText,
         bool isOut,
         unsigned int msgDate) {
     Init();
-    if (!gDb || peerId.isEmpty() || msgId == 0) return false;
+    if (!gDb || key.peerId.isEmpty() || msgId == 0) return false;
 
     // YANGI-2: avvalgi cache yozuvidan sender_id + is_media ni ham o'qib olamiz.
     // INSERT OR REPLACE butun qatorni almashtirgani uchun, re-cache da bularni
@@ -1744,11 +1754,11 @@ bool RecordBackgroundEdit(
     QString cachedSender;
     bool cachedMedia = false;
     const QString oldText = GetCachedTextAndDate(
-        peerId, msgId, cachedDate, &cachedSender, &cachedMedia);
+        key, msgId, cachedDate, &cachedSender, &cachedMedia);
     if (oldText.isEmpty()) {
         // Eski matn yo'q — saqlay olmaymiz. Yangi matnni cache ga yozamiz
         // (kelajakdagi qayta tahrirlash uchun), avvalgi sender/media bilan.
-        CacheMessageText(peerId, msgId, newText, isOut, msgDate,
+        CacheMessageText(key, msgId, newText, isOut, msgDate,
             cachedSender, cachedMedia);
         return false;
     }
@@ -1759,7 +1769,8 @@ bool RecordBackgroundEdit(
     // actioned_messages ga 'edited' yozuvi (rasmiy applyEdition o'rniga).
     // Format `restoreFromCustomDB` bilan mos: original_text = eski, new_text = yangi.
     ActionedMessage msg;
-    msg.peerId = peerId;
+    msg.accountId = key.accountId;
+    msg.peerId = key.peerId;
     msg.msgId = msgId;
     msg.type = "edited";
     msg.originalText = oldText;
@@ -1770,17 +1781,17 @@ bool RecordBackgroundEdit(
     SaveActionedMessage(msg);
 
     // In-memory cache ham yangilash — restoreFromCustomDB() uchun.
-    EnsurePeerCacheLoaded(peerId);
+    EnsurePeerCacheLoaded(key);
     {
         QMutexLocker locker(&gCacheMutex);
-        if (!gEditedCache[peerId].contains(msgId)) {
-            gEditedCache[peerId][msgId] = oldText;
+        if (!gEditedCache[key].contains(msgId)) {
+            gEditedCache[key][msgId] = oldText;
         }
     }
 
     // Cache ni yangi matn bilan yangilab qo'yamiz — keyingi tahrir uchun.
     // YANGI-2: avvalgi sender/media saqlanadi (T36 edit→delete da buzilmasin).
-    CacheMessageText(peerId, msgId, newText, isOut, msgDate,
+    CacheMessageText(key, msgId, newText, isOut, msgDate,
         cachedSender, cachedMedia);
     return true;
 }
@@ -1794,6 +1805,7 @@ void TryRecordBackgroundDelete(long long msgId) {
     // bir xil msg_id li kanal yozuvi ham cache da bo'lishi mumkin. Noto'g'ri peer ga
     // "o'chirildi" yozib qo'ymaslik uchun — barcha kandidatlardan FAQAT non-channel
     // (user/chat) peer ni tanlaymiz. Channel peer id: (value >> 48) & 0xFF == 2.
+    qint64 accountId = 0;
     QString peerId;
     QString text;
     QString senderId;
@@ -1804,21 +1816,23 @@ void TryRecordBackgroundDelete(long long msgId) {
 
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
-            "SELECT peer_id, text, is_out, msg_date, sender_id, is_media "
+            "SELECT account_id, peer_id, text, is_out, msg_date, sender_id, is_media "
             "FROM text_cache WHERE msg_id=?",
             -1, &stmt, nullptr) == SQLITE_OK) {
         sqlite3_bind_int64(stmt, 1, msgId);
         while (sqlite3_step(stmt) == SQLITE_ROW) {
-            const QString candidate = colText(stmt, 0);
+            const qint64 accId = sqlite3_column_int64(stmt, 0);
+            const QString candidate = colText(stmt, 1);
             const quint64 value = candidate.toULongLong();
             const bool isChannel = (((value >> 48) & 0xFFULL) == 2ULL);
             if (isChannel) continue; // non-channel delete — kanal yozuvini o'tkazib yuboramiz
             peerId   = candidate;
-            text     = colText(stmt, 1);
-            isOut    = (sqlite3_column_int(stmt, 2) != 0);
-            msgDate  = static_cast<unsigned int>(sqlite3_column_int64(stmt, 3));
-            senderId = colText(stmt, 4);
-            isMedia  = (sqlite3_column_int(stmt, 5) != 0);
+            text     = colText(stmt, 2);
+            isOut    = (sqlite3_column_int(stmt, 3) != 0);
+            msgDate  = static_cast<unsigned int>(sqlite3_column_int64(stmt, 4));
+            senderId = colText(stmt, 5);
+            isMedia  = (sqlite3_column_int(stmt, 6) != 0);
+            accountId = accId;
             found = true;
             break; // non-channel msg_id yagona bo'ladi
         }
@@ -1827,9 +1841,10 @@ void TryRecordBackgroundDelete(long long msgId) {
 
     if (!found || peerId.isEmpty()) return;
 
+    PeerKey key{accountId, peerId};
     // Foydalanuvchi o'zi o'chirgan bo'lsa, skip.
-    if (IsUserDeletePending(peerId, msgId)) {
-        ClearUserDeletePending(peerId, msgId);
+    if (IsUserDeletePending(key, msgId)) {
+        ClearUserDeletePending(key, msgId);
         return;
     }
 
@@ -1838,23 +1853,25 @@ void TryRecordBackgroundDelete(long long msgId) {
     // cache ga faqat ShouldBackgroundCache true bo'lgan peerlar tushadi (data
     // qatlamida), demak bu yerga kelganlarning hammasini yozaveramiz. Agar
     // AntiDelete o'chirilgan bo'lsa, loadDeletedMessages() baribir ko'rsatmaydi.
-    MarkDeleted(msgId, peerId, QString(), text, msgDate, isOut, senderId, isMedia);
+    MarkDeleted(msgId, key, QString(), text, msgDate, isOut, senderId, isMedia);
 }
 
 // ---------------------------------------------------------------------------
 // User-initiated delete support
 // ---------------------------------------------------------------------------
 
-void PermanentlyDeleteMessage(const QString &peerId, long long msgId) {
+void PermanentlyDeleteMessage(const PeerKey &key, long long msgId) {
     Init();
     // Remove from SQLite.
     if (gDb) {
         sqlite3_stmt *stmt = nullptr;
         if (sqlite3_prepare_v2(gDb,
-                "DELETE FROM actioned_messages WHERE peer_id = ? AND msg_id = ?",
+                "DELETE FROM actioned_messages WHERE peer_id = ? AND msg_id = ? "
+                "AND account_id IN (0, ?)",
                 -1, &stmt, nullptr) == SQLITE_OK) {
-            bindText(stmt, 1, peerId);
+            bindText(stmt, 1, key.peerId);
             sqlite3_bind_int64(stmt, 2, msgId);
+            sqlite3_bind_int64(stmt, 3, key.accountId);
             sqlite3_step(stmt);
             sqlite3_finalize(stmt);
         }
@@ -1862,35 +1879,35 @@ void PermanentlyDeleteMessage(const QString &peerId, long long msgId) {
     // Remove from in-memory caches.
     {
         QMutexLocker locker(&gCacheMutex);
-        if (gDeletedCache.contains(peerId)) {
-            gDeletedCache[peerId].remove(msgId);
+        if (gDeletedCache.contains(key)) {
+            gDeletedCache[key].remove(msgId);
         }
-        if (gEditedCache.contains(peerId)) {
-            gEditedCache[peerId].remove(msgId);
+        if (gEditedCache.contains(key)) {
+            gEditedCache[key].remove(msgId);
         }
     }
     // Drop any queued (unflushed) writes for this message.
     gPendingWrites.erase(
         std::remove_if(gPendingWrites.begin(), gPendingWrites.end(),
             [&](const ActionedMessage &m) {
-                return m.peerId == peerId && m.msgId == msgId;
+                return m.peerId == key.peerId && m.msgId == msgId && m.accountId == key.accountId;
             }),
         gPendingWrites.end());
 }
 
-void ScheduleUserDelete(const QString &peerId, long long msgId) {
+void ScheduleUserDelete(const PeerKey &key, long long msgId) {
     // Record intent before the API call so the server ACK can skip re-saving.
-    gUserDeletePending.insert({peerId, msgId});
+    gUserDeletePending.insert({key, msgId});
     // Also wipe any existing DB record immediately so restart won't restore it.
-    PermanentlyDeleteMessage(peerId, msgId);
+    PermanentlyDeleteMessage(key, msgId);
 }
 
-bool IsUserDeletePending(const QString &peerId, long long msgId) {
-    return gUserDeletePending.contains({peerId, msgId});
+bool IsUserDeletePending(const PeerKey &key, long long msgId) {
+    return gUserDeletePending.contains({key, msgId});
 }
 
-void ClearUserDeletePending(const QString &peerId, long long msgId) {
-    gUserDeletePending.remove({peerId, msgId});
+void ClearUserDeletePending(const PeerKey &key, long long msgId) {
+    gUserDeletePending.remove({key, msgId});
 }
 
 // ---------------------------------------------------------------------------
@@ -2707,7 +2724,7 @@ void ClearAllArchive() {
 //
 // idx_ah_peer_field (v8) bu so'rovni qoplama indeks qiladi.
 void SaveActivityHistoryEntry(
-        const QString &peerId,
+        const PeerKey &key,
         const QString &field,
         bool hasOldValue,
         const QString &oldValue,
@@ -2733,10 +2750,10 @@ void SaveActivityHistoryEntry(
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
             "INSERT INTO activity_history "
-            "(peer_id, field, old_value, new_value, observed_at) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "(peer_id, field, old_value, new_value, observed_at, account_id) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
             -1, &stmt, nullptr) == SQLITE_OK) {
-        bindText(stmt, 1, peerId);
+        bindText(stmt, 1, key.peerId);
         bindText(stmt, 2, field);
         if (hasOldValue) {
             bindText(stmt, 3, oldValue);
@@ -2745,6 +2762,7 @@ void SaveActivityHistoryEntry(
         }
         bindText(stmt, 4, newValue);
         sqlite3_bind_int64(stmt, 5, observedAt);
+        sqlite3_bind_int64(stmt, 6, key.accountId);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }
@@ -2753,8 +2771,8 @@ void SaveActivityHistoryEntry(
     // the new value without another SQLite round-trip.
     {
         QMutexLocker locker(&gCacheMutex);
-        gActivityLatestCache[peerId][field] = newValue;
-        gActivityLoadedPeers.insert(peerId);
+        gActivityLatestCache[key.peerId][field] = newValue;
+        gActivityLoadedPeers.insert(key.peerId);
     }
 }
 
