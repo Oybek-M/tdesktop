@@ -648,13 +648,37 @@ void EnsureArchiveLayout() {
         }
     };
 
-    // Baza (WAL/SHM bilan birga — ular yonida turishi SHART).
-    // Bu funksiya baza OCHILMASDAN OLDIN chaqiriladi, shuning uchun
-    // fayllar band emas.
-    for (const auto &suffix : { "", "-wal", "-shm" }) {
-        const auto name = QString("/actioned_messages.db")
-            + QString::fromLatin1(suffix);
-        moveIfNeeded(legacyAppData + name, root + "/db" + name);
+    // Baza + WAL/SHM — BITTA BUTUN sifatida.
+    //
+    // 2026-08-27, MA'LUMOT YO'QOTISHGA OLIB KELGAN NUQSON: ilgari bu
+    // uchta fayl alohida-alohida `moveIfNeeded` dan o'tkazilardi, ya'ni
+    // "maqsad yo'q" sharti har biri uchun MUSTAQIL tekshirilardi.
+    // Toza yopilishda SQLite `-wal`/`-shm` ni o'chirib ketadi, shuning
+    // uchun keyingi ishga tushishda maqsad tomonda ular BO'LMAYDI —
+    // natijada AppData'dagi eski, BOSHQA bazaga tegishli WAL jonli
+    // baza yoniga ko'chib o'tardi. SQLite uni ochilishda qo'llab,
+    // bazani buzardi (62 MB → 700 KB, `media_index` yo'qoldi,
+    // 272 ming faollik yozuvi o'qib bo'lmas holga keldi).
+    //
+    // Endi qaror FAQAT asosiy fayl bo'yicha bir marta qabul qilinadi.
+    // Maqsadda baza bo'lsa — eski WAL/SHM ko'chirilmaydi, balki
+    // O'CHIRILADI: ular allaqachon keraksiz va faqat zarar keltiradi.
+    {
+        const auto legacyDb = legacyAppData + u"/actioned_messages.db"_q;
+        const auto targetDb = root + u"/db/actioned_messages.db"_q;
+        if (QFile::exists(legacyDb) && !QFile::exists(targetDb)) {
+            // Haqiqiy bir martalik ko'chirish: uchalasi ham birga.
+            for (const auto &suffix : { "", "-wal", "-shm" }) {
+                const auto sfx = QString::fromLatin1(suffix);
+                moveIfNeeded(legacyDb + sfx, targetDb + sfx);
+            }
+        } else {
+            // Maqsadda jonli baza bor (yoki manba umuman yo'q) —
+            // eski yon fayllarni tashlab yuboramiz.
+            for (const auto &suffix : { "-wal", "-shm" }) {
+                QFile::remove(legacyDb + QString::fromLatin1(suffix));
+            }
+        }
     }
 
     // Sozlama JSON'lari.

@@ -52,7 +52,7 @@ struct ActionedMessage {
 // E19: Schema version constant — increment when adding new columns/tables.
 // RunMigrations() is called inside Init() automatically.
 // v11 (Vazifa 6): actioned_messages dagi absolyut media_path yo'llarni nisbiy qilish
-constexpr int kCurrentSchemaVersion = 11;
+constexpr int kCurrentSchemaVersion = 10;
 
 void Init();
 

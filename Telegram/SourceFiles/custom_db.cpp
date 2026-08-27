@@ -88,6 +88,11 @@ static QSet<QPair<PeerKey, long long>> gUserDeletePending;
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+// Sxema eskirgan bo'lsa, migratsiya boshlanishidan oldin baza faylini
+// nusxalaydi. Fayl hali OCHILMAGAN paytda chaqiriladi, shuning uchun
+// WAL/SHM yonida turmaydi va nusxa yaxlit bo'ladi.
+static void MaybeBackupBeforeMigration();
+
 static QString dbFilePath() {
     // 2026-08-15: AppData/CustomMod dan <arxiv ildizi>/db ga ko'chdi.
     // EnsureArchiveLayout() eski faylni (WAL/SHM bilan) bir marta
@@ -166,12 +171,70 @@ static QDateTime strToDt(const QString &s) {
 // Init / Migrations
 // ---------------------------------------------------------------------------
 
+static void MaybeBackupBeforeMigration() {
+    const auto path = dbFilePath();
+    if (!QFile::exists(path)) {
+        return; // yangi o'rnatish - nusxalanadigan narsa yo'q
+    }
+
+    // Sxema versiyasini ALOHIDA, faqat-o'qish ulanish orqali o'qiymiz:
+    // asosiy ulanish hali ochilmagan va uni shu yerda ochib qo'ysak
+    // WAL fayllari paydo bo'lib, nusxa yaxlitligini buzardi.
+    int version = 0;
+    sqlite3 *probe = nullptr;
+    if (sqlite3_open_v2(
+            path.toUtf8().constData(),
+            &probe,
+            SQLITE_OPEN_READONLY,
+            nullptr) == SQLITE_OK) {
+        sqlite3_stmt *stmt = nullptr;
+        if (sqlite3_prepare_v2(probe,
+                "SELECT version FROM schema_version WHERE rowid = 1",
+                -1, &stmt, nullptr) == SQLITE_OK) {
+            if (sqlite3_step(stmt) == SQLITE_ROW) {
+                version = sqlite3_column_int(stmt, 0);
+            }
+            sqlite3_finalize(stmt);
+        }
+    }
+    sqlite3_close(probe);
+
+    if (version >= kCurrentSchemaVersion) {
+        return; // migratsiya bo'lmaydi - nusxa ham kerak emas
+    }
+
+    const auto stamp = QDateTime::currentDateTime()
+        .toString(u"yyyyMMdd-HHmmss"_q);
+    const auto target = QString(u"%1.premigrate-v%2-%3.bak"_q)
+        .arg(path)
+        .arg(version)
+        .arg(stamp);
+    if (QFile::copy(path, target)) {
+        qDebug() << "[CustomMod] Pre-migration backup:" << target;
+    } else {
+        qWarning() << "[CustomMod] Pre-migration backup FAILED for" << path;
+    }
+}
+
 void Init() {
     if (gInitialized && gDb) return;
 
     // Sub-papkalarni yaratadi va eski joylashuvdan ko'chiradi. Baza
     // ochilishidan OLDIN bo'lishi shart.
     CustomSettings::EnsureArchiveLayout();
+
+    // Migratsiyadan OLDIN avtomatik zaxira (2026-08-27).
+    //
+    // Nima uchun: v10 sxemasi uchta jadvalni QAYTA QURADI
+    // (CREATE _v10 -> INSERT SELECT -> DROP -> RENAME). Bu qadamlar
+    // tranzaksiya ichida bo'lsa-da, baza fayli tashqi sabablarga ko'ra
+    // (masalan begona WAL) allaqachon buzilgan bo'lsa, migratsiya uni
+    // qutqara olmaydi. Faylning o'zidan nusxa esa qutqaradi.
+    //
+    // Nusxa FAQAT sxema eskirgan bo'lsa olinadi (ya'ni amalda har
+    // yangilanishda bir marta), shuning uchun ishga tushish tezligiga
+    // ta'sir qilmaydi.
+    MaybeBackupBeforeMigration();
 
     const QByteArray pathUtf8 = dbFilePath().toUtf8();
     const int rc = sqlite3_open_v2(
@@ -510,8 +573,14 @@ void RunMigrations() {
                 "WHERE media_path LIKE 'C:/Users/Oybek/customizationMainFolder/%'");
     }
 
-    // v10 → v11: Dinamik replace migratsiyasi (Vazifa 6.1).
-    if (version < 11) {
+    // v9 → v10 (davomi): dinamik media_path nisbiylashtirish.
+    //
+    // v11 EMAS: o'sha versiya Track C ning `sync_outbox`/`sync_state`
+    // jadvallari uchun band (docs/sync-protocol/STATUS.md). Bu blok
+    // v10 ning bir qismi — yuqoridagi qat'iy `replace()` faqat bitta
+    // eski yo'lni biladi, bu yerda esa joriy arxiv ildizi bo'yicha
+    // hisoblanadi.
+    if (version < 10) {
         sqlite3_stmt *stmt = nullptr;
         if (sqlite3_prepare_v2(gDb, "SELECT rowid, media_path FROM actioned_messages WHERE media_path IS NOT NULL AND media_path != ''", -1, &stmt, nullptr) == SQLITE_OK) {
             struct ToUpdate {
