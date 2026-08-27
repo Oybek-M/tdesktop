@@ -30,6 +30,8 @@
 namespace CustomActivityHistory {
 namespace {
 
+static Main::Session *gSession = nullptr;
+
 struct PendingStoryMedia {
 	PhotoData *photo = nullptr;
 	DocumentData *document = nullptr;
@@ -112,7 +114,7 @@ void CheckPendingStoryMedia() {
 						QDateTime::currentSecsSinceEpoch());
 					entry.layer = u"story"_q;
 					entry.status = u"present"_q;
-					CustomDB::UpsertMediaIndex(entry);
+					CustomDB::UpsertMediaIndex(CustomDB::PeerKey{qint64(gSession->userId().bare), it->peerId}, entry);
 					CustomMediaQuota::AddBytes(it->document->size);
 				} else {
 					CustomDB::SaveMediaFile(path, u"video"_q); // eski yo'l
@@ -143,7 +145,7 @@ void CheckPendingStoryMedia() {
 								QDateTime::currentSecsSinceEpoch());
 							entry.layer = u"avatar"_q;
 							entry.status = u"present"_q;
-							CustomDB::UpsertMediaIndex(entry);
+							CustomDB::UpsertMediaIndex(CustomDB::PeerKey{qint64(gSession->userId().bare), it->peerId}, entry);
 							CustomMediaQuota::AddBytes(entry.size);
 						}
 					}
@@ -180,7 +182,7 @@ void CheckPendingUserpics() {
 					QDateTime::currentSecsSinceEpoch());
 				entry.layer = u"avatar"_q;
 				entry.status = u"present"_q;
-				CustomDB::UpsertMediaIndex(entry);
+				CustomDB::UpsertMediaIndex(CustomDB::PeerKey{qint64(gSession->userId().bare), it->peerId}, entry);
 				CustomMediaQuota::AddBytes(entry.size);
 			}
 			done = true;
@@ -348,7 +350,7 @@ void RecordField(
 		}
 	}
 	CustomDB::SaveActivityHistoryEntry(
-		peerId, field, hadPrevious, oldValue, newValue, observedAt);
+		CustomDB::PeerKey{qint64(gSession->userId().bare), peerId}, field, hadPrevious, oldValue, newValue, observedAt);
 }
 
 } // namespace
@@ -414,6 +416,7 @@ QString DecodeStoryLabel(const QString &encoded) {
 }
 
 void Init(not_null<Main::Session*> session) {
+	gSession = session;
 	using Flag = Data::PeerUpdate::Flag;
 
 	session->changes().peerUpdates(
