@@ -203,3 +203,55 @@ uchun kerak.
 - `Telegram/SourceFiles/custom_activity_history.cpp`
 - `docs/sync-protocol/STATUS.md` (Track C uchun v11 o'rniga v12 surildi)
 - `docs/superpowers/specs/2026-08-28-a16-activity-capture-gaps.md`
+
+---
+
+## 6. §2 va §3 Implementatsiya hisoboti (bajarildi, 2026-08-28)
+
+### 6.1 §3: Tez tugma va vaqtinchalik bufer (QISM A)
+1. **Sozlama (`activityBufferMinutes`):**
+   - `custom_settings.h` / `.cpp` da `activityBufferMinutes` sozlamasi kiritildi (standart 10, oralig'i 1–120 daqiqa).
+   - `custom_mod_window.cpp` dagi Faollik tarixi bo'limida presetlar (5, 10, 30, 60 daqiqa) va qo'lda kiritish bilan UI taqdim etildi.
+2. **Xotiradagi halqa bufer:**
+   - `custom_activity_history.cpp` ichida kuzatilmayotgan (lekin Exclude ro'yxatida bo'lmagan) user'larning o'zgarishlari `gActivityBuffer` ga saqlanadi.
+   - Cheklovlar: peer boshiga ko'pi bilan 50 ta yozuv, umumiy ko'pi bilan 500 ta peer.
+   - `FlushBufferedActivity(session, peerId)` funksiyasi orqali peer kuzatuvga qo'shilganda uning o'tmishdagi buferlangan yozuvlari `source = 'buffer'` sifatida bazaga ko'chiriladi.
+3. **Kontekst menyusi tugmasi:**
+   - `window/window_peer_menu.cpp` da chat kontekst menyusi, tarix menyusi va profil menyusiga "Faollikni kuzatish" / "Faollik kuzatuvini to'xtatish" amallari ulandi.
+   - Bosilganda bufer avtomatik bazaga ko'chiriladi va toast bildirishnomasi (masalan: `Kuzatuv yoqildi — 3 ta yozuv tiklandi`) ko'rsatiladi.
+
+### 6.2 §2: Qo'lda faollik yozuvi kiritish (QISM B)
+1. **Forma va modal oyna:**
+   - `custom_mod_window.cpp` da Include ro'yxatidan keyin "✍️ Qo'lda faollik yozuvi qo'shish" tugmasi qo'shildi.
+   - `ChoosePeerBox` orqali foydalanuvchi tanlangach, sana/vaqt (`dd.MM.yyyy HH:mm`) va davomiyligi (soniyalarda) kiritiladigan oyna ochiladi.
+2. **Bazaga yozish:**
+   - `online:<on>` (`observed_at = on`) va agar davomiylik > 0 bo'lsa `offline:<on>` (`observed_at = on + duration`) yozuvlari `source = 'manual'` bilan saqlanadi.
+   - `HasActivityEntryAt` orqali takrorlanishdan himoyalangan.
+3. **Ko'rsatishda ajratish:**
+   - `ActivityHistoryEntry` struct'iga `source` maydoni qo'shildi va `GetActivityHistory` da o'qiladi (akkaunt filtrsiz, spec §0.13).
+   - `custom_activity_history_box.cpp` da o'zgarishlar jurnali qatorlariga manba belgilari qo'yildi:
+     - `observed` — belgisiz
+     - `story` — `📖`
+     - `manual` — `✍️`
+     - `buffer` — `⏱`
+
+### 6.3 Xotira va dizayn tahlili
+- **Bufer xotirasi hisobi:**
+  - Bitta yozuv (`BufferedChange`) taxminan 80 bayt RAM egallaydi.
+  - Bitta peer uchun 50 ta yozuv ≈ 4 KB.
+  - 500 ta peer to'liq to'lganda umumiy xotira: `500 * 4 KB ≈ 2.0 – 2.5 MB`.
+  - Bu zamonaviy tizimlar va tdesktop operativ xotirasi uchun mutlaqo xavfsiz va sezilmas darajada yengil.
+- **Izoh maydoni masalasi:**
+  - `activity_history` jadvalida izoh ustuni yo'q. Ushbu topshiriq uchun yana bir yangi DB migratsiyasini qilish ortiqcha murakkablik keltirib chiqarishi sababli, foydalanuvchi talabiga asosan izoh maydoni kiritilmadi.
+
+**O'zgartirilgan fayllar:**
+- `Telegram/SourceFiles/custom_settings.h`
+- `Telegram/SourceFiles/custom_settings.cpp`
+- `Telegram/SourceFiles/custom_activity_history.h`
+- `Telegram/SourceFiles/custom_activity_history.cpp`
+- `Telegram/SourceFiles/custom_activity_history_box.cpp`
+- `Telegram/SourceFiles/custom_db.h`
+- `Telegram/SourceFiles/custom_db.cpp`
+- `Telegram/SourceFiles/custom_mod_window.cpp`
+- `Telegram/SourceFiles/window/window_peer_menu.cpp`
+- `docs/superpowers/specs/2026-08-28-a16-activity-capture-gaps.md`
