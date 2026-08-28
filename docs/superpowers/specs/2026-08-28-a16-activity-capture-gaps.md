@@ -103,22 +103,67 @@ Bundan tashqari story kuzatuvi ham `ShouldTrackActivity()`
 darvozasidan o'tadi — ya'ni **kuzatilmayotgan odamning storysi ham
 yozilmaydi**. Demak 1-band ham bu muammoga to'liq yechim emas.
 
-### Ko'rib chiqish uchun variantlar (TANLANMAGAN — user hal qiladi)
+### QAROR (2026-08-28, foydalanuvchi tanladi): 1 + 2 BIRGA
 
-1. **Chat ro'yxatida tez tugma** — o'ng tugma → "Faollikni kuzatish".
-   Eng arzon, lekin baribir bir necha soniya ketadi.
-2. **Qisqa muddatli bufer** — BARCHA foydalanuvchilar uchun oxirgi
-   N soatlik status o'zgarishlari xotirada saqlanadi; odam ro'yxatga
-   qo'shilganda bufer bazaga ko'chiriladi. "Kech qo'shsam ham
-   yo'qolmaydi" degani. Xotira sarfi baholanishi kerak.
-3. **Hammasini yozish** — `ShouldTrackActivity()` darvozasi olib
-   tashlanadi, ro'yxat faqat KO'RSATISHNI filtrlaydi. Eng to'liq,
-   lekin baza tez o'sadi (hozir 30 kunlik saqlash bilan ~260k yozuv).
+Ikkalasi bir-birini to'ldiradi va **birga ishlashi shart**:
 
-Variant 2 ehtimol eng mos: yo'qotishni bartaraf qiladi, baza
-o'sishini esa cheklab turadi.
+- **Tugma** — odamni ro'yxatga bir bosishda qo'shadi (oldinga qarab)
+- **Bufer** — qo'shilgan lahzada oxirgi N daqiqalik kuzatuvlarni
+  bazaga ko'chiradi (**orqaga qarab**)
 
----
+Ya'ni foydalanuvchi onlaynni ko'radi, tugmani bosadi — va o'sha
+onlayn allaqachon o'tib ketgan bo'lsa ham saqlanib qoladi.
+
+#### 3.1 Tez tugma
+
+Chat ro'yxatida (va profil menyusida) o'ng tugma kontekst menyusiga
+band: **"Faollikni kuzatish"**.
+
+- Peer allaqachon ro'yxatda bo'lsa — "Kuzatuvni to'xtatish" ko'rinsin
+- Bosilganda `Include` ro'yxatiga qo'shiladi (Custom Window'dagi
+  ro'yxat bilan BIR XIL manba, ikkinchi ro'yxat yaratilmasin)
+- Bosilgandan so'ng darhol 3.2 dagi buferni bazaga ko'chirish
+  chaqirilsin
+- Toast: nechta yozuv tiklangani ko'rsatilsin, masalan
+  `Kuzatuv yoqildi — 3 ta yozuv tiklandi`
+
+#### 3.2 Vaqtinchalik bufer (halqa bufer)
+
+BARCHA foydalanuvchilar uchun status o'zgarishlari xotirada
+saqlanadi. Bazaga faqat kuzatilayotganlar yoziladi (hozirgidek).
+
+- Faqat RAM, diskka yozilmaydi
+- Vaqti o'tgan yozuvlar avtomatik tashlanadi
+- Peer kuzatuvga qo'shilganda — o'sha peer'ning buferdagi barcha
+  yozuvlari `activity_history` ga ko'chiriladi
+  (`source = 'buffer'`, 2-bandga qarang)
+- Ko'chirilgandan keyin takrorlanmasligi uchun bufer o'sha peer
+  bo'yicha tozalansin
+
+**Ogohlantirish:** bufer faqat xotirada, ya'ni ilova yopilsa
+yo'qoladi. Bu ATAYLAB — diskka yozish 3-variantga (hammasini
+yozish) aylanib ketardi va bazani shishirardi.
+
+#### 3.3 Sozlama: bufer davomiyligi
+
+Yangi sozlama: `activityBufferMinutes`, **standart 10**,
+ruxsat etilgan oraliq **1 – 120 daqiqa**.
+
+- Joylashuvi: Custom Window → **Faollik tarixi** bo'limi,
+  "Barcha Contact'larni kuzatish" tugmasi yonida
+  (`custom_mod_window.cpp:2027` atrofi)
+- Aniqlik: **daqiqa**
+- UI namunasi tayyor: `upstreamCheckIntervalMinutes`
+  (`custom_mod_window.cpp:1099-1131`) — presetlar + qo'lda kiritish
+  + `clamped` tekshiruvi. Aynan shu naqsh takrorlansin.
+- Sozlama e'loni: `custom_settings.h:52` yonida
+  (`int upstreamCheckIntervalMinutes = 1440;` bilan bir uslubda)
+- Yozish: `CustomSettings::SetInt(u"activityBufferMinutes"_q, ...)`
+
+**Xotira baholansin:** buferning taxminiy hajmini hisoblab, hujjatga
+yozing (nechta peer x nechta yozuv x qator hajmi). 120 daqiqada ham
+mantiqiy chegarada qolishi kerak; agar yo'q bo'lsa, peer boshiga
+yozuvlar sonini cheklang.
 
 ## 4. Qo'lda kiritilgan yozuv (bajarildi, 2026-08-28)
 
