@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/abstract_box.h"
 #include "data/components/passkeys.h"
 #include "data/data_passkey_deserialize.h"
+#include "intro/intro_bot_token.h"
 #include "intro/intro_phone.h"
 #include "intro/intro_widget.h"
 #include "intro/intro_password_check.h"
@@ -369,6 +370,35 @@ void QrWidget::setupControls() {
 	}, _skip->lifetime());
 
 	_skip->setClickedCallback([=] { submit(); });
+
+	setupBotTokenLink();
+}
+
+void QrWidget::setupBotTokenLink() {
+	if (_botToken) {
+		return;
+	}
+	_botToken = Ui::CreateChild<Ui::LinkButton>(
+		this,
+		u"Bot token orqali kirish"_q);
+	_botToken->show();
+	rpl::combine(
+		sizeValue(),
+		_botToken->widthValue()
+	) | rpl::on_next([=](QSize size, int tokenWidth) {
+		const auto topOffset = _passkey
+			? (3.0 * st::normalFont->height)
+			: (1.5 * st::normalFont->height);
+		_botToken->moveToLeft(
+			(size.width() - tokenWidth) / 2,
+			(contentTop()
+				+ st::introQrSkipTop
+				+ topOffset));
+	}, _botToken->lifetime());
+
+	_botToken->setClickedCallback([=] {
+		goNextOrBack<BotTokenWidget>();
+	});
 }
 
 void QrWidget::setupPasskeyLink() {
@@ -392,6 +422,14 @@ void QrWidget::setupPasskeyLink() {
 				+ st::introQrSkipTop
 				+ 1.5 * st::normalFont->height));
 	}, _passkey->lifetime());
+
+	if (_botToken) {
+		_botToken->moveToLeft(
+			(width() - _botToken->width()) / 2,
+			(contentTop()
+				+ st::introQrSkipTop
+				+ 3.0 * st::normalFont->height));
+	}
 
 	_passkey->setClickedCallback([=] {
 		const auto attempt = [=](
