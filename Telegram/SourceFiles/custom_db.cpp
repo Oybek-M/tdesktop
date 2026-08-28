@@ -3220,7 +3220,7 @@ QVector<ActivityHistoryEntry> GetActivityHistory(
 
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
-            "SELECT field, old_value, new_value, observed_at "
+            "SELECT field, old_value, new_value, observed_at, source "
             "FROM activity_history WHERE peer_id = ? "
             "ORDER BY observed_at DESC, id DESC "
             "LIMIT ?",
@@ -3234,6 +3234,8 @@ QVector<ActivityHistoryEntry> GetActivityHistory(
             entry.oldValue = entry.hasOldValue ? colText(stmt, 1) : QString();
             entry.newValue = colText(stmt, 2);
             entry.observedAt = sqlite3_column_int64(stmt, 3);
+            const auto src = colText(stmt, 4);
+            entry.source = src.isEmpty() ? u"observed"_q : src;
             result.append(entry);
         }
         sqlite3_finalize(stmt);

@@ -55,6 +55,12 @@ constexpr auto kShortGroupGapSeconds = 30 * 60;
 QString FormatEntryLine(const CustomDB::ActivityHistoryEntry &entry) {
 	const auto when = QDateTime::fromSecsSinceEpoch(entry.observedAt)
 		.toString(u"dd.MM.yyyy HH:mm"_q);
+	const auto sourcePrefix = [&] {
+		if (entry.source == u"story"_q) return u"📖 "_q;
+		if (entry.source == u"manual"_q) return u"✍️ "_q;
+		if (entry.source == u"buffer"_q) return u"⏱ "_q;
+		return QString();
+	}();
 	const auto fieldLabel = [&] {
 		if (entry.field == u"name"_q) return u"Ism"_q;
 		if (entry.field == u"username"_q) return u"Username"_q;
@@ -69,14 +75,14 @@ QString FormatEntryLine(const CustomDB::ActivityHistoryEntry &entry) {
 		? DecodeStoryLabel(entry.newValue)
 		: (entry.newValue.isEmpty() ? u"(bo'sh)"_q : entry.newValue);
 	if (!entry.hasOldValue) {
-		return fieldLabel + u": "_q + valueLabel + u" (kuzatish boshlandi, "_q + when + u")"_q;
+		return sourcePrefix + fieldLabel + u": "_q + valueLabel + u" (kuzatish boshlandi, "_q + when + u")"_q;
 	}
 	const auto oldLabel = (entry.field == u"status"_q)
 		? DecodeStatusLabel(entry.oldValue)
 		: (entry.field == u"story"_q)
 		? DecodeStoryLabel(entry.oldValue)
 		: (entry.oldValue.isEmpty() ? u"(bo'sh)"_q : entry.oldValue);
-	return fieldLabel + u": '"_q + oldLabel + u"' -> '"_q + valueLabel + u"' ("_q + when + u")"_q;
+	return sourcePrefix + fieldLabel + u": '"_q + oldLabel + u"' -> '"_q + valueLabel + u"' ("_q + when + u")"_q;
 }
 
 struct OnlinePeriod {

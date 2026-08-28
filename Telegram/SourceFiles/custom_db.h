@@ -471,6 +471,7 @@ struct ActivityHistoryEntry {
     QString oldValue;      // hasOldValue=false bo'lsa mazmunsiz (bo'sh)
     QString newValue;
     qint64 observedAt = 0; // unix timestamp (base::unixtime::now())
+    QString source = u"observed"_q; // "observed" | "story" | "manual" | "buffer"
 };
 
 // Yangi yozuv qo'shadi. hasOldValue=false — bu peer/field juftligi uchun

@@ -2195,6 +2195,117 @@ void fillActivityHistorySection(
 		});
 	}
 
+	// ── Qo'lda faollik yozuvi qo'shish (A16 §2) ───────────────────
+	Ui::AddSkip(content, 12);
+	content->add(
+		object_ptr<Ui::RoundButton>(
+			content,
+			rpl::single(u"✍️ Qo'lda faollik yozuvi qo'shish"_q),
+			st::defaultBoxButton),
+		st::boxRowPadding)
+	->addClickHandler([=] {
+		if (!gInstance) return;
+		gInstance->showBox(ChoosePeerBox(
+			&controller->session(),
+			[=](not_null<Data::Thread*> thread) -> bool {
+				const auto peer = thread->peer();
+				if (!peer->isUser()) {
+					Ui::Toast::Show(
+						u"Faqat shaxsiy chatlar (User) uchun faollik kiritiladi."_q);
+					return true;
+				}
+				const auto peerId = QString::number(peer->id.value);
+				const auto name = peer->name();
+
+				if (!gInstance) return true;
+				gInstance->showBox(Box([=](not_null<Ui::GenericBox*> box) {
+					box->setTitle(rpl::single(u"Qo'lda faollik yozish — "_q + name));
+					const auto form = box->verticalLayout();
+
+					form->add(
+						object_ptr<Ui::FlatLabel>(
+							form,
+							rpl::single(u"Sana va vaqt (dd.MM.yyyy HH:mm):"_q),
+							st::defaultSubsectionTitle),
+						st::defaultSubsectionTitlePadding);
+
+					const auto nowStr = QDateTime::currentDateTime().toString(u"dd.MM.yyyy HH:mm"_q);
+					const auto timeInput = form->add(
+						object_ptr<Ui::InputField>(
+							form,
+							st::defaultInputField,
+							rpl::single(u"dd.MM.yyyy HH:mm"_q),
+							nowStr),
+						st::boxRowPadding);
+
+					form->add(
+						object_ptr<Ui::FlatLabel>(
+							form,
+							rpl::single(u"Davomiyligi (soniya, 0 = faqat online):"_q),
+							st::defaultSubsectionTitle),
+						st::defaultSubsectionTitlePadding);
+
+					const auto durationInput = form->add(
+						object_ptr<Ui::InputField>(
+							form,
+							st::defaultInputField,
+							rpl::single(u"Soniya (standart 30)"_q),
+							u"30"_q),
+						st::boxRowPadding);
+
+					box->addButton(rpl::single(u"Saqlash"_q), [=] {
+						const auto dt = QDateTime::fromString(timeInput->getLastText().trimmed(), u"dd.MM.yyyy HH:mm"_q);
+						if (!dt.isValid()) {
+							Ui::Toast::Show(u"Noto'g'ri sana formati! Masalan: 28.08.2026 17:03"_q);
+							return;
+						}
+						bool ok = false;
+						const auto duration = durationInput->getLastText().trimmed().toInt(&ok);
+						const auto durationSecs = ok ? std::max(0, duration) : 30;
+
+						const auto on = dt.toSecsSinceEpoch();
+						const auto off = on + durationSecs;
+						const auto accountId = qint64(controller->session().userId().bare);
+
+						int added = 0;
+						if (!CustomDB::HasActivityEntryAt(peerId, u"status"_q, on)) {
+							CustomDB::SaveActivityHistoryEntry(
+								CustomDB::PeerKey{ accountId, peerId },
+								u"status"_q,
+								false,
+								QString(),
+								u"online:"_q + QString::number(on),
+								on,
+								u"manual"_q);
+							++added;
+						}
+						if (durationSecs > 0 && !CustomDB::HasActivityEntryAt(peerId, u"status"_q, off)) {
+							CustomDB::SaveActivityHistoryEntry(
+								CustomDB::PeerKey{ accountId, peerId },
+								u"status"_q,
+								false,
+								QString(),
+								u"offline:"_q + QString::number(on),
+								off,
+								u"manual"_q);
+							++added;
+						}
+
+						box->closeBox();
+						if (added > 0) {
+							Ui::Toast::Show(u"Faollik yozuvi saqlandi ✓"_q);
+						} else {
+							Ui::Toast::Show(u"Bu vaqt uchun yozuv allaqachon mavjud."_q);
+						}
+					});
+					box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
+				}));
+
+				return true;
+			},
+			rpl::single(u"Qo'lda yozuv — chat tanlash"_q)));
+	});
+
 	// ── Exclude List ──────────────────────────────────────────────
 	Ui::AddSkip(content, 12);
 	content->add(
