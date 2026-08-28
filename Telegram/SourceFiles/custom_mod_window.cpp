@@ -530,7 +530,7 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 			CustomSettings::Set(id, on);
 			Ui::Toast::Show(
 				on ? (text + u" yoqildi ✓"_q)
-				   : (text + u" oʻchirildi"_q));
+				   : (text + u" o'chirildi"_q));
 		}, btn->lifetime());
 
 		if (!description.isEmpty()) {
@@ -560,8 +560,8 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 	addSection(u"📱 Qurilma ko'rinishini almashtirish"_q);
 	const auto spoofToggleBtn = addToggle(
 		u"spoofMobile"_q,
-		u"Mobil qurilma koʻrinishi"_q,
-		u"Telegram mobil ilovadan ishlatilayotgandek koʻrinadi."_q);
+		u"Mobil qurilma ko'rinishi"_q,
+		u"Telegram mobil ilovadan ishlatilayotgandek ko'rinadi."_q);
 
 	Ui::AddSkip(content, 8);
 
@@ -669,11 +669,11 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 	addToggle(
 		u"ghostMode"_q,
 		u"Ghost Mode"_q,
-		u"Online holatini, yozmoqda belgisini va xabar oʻqildi bildirishnomasini yashiradi.\n\nYoqilgach, to'liq kuchga kirishi uchun 1-2 daqiqa ketishi mumkin."_q);
+		u"Online holatini, yozmoqda belgisini va xabar o'qildi bildirishnomasini yashiradi.\n\nYoqilgach, to'liq kuchga kirishi uchun 1-2 daqiqa ketishi mumkin."_q);
 	addToggle(
 		u"storyAnonymousView"_q,
-		u"Hikoyalarni anonim koʻrish"_q,
-		u"Hikoyani koʻrganingiz haqida egasiga bildirish yuborilmaydi."_q);
+		u"Hikoyalarni anonim ko'rish"_q,
+		u"Hikoyani ko'rganingiz haqida egasiga bildirish yuborilmaydi."_q);
 	addToggle(
 		u"storyMediaBackupEnabled"_q,
 		u"Hikoya media'sini saqlash"_q,
@@ -681,19 +681,19 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 	addToggle(
 		u"bypassRestrictions"_q,
 		u"Cheklangan chatda nusxalash va yuborish"_q,
-		u"Cheklov qoʻyilgan chatlardagi xabarlarni boshqaga yuborish yoki nusxa olishga ruxsat beradi."_q);
+		u"Cheklov qo'yilgan chatlardagi xabarlarni boshqaga yuborish yoki nusxa olishga ruxsat beradi."_q);
 	addToggle(
 		u"antiDelete"_q,
 		u"Anti-Delete"_q,
-		u"Oʻchirilgan xabarlarni koʻrinishda qoldiradi."_q);
+		u"O'chirilgan xabarlarni ko'rinishda qoldiradi."_q);
 	addToggle(
 		u"antiEdit"_q,
 		u"Anti-Edit"_q,
-		u"Tahrirdan oldingi matnni koʻrsatadi."_q);
+		u"Tahrirdan oldingi matnni ko'rsatadi."_q);
 	addToggle(
 		u"offlineDb"_q,
 		u"Offline xabar bazasi"_q,
-		u"Xabarlar va medialarni internet boʻlmaganda ham koʻrish uchun qurilmada saqlaydi."_q);
+		u"Xabarlar va medialarni internet bo'lmaganda ham ko'rish uchun qurilmada saqlaydi."_q);
 
 	// A13/K6.3: arxiv statistikasi — foydalanuvchi arxiv haqiqatan
 	// to'layotganini va qancha joy egallayotganini ko'rib tursin.
@@ -730,8 +730,8 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 		const auto desc = content->add(
 			object_ptr<Ui::FlatLabel>(
 				content,
-				rpl::single(u"Sizni ham qaytarib contact'ga qoʻshgan odamlar ismi "
-					"yoniga belgi qoʻyadi. Har bir joy uchun mustaqil yoqish va "
+				rpl::single(u"Sizni ham qaytarib contact'ga qo'shgan odamlar ismi "
+					"yoniga belgi qo'yadi. Har bir joy uchun mustaqil yoqish va "
 					"mustaqil belgi (emoji) tanlash mumkin."_q),
 				st::customModHintLabel),
 			st::boxRowPadding,
@@ -750,12 +750,12 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 	Ui::AddSkip(content, 8);
 	addToggle(
 		u"mutualContactShowInChatList"_q,
-		u"Chat roʻyxatida koʻrsatish"_q,
+		u"Chat ro'yxatida ko'rsatish"_q,
 		QString());
 	content->add(
 		object_ptr<Ui::FlatLabel>(
 			content,
-			rpl::single(u"Belgi (chat roʻyxati uchun):"_q),
+			rpl::single(u"Belgi (chat ro'yxati uchun):"_q),
 			st::defaultSubsectionTitle),
 		st::defaultSubsectionTitlePadding);
 	const auto chatListEmojiInput = content->add(
@@ -769,12 +769,12 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 	Ui::AddSkip(content, 8);
 	addToggle(
 		u"mutualContactShowInContactsList"_q,
-		u"Contacts roʻyxatida koʻrsatish"_q,
+		u"Contacts ro'yxatida ko'rsatish"_q,
 		QString());
 	content->add(
 		object_ptr<Ui::FlatLabel>(
 			content,
-			rpl::single(u"Belgi (Contacts roʻyxati uchun):"_q),
+			rpl::single(u"Belgi (Contacts ro'yxati uchun):"_q),
 			st::defaultSubsectionTitle),
 		st::defaultSubsectionTitlePadding);
 	const auto contactsListEmojiInput = content->add(
@@ -788,7 +788,7 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 	Ui::AddSkip(content, 8);
 	addToggle(
 		u"mutualContactShowInProfile"_q,
-		u"Profil sarlavhasida koʻrsatish"_q,
+		u"Profil sarlavhasida ko'rsatish"_q,
 		QString());
 	content->add(
 		object_ptr<Ui::FlatLabel>(
@@ -807,12 +807,12 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 	Ui::AddSkip(content, 8);
 	addToggle(
 		u"mutualContactShowInMembersList"_q,
-		u"Guruh a'zolari roʻyxatida koʻrsatish"_q,
+		u"Guruh a'zolari ro'yxatida ko'rsatish"_q,
 		QString());
 	content->add(
 		object_ptr<Ui::FlatLabel>(
 			content,
-			rpl::single(u"Belgi (Guruh a'zolari roʻyxati uchun):"_q),
+			rpl::single(u"Belgi (Guruh a'zolari ro'yxati uchun):"_q),
 			st::defaultSubsectionTitle),
 		st::defaultSubsectionTitlePadding);
 	const auto membersListEmojiInput = content->add(
@@ -1221,8 +1221,8 @@ void fillPeerSection(
 			object_ptr<Ui::FlatLabel>(
 				content,
 				rpl::single(isWhitelist
-					? u"Bu roʻyxatdagi chatlar uchun barcha funksiyalar doim yoqiq boʻladi."_q
-					: u"Bu roʻyxatdagi chatlar uchun barcha funksiyalar doim oʻchiq boʻladi."_q),
+					? u"Bu ro'yxatdagi chatlar uchun barcha funksiyalar doim yoqiq bo'ladi."_q
+					: u"Bu ro'yxatdagi chatlar uchun barcha funksiyalar doim o'chiq bo'ladi."_q),
 				st::customModHintLabel),
 			st::boxRowPadding,
 			style::al_justify);
@@ -1264,8 +1264,8 @@ void fillPeerSection(
 				}
 				if (hadConflict) {
 					Ui::Toast::Show(
-						u"Qarama-qarshi roʻyxatdagi mos kategoriya "
-						"avtomatik oʻchirildi."_q);
+						u"Qarama-qarshi ro'yxatdagi mos kategoriya "
+						"avtomatik o'chirildi."_q);
 					if (onRebuild) onRebuild();
 				}
 			}, btn->lifetime());
@@ -1304,12 +1304,12 @@ void fillPeerSection(
 					? CustomSettings::IsInWhitelist(peerId)
 					: CustomSettings::IsInBlocklist(peerId);
 				if (already) {
-					Ui::Toast::Show(u"Bu chat allaqachon roʻyxatda."_q);
+					Ui::Toast::Show(u"Bu chat allaqachon ro'yxatda."_q);
 					return true;
 				}
 				// wasInOpposite AddToWhitelist/AddToBlocklist dan OLDIN hisoblanishi shart —
 				// bu funksiyalar chaqirilgach, peer avtomatik ravishda qarama-qarshi
-				// roʻyxatdan olib tashlanadi (mutual exclusion), shuning uchun keyin
+				// ro'yxatdan olib tashlanadi (mutual exclusion), shuning uchun keyin
 				// tekshirsak har doim false qaytadi.
 				const auto wasInOpposite = isWhitelist
 					? CustomSettings::IsInBlocklist(peerId)
@@ -1321,19 +1321,19 @@ void fillPeerSection(
 				}
 				if (wasInOpposite) {
 					Ui::Toast::Show(name + (isWhitelist
-						? u" Black List'dan olib tashlandi va White List'ga qoʻshildi."_q
-						: u" White List'dan olib tashlandi va Black List'ga qoʻshildi."_q));
+						? u" Black List'dan olib tashlandi va White List'ga qo'shildi."_q
+						: u" White List'dan olib tashlandi va Black List'ga qo'shildi."_q));
 					if (onRebuild) onRebuild();
 				} else {
 					state->addEntry(peerId, name);
-					Ui::Toast::Show(name + u" qoʻshildi."_q);
+					Ui::Toast::Show(name + u" qo'shildi."_q);
 				}
 				// raise()/activateWindow() shart emas — dialog window ichida ochiladi.
 				return true;
 			},
 			rpl::single(isWhitelist
-				? u"White List ga qoʻshish"_q
-				: u"Black List ga qoʻshish"_q)));
+				? u"White List ga qo'shish"_q
+				: u"Black List ga qo'shish"_q)));
 	});
 
 	// ── ID orqali qo'shish (secondary) ──────────────────────────
@@ -1341,7 +1341,7 @@ void fillPeerSection(
 	content->add(
 		object_ptr<Ui::FlatLabel>(
 			content,
-			rpl::single(u"Yoki ID orqali qoʻshish:"_q),
+			rpl::single(u"Yoki ID orqali qo'shish:"_q),
 			st::customModHintLabel),
 		st::defaultSubsectionTitlePadding);
 
@@ -1365,26 +1365,26 @@ void fillPeerSection(
 		object_ptr<Ui::RoundButton>(
 			content,
 			rpl::single(isWhitelist
-				? u"ID boʻyicha White List ga qoʻshish"_q
-				: u"ID boʻyicha Black List ga qoʻshish"_q),
+				? u"ID bo'yicha White List ga qo'shish"_q
+				: u"ID bo'yicha Black List ga qo'shish"_q),
 			st::defaultBoxButton),
 		st::boxRowPadding)
 	->addClickHandler([=] {
 		const auto peerId = peerIdInput->getLastText().trimmed();
 		if (peerId.isEmpty()) {
-			Ui::Toast::Show(u"Chat ID boʻsh. Iltimos kiriting."_q);
+			Ui::Toast::Show(u"Chat ID bo'sh. Iltimos kiriting."_q);
 			return;
 		}
 		const auto already = isWhitelist
 			? CustomSettings::IsInWhitelist(peerId)
 			: CustomSettings::IsInBlocklist(peerId);
 		if (already) {
-			Ui::Toast::Show(u"Bu chat allaqachon roʻyxatda."_q);
+			Ui::Toast::Show(u"Bu chat allaqachon ro'yxatda."_q);
 			return;
 		}
 		// wasInOpposite AddToWhitelist/AddToBlocklist dan OLDIN hisoblanishi shart —
 		// bu funksiyalar chaqirilgach, peer avtomatik ravishda qarama-qarshi
-		// roʻyxatdan olib tashlanadi (mutual exclusion), shuning uchun keyin
+		// ro'yxatdan olib tashlanadi (mutual exclusion), shuning uchun keyin
 		// tekshirsak har doim false qaytadi.
 		const auto wasInOpposite = isWhitelist
 			? CustomSettings::IsInBlocklist(peerId)
@@ -1398,13 +1398,13 @@ void fillPeerSection(
 		peerIdInput->setText(QString());
 		nameInput->setText(QString());
 		if (wasInOpposite) {
-			Ui::Toast::Show(u"Qarama-qarshi roʻyxatdan olib tashlandi va "_q
+			Ui::Toast::Show(u"Qarama-qarshi ro'yxatdan olib tashlandi va "_q
 				+ (isWhitelist ? u"White List"_q : u"Black List"_q)
-				+ u"'ga qoʻshildi: "_q + peerId);
+				+ u"'ga qo'shildi: "_q + peerId);
 			if (onRebuild) onRebuild();
 		} else {
 			state->addEntry(peerId, name);
-			Ui::Toast::Show(u"Qoʻshildi: "_q + peerId);
+			Ui::Toast::Show(u"Qo'shildi: "_q + peerId);
 		}
 	});
 
@@ -1424,10 +1424,10 @@ void fillPeerSection(
 		const auto n = state->visibleCount;
 		state->countLabel->setText(isWhitelist
 			? (n == 0
-				? u"White List — boʻsh"_q
+				? u"White List — bo'sh"_q
 				: u"White List — %1 ta chat"_q.arg(n))
 			: (n == 0
-				? u"Black List — boʻsh"_q
+				? u"Black List — bo'sh"_q
 				: u"Black List — %1 ta chat"_q.arg(n)));
 		state->emptyWrap->toggle(
 			n == 0,
@@ -1443,7 +1443,7 @@ void fillPeerSection(
 		st::boxRowPadding)
 	->addClickHandler([=] {
 		if (state->visibleCount == 0) {
-			Ui::Toast::Show(u"Roʻyxat allaqachon boʻsh."_q);
+			Ui::Toast::Show(u"Ro'yxat allaqachon bo'sh."_q);
 			return;
 		}
 		if (isWhitelist) {
@@ -1470,7 +1470,7 @@ void fillPeerSection(
 			state->entriesLayout,
 			object_ptr<Ui::FlatLabel>(
 				state->entriesLayout,
-				rpl::single(u"Roʻyxat boʻsh. Yuqoridan chat qoʻshing."_q),
+				rpl::single(u"Ro'yxat bo'sh. Yuqoridan chat qo'shing."_q),
 				st::customModHintLabel)),
 		st::defaultSubsectionTitlePadding,
 		style::al_justify);
@@ -1527,7 +1527,7 @@ void fillPeerSection(
 		// Delete button
 		const auto delBtn = Ui::CreateChild<Ui::RoundButton>(
 			row,
-			rpl::single(u"Oʻchirish"_q),
+			rpl::single(u"O'chirish"_q),
 			st::attentionBoxButton);
 		delBtn->setFixedWidth(kDelBtnW);
 		// Barcha child widgetlar uchun show() majburiy — Qt yangi child larni
@@ -1577,7 +1577,7 @@ void fillPeerSection(
 			entryWrap->toggle(false, anim::type::normal);
 			--state->visibleCount;
 			updateHeader(true);
-			Ui::Toast::Show(u"Roʻyxatdan oʻchirildi."_q);
+			Ui::Toast::Show(u"Ro'yxatdan o'chirildi."_q);
 		});
 
 		// SlideWrap default _toggled=false (yashirin, height=0) — darhol ko'rsatish.
@@ -1677,7 +1677,7 @@ void fillPerChatSection(
 				const auto peerId = QString::number(peer->id.value);
 				const auto name = peer->name();
 				if (CustomSettings::HasPerPeerOverride(peerId)) {
-					Ui::Toast::Show(u"Bu chat allaqachon roʻyxatda."_q);
+					Ui::Toast::Show(u"Bu chat allaqachon ro'yxatda."_q);
 					return true;
 				}
 				CustomSettings::AddPerPeerOverride(peerId, name);
@@ -1688,7 +1688,7 @@ void fillPerChatSection(
 						break;
 					}
 				}
-				Ui::Toast::Show(name + u" qoʻshildi."_q);
+				Ui::Toast::Show(name + u" qo'shildi."_q);
 				return true;
 			},
 			rpl::single(u"Per-Chat sozlash uchun chat tanlang"_q)));
@@ -1706,7 +1706,7 @@ void fillPerChatSection(
 	const auto updateHeader = [=](bool animated) {
 		const auto n = state->visibleCount;
 		state->countLabel->setText(n == 0
-			? u"Per-Chat — boʻsh"_q
+			? u"Per-Chat — bo'sh"_q
 			: u"Per-Chat — %1 ta chat"_q.arg(n));
 		state->emptyWrap->toggle(
 			n == 0,
@@ -1722,7 +1722,7 @@ void fillPerChatSection(
 		st::boxRowPadding)
 	->addClickHandler([=] {
 		if (state->visibleCount == 0) {
-			Ui::Toast::Show(u"Roʻyxat allaqachon boʻsh."_q);
+			Ui::Toast::Show(u"Ro'yxat allaqachon bo'sh."_q);
 			return;
 		}
 		CustomSettings::ClearAllPerPeerOverrides();
@@ -1731,7 +1731,7 @@ void fillPerChatSection(
 		}
 		state->visibleCount = 0;
 		updateHeader(true);
-		Ui::Toast::Show(u"Per-Chat roʻyxati tozalandi."_q);
+		Ui::Toast::Show(u"Per-Chat ro'yxati tozalandi."_q);
 	});
 
 	state->entriesLayout = content->add(
@@ -1743,7 +1743,7 @@ void fillPerChatSection(
 			state->entriesLayout,
 			object_ptr<Ui::FlatLabel>(
 				state->entriesLayout,
-				rpl::single(u"Per-Chat sozlash uchun yuqoridan chat qoʻshing."_q),
+				rpl::single(u"Per-Chat sozlash uchun yuqoridan chat qo'shing."_q),
 				st::customModHintLabel)),
 		st::defaultSubsectionTitlePadding,
 		style::al_justify);
@@ -1809,7 +1809,7 @@ void fillPerChatSection(
 
 		const auto rmBtn = Ui::CreateChild<Ui::RoundButton>(
 			header,
-			rpl::single(u"Oʻchirish"_q),
+			rpl::single(u"O'chirish"_q),
 			st::attentionBoxButton);
 		rmBtn->setFixedWidth(kDelBtnW);
 
@@ -1877,7 +1877,7 @@ void fillPerChatSection(
 			entryWrap->toggle(false, anim::type::normal);
 			--state->visibleCount;
 			updateHeader(true);
-			Ui::Toast::Show(u"Per-Chat dan oʻchirildi."_q);
+			Ui::Toast::Show(u"Per-Chat dan o'chirildi."_q);
 		});
 
 		entryWrap->toggle(true, anim::type::instant);
@@ -1949,7 +1949,7 @@ void AddAvatarPeerRow(
 		st::customModHintLabel);
 	const auto delBtn = Ui::CreateChild<Ui::RoundButton>(
 		row,
-		rpl::single(u"Oʻchirish"_q),
+		rpl::single(u"O'chirish"_q),
 		st::attentionBoxButton);
 	delBtn->setFixedWidth(kDelBtnW);
 	av->show();
@@ -2040,7 +2040,7 @@ void fillActivityHistorySection(
 				CustomSettings::Set(u"activityHistoryTrackAllContacts"_q, on);
 				Ui::Toast::Show(on
 					? u"Barcha kontaktlarni kuzatish yoqildi ✓"_q
-					: u"Barcha kontaktlarni kuzatish oʻchirildi"_q);
+					: u"Barcha kontaktlarni kuzatish o'chirildi"_q);
 			}, btn->lifetime());
 	}
 
@@ -2169,11 +2169,11 @@ void fillActivityHistorySection(
 					return true;
 				}
 				CustomSettings::AddToActivityInclude(peerId, name);
-				Ui::Toast::Show(name + u" Include List'ga qoʻshildi."_q);
+				Ui::Toast::Show(name + u" Include List'ga qo'shildi."_q);
 				if (onRebuild) onRebuild();
 				return true;
 			},
-			rpl::single(u"Include List'ga qoʻshish"_q)));
+			rpl::single(u"Include List'ga qo'shish"_q)));
 	});
 	for (const auto &e : CustomSettings::GetActivityInclude()) {
 		const auto peerId = e.first;
@@ -2338,11 +2338,11 @@ void fillActivityHistorySection(
 					return true;
 				}
 				CustomSettings::AddToActivityExclude(peerId, name);
-				Ui::Toast::Show(name + u" Exclude List'ga qoʻshildi."_q);
+				Ui::Toast::Show(name + u" Exclude List'ga qo'shildi."_q);
 				if (onRebuild) onRebuild();
 				return true;
 			},
-			rpl::single(u"Exclude List'ga qoʻshish"_q)));
+			rpl::single(u"Exclude List'ga qo'shish"_q)));
 	});
 	for (const auto &e : CustomSettings::GetActivityExclude()) {
 		const auto peerId = e.first;
@@ -2398,7 +2398,7 @@ void fillPeersTab(
 			object_ptr<Ui::FlatLabel>(
 				content,
 				rpl::single(u"💡 \"Chat tanlash\" tugmasi bosilganda asosiy Telegram oynasida "
-					"chat tanlash oynasi ochiladi. Tanlagandan soʻng bu oyna avvalgi holatiga "
+					"chat tanlash oynasi ochiladi. Tanlagandan so'ng bu oyna avvalgi holatiga "
 					"qaytadi."_q),
 				st::customModHintLabel),
 			st::boxRowPadding,
@@ -2464,7 +2464,7 @@ void fillArchiveTab(
 			content->add(
 				object_ptr<Ui::FlatLabel>(
 					content,
-					rpl::single(u"Arxivda xabarlar yoʻq."_q),
+					rpl::single(u"Arxivda xabarlar yo'q."_q),
 					st::boxLabel),
 				st::boxRowPadding);
 			return;
@@ -2532,7 +2532,7 @@ void fillArchiveTab(
 	};
 
 	addMessageRows(
-		u"🗑️ Oʻchirilgan xabarlar"_q,
+		u"🗑️ O'chirilgan xabarlar"_q,
 		CustomDB::GetAllDeletedMessages(300));
 
 	Ui::AddDivider(content);
@@ -2551,7 +2551,7 @@ void fillArchiveTab(
 			content->add(
 				object_ptr<Ui::FlatLabel>(
 					content,
-					rpl::single(u"Arxivda tahrir yozuvlari yoʻq."_q),
+					rpl::single(u"Arxivda tahrir yozuvlari yo'q."_q),
 					st::boxLabel),
 				st::boxRowPadding);
 		} else {
@@ -2654,7 +2654,7 @@ void fillAboutTab(
 		object_ptr<Ui::FlatLabel>(
 			content,
 			rpl::single(
-				u"🗄️ Arxiv holati: %1 oʻchirilgan • %2 tahrirlangan"_q
+				u"🗄️ Arxiv holati: %1 o'chirilgan • %2 tahrirlangan"_q
 				.arg(stats0.deletedCount).arg(stats0.editedCount)),
 			st::customModHintLabel),
 		st::defaultSubsectionTitlePadding);
@@ -2663,7 +2663,7 @@ void fillAboutTab(
 	const auto refreshStats = [statsLabel]() {
 		const auto s = CustomDB::GetArchiveStats();
 		statsLabel->setText(
-			u"🗄️ Arxiv holati: %1 oʻchirilgan • %2 tahrirlangan"_q
+			u"🗄️ Arxiv holati: %1 o'chirilgan • %2 tahrirlangan"_q
 				.arg(s.deletedCount).arg(s.editedCount));
 	};
 
@@ -2678,7 +2678,7 @@ void fillAboutTab(
 		object_ptr<Ui::FlatLabel>(
 			content,
 			rpl::single(u"Eksport ZIP fayli QUYIDAGILARNI saqlaydi:\n"
-				"• Oʻchirilgan/tahrirlangan xabarlar bazasi\n"
+				"• O'chirilgan/tahrirlangan xabarlar bazasi\n"
 				"• Bomb media (rasm/video)\n"
 				"• White/Black List (peer_lists.json)\n"
 				"• Branding sozlamalari (branding.json)\n"
@@ -2711,7 +2711,7 @@ void fillAboutTab(
 	content->add(
 		object_ptr<Ui::RoundButton>(
 			content,
-			rpl::single(u"📁 Papkani o‘zgartirish"_q),
+			rpl::single(u"📁 Papkani o'zgartirish"_q),
 			st::defaultBoxButton),
 		st::boxRowPadding
 	)->addClickHandler([=] {
@@ -2726,16 +2726,16 @@ void fillAboutTab(
 		}
 
 		QMessageBox moveBox(dialogParent);
-		moveBox.setWindowTitle(u"Arxiv papkasini o‘zgartirish"_q);
+		moveBox.setWindowTitle(u"Arxiv papkasini o'zgartirish"_q);
 		moveBox.setText(
 			u"Eski: "_q + current
 			+ u"\nYangi: "_q + QDir::cleanPath(chosen)
-			+ u"\n\nMavjud maʼlumotlarni yangi papkaga "
-			  "ko‘chiraymi?"_q);
+			+ u"\n\nMavjud ma'lumotlarni yangi papkaga "
+			  "ko'chiraymi?"_q);
 		const auto moveBtn = moveBox.addButton(
-			u"📦 Ko‘chirish"_q, QMessageBox::AcceptRole);
+			u"📦 Ko'chirish"_q, QMessageBox::AcceptRole);
 		moveBox.addButton(
-			u"Ko‘chirmasdan, yangi joydan boshlansin"_q,
+			u"Ko'chirmasdan, yangi joydan boshlansin"_q,
 			QMessageBox::DestructiveRole);
 		moveBox.addButton(QMessageBox::Cancel);
 		moveBox.setDefaultButton(moveBtn);
@@ -2754,10 +2754,10 @@ void fillAboutTab(
 		CustomSettings::SetArchiveRoot(chosen);
 		Ui::Toast::Show(
 			(role == QMessageBox::AcceptRole)
-				? u"Papka o‘zgartirildi. Maʼlumotlar qayta ishga "
-				  "tushganda ko‘chiriladi. Dastur 3 soniyada qayta "
+				? u"Papka o'zgartirildi. Ma'lumotlar qayta ishga "
+				  "tushganda ko'chiriladi. Dastur 3 soniyada qayta "
 				  "yuklanadi..."_q
-				: u"Papka o‘zgartirildi. Dastur 3 soniyada qayta "
+				: u"Papka o'zgartirildi. Dastur 3 soniyada qayta "
 				  "yuklanadi..."_q);
 		QTimer::singleShot(3000, [] { Core::Restart(); });
 	});
@@ -2865,8 +2865,8 @@ void fillAboutTab(
 					scanBtn->setDisabled(false);
 
 					const auto indexed = (added > 0)
-						? (u"%1 ta fayl indeksga qoʻshildi.\n\n"_q).arg(added)
-						: u"Indeksga yangi fayl qoʻshilmadi.\n\n"_q;
+						? (u"%1 ta fayl indeksga qo'shildi.\n\n"_q).arg(added)
+						: u"Indeksga yangi fayl qo'shilmadi.\n\n"_q;
 					const auto toFix = preview.extensionAdded
 						+ preview.movedFolder;
 					if (!toFix) {
@@ -2878,10 +2878,10 @@ void fillAboutTab(
 					if (!window) return;
 					window->show(Ui::MakeConfirmBox({
 						.text = indexed
-							+ u"Tuzatish kerak boʻlgan fayllar:\n"_q
-							+ u"• kengaytma qoʻshiladi: "_q
+							+ u"Tuzatish kerak bo'lgan fayllar:\n"_q
+							+ u"• kengaytma qo'shiladi: "_q
 							+ QString::number(preview.extensionAdded)
-							+ u"\n• toʻgʻri papkaga koʻchiriladi: "_q
+							+ u"\n• to'g'ri papkaga ko'chiriladi: "_q
 							+ QString::number(preview.movedFolder)
 							+ u"\n• turi aniqlanmadi (tegilmaydi): "_q
 							+ QString::number(preview.unknown)
@@ -2894,7 +2894,7 @@ void fillAboutTab(
 							CustomDB::RepairArchiveMediaAsync(false, [=](
 									CustomDB::RepairReport done) {
 								Ui::Toast::Show(
-									u"Tuzatildi: %1 kengaytma, %2 koʻchirildi"
+									u"Tuzatildi: %1 kengaytma, %2 ko'chirildi"
 									", %3 xato."_q
 										.arg(done.extensionAdded)
 										.arg(done.movedFolder)
@@ -3081,7 +3081,7 @@ void fillAboutTab(
 	const auto exportBtn = content->add(
 		object_ptr<Ui::RoundButton>(
 			content,
-			rpl::single(u"📤 Toʻliq zaxira nusxa olish"_q),
+			rpl::single(u"📤 To'liq zaxira nusxa olish"_q),
 			st::defaultBoxButton),
 		st::boxRowPadding);
 	exportBtn->addClickHandler([=] {
@@ -3152,7 +3152,7 @@ void fillAboutTab(
 		const auto mergeBtn = modeBox.addButton(
 			u"🔗 Birlashtirish"_q, QMessageBox::AcceptRole);
 		modeBox.addButton(
-			u"🔄 Toʻliq almashtirish"_q, QMessageBox::DestructiveRole);
+			u"🔄 To'liq almashtirish"_q, QMessageBox::DestructiveRole);
 		modeBox.addButton(QMessageBox::Cancel);
 		modeBox.setDefaultButton(mergeBtn);
 		modeBox.exec();
@@ -3172,13 +3172,13 @@ void fillAboutTab(
 			dialogParent,
 			u"Zaxiradan tiklash"_q,
 			fullReplace
-				? u"DIQQAT! Joriy arxivdagi BARCHA maʻlumotlar\n"
-				  "(oʻchirilgan/tahrirlangan xabarlar, media) OʻCHIRILADI\n"
-				  "va tanlangan zaxira bilan toʻliq almashtiriladi.\n\n"
-				  "Bu amalni ortga qaytarib boʻlmaydi. Davom etasizmi?"_q
-				: u"Tanlangan zaxiradagi maʻlumotlar JORIY arxivga QOʻSHILADI\n"
-				  "(birlashtiriladi) — hozirgi qurilmadagi oʻchirilgan/tahrirlangan\n"
-				  "xabarlar va media saqlanib qoladi, oʻchirilmaydi.\n\n"
+				? u"DIQQAT! Joriy arxivdagi BARCHA ma'lumotlar\n"
+				  "(o'chirilgan/tahrirlangan xabarlar, media) O'CHIRILADI\n"
+				  "va tanlangan zaxira bilan to'liq almashtiriladi.\n\n"
+				  "Bu amalni ortga qaytarib bo'lmaydi. Davom etasizmi?"_q
+				: u"Tanlangan zaxiradagi ma'lumotlar JORIY arxivga QO'SHILADI\n"
+				  "(birlashtiriladi) — hozirgi qurilmadagi o'chirilgan/tahrirlangan\n"
+				  "xabarlar va media saqlanib qoladi, o'chirilmaydi.\n\n"
 				  "Davom etasizmi?"_q,
 			QMessageBox::Yes | QMessageBox::Cancel,
 			QMessageBox::Cancel);
@@ -3198,9 +3198,9 @@ void fillAboutTab(
 				const auto s = CustomDB::GetArchiveStats();
 				Ui::Toast::Show(
 					(fullReplace
-						? u"Toʻliq almashtirish muvaffaqiyatli! "_q
+						? u"To'liq almashtirish muvaffaqiyatli! "_q
 						: u"Tiklash muvaffaqiyatli! "_q)
-					+ u"%1 oʻchirilgan, %2 tahrirlangan. "
+					+ u"%1 o'chirilgan, %2 tahrirlangan. "
 					  "Dastur 3 soniya ichida qayta yuklanadi..."_q
 						.arg(s.deletedCount).arg(s.editedCount));
 				// Registry va JSON sozlamalar yangi qiymatlar bilan to'liq
@@ -3221,7 +3221,7 @@ void fillAboutTab(
 	const auto importMediaBtn = content->add(
 		object_ptr<Ui::RoundButton>(
 			content,
-			rpl::single(u"🎞 Media arxivini qoʻshish (CustomModMedia_*.zip)"_q),
+			rpl::single(u"🎞 Media arxivini qo'shish (CustomModMedia_*.zip)"_q),
 			st::defaultBoxButton),
 		st::boxRowPadding);
 	importMediaBtn->addClickHandler([=] {
@@ -3240,8 +3240,8 @@ void fillAboutTab(
 			if (!weak) return;
 			importMediaBtn->setDisabled(false);
 			Ui::Toast::Show(ok
-				? u"Media arxivi qoʻshildi ✓"_q
-				: u"Media arxivini qoʻshib boʻlmadi."_q);
+				? u"Media arxivi qo'shildi ✓"_q
+				: u"Media arxivini qo'shib bo'lmadi."_q);
 		});
 	});
 
@@ -3280,30 +3280,30 @@ void fillAboutTab(
 	content->add(
 		object_ptr<Ui::FlatLabel>(
 			content,
-			rpl::single(u"Quyidagi amallar arxiv maʻlumotlarini BUTUNLAY oʻchiradi.\n"
-				"Bu amalni bekor qilib boʻlmaydi. Tasdiqlash talab qilinadi."_q),
+			rpl::single(u"Quyidagi amallar arxiv ma'lumotlarini BUTUNLAY o'chiradi.\n"
+				"Bu amalni bekor qilib bo'lmaydi. Tasdiqlash talab qilinadi."_q),
 			st::customModHintLabel),
 		st::defaultSubsectionTitlePadding);
 
 	content->add(
 		object_ptr<Ui::RoundButton>(
 			content,
-			rpl::single(u"🗑️  Oʻchirilganlar arxivini tozalash"_q),
+			rpl::single(u"🗑️  O'chirilganlar arxivini tozalash"_q),
 			st::attentionBoxButton),
 		st::boxRowPadding)
 	->addClickHandler([=] {
 		const auto reply = QMessageBox::warning(
 			dialogParent,
-			u"Oʻchirilganlar arxivini tozalash"_q,
-			u"Bu amal BARCHA saqlangan oʻchirilgan xabarlarni oʻchiradi.\n\n"
-			"Bu amalni bekor qilib boʻlmaydi.\n\nDavom etasizmi?"_q,
+			u"O'chirilganlar arxivini tozalash"_q,
+			u"Bu amal BARCHA saqlangan o'chirilgan xabarlarni o'chiradi.\n\n"
+			"Bu amalni bekor qilib bo'lmaydi.\n\nDavom etasizmi?"_q,
 			QMessageBox::Yes | QMessageBox::Cancel,
 			QMessageBox::Cancel);
 		if (reply != QMessageBox::Yes) return;
 		CustomDB::ClearDeletedArchive();
 		refreshStats();
 		if (onArchiveChanged) onArchiveChanged();
-		Ui::Toast::Show(u"🗑️ Oʻchirilganlar arxivi tozalandi."_q);
+		Ui::Toast::Show(u"🗑️ O'chirilganlar arxivi tozalandi."_q);
 	});
 
 	content->add(
@@ -3316,8 +3316,8 @@ void fillAboutTab(
 		const auto reply = QMessageBox::warning(
 			dialogParent,
 			u"Tahrir tarixini tozalash"_q,
-			u"Bu amal BARCHA saqlangan tahrir yozuvlarini oʻchiradi.\n\n"
-			"Bu amalni bekor qilib boʻlmaydi.\n\nDavom etasizmi?"_q,
+			u"Bu amal BARCHA saqlangan tahrir yozuvlarini o'chiradi.\n\n"
+			"Bu amalni bekor qilib bo'lmaydi.\n\nDavom etasizmi?"_q,
 			QMessageBox::Yes | QMessageBox::Cancel,
 			QMessageBox::Cancel);
 		if (reply != QMessageBox::Yes) return;
@@ -3330,17 +3330,17 @@ void fillAboutTab(
 	content->add(
 		object_ptr<Ui::RoundButton>(
 			content,
-			rpl::single(u"☠️  BARCHA arxivni tozalash (Oʻchirilgan + Tahrir)"_q),
+			rpl::single(u"☠️  BARCHA arxivni tozalash (O'chirilgan + Tahrir)"_q),
 			st::attentionBoxButton),
 		st::boxRowPadding)
 	->addClickHandler([=] {
 		const auto first = QMessageBox::warning(
 			dialogParent,
 			u"BARCHA arxivni tozalash"_q,
-			u"Bu amal BARCHA arxiv maʻlumotlarini oʻchiradi:\n"
-			"  • Barcha oʻchirilgan xabar yozuvlari\n"
+			u"Bu amal BARCHA arxiv ma'lumotlarini o'chiradi:\n"
+			"  • Barcha o'chirilgan xabar yozuvlari\n"
 			"  • Barcha tahrir tarixi yozuvlari\n\n"
-			"Bu amalni bekor qilib boʻlmaydi."_q,
+			"Bu amalni bekor qilib bo'lmaydi."_q,
 			QMessageBox::Yes | QMessageBox::Cancel,
 			QMessageBox::Cancel);
 		if (first != QMessageBox::Yes) return;
@@ -3348,15 +3348,15 @@ void fillAboutTab(
 			dialogParent,
 			u"Yakuniy tasdiqlash"_q,
 			u"HAQIQATAN HAM ishonchingiz komilmi?\n\n"
-			"Barcha oʻchirilgan xabar va tahrir yozuvlari\n"
-			"BUTUNLAY yoʻqoladi."_q,
+			"Barcha o'chirilgan xabar va tahrir yozuvlari\n"
+			"BUTUNLAY yo'qoladi."_q,
 			QMessageBox::Yes | QMessageBox::Cancel,
 			QMessageBox::Cancel);
 		if (second != QMessageBox::Yes) return;
 		CustomDB::ClearAllArchive();
 		refreshStats();
 		if (onArchiveChanged) onArchiveChanged();
-		Ui::Toast::Show(u"☠️ Barcha arxiv maʻlumotlari tozalandi."_q);
+		Ui::Toast::Show(u"☠️ Barcha arxiv ma'lumotlari tozalandi."_q);
 	});
 
 	Ui::AddSkip(content, st::settingsThumbSkip);
