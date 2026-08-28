@@ -2243,6 +2243,7 @@ void History::loadDeletedMessages() {
 		"\xe2\x80\x94\xe2\x80\x94 O'CHIRILDI \xe2\x80\x94\xe2\x80\x94");
 
 	int injectedCount = 0;
+	int skippedEmpty = 0; // mazmuni yo'qligi uchun chizilmagan yozuvlar
 	for (const auto &msg : deleted) {
 		// Skip if already present (loaded from server or already injected).
 		if (owner().message(peer, MsgId(msg.msgId))) continue;
@@ -2277,15 +2278,27 @@ void History::loadDeletedMessages() {
 		// yopilgan (2026-08-13). DB dalili: 2026-08 da 1388 ta o'chirish,
 		// bo'sh yozuv 0 ta (05-oyda 11.5% edi).
 		//
-		// Eski 11 ta qoldiq yozuv esa hech qanday ma'lumot bermaydi —
-		// chatda faqat shovqin bo'lib turadi. DB'da qoladi (statistika
-		// uchun), lekin chatga qo'yilmaydi.
-		const auto hasMedia = msg.isMedia || !msg.mediaPath.isEmpty();
-		if (msg.text.isEmpty() && !hasMedia) {
-			continue;
-		}
-
-		// Media placeholder binding (Task 5):
+		// Qoldiq yozuvlar esa hech qanday ma'lumot bermaydi — chatda
+		// faqat shovqin bo'lib turadi. DB'da qoladi (statistika uchun),
+		// lekin chatga qo'yilmaydi.
+		//
+		// 2026-08-27: media YO'LI AVVAL hal qilinadi, KEYIN ko'rsatish
+		// haqida qaror qabul qilinadi. Ilgari tartib teskari edi va
+		// shuning uchun yuqoridagi "mazmunsizni ko'rsatmaymiz" qoidasi
+		// AMALDA ISHLAMASDI: shart `msg.isMedia || !mediaPath.isEmpty()`
+		// bo'lgani uchun `is_media = 1` bayrog'i yolg'iz o'zi yetardi.
+		// Natijada media FAYLI yo'q (yo'l bo'sh yoki fayl diskda yo'q)
+		// yozuvlar ham chatga "(media xabar)" bo'lib chizilardi.
+		//
+		// Baza dalili (2026-08-27): `is_media = 1` va `media_path` bo'sh
+		// bo'lgan 943 ta o'chirilgan yozuv bor edi; faqat Akam chatining
+		// o'zida 218 tadan 194 tasi shunday — ya'ni ko'rinayotgan
+		// "arvohlar"ning 89 % i aynan shu nuqsondan kelib chiqqan.
+		//
+		// Endi qoida sodda: yozuv KO'RSATILADI faqat mazmuni bo'lsa —
+		// (a) matn bor, YOKI (b) media fayli HAQIQATAN diskda mavjud.
+		// Yozuv bazada QOLADI (statistika va kelajakdagi tiklash uchun),
+		// shunchaki chatga qo'yilmaydi.
 		QString localPath = msg.mediaPath;
 		DocumentData *document = nullptr;
 		QFileInfo fileInfo;
@@ -2319,20 +2332,20 @@ void History::loadDeletedMessages() {
 			}
 		}
 
+		// Mazmun tekshiruvi (yuqoridagi izohga qarang). `document`
+		// null bo'lmasa — media fayli diskda TOPILDI degani.
+		if (msg.text.isEmpty() && !document) {
+			skippedEmpty++;
+			continue;
+		}
+
 		TextWithEntities displayText;
 		displayText.append(marker + "\n\n");
 		if (!msg.text.isEmpty()) {
 			displayText.append(TextWithEntities{ msg.text });
-		} else if (document) {
+		} else {
 			displayText.append(TextWithEntities{
 				u"📎 Fayl: "_q + fileInfo.fileName() });
-		} else {
-			// isMedia bayrog'i v5 da qo'shilgan — undan oldingi yozuvlarda
-			// u 0, lekin mediaPath to'lgan bo'lishi mumkin. Shuning uchun
-			// ikkalasiga ham qaraymiz, aks holda haqiqiy media xabar
-			// "matn saqlanmagan" bo'lib ko'rinardi.
-			displayText.append(TextWithEntities{
-				u"(media xabar)"_q });
 		}
 
 		// Past-4: guruhda haqiqiy yuboruvchini ko'rsatamiz. DB da sender_id bo'lsa
@@ -2373,7 +2386,8 @@ void History::loadDeletedMessages() {
 	}
 	if (injectedCount > 0) {
 		qDebug() << "[CustomMod] Injected" << injectedCount
-		         << "deleted messages for peer" << peer->id.value;
+		         << "deleted messages for peer" << peer->id.value
+		         << "| skipped (mazmunsiz):" << skippedEmpty;
 	}
 }
 
