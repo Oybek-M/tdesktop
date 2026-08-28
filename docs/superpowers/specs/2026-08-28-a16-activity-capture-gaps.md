@@ -2,7 +2,9 @@
 
 **Sana:** 2026-08-28
 **So'ragan:** foydalanuvchi (aniq hodisa asosida, pastda)
-**Holat:** 🔴 OCHIQ — tez implement qilinishi kerak
+**Holat:** 🟡 KOD TAYYOR — uchala band ham implement qilingan va
+`origin/Oybek` ga push qilingan. **BUILD HALI QILINMAGAN** (2026-08-28,
+foydalanuvchi laptopi band). Build va qo'lda sinovdan keyin yopiladi.
 **Ustuvorlik:** A15 (bot token) dan OLDIN
 
 ---

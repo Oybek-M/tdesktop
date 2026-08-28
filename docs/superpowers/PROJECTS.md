@@ -4,9 +4,43 @@ Bu fayl qaysi ish **hozir faol**, qaysi biri **to'xtatib qo'yilgan** va
 qaysi biri **hali muhokama bosqichida** ekanini ko'rsatadi. Yangi
 sessiya boshlanganda birinchi shu yerga qarang.
 
-Oxirgi yangilanish: 2026-08-25
+Oxirgi yangilanish: 2026-08-28
 
-# ERTAGA SHU YERDAN BOSHLANG (2026-08-26) — TRACK C
+---
+
+# 🔴 SHU YERDAN BOSHLANG (2026-08-28) — BUILD KUTILMOQDA
+
+**Kod tayyor, lekin `Telegram.exe` HALI QURILMAGAN.** Oxirgi
+muvaffaqiyatli build 2026-08-28 da bo'lgan; undan KEYIN quyidagi
+ishlar qo'shildi va ular build'ga tushmagan. Foydalanuvchi build'ni
+o'zi ishga tushiradi (laptop og'ir dasturlar bilan band).
+
+## Build'dan keyin tekshirilishi kerak bo'lgan ishlar
+
+| Ish | Commit | Nima sinaladi |
+|---|---|---|
+| **A16 §1** — story vaqti `status` shkalasiga | `70695edabb` | Story qo'ygan kontaktning story vaqti so'nggi-faollik shkalasida onlayn nuqtasi bo'lib chiqsin |
+| **Sxema v11** — `activity_history.source` | `bb1ff6d846` | Migratsiya toza o'tsin, `source` ustuni paydo bo'lsin |
+| **A16 §3** — tez tugma + bufer | `4fc346ea48` | Chatga o'ng tugma → "Faollikni kuzatish"; bosilganda oldingi daqiqalardagi faollik tiklansin |
+| **A16 §2** — qo'lda yozuv + belgilar | `1c0719bb7a` | "Qo'lda faollik yozuvi qo'shish" oynasi; tarixda 📖 / ✍️ / ⏱ belgilari |
+| **A15** — bot token login (1-bosqich) | `537893e329`..`9cfca110b5` | Login ekrani ochilsin; `log.txt` da `[BOTPROBE]` qatorlari paydo bo'lsin |
+| Tuzatishlar | `cd39761ea2`, `acb45f86c6` | Imlo, bufer shovqin filtri, apostroflar |
+
+**A15 sinovi alohida muhim:** `log.txt` dagi `[BOTPROBE] messages.getDialogs`
+natijasi bot token yo'nalishi davom etadimi yoki yopiladimi — shuni hal qiladi.
+Yo'riqnoma: `specs/2026-08-28-a15-bot-token-phase1.md`
+
+## Yaqinda YOPILGAN ishlar
+
+- ✅ **Sxema v10 — akkaunt izolyatsiyasi** (build o'tdi, sinovdan o'tdi)
+- ✅ **Arvoh yozuvlar** — Akam chatida 218 → 15
+  (`specs/2026-08-27-legacy-ghost-rows-followup.md`)
+- ✅ **Baza buzilishi tuzatildi** — `EnsureArchiveLayout` begona WAL/SHM
+  ni ko'chirardi; migratsiyadan oldin avtomatik zaxira qo'shildi
+
+---
+
+# ARXIV — TRACK C (2026-08-26 dagi yozuv)
 
 **Track A (tdesktop) YOPILDI.** v7.1.1 chiqarildi, uchala mirror'da,
 self-update ishlaydi va real sinovdan o'tdi.
@@ -268,7 +302,7 @@ shuning uchun birga qilinadi.
 | 5 | **A14 — o'qilgan vaqt orqali faollik** 🆕 | Pastda batafsil. Foydalanuvchi 2026-08-25 da topdi. |
 | 6 | **Reliz yuklashni API ga o'tkazish** 🆕 | SSH/scp o'rniga `customsync-server` API. Yuqorida batafsil. |
 | 7 | **A15 — bot token orqali kirish** 🆕 | Foydalanuvchi 2026-08-26 da so'radi. **v10 dan KEYIN.** Pastda batafsil. |
-| 8 | **A16 — faollik kuzatuvidagi bo'shliqlar** 🆕 | Foydalanuvchi 2026-08-28 da so'radi. **A15 dan OLDIN, tez kerak.** 3 ta bo'shliq: story vaqti `status` ga tushmaydi, qo'lda yozuv qo'shish yo'q, ro'yxatga o'z vaqtida qo'sha olmaslik. **Qaror qabul qilingan:** tez tugma + vaqtinchalik bufer (`activityBufferMinutes`, standart 10, 1–120 daqiqa, Faollik tarixi bo'limida sozlanadi). Batafsil: [`specs/2026-08-28-a16-activity-capture-gaps.md`](specs/2026-08-28-a16-activity-capture-gaps.md) |
+| 8 | **A16 — faollik kuzatuvidagi bo'shliqlar** | 🟡 **KOD TAYYOR, BUILD QILINMAGAN** (2026-08-28). Uchala band implement qilingan va push qilingan. 3 ta bo'shliq: story vaqti `status` ga tushmaydi, qo'lda yozuv qo'shish yo'q, ro'yxatga o'z vaqtida qo'sha olmaslik. **Qaror qabul qilingan:** tez tugma + vaqtinchalik bufer (`activityBufferMinutes`, standart 10, 1–120 daqiqa, Faollik tarixi bo'limida sozlanadi). Batafsil: [`specs/2026-08-28-a16-activity-capture-gaps.md`](specs/2026-08-28-a16-activity-capture-gaps.md) |
 
 **Qo'shimcha (2026-08-26 da qo'shildi) — ENG USTUVOR:**
 **Sxema v10 — `account_id`** + 3 ta media tuzatishi. 12 ta akkaunt
