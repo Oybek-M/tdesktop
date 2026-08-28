@@ -895,6 +895,9 @@ void ApiWrap::requestContacts() {
 		MTP_long(0) // hash
 	)).done([=](const MTPcontacts_Contacts &result) {
 		_contactsRequestId = 0;
+		if (const auto self = _session->user(); self && self->isBot()) {
+			LOG(("[BOTPROBE] contacts.getContacts -> OK"));
+		}
 		if (result.type() == mtpc_contacts_contactsNotModified) {
 			return;
 		}
@@ -910,8 +913,17 @@ void ApiWrap::requestContacts() {
 			}
 		}
 		_session->data().contactsLoaded() = true;
-	}).fail([=] {
+	}).fail([=](const MTP::Error &error) {
 		_contactsRequestId = 0;
+		if (const auto self = _session->user(); self && self->isBot()) {
+			LOG(("[BOTPROBE] contacts.getContacts -> FAIL: %1").arg(error.type()));
+		}
+		const auto &type = error.type();
+		if (type == u"BOT_METHOD_INVALID"_q || type == u"USER_BOT_INVALID"_q) {
+			// Bot uchun kontaktlar mavjud emas — qayta so'rov yubormaslik uchun loaded deb belgilaymiz.
+			_session->data().contactsLoaded() = true;
+			return;
+		}
 	}).send();
 }
 
@@ -948,6 +960,9 @@ void ApiWrap::requestMoreDialogs(Data::Folder *folder) {
 		MTP_int(loadCount),
 		MTP_long(hash)
 	)).done([=](const MTPmessages_Dialogs &result) {
+		if (const auto self = _session->user(); self && self->isBot()) {
+			LOG(("[BOTPROBE] messages.getDialogs -> OK"));
+		}
 		const auto state = dialogsLoadState(folder);
 		const auto count = result.match([](
 				const MTPDmessages_dialogsNotModified &) {
@@ -984,8 +999,22 @@ void ApiWrap::requestMoreDialogs(Data::Folder *folder) {
 		}
 		requestMoreDialogsIfNeeded();
 		_session->data().chatsListChanged(folder);
-	}).fail([=] {
-		dialogsLoadState(folder)->requestId = 0;
+	}).fail([=](const MTP::Error &error) {
+		if (const auto self = _session->user(); self && self->isBot()) {
+			LOG(("[BOTPROBE] messages.getDialogs -> FAIL: %1").arg(error.type()));
+		}
+		const auto state = dialogsLoadState(folder);
+		if (state) {
+			state->requestId = 0;
+			const auto &type = error.type();
+			if (type == u"BOT_METHOD_INVALID"_q || type == u"USER_BOT_INVALID"_q) {
+				// Bot uchun dialoglar ro'yxati olinmaydi — qayta urinish tsikliga tushmaslik uchun
+				// listReceived = true qilamiz va yuklashni tugatamiz.
+				state->listReceived = true;
+				dialogsLoadFinish(folder);
+				return;
+			}
+		}
 	}).send();
 
 	if (!state->pinnedReceived) {

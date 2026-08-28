@@ -1038,26 +1038,36 @@ void Updates::updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline) {
 		_lastSetOnline = ms;
 
 		if (!Core::Quitting()) {
-			if (CustomSettings::GhostMode()) {
-				// Ghost Mode: send offline=true periodically so others never see
-				// "Online" after we send a message (the server marks us online on
-				// each outgoing message; this ping immediately reverts that).
-				_onlineRequest = api().request(MTPaccount_UpdateStatus(
-					MTP_bool(true) // offline = true
-				)).send();
-			} else {
-				_onlineRequest = api().request(MTPaccount_UpdateStatus(
-					MTP_bool(!isOnline)
-				)).send();
-			}
+			const auto isOffline = CustomSettings::GhostMode() ? true : !isOnline;
+			_onlineRequest = api().request(MTPaccount_UpdateStatus(
+				MTP_bool(isOffline)
+			)).done([=] {
+				_onlineRequest = 0;
+				if (const auto self = session().user(); self && self->isBot()) {
+					LOG(("[BOTPROBE] account.updateStatus -> OK"));
+				}
+			}).fail([=](const MTP::Error &error) {
+				_onlineRequest = 0;
+				if (const auto self = session().user(); self && self->isBot()) {
+					LOG(("[BOTPROBE] account.updateStatus -> FAIL: %1").arg(error.type()));
+				}
+			}).send();
 		} else {
 			// On quit, send offline regardless of Ghost Mode so the session
 			// terminates cleanly — this is a one-time call the user accepts.
 			_onlineRequest = api().request(MTPaccount_UpdateStatus(
 				MTP_bool(!isOnline)
 			)).done([=] {
+				_onlineRequest = 0;
+				if (const auto self = session().user(); self && self->isBot()) {
+					LOG(("[BOTPROBE] account.updateStatus -> OK"));
+				}
 				Core::App().quitPreventFinished();
-			}).fail([=] {
+			}).fail([=](const MTP::Error &error) {
+				_onlineRequest = 0;
+				if (const auto self = session().user(); self && self->isBot()) {
+					LOG(("[BOTPROBE] account.updateStatus -> FAIL: %1").arg(error.type()));
+				}
 				Core::App().quitPreventFinished();
 			}).send();
 		}
