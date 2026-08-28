@@ -1,7 +1,7 @@
 # 7.4 O'TMADI — eski (`account_id = 0`) arvohlar hamon ko'rinmoqda
 
 **Sana:** 2026-08-27
-**Holat:** 🔴 OCHIQ — v10 dan keyingi BIRINCHI USTUVOR vazifa
+**Holat:** ✅ YOPILDI (2026-08-28) — pastdagi 6-bo'limga qarang
 **Bog'liq:** `2026-08-26-multi-account-db-isolation-design.md`,
 `2026-08-26-account-isolation-v10-plan.md` (Vazifa 7.4)
 
@@ -84,3 +84,50 @@ Implement qilishdan OLDIN foydalanuvchi bilan kelishilsin.
 
 Foydalanuvchi 1–4 dan qaysi biri (yoki qanday kombinatsiya)
 kerakligini aytgach implement qilinadi. **Ruxsatsiz boshlanmasin.**
+
+
+---
+
+## 6. YECHIM (2026-08-28) — ✅ tasdiqlangan
+
+Ikki qatlamli tuzatish `history.cpp::loadDeletedMessages()` da.
+Ikkalasi ham FAQAT ko'rsatish bosqichida — bazaga yozilmaydi,
+yashirilgan yozuvlar butunligicha qoladi.
+
+### 6.1 Mediasiz "(media xabar)" yozuvlari
+
+**Ildiz sabab:** media yo'li ko'rsatish qaroridan KEYIN hal qilinardi.
+Shart `msg.isMedia || !mediaPath.isEmpty()` bo'lgani uchun `is_media=1`
+bayrog'i yolg'iz o'zi yetardi — fayl umuman bo'lmasa ham yozuv
+chizilaverardi.
+
+**Tuzatish:** tartib teskari qilindi. Yozuv ko'rsatiladi faqat matn
+bor YOKI media fayli HAQIQATAN diskda mavjud bo'lsa.
+
+**Ta'sir:** 2490 -> 1670 (820 yozuv yashirildi).
+
+### 6.2 Monotonlik qoidasi (begona akkaunt yozuvlari)
+
+Bitta akkaunt ichida `msg_id` va `msg_date` birga o'sadi. Langarlar
+shu akkauntning HAQIQIY server xabarlaridan olinadi
+(`isRegular() && !isLocal()`), demak ta'rifan ishonchli.
+
+Noto'g'ri yashirishga qarshi 4 himoya (har qanday shubhada
+"ko'rsatiladi"):
+
+1. Kamida 5 ta langar
+2. `msg_date > 0`
+3. Sana langarlar oralig'ida bo'lsin
+4. Chetlanish >= 4x oraliq, minimum 1000 ID
+
+### Natija (qo'lda sinov, 2026-08-28)
+
+| | Oldin | Keyin |
+|---|---|---|
+| Akam chati | 218 | **15** |
+
+Foydalanuvchi tasdig'i: "arvohlar yo'qoldi, faqat 15 ta haqiqiy yozuv
+qoldi". Bashorat 13 ta haqiqiy edi — ya'ni noto'g'ri yashirish
+kuzatilmadi, begonalarning deyarli hammasi tutildi.
+
+**Shu bilan v10 (Vazifa 7.4) ham yopiladi.**
