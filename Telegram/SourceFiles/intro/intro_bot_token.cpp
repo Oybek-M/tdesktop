@@ -1,18 +1,18 @@
-﻿/*
+/*
 This file is part of Telegram Desktop,
 the official desktop application for the Telegram messaging service.
 
 For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
-#include intro/intro_bot_token.h
+#include "intro/intro_bot_token.h"
 
-#include config.h
-#include lang/lang_keys.h
-#include intro/intro_widget.h
-#include ui/widgets/fields/input_field.h
-#include ui/widgets/labels.h
-#include styles/style_intro.h
+#include "config.h"
+#include "lang/lang_keys.h"
+#include "intro/intro_widget.h"
+#include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/labels.h"
+#include "styles/style_intro.h"
 
 namespace Intro {
 namespace details {
@@ -22,14 +22,17 @@ BotTokenWidget::BotTokenWidget(
 	not_null<Main::Account*> account,
 	not_null<Data*> data)
 : Step(parent, account, data)
-, _token(this, st::introCountry, rpl::single(uBot token_q))
+, _token(this, st::introName, rpl::single(u"Bot token"_q))
 , _warning(
 	this,
-	rpl::single(uSinov rejimi: bot akkauntda chat ro'yxati va kontaktlar ishlamasligi mumkin._q),
+	// Ogohlantirish ATAYLAB ekranda turadi: 1-bosqichda bot akkaunt
+	// bilan chat ro'yxati va kontaktlar ishlashi TEKSHIRILMAGAN.
+	// Foydalanuvchi bo'sh oynani nuqson deb o'ylamasligi kerak.
+	rpl::single(u"Sinov rejimi: bot akkauntda chat ro'yxati va "
+		"kontaktlar ishlamasligi mumkin."_q),
 	st::introDescription) {
-
-	setTitleText(rpl::single(uBot token orqali kirish_q));
-	setDescriptionText(TextWithEntities{ u@BotFather bergan tokenni kiriting_q });
+	setTitleText(rpl::single(u"Bot token orqali kirish"_q));
+	setDescriptionText(rpl::single(u"@BotFather bergan tokenni kiriting"_q));
 	setErrorCentered(true);
 
 	_token->changes() | rpl::on_next([=] {
@@ -44,7 +47,7 @@ BotTokenWidget::BotTokenWidget(
 }
 
 QString BotTokenWidget::accessibilityName() {
-	return uBot token orqali kirish_q;
+	return u"Bot token orqali kirish"_q;
 }
 
 rpl::producer<QString> BotTokenWidget::nextButtonText() const {
@@ -57,17 +60,13 @@ void BotTokenWidget::setInnerFocus() {
 
 void BotTokenWidget::activate() {
 	Step::activate();
+	_token->show();
+	_warning->show();
 	setInnerFocus();
 }
 
 void BotTokenWidget::cancelled() {
-	if (_requestId) {
-		api().request(base::take(_requestId)).cancel();
-	}
-}
-
-int BotTokenWidget::errorTop() const {
-	return contentTop() + st::introErrorBelowLinkTop;
+	api().request(base::take(_sentRequest)).cancel();
 }
 
 void BotTokenWidget::resizeEvent(QResizeEvent *e) {
@@ -79,35 +78,38 @@ void BotTokenWidget::updateControlsGeometry() {
 	const auto fieldTop = contentTop() + st::introStepFieldTop;
 	_token->moveToLeft(contentLeft(), fieldTop);
 
-	const auto warningTop = fieldTop + _token->height() + st::introPhoneTop * 2;
+	const auto warningTop = fieldTop
+		+ st::introName.heightMin
+		+ st::introPhoneTop;
 	_warning->resizeToWidth(st::introNextButton.width);
 	_warning->moveToLeft(contentLeft(), warningTop);
 }
 
 void BotTokenWidget::submit() {
-	if (_requestId) {
+	if (_sentRequest) {
 		return;
 	}
 	const auto token = _token->getLastText().trimmed();
 	if (token.isEmpty()) {
-		showError(rpl::single(uIltimos, bot tokenni kiriting._q));
+		showError(rpl::single(u"Iltimos, bot tokenni kiriting."_q));
 		setInnerFocus();
 		return;
 	}
-
 	hideError();
 
-	// Bot token orqali kirish so'rovi: auth.importBotAuthorization MTProto metodini chaqiramiz.
-	_requestId = api().request(MTPauth_ImportBotAuthorization(
-		MTP_int(0), // flags
+	// QR oqimidan farqli o'laroq bu yerda oraliq bosqich yo'q: server
+	// darhol `auth.Authorization` qaytaradi va `finish()` sessiyani
+	// o'zi yaratadi (intro_signup.cpp dagi nameSubmitDone bilan bir xil).
+	_sentRequest = api().request(MTPauth_ImportBotAuthorization(
+		MTP_int(0), // flags — hozircha ishlatilmaydi
 		MTP_int(ApiId),
 		MTP_string(ApiHash),
 		MTP_string(token)
 	)).done([=](const MTPauth_Authorization &result) {
-		_requestId = 0;
+		_sentRequest = 0;
 		finish(result);
 	}).fail([=](const MTP::Error &error) {
-		_requestId = 0;
+		_sentRequest = 0;
 		showTokenError(error);
 	}).send();
 }
@@ -115,15 +117,20 @@ void BotTokenWidget::submit() {
 void BotTokenWidget::showTokenError(const MTP::Error &error) {
 	if (MTP::IsFloodError(error)) {
 		showError(tr::lng_flood_error());
+		setInnerFocus();
 		return;
 	}
-	const auto &err = error.type();
-	if (err == uBOT_TOKEN_INVALID_q || err == uACCESS_TOKEN_INVALID_q) {
-		showError(rpl::single(uBot token noto'g'ri. Tekshirib qayta kiriting._q));
-	} else if (err == uBOT_TOKEN_EXPIRED_q || err == uACCESS_TOKEN_EXPIRED_q) {
-		showError(rpl::single(uBot token muddati o'tgan._q));
+	const auto type = error.type();
+	if (type == u"ACCESS_TOKEN_INVALID"_q) {
+		showError(rpl::single(
+			u"Bot token noto'g'ri. Tekshirib qayta kiriting."_q));
+	} else if (type == u"ACCESS_TOKEN_EXPIRED"_q) {
+		showError(rpl::single(u"Bot token muddati o'tgan."_q));
 	} else {
-		showError(rpl::single(uXatolik: _q + err));
+		// Noma'lum xatoni YASHIRMAYMIZ: 1-bosqichning maqsadi aynan
+		// server nima qaytarishini bilish, shuning uchun tur nomi
+		// foydalanuvchiga ko'rsatiladi.
+		showError(rpl::single(u"Xatolik: "_q + type));
 	}
 	setInnerFocus();
 }
