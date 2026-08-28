@@ -180,3 +180,26 @@ Zaxira: `actioned_messages.db.manual-20260828-171341.bak`.
 ⚠️ Bu yozuvlar **qo'lda kiritilgan**, lekin hozircha kuzatilgan
 yozuvlardan ajratilmaydi — 2-banddagi `source` ustuni aynan shuning
 uchun kerak.
+
+---
+
+## 5. §1 Implementatsiya hisoboti (bajarildi, 2026-08-28)
+
+§1 da tavsiflangan story vaqtidan faollik (`status`) nuqtasini hosil qilish mexanizmi to'liq implement qilindi:
+
+1. **Sxema v11 (`activity_history.source` ustuni):**
+   - `activity_history` jadvaliga `source TEXT NOT NULL DEFAULT 'observed'` ustuni qo'shildi.
+   - `source = 'observed'` — tizim real-vaqtda kuzatgan yozuvlar.
+   - `source = 'story'` — story qo'yilgan vaqtidan hosil qilingan yozuvlar.
+   - `custom_db.h` da `kCurrentSchemaVersion` 11 ga oshirildi.
+2. **`HasActivityEntryAt` dublikat tekshiruvi:**
+   - Bir xil `(peer_id, field, observed_at)` yozuvi qayta yozilmasligi uchun `CustomDB::HasActivityEntryAt` funksiyasi qo'shildi (akkauntlar aro birlashgan holatda tekshiradi).
+3. **`custom_activity_history.cpp` dagi integratsiya:**
+   - `stories().itemsChanged()` ishlovchisida `RecordField(... u"story"_q ...)` saqlangan holda, uning yonida `story->date()` vaqti bilan `status` (`online:<story_date>`) yozuvi `CustomDB::SaveActivityHistoryEntry` orqali to'g'ridan-to'g'ri bazaga yozilishi yo'lga qo'yildi (`observed_at` ga story qo'yilgan haqiqiy vaqt yoziladi).
+
+**O'zgartirilgan fayllar:**
+- `Telegram/SourceFiles/custom_db.h`
+- `Telegram/SourceFiles/custom_db.cpp`
+- `Telegram/SourceFiles/custom_activity_history.cpp`
+- `docs/sync-protocol/STATUS.md` (Track C uchun v11 o'rniga v12 surildi)
+- `docs/superpowers/specs/2026-08-28-a16-activity-capture-gaps.md`
