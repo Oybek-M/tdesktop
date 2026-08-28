@@ -503,6 +503,22 @@ void Init(not_null<Main::Session*> session) {
 			QString::number(story->date()),
 			now);
 
+		// A16 §1: Story qo'yilgan vaqt — foydalanuvchi aniq onlayn bo'lgan lahza.
+		// Buni status shkalasiga kiritamiz. observed_at ga story ko'rilgan vaqt (now)
+		// emas, aynan story QO'YILGAN vaqt (storyDate) yoziladi.
+		// Akkauntlar aro takror yozmaslik uchun bazadan tekshiramiz.
+		const auto storyDate = qint64(story->date());
+		if (storyDate > 0 && !CustomDB::HasActivityEntryAt(peerId2, u"status"_q, storyDate)) {
+			CustomDB::SaveActivityHistoryEntry(
+				CustomDB::PeerKey{ qint64(session->userId().bare), peerId2 },
+				u"status"_q,
+				false,                                     // hasOldValue - oldingi qiymat YO'Q
+				QString(),                                 // oldValue
+				u"online:"_q + QString::number(storyDate), // newValue
+				storyDate,                                 // observed_at = story QO'YILGAN vaqt
+				u"story"_q);                               // source
+		}
+
 		const auto fullId = FullStoryId{ peerId, latest.id };
 		if (!gProcessedStoryMedia.contains(fullId)) {
 			gProcessedStoryMedia.emplace(fullId);
