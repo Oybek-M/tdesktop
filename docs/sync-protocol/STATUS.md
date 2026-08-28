@@ -29,7 +29,7 @@ Oxirgi yangilanish: **2026-08-26**
 | Nima | Holat |
 |---|---|
 | `qtwebsockets` moduli | ✅ qurildi va sinovdan o'tdi (2026-08-25) |
-| Sxema versiyasi | **v10** — build 2026-08-27 16:24 da muvaffaqiyatli o'tdi; qo'lda sinov kutilmoqda |
+| Sxema versiyasi | **v10** qo'llangan va tasdiqlangan (2026-08-27). **v11** (`activity_history.source`, A16 §1) kodda tayyor, build kutilmoqda |
 | `account_id` (ko'p akkaunt) | ✅ **BOR** — 5 ta jadvalda. `activity_history` ataylab FILTRLANMAYDI (spec §0.13) |
 | `media_index` jadvali | ✅ mavjud, 1543 yozuv |
 | `sha256` maydoni | ❌ **BO'SH** — hisoblash hali yozilmagan |
