@@ -2223,6 +2223,24 @@ void History::loadDeletedMessages() {
 	auto deleted = CustomDB::GetDeletedMessages(key);
 	if (deleted.empty()) return;
 
+	// ── Begona akkaunt yozuvlarini aniqlash uchun LANGARLAR ──────────
+	//
+	// Bitta akkauntning bitta chatidagi xabar ID'lari vaqt bo'yicha
+	// MONOTON o'sadi. Boshqa akkauntning o'sha odam bilan yozishmasi
+	// esa butunlay boshqa ID hisobidan boradi. Shuning uchun "sana X
+	// bo'lganda ID taxminan Y bo'lishi kerak" munosabati begona
+	// yozuvni fosh qiladi.
+	//
+	// Dalil (2026-08-27, Akam chati): ID 5380 -> iyun, ID 370000 -> may.
+	// Kichikroq ID kechroq sanada — bitta akkaunt ichida BO'LMAYDI.
+	//
+	// Langarlar faqat SHU akkauntning haqiqiy server xabarlaridan
+	// olinadi (isRegular && !isLocal), ya'ni ular ta'rifan ishonchli.
+	struct RealAnchor {
+		unsigned int date = 0;
+		int64 id = 0;
+	};
+	std::vector<RealAnchor> anchors;
 	MsgId minReal = 0;
 	unsigned int minRealDate = 0;
 	for (const auto &block : blocks) {
@@ -2235,22 +2253,84 @@ void History::loadDeletedMessages() {
 					minReal = msgId;
 					minRealDate = msgDate;
 				}
+				if (msgDate > 0) {
+					anchors.push_back({ msgDate, msgId.bare });
+				}
 			}
 		}
 	}
+	ranges::sort(anchors, [](const RealAnchor &a, const RealAnchor &b) {
+		return (a.date != b.date) ? (a.date < b.date) : (a.id < b.id);
+	});
+
+	// Eski (account_id = 0) yozuv shu akkauntga TEGISHLI EMASmi?
+	//
+	// Noto'g'ri "ha" javobi HAQIQIY o'chirilgan xabarni yashiradi, ya'ni
+	// foydalanuvchi uchun ma'lumot yo'qolishi bilan teng. Shuning uchun
+	// qoida ataylab QAT'IY va faqat aniq holatlarda "ha" deydi:
+	//
+	//   1. Kamida kMinAnchors ta langar bo'lsin — bir-ikki xabardan
+	//      xulosa chiqarib bo'lmaydi.
+	//   2. Yozuvning sanasi bo'lsin (0 bo'lsa hukm yo'q).
+	//   3. Sana langarlar ORALIG'IDA bo'lsin — chetdagi yozuv uchun
+	//      taqqoslash bazasi yo'q, demak ko'rsatiladi.
+	//   4. Chetlanish KATTA bo'lsin — shu oraliqdagi real ID o'sishidan
+	//      kamida 4 barobar, va hech bo'lmaganda 1000 ta ID.
+	//
+	// Har qanday shubhada javob "yo'q" — ya'ni yozuv KO'RSATILADI.
+	constexpr auto kMinAnchors = 5;
+	constexpr auto kMinMargin = int64(1000);
+	const auto looksForeign = [&](int64 msgId, unsigned int date) {
+		if (int(anchors.size()) < kMinAnchors || !date) {
+			return false;
+		}
+		if (date < anchors.front().date || date > anchors.back().date) {
+			return false;
+		}
+		// Sanani qamrab turgan ikki langar.
+		const RealAnchor *lo = nullptr;
+		const RealAnchor *hi = nullptr;
+		for (const auto &a : anchors) {
+			if (a.date <= date) {
+				lo = &a;
+			}
+			if (a.date >= date) {
+				hi = &a;
+				break;
+			}
+		}
+		if (!lo || !hi || hi->id < lo->id) {
+			return false;
+		}
+		const auto span = hi->id - lo->id;
+		const auto margin = std::max(kMinMargin, span * 4);
+		return (msgId < lo->id - margin) || (msgId > hi->id + margin);
+	};
 
 	const QString marker = QString::fromUtf8(
 		"\xe2\x80\x94\xe2\x80\x94 O'CHIRILDI \xe2\x80\x94\xe2\x80\x94");
 
 	int injectedCount = 0;
-	int skippedEmpty = 0; // mazmuni yo'qligi uchun chizilmagan yozuvlar
+	int skippedEmpty = 0;   // mazmuni yo'qligi uchun chizilmagan
+	int skippedForeign = 0; // boshqa akkauntniki deb topilgan
 	for (const auto &msg : deleted) {
 		// Skip if already present (loaded from server or already injected).
 		if (owner().message(peer, MsgId(msg.msgId))) continue;
 
-		// Eski yozuvlar uchun ID-diapazon tekshiruvi:
-		if (msg.accountId == 0 && minReal > 0) {
-			if (msg.msgId < minReal.bare && msg.date > minRealDate) {
+		// Eski (egasi noma'lum) yozuvlar uchun ikki bosqichli tekshiruv.
+		// Yangi yozuvlarda account_id to'g'ri, ularga TEGILMAYDI.
+		if (msg.accountId == 0) {
+			// (a) Sodda diapazon qoidasi: ID biz ko'rgan eng kichik
+			//     ID'dan ham past, lekin sanasi undan yangi.
+			if (minReal > 0
+				&& msg.msgId < minReal.bare
+				&& msg.date > minRealDate) {
+				skippedForeign++;
+				continue;
+			}
+			// (b) Monotonlik qoidasi (yuqoridagi izohga qarang).
+			if (looksForeign(msg.msgId, msg.date)) {
+				skippedForeign++;
 				continue;
 			}
 		}
@@ -2387,7 +2467,8 @@ void History::loadDeletedMessages() {
 	if (injectedCount > 0) {
 		qDebug() << "[CustomMod] Injected" << injectedCount
 		         << "deleted messages for peer" << peer->id.value
-		         << "| skipped (mazmunsiz):" << skippedEmpty;
+		         << "| skipped: mazmunsiz" << skippedEmpty
+		         << ", begona" << skippedForeign;
 	}
 }
 
