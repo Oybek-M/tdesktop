@@ -260,7 +260,7 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 			content->add(
 				object_ptr<Ui::FlatLabel>(
 					content,
-					rpl::single(u"(hali hech qanday yozuq yo'q)"_q),
+					rpl::single(u"(hali hech qanday yozuv yo'q)"_q),
 					st::boxLabel),
 				st::boxRowPadding);
 		}

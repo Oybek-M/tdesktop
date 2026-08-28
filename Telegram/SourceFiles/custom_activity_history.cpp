@@ -662,7 +662,33 @@ int FlushBufferedActivity(
 	const auto key = CustomDB::PeerKey{ accountId, peerId };
 	int savedCount = 0;
 
+	// Shovqin filtri — RecordField() dagi qoidaning aynan o'zi.
+	//
+	// Nima uchun kerak: buferga yozishda RecordField() chetlab o'tiladi,
+	// ya'ni uning 60-soniyalik filtri ishlamaydi. Telegram esa oflayn
+	// kontakt uchun ham "oxirgi ko'rilgan" vaqtini davriy yangilab
+	// turadi — holat o'zgarmasa ham qiymat ichidagi raqam o'zgaradi.
+	// Filtrsiz ko'chirishda shu ma'nosiz qatorlar bazaga tushardi
+	// (tarixan bunday shovqin status yozuvlarining 13.6% ini tashkil
+	// qilgan). Bu yerda ketma-ket ikki yozuv solishtiriladi.
+	QString lastStatusValue;
+	qint64 lastStatusAt = 0;
+
 	for (const auto &change : changes) {
+		if (change.field == u"status"_q && !lastStatusValue.isEmpty()) {
+			if (StatusState(lastStatusValue) == StatusState(change.newValue)) {
+				const auto newAge = StatusAge(change.newValue, change.observedAt);
+				const auto oldAge = StatusAge(lastStatusValue, lastStatusAt);
+				if (newAge >= 0 && oldAge >= 0
+						&& std::llabs(newAge - oldAge) < 60) {
+					continue;
+				}
+			}
+		}
+		if (change.field == u"status"_q) {
+			lastStatusValue = change.newValue;
+			lastStatusAt = change.observedAt;
+		}
 		if (CustomDB::HasActivityEntryAt(peerId, change.field, change.observedAt)) {
 			continue;
 		}

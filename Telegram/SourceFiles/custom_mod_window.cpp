@@ -2082,7 +2082,7 @@ void fillActivityHistorySection(
 		object_ptr<Ui::InputField>(
 			customBufferForm,
 			st::defaultInputField,
-			rpl::single(u"Daqiqada (1 – 120)"_q),
+			rpl::single(u"Daqiqa (1 – 120)"_q),
 			QString::number(CustomSettings::ActivityBufferMinutes())),
 		st::boxRowPadding);
 	customBufferForm->add(
