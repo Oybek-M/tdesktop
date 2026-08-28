@@ -268,7 +268,7 @@ shuning uchun birga qilinadi.
 | 5 | **A14 — o'qilgan vaqt orqali faollik** 🆕 | Pastda batafsil. Foydalanuvchi 2026-08-25 da topdi. |
 | 6 | **Reliz yuklashni API ga o'tkazish** 🆕 | SSH/scp o'rniga `customsync-server` API. Yuqorida batafsil. |
 | 7 | **A15 — bot token orqali kirish** 🆕 | Foydalanuvchi 2026-08-26 da so'radi. **v10 dan KEYIN.** Pastda batafsil. |
-| 8 | **A16 — faollik kuzatuvidagi bo'shliqlar** 🆕 | Foydalanuvchi 2026-08-28 da so'radi. **A15 dan OLDIN, tez kerak.** 3 ta bo'shliq: story vaqti `status` ga tushmaydi, qo'lda yozuv qo'shish yo'q, ro'yxatga o'z vaqtida qo'sha olmaslik. Batafsil: [`specs/2026-08-28-a16-activity-capture-gaps.md`](specs/2026-08-28-a16-activity-capture-gaps.md) |
+| 8 | **A16 — faollik kuzatuvidagi bo'shliqlar** 🆕 | Foydalanuvchi 2026-08-28 da so'radi. **A15 dan OLDIN, tez kerak.** 3 ta bo'shliq: story vaqti `status` ga tushmaydi, qo'lda yozuv qo'shish yo'q, ro'yxatga o'z vaqtida qo'sha olmaslik. **Qaror qabul qilingan:** tez tugma + vaqtinchalik bufer (`activityBufferMinutes`, standart 10, 1–120 daqiqa, Faollik tarixi bo'limida sozlanadi). Batafsil: [`specs/2026-08-28-a16-activity-capture-gaps.md`](specs/2026-08-28-a16-activity-capture-gaps.md) |
 
 **Qo'shimcha (2026-08-26 da qo'shildi) — ENG USTUVOR:**
 **Sxema v10 — `account_id`** + 3 ta media tuzatishi. 12 ta akkaunt
