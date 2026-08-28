@@ -1401,6 +1401,8 @@ PRIVATE
     inline_bots/inline_results_inner.h
     inline_bots/inline_results_widget.cpp
     inline_bots/inline_results_widget.h
+    intro/intro_bot_token.cpp
+    intro/intro_bot_token.h
     intro/intro_code.cpp
     intro/intro_code.h
     intro/intro_email.cpp
