@@ -51,8 +51,8 @@ struct ActionedMessage {
 
 // E19: Schema version constant — increment when adding new columns/tables.
 // RunMigrations() is called inside Init() automatically.
-// v11 (Vazifa 6): actioned_messages dagi absolyut media_path yo'llarni nisbiy qilish
-constexpr int kCurrentSchemaVersion = 10;
+// v11 (A16 §1): activity_history ga source ustuni
+constexpr int kCurrentSchemaVersion = 11;
 
 void Init();
 
@@ -486,6 +486,14 @@ void SaveActivityHistoryEntry(
     bool hasOldValue,
     const QString &oldValue,
     const QString &newValue,
+    qint64 observedAt,
+    const QString &source = u"observed"_q);
+
+// A16 §1: Berilgan peer, field va observed_at bo'yicha yozuv borligini tekshiradi (dublikat oldini olish).
+// Akkaunt bo'yicha filtrlanmaydi (activity_history akkauntlar aro birlashgan).
+[[nodiscard]] bool HasActivityEntryAt(
+    const QString &peerId,
+    const QString &field,
     qint64 observedAt);
 
 // Shu peer/field uchun eng oxirgi yozilgan qiymatni qaytaradi.

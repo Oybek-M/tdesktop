@@ -614,6 +614,16 @@ void RunMigrations() {
         }
     }
 
+    // v10 → v11: activity_history ga source ustuni (A16 §1).
+    //
+    // Nima uchun: story qo'yilgan vaqtidan hosil qilingan 'status' nuqtalarini
+    // tizim real-vaqtda kuzatgan haqiqiy holat o'zgarishlaridan ajratish kerak.
+    // source='observed' (standart) yoki 'story' (story vaqtidan olingan).
+    if (version < 11) {
+        execSql("ALTER TABLE activity_history "
+                "ADD COLUMN source TEXT NOT NULL DEFAULT 'observed'");
+    }
+
     // Update version stamp.
     {
         sqlite3_stmt *stmt = nullptr;
@@ -2935,7 +2945,8 @@ void SaveActivityHistoryEntry(
         bool hasOldValue,
         const QString &oldValue,
         const QString &newValue,
-        qint64 observedAt) {
+        qint64 observedAt,
+        const QString &source) {
     Init();
     // 2026-08-24: ilgari har 50-yozuvda tozalanardi. Last-seen yozuvlari
     // kuniga ~10 600 ta — ya'ni kuniga ~210 marta tozalash. Saqlash muddati
@@ -2956,8 +2967,8 @@ void SaveActivityHistoryEntry(
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
             "INSERT INTO activity_history "
-            "(peer_id, field, old_value, new_value, observed_at, account_id) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "(peer_id, field, old_value, new_value, observed_at, account_id, source) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
             -1, &stmt, nullptr) == SQLITE_OK) {
         bindText(stmt, 1, key.peerId);
         bindText(stmt, 2, field);
@@ -2969,17 +2980,46 @@ void SaveActivityHistoryEntry(
         bindText(stmt, 4, newValue);
         sqlite3_bind_int64(stmt, 5, observedAt);
         sqlite3_bind_int64(stmt, 6, key.accountId);
+        bindText(stmt, 7, source);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }
 
     // Keep the in-memory cache in sync so repeat lookups this session see
     // the new value without another SQLite round-trip.
-    {
+    // Faqat tizim hozir kuzatgan ('observed') yozuvlar keshni yangilaydi —
+    // o'tmishdagi retrospektiv nuqtalar (masalan story) joriy eng so'nggi
+    // holatni buzmasligi kerak.
+    if (source == u"observed"_q) {
         QMutexLocker locker(&gCacheMutex);
         gActivityLatestCache[key.peerId][field] = newValue;
         gActivityLoadedPeers.insert(key.peerId);
     }
+}
+
+bool HasActivityEntryAt(
+        const QString &peerId,
+        const QString &field,
+        qint64 observedAt) {
+    Init();
+    if (!gDb) return false;
+
+    sqlite3_stmt *stmt = nullptr;
+    bool exists = false;
+    if (sqlite3_prepare_v2(gDb,
+            "SELECT 1 FROM activity_history "
+            "WHERE peer_id = ? AND field = ? AND observed_at = ? "
+            "LIMIT 1",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        bindText(stmt, 1, peerId);
+        bindText(stmt, 2, field);
+        sqlite3_bind_int64(stmt, 3, observedAt);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            exists = true;
+        }
+        sqlite3_finalize(stmt);
+    }
+    return exists;
 }
 
 // Delete activity_history entries older than |days| days. Same pattern as
