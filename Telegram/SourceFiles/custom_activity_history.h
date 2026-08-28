@@ -34,4 +34,10 @@ void Init(not_null<Main::Session*> session);
 // — story'ning qo'yilgan vaqti (unix timestamp, matn sifatida).
 [[nodiscard]] QString DecodeStoryLabel(const QString &encoded);
 
+// A16 §3: Peer kuzatuvga qo'shilganda chaqiriladi: shu peer'ning buferdagi
+// o'zgarishlarini bazaga ko'chiradi. Ko'chirilgan yozuvlar sonini qaytaradi.
+int FlushBufferedActivity(
+	not_null<Main::Session*> session,
+	const QString &peerId);
+
 } // namespace CustomActivityHistory

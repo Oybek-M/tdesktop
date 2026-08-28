@@ -77,6 +77,96 @@ constexpr auto kUserpicMaxAttempts = 30;
 
 std::vector<PendingUserpic> gPendingUserpics;
 
+// ── A16 §3: Vaqtinchalik faollik buferi ──────────────────────────────
+struct BufferedChange {
+	QString field;
+	QString oldValue;
+	QString newValue;
+	qint64 observedAt = 0;
+};
+
+constexpr int kMaxBufferEntriesPerPeer = 50;
+constexpr int kMaxBufferedPeers = 500;
+constexpr int kBufferPruneIntervalWrites = 100;
+
+base::flat_map<QString, std::vector<BufferedChange>> gActivityBuffer;
+int gBufferWriteCount = 0;
+
+void PruneStaleBufferedActivity(qint64 now) {
+	const auto cutoff = now - qint64(CustomSettings::ActivityBufferMinutes()) * 60;
+	for (auto it = gActivityBuffer.begin(); it != gActivityBuffer.end();) {
+		auto &entries = it->second;
+		entries.erase(
+			std::remove_if(entries.begin(), entries.end(), [=](const BufferedChange &c) {
+				return c.observedAt < cutoff;
+			}),
+			entries.end());
+		if (entries.empty()) {
+			it = gActivityBuffer.erase(it);
+		} else {
+			++it;
+		}
+	}
+}
+
+void PushToActivityBuffer(
+		const QString &peerId,
+		const QString &field,
+		const QString &oldValue,
+		const QString &newValue,
+		qint64 now) {
+	// Exclude ro'yxatidagi peer buferga ham yozilmaydi — foydalanuvchi
+	// uni ataylab kuzatuvdan chiqarib tashlagan.
+	if (CustomSettings::IsInActivityExclude(peerId)) {
+		return;
+	}
+
+	++gBufferWriteCount;
+	if (gBufferWriteCount >= kBufferPruneIntervalWrites) {
+		gBufferWriteCount = 0;
+		PruneStaleBufferedActivity(now);
+	}
+
+	// Peerlar soni chegaradan oshganda eng eski faoliyatli peerni o'chiramiz
+	if (gActivityBuffer.size() >= kMaxBufferedPeers && !gActivityBuffer.contains(peerId)) {
+		auto oldestPeerIt = gActivityBuffer.begin();
+		qint64 oldestTime = std::numeric_limits<qint64>::max();
+		for (auto it = gActivityBuffer.begin(); it != gActivityBuffer.end(); ++it) {
+			if (!it->second.empty() && it->second.front().observedAt < oldestTime) {
+				oldestTime = it->second.front().observedAt;
+				oldestPeerIt = it;
+			}
+		}
+		if (oldestPeerIt != gActivityBuffer.end()) {
+			gActivityBuffer.erase(oldestPeerIt);
+		}
+	}
+
+	auto &list = gActivityBuffer[peerId];
+	const auto cutoff = now - qint64(CustomSettings::ActivityBufferMinutes()) * 60;
+	list.erase(
+		std::remove_if(list.begin(), list.end(), [=](const BufferedChange &c) {
+			return c.observedAt < cutoff;
+		}),
+		list.end());
+
+	// Ketma-ket bir xil qiymat kelsa takrorlamaslik
+	if (!list.empty() && list.back().field == field && list.back().newValue == newValue) {
+		return;
+	}
+
+	list.push_back(BufferedChange{
+		.field = field,
+		.oldValue = oldValue,
+		.newValue = newValue,
+		.observedAt = now,
+	});
+
+	if (list.size() > kMaxBufferEntriesPerPeer) {
+		list.erase(list.begin(), list.begin() + (list.size() - kMaxBufferEntriesPerPeer));
+	}
+}
+
 QString SaveStoryImage(const QImage &image, PhotoId id) {
 	// 2026-08-15: arxiv ildizi endi sozlanadi — yagona manba
 	// CustomSettings::ArchiveMediasDir().
@@ -434,34 +524,50 @@ void Init(not_null<Main::Session*> session) {
 			return; // faqat User (shaxsiy chat) kuzatiladi — spec §7
 		}
 		const auto peerId = QString::number(user->id.value);
-		if (!CustomSettings::ShouldTrackActivity(peerId, user->isContact())) {
-			return;
-		}
-
+		const auto isTracking = CustomSettings::ShouldTrackActivity(peerId, user->isContact());
 		const auto now = base::unixtime::now();
 
 		if (update.flags & Flag::Name) {
-			RecordField(session, peerId, u"name"_q, user->name(), now);
+			const auto val = user->name();
+			if (isTracking) {
+				RecordField(session, peerId, u"name"_q, val, now);
+			} else {
+				PushToActivityBuffer(peerId, u"name"_q, QString(), val, now);
+			}
 		}
 		if (update.flags & Flag::Username) {
-			RecordField(session, peerId, u"username"_q, user->username(), now);
+			const auto val = user->username();
+			if (isTracking) {
+				RecordField(session, peerId, u"username"_q, val, now);
+			} else {
+				PushToActivityBuffer(peerId, u"username"_q, QString(), val, now);
+			}
 		}
 		if (update.flags & Flag::Photo) {
 			const auto value = user->hasUserpic()
 				? QString::number(user->userpicPhotoId())
 				: u"empty"_q;
-			RecordField(session, peerId, u"photo"_q, value, now);
-			// Rasm ID'sining o'zi yetarli emas — eski rasm
-			// almashtirilsa yo'qoladi. Rasmning O'ZINI ham saqlaymiz.
-			MaybeBackupUserpic(session, user);
+			if (isTracking) {
+				RecordField(session, peerId, u"photo"_q, value, now);
+				// Rasm ID'sining o'zi yetarli emas — eski rasm
+				// almashtirilsa yo'qoladi. Rasmning O'ZINI ham saqlaymiz.
+				MaybeBackupUserpic(session, user);
+			} else {
+				PushToActivityBuffer(peerId, u"photo"_q, QString(), value, now);
+			}
 		}
 		if (update.flags & Flag::OnlineStatus) {
-			RecordField(
-				session,
-				peerId,
-				u"status"_q,
-				EncodeStatus(user->lastseen(), now),
-				now);
+			const auto encoded = EncodeStatus(user->lastseen(), now);
+			if (isTracking) {
+				RecordField(
+					session,
+					peerId,
+					u"status"_q,
+					encoded,
+					now);
+			} else {
+				PushToActivityBuffer(peerId, u"status"_q, QString(), encoded, now);
+			}
 		}
 	}, session->lifetime());
 
@@ -531,6 +637,47 @@ void Init(not_null<Main::Session*> session) {
 		CheckPendingStoryMedia();
 		CheckPendingUserpics();
 	}, session->lifetime());
+}
+
+int FlushBufferedActivity(
+		not_null<Main::Session*> session,
+		const QString &peerId) {
+	auto it = gActivityBuffer.find(peerId);
+	if (it == gActivityBuffer.end()) {
+		return 0;
+	}
+
+	auto changes = std::move(it->second);
+	gActivityBuffer.erase(it);
+
+	// Vaqt bo'yicha o'sish tartibida saralaymiz (eng eskidan yangisiga)
+	std::sort(
+		changes.begin(),
+		changes.end(),
+		[](const BufferedChange &a, const BufferedChange &b) {
+			return a.observedAt < b.observedAt;
+		});
+
+	const auto accountId = qint64(session->userId().bare);
+	const auto key = CustomDB::PeerKey{ accountId, peerId };
+	int savedCount = 0;
+
+	for (const auto &change : changes) {
+		if (CustomDB::HasActivityEntryAt(peerId, change.field, change.observedAt)) {
+			continue;
+		}
+		CustomDB::SaveActivityHistoryEntry(
+			key,
+			change.field,
+			!change.oldValue.isEmpty(),
+			change.oldValue,
+			change.newValue,
+			change.observedAt,
+			u"buffer"_q);
+		++savedCount;
+	}
+
+	return savedCount;
 }
 
 } // namespace CustomActivityHistory

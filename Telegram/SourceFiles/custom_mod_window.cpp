@@ -2044,6 +2044,98 @@ void fillActivityHistorySection(
 			}, btn->lifetime());
 	}
 
+	// ── Vaqtinchalik bufer (daqiqa) ──────────────────────────────
+	Ui::AddSkip(content, 12);
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(u"Vaqtinchalik bufer (daqiqa)"_q),
+			st::defaultSubsectionTitle),
+		st::defaultSubsectionTitlePadding);
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(u"Kuzatilmayotgan odamlarning faolligi shu muddat davomida xotirada saqlanadi. Odamni kuzatuvga qo'shsangiz, shu davrdagi yozuvlar tiklanadi."_q),
+			st::customModHintLabel),
+		st::boxRowPadding);
+
+	struct BufferPreset { QString label; int minutes; };
+	const BufferPreset kBufferPresets[4] = {
+		{ u"5 daqiqa"_q, 5 },
+		{ u"10 daqiqa"_q, 10 },
+		{ u"30 daqiqa"_q, 30 },
+		{ u"60 daqiqa"_q, 60 },
+	};
+	const auto isBufferPreset = [](int minutes) {
+		return minutes == 5 || minutes == 10 || minutes == 30 || minutes == 60;
+	};
+	const auto selectedBufferMinutes = std::make_shared<rpl::variable<int>>(
+		CustomSettings::ActivityBufferMinutes());
+
+	const auto customBufferWrap = content->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			content,
+			object_ptr<Ui::VerticalLayout>(content)),
+		style::margins(0, 0, 0, 0));
+	const auto customBufferForm = customBufferWrap->entity();
+	const auto customBufferInput = customBufferForm->add(
+		object_ptr<Ui::InputField>(
+			customBufferForm,
+			st::defaultInputField,
+			rpl::single(u"Daqiqada (1 – 120)"_q),
+			QString::number(CustomSettings::ActivityBufferMinutes())),
+		st::boxRowPadding);
+	customBufferForm->add(
+		object_ptr<Ui::RoundButton>(
+			customBufferForm,
+			rpl::single(u"💾 Saqlash"_q),
+			st::defaultBoxButton),
+		st::boxRowPadding)
+	->addClickHandler([=] {
+		bool ok = false;
+		const auto parsed = customBufferInput->getLastText().trimmed().toInt(&ok);
+		const auto clamped = std::clamp(ok ? parsed : 10, 1, 120);
+		CustomSettings::SetInt(u"activityBufferMinutes"_q, clamped);
+		*selectedBufferMinutes = clamped;
+		Ui::Toast::Show(
+			u"Bufer muddati saqlandi: "_q + QString::number(clamped) + u" daqiqa"_q);
+	});
+	customBufferWrap->toggle(
+		!isBufferPreset(CustomSettings::ActivityBufferMinutes()),
+		anim::type::instant);
+
+	for (const auto &preset : kBufferPresets) {
+		const auto minutes = preset.minutes;
+		const auto label = preset.label;
+		content->add(
+			object_ptr<Ui::RoundButton>(
+				content,
+				selectedBufferMinutes->value() | rpl::map([=](int current) {
+					return (current == minutes)
+						? (u"✓ "_q + label)
+						: label;
+				}),
+				st::defaultBoxButton),
+			st::boxRowPadding)
+		->addClickHandler([=] {
+			CustomSettings::SetInt(u"activityBufferMinutes"_q, minutes);
+			*selectedBufferMinutes = minutes;
+			customBufferWrap->toggle(false, anim::type::normal);
+			Ui::Toast::Show(u"Bufer muddati saqlandi."_q);
+		});
+	}
+	content->add(
+		object_ptr<Ui::RoundButton>(
+			content,
+			rpl::single(u"Boshqa..."_q),
+			st::defaultBoxButton),
+		st::boxRowPadding)
+	->addClickHandler([=] {
+		customBufferWrap->toggle(
+			!customBufferWrap->toggled(),
+			anim::type::normal);
+	});
+
 	// ── Include List ──────────────────────────────────────────────
 	Ui::AddSkip(content, 12);
 	content->add(

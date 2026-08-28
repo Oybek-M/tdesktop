@@ -133,6 +133,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_share_box.h"
 #include "styles/style_window.h" // st::windowMinWidth
 #include "styles/style_menu_icons.h"
+#include "custom_settings.h"
+#include "custom_activity_history.h"
 #include "styles/style_premium.h"
 
 #include <QAction>
@@ -347,6 +349,7 @@ private:
 	void addBoostChat();
 	void addToggleFee();
 	void addSetPersonalChannel();
+	void addCustomActivityTrack();
 
 	[[nodiscard]] bool skipCreateActions() const;
 	[[nodiscard]] SendMenu::Details createSendMenuDetails() const;
@@ -1846,6 +1849,36 @@ void Filler::addVideoChat() {
 	});
 }
 
+void Filler::addCustomActivityTrack() {
+	if (!_peer || !_peer->isUser() || _peer->isSelf()) {
+		return;
+	}
+	const auto peer = _peer;
+	const auto peerId = QString::number(peer->id.value);
+	const auto isTracked = CustomSettings::IsInActivityInclude(peerId);
+	const auto text = isTracked
+		? u"Faollik kuzatuvini to'xtatish"_q
+		: u"Faollikni kuzatish"_q;
+
+	const auto controller = _controller;
+	_addAction(text, [=] {
+		if (isTracked) {
+			CustomSettings::RemoveFromActivityInclude(peerId);
+			controller->showToast(u"Kuzatuv to'xtatildi"_q);
+		} else {
+			CustomSettings::AddToActivityInclude(peerId, peer->name());
+			const auto restored = CustomActivityHistory::FlushBufferedActivity(
+				&peer->session(), peerId);
+			if (restored > 0) {
+				controller->showToast(
+					u"Kuzatuv yoqildi — %1 ta yozuv tiklandi"_q.arg(restored));
+			} else {
+				controller->showToast(u"Kuzatuv yoqildi"_q);
+			}
+		}
+	});
+}
+
 void Filler::fillContextMenuActions() {
 	addNewWindow();
 	addUngroup();
@@ -1859,6 +1892,7 @@ void Filler::fillContextMenuActions() {
 	addToggleUnreadMark();
 	addToggleTopicClosed();
 	addToggleFolder();
+	addCustomActivityTrack();
 	if (const auto user = _peer->asUser()) {
 		if (!user->isContact()) {
 			addBlockUser();
@@ -1882,6 +1916,7 @@ void Filler::fillHistoryActions() {
 	addCreatePoll();
 	addCreateTodoList();
 	addThemeEdit();
+	addCustomActivityTrack();
 	addToggleNoForwards();
 	addViewDiscussion();
 	addDirectMessages();
@@ -1909,6 +1944,7 @@ void Filler::fillProfileActions() {
 	addTopicLink();
 	addManageTopic();
 	addToggleTopicClosed();
+	addCustomActivityTrack();
 	addViewDiscussion();
 	addDirectMessages();
 	addExportChat();

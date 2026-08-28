@@ -198,6 +198,10 @@ void UpdateString(const QString &id, const QString &value) {
 int UpdateInt(const QString &id, int value) {
     if (id == "spoofDeviceType") gValues.spoofDeviceType = value;
     else if (id == "upstreamCheckIntervalMinutes") gValues.upstreamCheckIntervalMinutes = value;
+    else if (id == "activityBufferMinutes") {
+        gValues.activityBufferMinutes = std::clamp(value, 1, 120);
+        return gValues.activityBufferMinutes;
+    }
     // Chegaralar aynan SHU YERDA qisiladi (SetInt() da emas), shunda
     // qiymat qaysi yo'ldan kelishidan qat'i nazar — UI, Init(), yoki
     // qo'lda tahrirlangan registry — xavfsiz oraliqda qoladi.
@@ -284,6 +288,8 @@ void Init() {
         "upstreamCheckEnabled", true).toBool();
     gValues.upstreamCheckIntervalMinutes = settings.value(
         "upstreamCheckIntervalMinutes", 1440).toInt();
+    gValues.activityBufferMinutes = std::clamp(settings.value(
+        "activityBufferMinutes", 10).toInt(), 1, 120);
     gValues.upstreamLastKnownVersion = settings.value(
         "upstreamLastKnownVersion", QString()).toString();
     gValues.upstreamEtag = settings.value(
