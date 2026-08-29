@@ -10,14 +10,22 @@ Oxirgi yangilanish: 2026-08-28
 
 # 🟡 SHU YERDAN BOSHLANG (2026-08-28) — QO'LDA SINOV KUTILMOQDA
 
-✅ **BUILD O'TDI — 2026-08-28, 15:31** (commit `f9867e77d3` bilan).
-Endi `Telegram.exe` da quyidagilarning hammasi bor, lekin ular
-**HALI QO'LDA SINOVDAN O'TMAGAN**.
+✅ **BUILD O'TDI — 2026-08-29, 16:58** (commit `71307a9704` bilan).
 
-🔴 **Birinchi ishga tushirishda sxema v11 migratsiyasi qo'llanadi.**
-Undan oldin avtomatik `.premigrate-v10-*.bak` nusxasi olinadi.
+**2026-08-29 sinovidan o'tganlar:** A16 §3 (tugma + bufer) ✅,
+§2 (qo'lda yozuv) ✅, sxema v11 migratsiyasi ✅, avtomatik
+migratsiya zaxirasi ✅. A15 sinovi HAL QILUVCHI natija berdi
+(pastga qarang).
 
-## Sinovdan o'tkazilishi kerak bo'lgan ishlar
+🔴 **Oxirgi build'dagi UCHTA narsa hali sinalmagan:**
+
+| Nima | Qanday sinaladi |
+|---|---|
+| **Sxema v12** — story backfill | Ishga tushirishda migratsiya toza o'tsin. ⚠️ Bu mashinada **0 qator** qo'shiladi (2026-08-29 da qo'lda backfill qilingan) — bu normal, migratsiya idempotent |
+| **Yozuvni o'chirish** | Faollik tarixida `🗑 O'chirish` havolasi FAQAT 📖/✍️/⏱ yozuvlarda chiqsin, `observed` larda **chiqmasin** |
+| **A15 ogohlantirish matni** | Bot token ekranida matn uzun (4 qator) — "Next" tugmasi bilan to'qnashmayotganini **ko'z bilan tekshirish kerak** |
+
+## Avvalgi build (2026-08-28) dan sinalgan ishlar
 
 | Ish | Commit | Nima sinaladi |
 |---|---|---|
@@ -25,7 +33,7 @@ Undan oldin avtomatik `.premigrate-v10-*.bak` nusxasi olinadi.
 | **Sxema v11** — `activity_history.source` | `bb1ff6d846` | Migratsiya toza o'tsin, `source` ustuni paydo bo'lsin |
 | **A16 §3** — tez tugma + bufer | `4fc346ea48` | Chatga o'ng tugma → "Faollikni kuzatish"; bosilganda oldingi daqiqalardagi faollik tiklansin |
 | **A16 §2** — qo'lda yozuv + belgilar | `1c0719bb7a` | "Qo'lda faollik yozuvi qo'shish" oynasi; tarixda 📖 / ✍️ / ⏱ belgilari |
-| **A15** — bot token login (1-bosqich) | `537893e329`..`9cfca110b5` | Login ekrani ochilsin; `log.txt` da `[BOTPROBE]` qatorlari paydo bo'lsin |
+| **A15** — bot token login | `537893e329`..`71307a9704` | 🔴 **SINOVDAN O'TDI — `BOT_METHOD_INVALID`.** To'liq klient MUMKIN EMAS. Kod saqlab qolindi (B varianti), ogohlantirish bilan |
 | Tuzatishlar | `cd39761ea2`, `acb45f86c6` | Imlo, bufer shovqin filtri, apostroflar |
 
 **A15 sinovi alohida muhim:** `log.txt` dagi `[BOTPROBE] messages.getDialogs`
@@ -309,7 +317,7 @@ shuning uchun birga qilinadi.
 | 5 | **A14 — o'qilgan vaqt orqali faollik** 🆕 | Pastda batafsil. Foydalanuvchi 2026-08-25 da topdi. |
 | 6 | **Reliz yuklashni API ga o'tkazish** 🆕 | SSH/scp o'rniga `customsync-server` API. Yuqorida batafsil. |
 | 7 | **A15 — bot token orqali kirish** 🆕 | Foydalanuvchi 2026-08-26 da so'radi. **v10 dan KEYIN.** Pastda batafsil. |
-| 8 | **A16 — faollik kuzatuvidagi bo'shliqlar** | 🟡 **KOD TAYYOR, BUILD QILINMAGAN** (2026-08-28). Uchala band implement qilingan va push qilingan. 3 ta bo'shliq: story vaqti `status` ga tushmaydi, qo'lda yozuv qo'shish yo'q, ro'yxatga o'z vaqtida qo'sha olmaslik. **Qaror qabul qilingan:** tez tugma + vaqtinchalik bufer (`activityBufferMinutes`, standart 10, 1–120 daqiqa, Faollik tarixi bo'limida sozlanadi). Batafsil: [`specs/2026-08-28-a16-activity-capture-gaps.md`](specs/2026-08-28-a16-activity-capture-gaps.md) |
+| 8 | **A16 — faollik kuzatuvidagi bo'shliqlar** | 🟢 **DEYARLI TUGADI** (2026-08-29). §3 va §2 sinovdan o'tdi, §1 backfill (v12) va o'chirish imkoni qurildi — sinov qoldi. 3 ta bo'shliq: story vaqti `status` ga tushmaydi, qo'lda yozuv qo'shish yo'q, ro'yxatga o'z vaqtida qo'sha olmaslik. **Qaror qabul qilingan:** tez tugma + vaqtinchalik bufer (`activityBufferMinutes`, standart 10, 1–120 daqiqa, Faollik tarixi bo'limida sozlanadi). Batafsil: [`specs/2026-08-28-a16-activity-capture-gaps.md`](specs/2026-08-28-a16-activity-capture-gaps.md) |
 
 **Qo'shimcha (2026-08-26 da qo'shildi) — ENG USTUVOR:**
 **Sxema v10 — `account_id`** + 3 ta media tuzatishi. 12 ta akkaunt
