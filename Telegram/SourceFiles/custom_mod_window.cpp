@@ -2298,7 +2298,9 @@ void fillActivityHistorySection(
 							Ui::Toast::Show(u"Bu vaqt uchun yozuv allaqachon mavjud."_q);
 						}
 					});
-					box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
+					box->addButton(
+						rpl::single(u"Bekor qilish"_q),
+						[=] { box->closeBox(); });
 				}));
 
 				return true;

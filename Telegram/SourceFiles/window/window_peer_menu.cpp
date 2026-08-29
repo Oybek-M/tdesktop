@@ -1876,7 +1876,7 @@ void Filler::addCustomActivityTrack() {
 				controller->showToast(u"Kuzatuv yoqildi"_q);
 			}
 		}
-	});
+	}, &st::menuIconSchedule);
 }
 
 void Filler::fillContextMenuActions() {
