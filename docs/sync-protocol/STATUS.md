@@ -68,22 +68,31 @@ yo'qotish — tiklab bo'lmaydi.
 ## customsync-server — implement holati
 
 **Papka:** `Projects programming\Telegram\customsync-server`
-**Branch:** `Oybek` — 5 ta commit
+**Branch:** `Oybek`
 
 🔴 **Aniq holat va keyingi qadam shu loyihaning `PROGRESS.md`
-faylida.** Quyidagisi faqat qisqacha.
+faylida.** Quyidagisi faqat qisqacha ko'rinish va ESKIRISHI mumkin —
+ziddiyat bo'lsa `PROGRESS.md` ustun turadi.
 
-| Plan 01a task | Holat |
+| Plan | Holat |
 |---|---|
-| 1 — solution skeleti | ✅ 5 loyiha + `/api/v1/health` |
-| 2 — `RecordId` + kontraktlar | ✅ `test-vectors.json` bilan tekshirilgan |
-| 3 — PostgreSQL sxemasi | ✅ baza yaratildi, 10 jadval |
-| 4-7 | ⚪ |
+| **01a** — backend poydevori | ✅ TUGADI (7/7 task) |
+| **01b** — sync yadrosi | 🟡 Task 1-5 ✅, **Task 6 (WebSocket) — keyingi** |
+| 02 — tdesktop agenti | ⚪ |
+| 03 — web controller | ⚪ |
+| 04 — storage lifecycle | ⚪ |
+| 05 — always-on capture (TDLib) | ⚪ |
+| 06 — reliz boshqaruvi | ⚪ |
 
-`dotnet test`: 10 test, hammasi o'tadi.
+`dotnet test`: **85 test, hammasi o'tadi** (2026-08-28 holati).
 
-**Keyingi qadam:** Task 4 — `SettingsService` (runtime konfiguratsiya,
-qoida K1). Muhit tayyor, to'siq yo'q.
+**Keyingi qadam:** plan 01b Task 6 — `NotifyHub` stub'i haqiqiy
+WebSocket implementatsiyasiga almashtiriladi (`SyncEndpoints` uni
+allaqachon chaqiradi).
+
+⚠️ `PROGRESS.md` dagi uchta ogohlantirishni implementdan oldin o'qing:
+`record_id` endi `account_hash` oladi (§0.12), ustunlar `snake_case`,
+va testlarda `pull?since=0` ishlatilmaydi.
 
 **Tartib:** 01a → 01b → 02 → 03 → 04 → 05 → 06
 

@@ -59,8 +59,13 @@ self-update ishlaydi va real sinovdan o'tdi.
 - 01a backend poydevori / 01b sync yadrosi / 02 tdesktop agenti
   03 web controller / 04 storage lifecycle / 05 capture service
 
-**Papka (kelishilgan):** `Projects programming\customsync-server`
-— tdesktop repo'sida EMAS.
+**Papka (HAQIQIY):** `Projects programming\Telegram\customsync-server`
+— alohida repo, tdesktop git tarixiga kirmaydi.
+
+🟢 **Track C FAOL implementatsiyada** (2026-08-28). 01a tugagan,
+01b Task 1-5 tugagan, keyingi qadam 01b Task 6 (WebSocket).
+**Aniq holat: o'sha loyihaning `PROGRESS.md` faylida** — bu yerdagi
+yozuvlar eskirishi mumkin.
 
 **Boshlash tartibi:** 01a -> 01b -> 02 -> 03 -> 04 -> 05
 
@@ -116,7 +121,7 @@ uchun.
    tejash uchun).
 4. **3-bosqich — Track C: `customsync-server`.** Yangi, mustaqil
    repo. Joylashuv **kelishildi**: top-level yangi papka
-   `C:\Users\Oybek\Documents\Projects programming\customsync-server`
+   `C:\Users\Oybek\Documents\Projects programming\Telegram\customsync-server`
    (2-tavsiya emas — ikkalasi ham `Telegram\Telegram\` ichiga
    joylashgan tdesktop'ning o'z build-scaffold'i, `DesktopPrivate`
    maxfiy kalitlari bilan bir joyda — shu sabab rad etildi). Boshlash
