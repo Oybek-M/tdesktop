@@ -257,3 +257,51 @@ uchun kerak.
 - `Telegram/SourceFiles/custom_mod_window.cpp`
 - `Telegram/SourceFiles/window/window_peer_menu.cpp`
 - `docs/superpowers/specs/2026-08-28-a16-activity-capture-gaps.md`
+
+---
+
+## 7. QO'LDA SINOV NATIJALARI (2026-08-29)
+
+Build 2026-08-28 15:31 da o'tdi, sinov 2026-08-29 16:12 da.
+Migratsiya v11 toza qo'llandi, avtomatik zaxira ishladi
+(`premigrate-v10-20260829-153839.bak`), `integrity_check: ok`.
+
+| Band | Natija |
+|---|---|
+| §3 — tugma + bufer | ✅ **ISHLAYDI** — `source='buffer'` yozuvi bazada tasdiqlandi |
+| §2 — qo'lda yozuv | ✅ ishlaydi (4 yozuv), lekin \U0001F534 **kamchilik bor**, pastga qarang |
+| §1 — story → status | ⚠️ kod ishga tushmagan (build'dan keyin yangi story kelmagan), lekin \U0001F534 **kamchilik bor** |
+
+### \U0001F534 YANGI KAMCHILIK 1 — story yozuvlari retroaktiv o'girilmaydi
+
+§1 kodi faqat **kelajakdagi** story hodisalarida ishlaydi
+(`stories().itemsChanged()`). Bazadagi **mavjud** `field='story'`
+yozuvlari (95 ta, 2026-08-20 dan buyon) hech qachon `status`
+nuqtasiga aylanmaydi.
+
+Foydalanuvchi buni "ishlamayapti" deb ko'rdi — aslida kod to'g'ri,
+lekin natija ko'rinmasligi uchun yangi story kutish kerak edi.
+
+**Vaqtinchalik chora (2026-08-29):** 92 ta nuqta bazaga qo'lda
+backfill qilindi (zaxira: `storybackfill-20260829-161542.bak`).
+
+**Kerak:** kodda bir martalik backfill — sxema **v12** migratsiyasi
+sifatida. Har bir `field='story'` yozuvi uchun, agar o'sha
+`observed_at` da `status` yozuvi yo'q bo'lsa, `online:<story_date>`
+nuqtasi `source='story'` bilan qo'shilsin. Shunda boshqa
+mashinalarda ham, kelajakdagi o'rnatishlarda ham o'zi ishlaydi.
+
+### \U0001F534 YANGI KAMCHILIK 2 — qo'lda yozuvni tuzatib bo'lmaydi
+
+§2 formasida sana/vaqt xato kiritilsa — **orqaga yo'l yo'q**.
+Yozuvni tahrirlash ham, o'chirish ham mumkin emas. Bu forma
+loyihalanganda o'ylanmagan.
+
+**Kerak:** Faollik tarixi ro'yxatida `source IN ('manual','story',
+'buffer')` yozuvlar uchun kontekst menyusi yoki tugma:
+
+- **O'chirish** — eng zarur, xato yozuvni yo'q qiladi
+- **Tahrirlash** — ixtiyoriy, o'chirib qayta qo'shish ham yetadi
+
+⚠️ `source='observed'` yozuvlar **o'chirilmasin** — ular tizim
+kuzatuvi, ularga tegish ma'lumot yaxlitligini buzadi.
