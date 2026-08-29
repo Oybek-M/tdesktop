@@ -8,14 +8,16 @@ Oxirgi yangilanish: 2026-08-28
 
 ---
 
-# 🔴 SHU YERDAN BOSHLANG (2026-08-28) — BUILD KUTILMOQDA
+# 🟡 SHU YERDAN BOSHLANG (2026-08-28) — QO'LDA SINOV KUTILMOQDA
 
-**Kod tayyor, lekin `Telegram.exe` HALI QURILMAGAN.** Oxirgi
-muvaffaqiyatli build 2026-08-28 da bo'lgan; undan KEYIN quyidagi
-ishlar qo'shildi va ular build'ga tushmagan. Foydalanuvchi build'ni
-o'zi ishga tushiradi (laptop og'ir dasturlar bilan band).
+✅ **BUILD O'TDI — 2026-08-28, 15:31** (commit `f9867e77d3` bilan).
+Endi `Telegram.exe` da quyidagilarning hammasi bor, lekin ular
+**HALI QO'LDA SINOVDAN O'TMAGAN**.
 
-## Build'dan keyin tekshirilishi kerak bo'lgan ishlar
+🔴 **Birinchi ishga tushirishda sxema v11 migratsiyasi qo'llanadi.**
+Undan oldin avtomatik `.premigrate-v10-*.bak` nusxasi olinadi.
+
+## Sinovdan o'tkazilishi kerak bo'lgan ishlar
 
 | Ish | Commit | Nima sinaladi |
 |---|---|---|
