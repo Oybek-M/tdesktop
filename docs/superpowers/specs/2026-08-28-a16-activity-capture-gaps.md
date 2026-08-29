@@ -305,3 +305,15 @@ loyihalanganda o'ylanmagan.
 
 ⚠️ `source='observed'` yozuvlar **o'chirilmasin** — ular tizim
 kuzatuvi, ularga tegish ma'lumot yaxlitligini buzadi.
+
+### 7.1 Kamchiliklar tuzatildi (2026-08-29)
+
+Ikkala kamchilik ham kod darajasida to'liq hal qilindi:
+
+1. **YANGI KAMCHILIK 1 (Story backfill — hal qilindi):**
+   - Sxema **v12** migratsiyasi (`RunMigrations()` ichida) kiritildi: mavjud `field='story'` yozuvlari `status` nuqtasiga (`source='story'`, `observed_at = CAST(new_value AS INTEGER)`) avtomatik va xavfsiz (dublikat tekshiruvi bilan) ko'chiriladi.
+   - `kCurrentSchemaVersion` 12 ga oshirildi.
+2. **YANGI KAMCHILIK 2 (Nokuzatilgan yozuvlarni o'chirish — hal qilindi):**
+   - `ActivityHistoryEntry` struct'iga `id` maydoni qo'shildi va `GetActivityHistory` da o'qiladi.
+   - `CustomDB::DeleteActivityEntry(id)` funksiyasi qo'shildi (faqat `source != 'observed'` bo'lgan yozuvlarni o'chiradi).
+   - Faollik tarixi oynasida (`custom_activity_history_box.cpp`) noshaxsiy/sun'iy yozuvlar (`source != 'observed'`) tagiga "🗑 O'chirish" havolasi ulandi.

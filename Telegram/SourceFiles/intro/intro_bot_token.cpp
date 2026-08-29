@@ -25,11 +25,13 @@ BotTokenWidget::BotTokenWidget(
 , _token(this, st::introName, rpl::single(u"Bot token"_q))
 , _warning(
 	this,
-	// Ogohlantirish ATAYLAB ekranda turadi: 1-bosqichda bot akkaunt
-	// bilan chat ro'yxati va kontaktlar ishlashi TEKSHIRILMAGAN.
-	// Foydalanuvchi bo'sh oynani nuqson deb o'ylamasligi kerak.
-	rpl::single(u"Sinov rejimi: bot akkauntda chat ro'yxati va "
-		"kontaktlar ishlamasligi mumkin."_q),
+	// Ogohlantirish ATAYLAB ekranda turadi: 2026-08-29 sinovida tasdiqlandi —
+	// Telegram serveri botlarga dialoglar ro'yxatini bermaydi (BOT_METHOD_INVALID).
+	// Foydalanuvchi doimiy "Loading..." holatini dastur xatosi deb o'ylamasligi kerak.
+	rpl::single(u"DIQQAT: bot akkauntda chat ro'yxati ISHLAMAYDI. "
+		"Telegram serveri botlarga dialoglar ro'yxatini bermaydi "
+		"(BOT_METHOD_INVALID), shuning uchun ilova \"Loading...\" "
+		"holatida qoladi. Bu rejim faqat diagnostika uchun saqlangan."_q),
 	st::introDescription) {
 	setTitleText(rpl::single(u"Bot token orqali kirish"_q));
 	setDescriptionText(rpl::single(u"@BotFather bergan tokenni kiriting"_q));

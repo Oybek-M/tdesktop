@@ -116,12 +116,8 @@ Kod behuda ketmadi: `BOTPROBE` diagnostikasi va xato tsiklini
 to'xtatish mantig'i savolni **taxmin bilan emas, dalil bilan**
 yopdi. 250 satr evaziga noto'g'ri yo'nalishga oylab ketmaslik.
 
-### Qaror kerak (foydalanuvchi hal qiladi)
+### Qaror (2026-08-29): B varianti tanlandi
 
-| Variant | Izoh |
-|---|---|
-| **A. Yopish** | Login ekrani va probe kodi olib tashlanadi. Eng toza. |
-| **B. Saqlab qo'yish** | Kod qoladi, lekin ekranda ochiq ogohlantirish: "bot rejimi to'liq ishlamaydi". Kelajakda bot konsoli qurilsa asos bo'ladi. |
-| **C. Bot konsoli** | Chat ro'yxati o'rniga boshqa UI: `messages.getMessages` (ID bo'yicha xabar) + `updates` orqali real vaqtda kelgan xabarlar. Bu **yangi, alohida loyiha**, kichik ish emas. |
-
-Hozircha hech biri tanlanmagan.
+Foydalanuvchi qaroriga ko'ra **B varianti (Saqlab qo'yish)** tanlandi:
+- Kod diagnostika va kelajakdagi imkoniyatlar uchun saqlab qolindi.
+- `intro_bot_token.cpp` dagi ogohlantirish matni fakt asosida yangilandi: Telegram serveri botlarga dialoglar ro'yxatini bermasligi (`BOT_METHOD_INVALID`) va chat ro'yxati ishlamasligi ochiq ko'rsatildi.
