@@ -87,3 +87,41 @@ foydalanuvchi akkauntida logga hech narsa yozilmaydi.
 
 Agar login **umuman** o'tmasa (ya'ni `auth.importBotAuthorization`
 xato bersa), ekranda xato turi ko'rsatiladi — o'shani ham qayd eting.
+
+---
+
+## 4. SINOV NATIJASI (2026-08-29) — HAL QILUVCHI
+
+Haqiqiy bot token bilan kirildi. `log.txt` dan:
+
+```
+[2026.08.29 16:12:28] [BOTPROBE] messages.getDialogs -> FAIL: BOT_METHOD_INVALID
+[2026.08.29 16:12:28] RPC Error: request 1389 got fail with code 400, error BOT_METHOD_INVALID
+[2026.08.29 16:12:28] [BOTPROBE] account.updateStatus -> FAIL: BOT_METHOD_INVALID
+```
+
+### Xulosa: "bot token bilan to'liq klient" MUMKIN EMAS
+
+Taxmin tasdiqlandi. Server bot akkauntga `messages.getDialogs` ni
+bermaydi — bot uchun "dialoglar ro'yxati" tushunchasi umuman yo'q.
+Login ishlaydi, lekin ilova doimiy "Loading..." holatida qoladi va
+chat ro'yxati hech qachon to'lmaydi.
+
+`account.updateStatus` ham rad etiladi — ya'ni Ghost Mode kabi
+funksiyalar bot akkauntda ma'nosiz.
+
+### 1-bosqichning qiymati
+
+Kod behuda ketmadi: `BOTPROBE` diagnostikasi va xato tsiklini
+to'xtatish mantig'i savolni **taxmin bilan emas, dalil bilan**
+yopdi. 250 satr evaziga noto'g'ri yo'nalishga oylab ketmaslik.
+
+### Qaror kerak (foydalanuvchi hal qiladi)
+
+| Variant | Izoh |
+|---|---|
+| **A. Yopish** | Login ekrani va probe kodi olib tashlanadi. Eng toza. |
+| **B. Saqlab qo'yish** | Kod qoladi, lekin ekranda ochiq ogohlantirish: "bot rejimi to'liq ishlamaydi". Kelajakda bot konsoli qurilsa asos bo'ladi. |
+| **C. Bot konsoli** | Chat ro'yxati o'rniga boshqa UI: `messages.getMessages` (ID bo'yicha xabar) + `updates` orqali real vaqtda kelgan xabarlar. Bu **yangi, alohida loyiha**, kichik ish emas. |
+
+Hozircha hech biri tanlanmagan.
