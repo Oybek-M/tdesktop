@@ -624,6 +624,32 @@ void RunMigrations() {
                 "ADD COLUMN source TEXT NOT NULL DEFAULT 'observed'");
     }
 
+    // v11 → v12: mavjud story yozuvlarini status shkalasiga ko'chirish (A16 §1).
+    //
+    // Nima uchun: §1 kodi faqat YANGI story hodisasida ishlaydi. Bazadagi
+    // eski `field='story'` yozuvlari esa shkalada ko'rinmasdi — foydalanuvchi
+    // buni "ishlamayapti" deb ko'rdi. Bu bir martalik ko'chirish.
+    //
+    // `new_value` — story QO'YILGAN vaqt (unix). `observed_at` ga aynan
+    // o'sha yoziladi, kuzatilgan vaqt EMAS.
+    if (version < 12) {
+        execSql(
+            "INSERT INTO activity_history "
+            "(peer_id, field, old_value, new_value, observed_at, account_id, source) "
+            "SELECT s.peer_id, 'status', NULL, "
+            "  'online:' || CAST(s.new_value AS INTEGER), "
+            "  CAST(s.new_value AS INTEGER), s.account_id, 'story' "
+            "FROM activity_history s "
+            "WHERE s.field = 'story' "
+            "  AND s.new_value IS NOT NULL "
+            "  AND CAST(s.new_value AS INTEGER) > 0 "
+            "  AND NOT EXISTS ("
+            "    SELECT 1 FROM activity_history x "
+            "    WHERE x.peer_id = s.peer_id "
+            "      AND x.field = 'status' "
+            "      AND x.observed_at = CAST(s.new_value AS INTEGER))");
+    }
+
     // Update version stamp.
     {
         sqlite3_stmt *stmt = nullptr;

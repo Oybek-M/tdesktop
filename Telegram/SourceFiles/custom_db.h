@@ -52,7 +52,8 @@ struct ActionedMessage {
 // E19: Schema version constant — increment when adding new columns/tables.
 // RunMigrations() is called inside Init() automatically.
 // v11 (A16 §1): activity_history ga source ustuni
-constexpr int kCurrentSchemaVersion = 11;
+// v12 (A16 §1): mavjud story yozuvlarini status shkalasiga ko'chirish (backfill)
+constexpr int kCurrentSchemaVersion = 12;
 
 void Init();
 
