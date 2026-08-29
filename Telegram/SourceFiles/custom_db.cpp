@@ -3246,7 +3246,7 @@ QVector<ActivityHistoryEntry> GetActivityHistory(
 
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
-            "SELECT field, old_value, new_value, observed_at, source "
+            "SELECT id, field, old_value, new_value, observed_at, source "
             "FROM activity_history WHERE peer_id = ? "
             "ORDER BY observed_at DESC, id DESC "
             "LIMIT ?",
@@ -3255,18 +3255,37 @@ QVector<ActivityHistoryEntry> GetActivityHistory(
         sqlite3_bind_int(stmt, 2, (limit > 0) ? limit : -1);
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             ActivityHistoryEntry entry;
-            entry.field = colText(stmt, 0);
-            entry.hasOldValue = (sqlite3_column_type(stmt, 1) != SQLITE_NULL);
-            entry.oldValue = entry.hasOldValue ? colText(stmt, 1) : QString();
-            entry.newValue = colText(stmt, 2);
-            entry.observedAt = sqlite3_column_int64(stmt, 3);
-            const auto src = colText(stmt, 4);
+            entry.id = sqlite3_column_int64(stmt, 0);
+            entry.field = colText(stmt, 1);
+            entry.hasOldValue = (sqlite3_column_type(stmt, 2) != SQLITE_NULL);
+            entry.oldValue = entry.hasOldValue ? colText(stmt, 2) : QString();
+            entry.newValue = colText(stmt, 3);
+            entry.observedAt = sqlite3_column_int64(stmt, 4);
+            const auto src = colText(stmt, 5);
             entry.source = src.isEmpty() ? u"observed"_q : src;
             result.append(entry);
         }
         sqlite3_finalize(stmt);
     }
     return result;
+}
+
+bool DeleteActivityEntry(qint64 id) {
+    Init();
+    if (!gDb || id <= 0) return false;
+
+    sqlite3_stmt *stmt = nullptr;
+    bool deleted = false;
+    if (sqlite3_prepare_v2(gDb,
+            "DELETE FROM activity_history WHERE id = ? AND source != 'observed'",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, id);
+        if (sqlite3_step(stmt) == SQLITE_DONE) {
+            deleted = (sqlite3_changes(gDb) > 0);
+        }
+        sqlite3_finalize(stmt);
+    }
+    return deleted;
 }
 
 // ---------------------------------------------------------------------------

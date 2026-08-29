@@ -467,6 +467,7 @@ void ClearAllArchive();
 // bo'lganda amalga oshiriladi (chaqiruvchi tomonidan tekshiriladi).
 
 struct ActivityHistoryEntry {
+    qint64 id = 0;         // activity_history.id — o'chirish uchun kerak
     QString field;         // "name" | "username" | "photo" | "status"
     bool hasOldValue = false; // false = bu shu peer/field uchun BIRINCHI yozuv
     QString oldValue;      // hasOldValue=false bo'lsa mazmunsiz (bo'sh)
@@ -497,6 +498,11 @@ void SaveActivityHistoryEntry(
     const QString &peerId,
     const QString &field,
     qint64 observedAt);
+
+// A16: bitta faollik yozuvini o'chiradi. Faqat `source != 'observed'`
+// yozuvlar o'chiriladi — tizim kuzatgan yozuvlarga tegish ma'lumot
+// yaxlitligini buzadi. O'chirilgan bo'lsa true qaytaradi.
+[[nodiscard]] bool DeleteActivityEntry(qint64 id);
 
 // Shu peer/field uchun eng oxirgi yozilgan qiymatni qaytaradi.
 // Qaytish qiymati: true — topildi (outValue to'ldirildi), false — hali

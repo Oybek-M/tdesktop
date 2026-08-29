@@ -9,6 +9,7 @@
 #include "ui/widgets/labels.h"
 #include "ui/wrap/vertical_layout.h"
 #include "ui/widgets/scroll_area.h"
+#include "ui/toast/toast.h"
 #include "styles/style_layers.h"
 #include "styles/style_boxes.h"
 #include "styles/style_settings.h"
@@ -265,12 +266,29 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 				st::boxRowPadding);
 		}
 		for (const auto &e : entries) {
-			content->add(
+			const auto label = content->add(
 				object_ptr<Ui::FlatLabel>(
 					content,
 					rpl::single(FormatEntryLine(e)),
 					st::boxLabel),
 				st::boxRowPadding);
+
+			if (e.source != u"observed"_q) {
+				const auto delLink = content->add(
+					object_ptr<Ui::LinkButton>(
+						content,
+						u"🗑 O'chirish"_q),
+					st::boxRowPadding);
+				delLink->setClickedCallback([=] {
+					if (CustomDB::DeleteActivityEntry(e.id)) {
+						label->hide();
+						delLink->hide();
+						Ui::Toast::Show(u"Yozuv o'chirildi"_q);
+					} else {
+						Ui::Toast::Show(u"O'chirib bo'lmadi"_q);
+					}
+				});
+			}
 
 			// 2026-08-15: rasm o'zgarishida SAQLANGAN rasmni ochish
 			// imkoni. Ilgari avatar faqat diskda yotardi va uni faqat
