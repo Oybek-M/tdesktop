@@ -3155,11 +3155,26 @@ int CompactActivityHistory() {
 
     execSql("BEGIN");
     // 1-qoida
+    //
+    // 2026-08-30: `source = 'observed'` sharti QO'SHILDI — bu filtr
+    // faqat TIZIM KUZATGAN yozuvlarga tegishli.
+    //
+    // Nima uchun: filtr "holat bir xil VA yoshi farqi < 60s" bo'lsa
+    // o'chiradi. Retroaktiv nuqtalarda (story/manual/buffer) esa
+    // `observed_at` = hodisa vaqtining O'ZI, ya'ni "yosh" DOIM 0.
+    // Natijada bitta odamning ikkita story nuqtasi filtr uchun aynan
+    // bir xil ko'rinardi va ikkinchisi o'chib ketardi — 4 ta story'si
+    // bor odamda 1 ta nuqta qolgan (dalil: 2026-08-30 tekshiruvi).
+    //
+    // Shart oyna KIRISHIDA turibdi (WHERE ... WINDOW dan oldin), ya'ni
+    // retroaktiv yozuvlar na o'chiriladi, na LAG orqali taqqoslashga
+    // aralashadi.
     execSql(
         "DELETE FROM activity_history WHERE id IN (SELECT id FROM ("
         "  SELECT id, field, new_value nv, observed_at obs,"
         "         LAG(new_value) OVER w pv, LAG(observed_at) OVER w po"
         "  FROM activity_history"
+        "  WHERE source = 'observed'"
         "  WINDOW w AS (PARTITION BY peer_id, field ORDER BY id))"
         " WHERE field = 'status' AND pv IS NOT NULL"
         "   AND instr(nv, ':') > 0 AND instr(pv, ':') > 0"
