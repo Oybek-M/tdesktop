@@ -8,37 +8,23 @@ Oxirgi yangilanish: 2026-08-28
 
 ---
 
-# 🟡 SHU YERDAN BOSHLANG (2026-08-28) — QO'LDA SINOV KUTILMOQDA
+# ✅ TDESKTOP TOMONI TOZA (2026-08-30)
 
-✅ **BUILD O'TDI — 2026-08-29, 16:58** (commit `71307a9704` bilan).
+**Barcha ochiq ishlar yopildi, build va sinovdan o'tdi.**
 
-**2026-08-29 sinovidan o'tganlar:** A16 §3 (tugma + bufer) ✅,
-§2 (qo'lda yozuv) ✅, sxema v11 migratsiyasi ✅, avtomatik
-migratsiya zaxirasi ✅. A15 sinovi HAL QILUVCHI natija berdi
-(pastga qarang).
+Build: 2026-08-30 15:11 (`Pictures\Release\Telegram.exe`).
+Jonli baza sxemasi: **v12**, `integrity: ok`.
 
-🔴 **Oxirgi build'dagi UCHTA narsa hali sinalmagan:**
-
-| Nima | Qanday sinaladi |
+| Ish | Holat |
 |---|---|
-| **Sxema v12** — story backfill | Ishga tushirishda migratsiya toza o'tsin. ⚠️ Bu mashinada **0 qator** qo'shiladi (2026-08-29 da qo'lda backfill qilingan) — bu normal, migratsiya idempotent |
-| **Yozuvni o'chirish** | Faollik tarixida `🗑 O'chirish` havolasi FAQAT 📖/✍️/⏱ yozuvlarda chiqsin, `observed` larda **chiqmasin** |
-| **A15 ogohlantirish matni** | Bot token ekranida matn uzun (4 qator) — "Next" tugmasi bilan to'qnashmayotganini **ko'z bilan tekshirish kerak** |
+| **A16 §1** — story vaqti `status` shkalasiga | ✅ 92 nuqta, 📖 belgisi bilan |
+| **A16 §2** — qo'lda yozuv + `🗑 O'chirish` | ✅ o'chirish faqat retroaktiv yozuvlarda chiqadi |
+| **A16 §3** — tez tugma + vaqtinchalik bufer | ✅ |
+| **A15** — bot token | ✅ savol yopildi: `BOT_METHOD_INVALID`. Kod ogohlantirish bilan saqlandi |
+| Sxema **v11** (`source`) va **v12** (story backfill) | ✅ ikkala migratsiya toza o'tdi |
+| Kompaksiya xatosi | ✅ shovqin filtri retroaktiv yozuvlarni yeb qo'yardi — tuzatildi va isbotlandi (23 → 0) |
 
-## Avvalgi build (2026-08-28) dan sinalgan ishlar
-
-| Ish | Commit | Nima sinaladi |
-|---|---|---|
-| **A16 §1** — story vaqti `status` shkalasiga | `70695edabb` | Story qo'ygan kontaktning story vaqti so'nggi-faollik shkalasida onlayn nuqtasi bo'lib chiqsin |
-| **Sxema v11** — `activity_history.source` | `bb1ff6d846` | Migratsiya toza o'tsin, `source` ustuni paydo bo'lsin |
-| **A16 §3** — tez tugma + bufer | `4fc346ea48` | Chatga o'ng tugma → "Faollikni kuzatish"; bosilganda oldingi daqiqalardagi faollik tiklansin |
-| **A16 §2** — qo'lda yozuv + belgilar | `1c0719bb7a` | "Qo'lda faollik yozuvi qo'shish" oynasi; tarixda 📖 / ✍️ / ⏱ belgilari |
-| **A15** — bot token login | `537893e329`..`71307a9704` | 🔴 **SINOVDAN O'TDI — `BOT_METHOD_INVALID`.** To'liq klient MUMKIN EMAS. Kod saqlab qolindi (B varianti), ogohlantirish bilan |
-| Tuzatishlar | `cd39761ea2`, `acb45f86c6` | Imlo, bufer shovqin filtri, apostroflar |
-
-**A15 sinovi alohida muhim:** `log.txt` dagi `[BOTPROBE] messages.getDialogs`
-natijasi bot token yo'nalishi davom etadimi yoki yopiladimi — shuni hal qiladi.
-Yo'riqnoma: `specs/2026-08-28-a15-bot-token-phase1.md`
+Track C uchun keyingi bo'sh sxema versiyasi — **v13**.
 
 ## Yaqinda YOPILGAN ishlar
 
