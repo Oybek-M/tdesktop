@@ -317,3 +317,34 @@ Ikkala kamchilik ham kod darajasida to'liq hal qilindi:
    - `ActivityHistoryEntry` struct'iga `id` maydoni qo'shildi va `GetActivityHistory` da o'qiladi.
    - `CustomDB::DeleteActivityEntry(id)` funksiyasi qo'shildi (faqat `source != 'observed'` bo'lgan yozuvlarni o'chiradi).
    - Faollik tarixi oynasida (`custom_activity_history_box.cpp`) noshaxsiy/sun'iy yozuvlar (`source != 'observed'`) tagiga "🗑 O'chirish" havolasi ulandi.
+
+---
+
+## 8. \U0001F534 XATO: shovqin filtri retroaktiv yozuvlarni yeb qo'yardi (2026-08-30)
+
+Sxema v12 migratsiyasi toza o'tdi (integrity ok, dublikat 0, avtomatik
+zaxira `premigrate-v11-20260830-144322.bak`). Lekin bazani tekshirganda
+story nuqtalari **92 tadan 68 taga** tushib qolgani aniqlandi.
+
+**Sabab:** `CompactActivityHistory()` dagi 1-qoida (shovqin filtri).
+U ketma-ket `status` yozuvlarini solishtiradi va holat prefiksi bir xil
+bo'lib "yosh" farqi 60 soniyadan kam bo'lsa — o'chiradi.
+
+Retroaktiv nuqtalarda `observed_at` = hodisa vaqtining O'ZI, ya'ni
+**yosh doim 0**. Shuning uchun bir odamning ikkita story nuqtasi filtr
+uchun aynan bir xil ko'rinardi.
+
+Dalil: 4 ta story yozuvi bor odamda **1 ta** status nuqtasi qolgan.
+
+**Tuzatildi:** filtr oynasining kirishiga `WHERE source = 'observed'`
+qo'shildi — retroaktiv yozuvlar na o'chiriladi, na taqqoslashga
+aralashadi. Shart oyna kirishida (WINDOW dan oldin) turibdi.
+
+`manual` yozuvlar zarar ko'rmagan (6 tasi ham joyida): ular
+`online:`/`offline:` juftligi, prefikslari har xil bo'lgani uchun filtr
+ishga tushmagan. Ya'ni xato faqat bir xil prefiksli ketma-ket
+retroaktiv nuqtalarga tegishli edi.
+
+⚠️ **Build kerak.** Undan keyin yo'qolgan story nuqtalarini qayta
+backfill qilish mumkin (v12 migratsiyasi bir marta ishlagani uchun
+qo'lda qilinadi).
