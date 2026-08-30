@@ -203,13 +203,16 @@ record_id = SHA256(kind ‖ 0x00 ‖ peer_hash ‖ 0x00 ‖ msg_id ‖ 0x00 ‖ 
 to'qnashishi mumkin — turli akkauntlarning yozuvlari serverda
 **qaytarib bo'lmaydigan** tarzda bir-birining ustiga yoziladi.
 
-**Qaror (2026-08-26, `customsync-server` sessiyasida tasdiqlandi):**
-ikkala taklif qilingan yechim birlashtiriladi — ichki himoya
-(`peer_hash` akkauntga bog'lanadi) **va** tashqi himoya (`record_id`
-o'z `account_hash` maydonini oladi). Ikkalasi birga: `peer_hash`ga
-tayanadigan eski kod ham to'g'ri ishlaydi, `record_id`ning o'zi ham
-mustaqil tekshiriladi/filtrlanadi (masalan server tomonida
-shifrlashsiz `account_hash` bo'yicha).
+**Qaror (2026-08-26, `customsync-server` sessiyasida tasdiqlandi,
+tdesktop-client sessiyasidagi §5.1 topilmasi bilan TUZATILDI):**
+faqat **(a) variant** — `peer_hash` formulasi **o'ZGARMAYDI**.
+Sabab: `activity` kind (last-seen bypass) **kuzatilayotgan odam
+haqidagi obyektiv fakt**, "bizniki" emas — uni akkauntga bog'lash
+bypass qamrovini buzadi (bir necha akkauntning birlashgan kuzatuv
+oynasi buning asosi). Agar `peer_hash` akkauntga bog'lansa, `activity`
+ham majburan ajralib qolardi. Batafsil:
+[`2026-08-26-multi-account-db-isolation-design.md`](2026-08-26-multi-account-db-isolation-design.md)
+§4.1 va §5.1.
 
 **Yangi hosila kalit** (§4.1 kalit ierarxiyasiga qo'shiladi):
 
@@ -227,13 +230,6 @@ account_hash = HMAC-SHA256(account_key, account_id_decimal)[0:16] -> hex
 `account_id` — tdesktop'dagi `session().userId()`, o'nlik SATR
 sifatida (peer_id kabi).
 
-**`peer_hash` formulasi o'zgaradi** (§3.1/`sync-protocol/README.md`
-eskiradi, shu yer ustun turadi):
-
-```
-peer_hash = HMAC-SHA256(peer_key, account_id_decimal ‖ 0x00 ‖ peer_id_decimal)[0:16] -> hex
-```
-
 **`record_id` formulasi o'zgaradi:**
 
 ```
@@ -243,6 +239,14 @@ record_id = SHA256(kind ‖ 0x00 ‖ account_hash ‖ 0x00 ‖ peer_hash ‖ 0x0
 
 `0x00` ajratuvchi barcha maydonlar orasida, xuddi eski formuladagi
 kabi.
+
+🔴 **`activity` kind uchun `account_hash` = bo'sh satr (`""`).** Barcha
+boshqa kind'lar (`deleted`, `edited`, `ghost_read`, `setting`,
+`peer_directory`, `media_index`, `tombstone`) haqiqiy `account_hash`
+oladi. Bu ataylab: bir xil `activity` kuzatuvi ikki akkauntdan kelsa,
+`account_hash` bo'sh bo'lgani uchun ikkalasi **bir xil `record_id`**
+beradi va server K4 (yozish idempotent) orqali tabiiy ravishda
+birlashtiradi — alohida deduplikatsiya kodi kerak emas.
 
 🔴 **Bu `test-vectors.json` ni buzadi.** Hech bir platforma hali sync
 kodini implement qilmagan (tdesktop plan 02, server-controller 03,
@@ -350,6 +354,38 @@ variant uchun kamida bitta vektor, `record_id` bo'limiga esa bo'sh
 `account_hash` li kamida bitta `activity` vektori qo'shilishi shart —
 aks holda bu istisno platformalarda jimgina noto'g'ri implement
 qilinadi.
+
+### 0.13 `tombstone` nishoni OCHIQ maydonda yuboriladi (2026-08-27)
+
+§0.3 serverdan tombstone kelganda "asl yozuvni o'chirish"ni talab
+qiladi, lekin nishonni `payload` ichida deb belgilaydi. `payload`
+esa E2E shifrlangan `byte[]` — **server uni o'qiy olmaydi**, ya'ni
+talab hozirgi shaklda bajarilmaydi.
+
+**Qaror:** `tombstone` yozuvi `target_record_id` ni **ochiq**
+maydonda ham yuboradi. Sync so'rovida yangi ixtiyoriy maydon:
+
+```
+target_record_id  (faqat kind='tombstone' uchun, aks holda null)
+```
+
+`records` jadvaliga shu nomli nullable ustun qo'shiladi.
+
+🔴 **Bu hech qanday maxfiylikni buzmaydi.** `record_id` allaqachon
+ochiq — u `records` jadvalining PRIMARY KEY'i va har `pull`
+javobida qaytadi. Server barcha `record_id` larni baribir biladi,
+shuning uchun nishonni ochiq yuborish unga yangi ma'lumot bermaydi.
+Shifrlangan `payload` esa o'z joyida qoladi (nishon u yerda ham
+takrorlanadi — mijozlar uchun).
+
+**Server xatti-harakati** (idempotent, K4):
+1. `target_record_id` bo'yicha `records` dan asl qatorni o'chiradi.
+2. Tombstone yozuvining o'zini saqlaydi.
+3. Asl qator topilmasa ham tombstone saqlanadi — boshqa qurilma uni
+   keyinroq push qilishi mumkin, o'shanda darhol o'chiriladi.
+
+**Ta'sirlanadi:** hammasi. tdesktop sync agenti (plan 02) tombstone
+push qilganda shu maydonni to'ldirishi shart.
 
 ---
 

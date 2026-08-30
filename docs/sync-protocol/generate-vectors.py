@@ -36,11 +36,12 @@ account_key = hkdf(master, "customsync-account-v1")
 def account_hash(account_id):
     return hmac.new(account_key, account_id.encode(), hashlib.sha256).digest()[:16].hex()
 
-# spec §0.12: peer_hash endi account_id ni ham kiritadi -- shu bilan
-# ikkita akkauntning bir xil peer_id'si turli peer_hash beradi.
-def peer_hash(account_id, peer_id):
-    msg = account_id.encode() + b"\x00" + peer_id.encode()
-    return hmac.new(peer_key, msg, hashlib.sha256).digest()[:16].hex()
+# spec §0.12 (a variant): peer_hash O'ZGARMAYDI -- account ajratmasi
+# faqat record_id'dagi account_hash orqali beriladi. Sabab: activity
+# kind kuzatilayotgan odam haqidagi fakt, akkauntga bog'lansa bypass
+# qamrovi buziladi (tashxis §4.1/§5.1).
+def peer_hash(peer_id):
+    return hmac.new(peer_key, peer_id.encode(), hashlib.sha256).digest()[:16].hex()
 
 vec = {
   "_comment": [
@@ -77,15 +78,11 @@ vec = {
   },
 
   "peer_hash": {
-    "_note": [
-      "spec §0.12 (2026-08-26). HMAC-SHA256(peer_key, account_id || 0x00 || peer_id)[0..16] -> hex.",
-      "account_id va peer_id — O'NLIK SATR. Eski formula (account_id'siz) ESKIRGAN."
-    ],
+    "_note": "HMAC-SHA256(peer_key, peer_id)[0..16] -> hex. peer_id — O'NLIK SATR. Formula §0.12 dan keyin ham o'zgarmagan.",
     "cases": [
-      {"account_id": "111222333", "peer_id": "7053823996",      "peer_hash": peer_hash("111222333", "7053823996")},
-      {"account_id": "111222333", "peer_id": "562952781246744", "peer_hash": peer_hash("111222333", "562952781246744")},
-      {"account_id": "111222333", "peer_id": "0",               "peer_hash": peer_hash("111222333", "0")},
-      {"account_id": "444555666", "peer_id": "7053823996",      "peer_hash": peer_hash("444555666", "7053823996")}
+      {"peer_id": "7053823996",      "peer_hash": peer_hash("7053823996")},
+      {"peer_id": "562952781246744", "peer_hash": peer_hash("562952781246744")},
+      {"peer_id": "0",               "peer_hash": peer_hash("0")}
     ]
   },
 
@@ -95,7 +92,9 @@ vec = {
       "SHA256(kind || 0x00 || account_hash || 0x00 || peer_hash || 0x00 || msg_id_decimal || 0x00 || occurred_at_decimal)",
       "msg_id MANFIY bo'lishi mumkin (avatar -photo_id, story -story_id).",
       "Ishora SAQLANADI: -42 va 42 turli yozuvlar.",
-      "Oxirgi ikkita holat: bir xil kind/peer_hash/msg_id/occurred_at, FAQAT account_hash farq qiladi -- ikkalasi turli record_id berishi SHART (akkaunt ajratmasi tekshiruvi, §0.12)."
+      "account_hash = BO'SH SATR faqat kind='activity' uchun (tashxis §4.1/§5.1: last-seen bypass akkauntlar bo'ylab birlashadi). Boshqa hamma kind haqiqiy account_hash oladi.",
+      "Oxirgi 2 holat: bir xil deleted/peer_hash/msg_id/occurred_at, FAQAT account_hash farq qiladi -> turli record_id (ajratma ishlayapti).",
+      "Undan oldingi 2 holat: bir xil activity/peer_hash/msg_id/occurred_at, ikki turli akkaunt, account_hash ikkalasida ham bo'sh -> BIR XIL record_id (birlashish ishlayapti)."
     ],
     "cases": []
   },
@@ -120,22 +119,33 @@ acc_a = "111222333"
 acc_b = "444555666"
 ah_a = account_hash(acc_a)
 ah_b = account_hash(acc_b)
-ph = peer_hash(acc_a, "7053823996")
+ph = peer_hash("7053823996")
 for kind, mid, occ in [
     ("deleted",    395278,          1787000000),
     ("edited",     390234,          1787000001),
-    ("activity",   0,               1787000002),
+    ("activity",   0,               1787000002),   # account_hash="" -- pastga qarang
     ("media_index", 597,            1787000003),
     ("media_index", -5190442718973336697, 1787000004),   # avatar: -photo_id
     ("media_index", -12345,         1787000005),          # story: -story_id
     ("tombstone",  0,               1787000006),
 ]:
+    ah = "" if kind == "activity" else ah_a
     vec["record_id"]["cases"].append({
-        "kind": kind, "account_hash": ah_a, "peer_hash": ph, "msg_id": mid,
-        "occurred_at": occ, "record_id": record_id(kind, ah_a, ph, mid, occ)
+        "kind": kind, "account_hash": ah, "peer_hash": ph, "msg_id": mid,
+        "occurred_at": occ, "record_id": record_id(kind, ah, ph, mid, occ)
     })
 
-# Akkaunt ajratmasi tekshiruvi: bir xil kind/peer_hash/msg_id/occurred_at,
+# Birlashish tekshiruvi: activity, ikki turli akkaunt, account_hash
+# ikkalasida ham "" -- record_id BIR XIL bo'lishi SHART (last-seen
+# bypass akkauntlar bo'ylab birlashadi, tashxis §5.1).
+for _ in (acc_a, acc_b):
+    vec["record_id"]["cases"].append({
+        "kind": "activity", "account_hash": "", "peer_hash": ph,
+        "msg_id": 0, "occurred_at": 1787000200,
+        "record_id": record_id("activity", "", ph, 0, 1787000200)
+    })
+
+# Ajratma tekshiruvi: bir xil deleted/peer_hash/msg_id/occurred_at,
 # faqat account_hash farq qiladi -- record_id ham farq qilishi SHART.
 for ah in (ah_a, ah_b):
     vec["record_id"]["cases"].append({

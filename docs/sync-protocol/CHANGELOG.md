@@ -9,7 +9,38 @@ Format: `## YYYY-MM-DD — sarlavha`
 
 ---
 
-## 2026-08-26 — 🔴 `record_id` da akkaunt yo'q (HAL QILINMAGAN)
+## 2026-08-27 — `tombstone` nishoni ochiq maydonda
+
+**Nima:** `tombstone` yozuvi `target_record_id` ni ochiq maydonda ham
+yuboradi; `records` ga shu nomli nullable ustun qo'shiladi. Spec §0.13.
+
+**Nima uchun:** §0.3 serverdan asl yozuvni o'chirishni talab qiladi,
+lekin nishonni shifrlangan `payload` ichida belgilagan edi — server uni
+o'qiy olmaydi. Maxfiylik buzilmaydi: `record_id` allaqachon ochiq
+(PRIMARY KEY va har `pull` javobida qaytadi).
+
+**Ta'sirlanadi:** hammasi. tdesktop (plan 02) tombstone push qilganda
+maydonni to'ldirishi shart.
+
+---
+
+## 2026-08-26 — ✅ `record_id` akkaunt ajratmasi HAL QILINDI
+
+**Qaror:** faqat (a) variant. `peer_hash` o'zgarmaydi. `record_id`
+`account_hash` maydonini oladi, **`activity` kind uchun bo'sh satr**
+(§5.1 dagi birlashish talabi saqlanadi). Yangi kalit
+`customsync-account-v1`. Spec §0.12 to'liq formula bilan.
+
+`test-vectors.json` qayta generatsiya qilindi: `account_hash` (3),
+`record_id` (7→11, jumladan birlashish va ajratma isbotlovchi 4 ta
+yangi holat). `peer_hash` o'zgarmadi.
+
+**Ta'sirlanadi:** hammasi, lekin hech kim sync kodini hali
+implement qilmagan — eng arzon payt edi.
+
+---
+
+## 2026-08-26 — 🔴 `record_id` da akkaunt yo'q (HAL QILINMAGAN, ↑ ga qarang)
 
 **Nima:** tdesktop'da ko'p akkauntli aralashuv xatosi topildi — baza
 `(peer_id, msg_id)` bilan kalitlangan, `account_id` yo'q. 12 ta akkaunt
