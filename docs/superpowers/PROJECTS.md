@@ -300,7 +300,8 @@ shuning uchun birga qilinadi.
 | 2 | **S1 — story fonining miltillashi** | GL/RHI yo'liga qamalgan. Vaqtinchalik yechim bor (OpenGL o'chirish), ya'ni bloklamaydi. Eng noaniq ish. |
 | 3 | **Priority lazy loader** | Tanlangan chat yuqori prioritetga, chat almashganda prioritet ko'chadi. Hozircha shoshilinch emas — og'ir yuk fonga ko'chirilgan. |
 | 4 | **A10 — bitta tugmali sync+build+publish** | A9 ustiga quriladi. Har upstream sync'da qo'lda 4-5 qadam bajarilmoqda. |
-| 5 | **A14 — o'qilgan vaqt orqali faollik** 🆕 | Pastda batafsil. Foydalanuvchi 2026-08-25 da topdi. |
+| 0 | 🔴 **A17 — xabarning o'qilgan vaqtini saqlash** 🆕 | **ENG USTUVOR** (2026-08-31). AntiDelete xabarni saqlaydi, lekin o'qilgan vaqtini yo'qotadi. Sxema **v13** (`read_at`). A14 uchun poydevor. Ikkala loyihaga ham tegishli. Batafsil: [`specs/2026-08-31-a17-message-read-time-design.md`](specs/2026-08-31-a17-message-read-time-design.md) |
+| 5 | **A14 — o'qilgan vaqt orqali faollik** | A17 dan KEYIN — u tugagach bu arzon ishga aylanadi. Foydalanuvchi 2026-08-25 da topdi, pastda batafsil. |
 | 6 | **Reliz yuklashni API ga o'tkazish** 🆕 | SSH/scp o'rniga `customsync-server` API. Yuqorida batafsil. |
 | 7 | **A15 — bot token orqali kirish** 🆕 | Foydalanuvchi 2026-08-26 da so'radi. **v10 dan KEYIN.** Pastda batafsil. |
 | 8 | **A16 — faollik kuzatuvidagi bo'shliqlar** | 🟢 **DEYARLI TUGADI** (2026-08-29). §3 va §2 sinovdan o'tdi, §1 backfill (v12) va o'chirish imkoni qurildi — sinov qoldi. 3 ta bo'shliq: story vaqti `status` ga tushmaydi, qo'lda yozuv qo'shish yo'q, ro'yxatga o'z vaqtida qo'sha olmaslik. **Qaror qabul qilingan:** tez tugma + vaqtinchalik bufer (`activityBufferMinutes`, standart 10, 1–120 daqiqa, Faollik tarixi bo'limida sozlanadi). Batafsil: [`specs/2026-08-28-a16-activity-capture-gaps.md`](specs/2026-08-28-a16-activity-capture-gaps.md) |

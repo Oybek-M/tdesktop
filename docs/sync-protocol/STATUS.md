@@ -59,8 +59,8 @@ yo'qotish — tiklab bo'lmaydi.
    §4. Sync'dan OLDIN bajariladi.
 2. **`sha256` hisoblash** — `media_index` ga to'ldirish
    (yangi fayllar + mavjud 1543 ta uchun backfill)
-3. **Sxema v13** — `sync_outbox` + `sync_state`
-   ⚠️ v9 band (placeholder tozalash), v10 band (`account_id`), v11 band (`activity_history.source` ustuni, A16 §1), v12 band (story backfill, A16 §1)
+3. **Sxema v14** — `sync_outbox` + `sync_state`
+   ⚠️ v9 band (placeholder tozalash), v10 band (`account_id`), v11 band (`activity_history.source` ustuni, A16 §1), v12 band (story backfill, A16 §1), v13 band (`actioned_messages.read_at`, A17)
 4. `CustomSync` moduli — plan 02 ning qolgan qismi
 
 ---
