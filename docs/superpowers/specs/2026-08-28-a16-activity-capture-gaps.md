@@ -348,3 +348,22 @@ retroaktiv nuqtalarga tegishli edi.
 ⚠️ **Build kerak.** Undan keyin yo'qolgan story nuqtalarini qayta
 backfill qilish mumkin (v12 migratsiyasi bir marta ishlagani uchun
 qo'lda qilinadi).
+
+### Tuzatish TASDIQLANDI (2026-08-30, build 15:11)
+
+Yangi build ishga tushirilgach, kompaksiya qoidasi jonli baza ustida
+simulyatsiya qilindi:
+
+| Kod | O'chiriladigan yozuvlar |
+|---|---|
+| Eski (filtrsiz) | **23** — hammasi `source='story'` |
+| Yangi (`WHERE source='observed'`) | **0** |
+
+Story nuqtalari qayta backfill qilindi: **68 → 92**
+(zaxira: `storyrefill-20260830-151445.bak`, `integrity: ok`).
+
+95 ta `field='story'` yozuvidan 92 tasi status nuqtasiga ega. Qolgan
+3 tasi — o'sha vaqtda allaqachon haqiqiy `observed` status yozuvi
+bo'lgan holatlar (`NOT EXISTS` sharti to'g'ri ishlagan).
+
+**A16 §1 shu bilan to'liq yopiladi.**
