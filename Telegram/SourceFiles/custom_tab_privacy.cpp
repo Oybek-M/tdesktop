@@ -1,16 +1,8 @@
 #include "custom_tab_common.h"
 
 void fillPrivacyTab(not_null<Ui::VerticalLayout*> content) {
-	const auto addSection = [&](const QString &title) {
-		content->add(
-			object_ptr<Ui::FlatLabel>(
-				content,
-				rpl::single(title),
-				st::defaultSubsectionTitle),
-			st::defaultSubsectionTitlePadding);
-	};
-
 	const auto addToggle = [&](
+			not_null<Ui::VerticalLayout*> parent,
 			const QString &id,
 			const QString &text,
 			const QString &description) {
@@ -24,15 +16,13 @@ void fillPrivacyTab(not_null<Ui::VerticalLayout*> content) {
 		else if (id == u"storyAnonymousView"_q) current = val.storyAnonymousView;
 		else if (id == u"storyMediaBackupEnabled"_q) current = val.storyMediaBackupEnabled;
 
-		const auto btn = content->add(
+		const auto btn = parent->add(
 			object_ptr<Ui::SettingsButton>(
-				content,
+				parent,
 				rpl::single(text),
 				st::settingsButtonNoIcon));
 		btn->toggleOn(rpl::single(current));
 
-		// rpl::skip(1) — startup da dastlabki emit o'tkazib yuboriladi.
-		// Faqat foydalanuvchi toggle bosganida Set() va toast ishlaydi.
 		btn->toggledValue()
 			| rpl::skip(1)
 			| rpl::on_next([=](bool on) {
@@ -43,14 +33,14 @@ void fillPrivacyTab(not_null<Ui::VerticalLayout*> content) {
 		}, btn->lifetime());
 
 		if (!description.isEmpty()) {
-			const auto descLabel = content->add(
+			const auto descLabel = parent->add(
 				object_ptr<Ui::FlatLabel>(
-					content,
+					parent,
 					rpl::single(description),
 					st::customModHintLabel),
 				st::boxRowPadding,
 				style::al_justify);
-			content->widthValue() | rpl::on_next([=](int w) {
+			parent->widthValue() | rpl::on_next([=](int w) {
 				const auto lw = w
 					- st::boxRowPadding.left()
 					- st::boxRowPadding.right();
@@ -63,33 +53,41 @@ void fillPrivacyTab(not_null<Ui::VerticalLayout*> content) {
 		return btn;
 	};
 
-	Ui::AddSkip(content, st::settingsThumbSkip);
-	addSection(u"🛡️ Yashirinlik va Maxfiylik"_q);
+	// 1-bo'lim: Yashirinlik (Standart ochiq)
+	const auto s1 = AddCollapsibleSection(content, u"🛡️ Yashirinlik va Maxfiylik"_q, true);
+
 	addToggle(
+		s1,
 		u"ghostMode"_q,
 		u"Ghost Mode"_q,
 		u"Online holatini, yozmoqda belgisini va xabar o'qildi bildirishnomasini yashiradi.\n\nYoqilgach, to'liq kuchga kirishi uchun 1-2 daqiqa ketishi mumkin."_q);
 	addToggle(
+		s1,
 		u"storyAnonymousView"_q,
 		u"Hikoyalarni anonim ko'rish"_q,
 		u"Hikoyani ko'rganingiz haqida egasiga bildirish yuborilmaydi."_q);
 	addToggle(
+		s1,
 		u"storyMediaBackupEnabled"_q,
 		u"Hikoya media'sini saqlash"_q,
 		u"Kuzatilayotgan userlarning hikoya (story) rasmi/videosi avtomatik, ko'rmasdan lokal saqlanadi. Disk joyini sarflaydi, standart holatda o'chirilgan."_q);
 	addToggle(
+		s1,
 		u"bypassRestrictions"_q,
 		u"Cheklangan chatda nusxalash va yuborish"_q,
 		u"Cheklov qo'yilgan chatlardagi xabarlarni boshqaga yuborish yoki nusxa olishga ruxsat beradi."_q);
 	addToggle(
+		s1,
 		u"antiDelete"_q,
 		u"Anti-Delete"_q,
 		u"O'chirilgan xabarlarni ko'rinishda qoldiradi."_q);
 	addToggle(
+		s1,
 		u"antiEdit"_q,
 		u"Anti-Edit"_q,
 		u"Tahrirdan oldingi matnni ko'rsatadi."_q);
 	addToggle(
+		s1,
 		u"offlineDb"_q,
 		u"Offline xabar bazasi"_q,
 		u"Xabarlar va medialarni internet bo'lmaganda ham ko'rish uchun qurilmada saqlaydi."_q);
@@ -98,9 +96,9 @@ void fillPrivacyTab(not_null<Ui::VerticalLayout*> content) {
 	{
 		const auto archived = CustomDB::ArchivedMessageCount();
 		const auto sizeMb = CustomDB::DatabaseSizeBytes() / (1024 * 1024);
-		const auto stats = content->add(
+		const auto stats = s1->add(
 			object_ptr<Ui::FlatLabel>(
-				content,
+				s1,
 				rpl::single(u"Arxivda "_q
 					+ QString::number(archived)
 					+ u" ta xabar saqlangan. Baza hajmi: "_q
@@ -109,7 +107,7 @@ void fillPrivacyTab(not_null<Ui::VerticalLayout*> content) {
 				st::customModHintLabel),
 			st::boxRowPadding,
 			style::al_justify);
-		content->widthValue() | rpl::on_next([=](int w) {
+		s1->widthValue() | rpl::on_next([=](int w) {
 			const auto lw = w
 				- st::boxRowPadding.left()
 				- st::boxRowPadding.right();

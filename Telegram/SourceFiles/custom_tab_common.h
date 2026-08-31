@@ -113,6 +113,12 @@ private:
 	rpl::event_stream<int> _tabSelected;
 };
 
+// ── Collapsible Subsection Helper ────────────────────────────────────
+not_null<Ui::VerticalLayout*> AddCollapsibleSection(
+	not_null<Ui::VerticalLayout*> container,
+	const QString &title,
+	bool initialOpen = false);
+
 // ── 7 Tab Builders ───────────────────────────────────────────────────
 void fillPrivacyTab(not_null<Ui::VerticalLayout*> content);
 void fillAppearanceTab(not_null<Ui::VerticalLayout*> content);

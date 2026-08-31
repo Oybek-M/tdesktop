@@ -1,16 +1,8 @@
 #include "custom_tab_common.h"
 
 void fillAppearanceTab(not_null<Ui::VerticalLayout*> content) {
-	const auto addSection = [&](const QString &title) {
-		content->add(
-			object_ptr<Ui::FlatLabel>(
-				content,
-				rpl::single(title),
-				st::defaultSubsectionTitle),
-			st::defaultSubsectionTitlePadding);
-	};
-
 	const auto addToggle = [&](
+			not_null<Ui::VerticalLayout*> parent,
 			const QString &id,
 			const QString &text,
 			const QString &description) {
@@ -22,9 +14,9 @@ void fillAppearanceTab(not_null<Ui::VerticalLayout*> content) {
 		else if (id == u"mutualContactShowInProfile"_q) current = val.mutualContactShowInProfile;
 		else if (id == u"mutualContactShowInMembersList"_q) current = val.mutualContactShowInMembersList;
 
-		const auto btn = content->add(
+		const auto btn = parent->add(
 			object_ptr<Ui::SettingsButton>(
-				content,
+				parent,
 				rpl::single(text),
 				st::settingsButtonNoIcon));
 		btn->toggleOn(rpl::single(current));
@@ -39,14 +31,14 @@ void fillAppearanceTab(not_null<Ui::VerticalLayout*> content) {
 		}, btn->lifetime());
 
 		if (!description.isEmpty()) {
-			const auto descLabel = content->add(
+			const auto descLabel = parent->add(
 				object_ptr<Ui::FlatLabel>(
-					content,
+					parent,
 					rpl::single(description),
 					st::customModHintLabel),
 				st::boxRowPadding,
 				style::al_justify);
-			content->widthValue() | rpl::on_next([=](int w) {
+			parent->widthValue() | rpl::on_next([=](int w) {
 				const auto lw = w
 					- st::boxRowPadding.left()
 					- st::boxRowPadding.right();
@@ -59,19 +51,21 @@ void fillAppearanceTab(not_null<Ui::VerticalLayout*> content) {
 		return btn;
 	};
 
-	Ui::AddSkip(content, st::settingsThumbSkip);
-	addSection(u"📱 Qurilma ko'rinishini almashtirish"_q);
+	// 1-bo'lim: Qurilma ko'rinishi (Standart ochiq)
+	const auto s1 = AddCollapsibleSection(content, u"📱 Qurilma ko'rinishini almashtirish"_q, true);
+
 	const auto spoofToggleBtn = addToggle(
+		s1,
 		u"spoofMobile"_q,
 		u"Mobil qurilma ko'rinishi"_q,
 		u"Telegram mobil ilovadan ishlatilayotgandek ko'rinadi."_q);
 
-	Ui::AddSkip(content, 8);
+	Ui::AddSkip(s1, 8);
 
-	const auto spoofFormWrap = content->add(
+	const auto spoofFormWrap = s1->add(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
-			content,
-			object_ptr<Ui::VerticalLayout>(content)),
+			s1,
+			object_ptr<Ui::VerticalLayout>(s1)),
 		style::margins(0, 0, 0, 0));
 	const auto spoofForm = spoofFormWrap->entity();
 
@@ -165,21 +159,20 @@ void fillAppearanceTab(not_null<Ui::VerticalLayout*> content) {
 			spoofFormWrap->toggle(on, anim::type::normal);
 		}, spoofFormWrap->lifetime());
 
-	// ── Mutual-Contact Indikatori ─────────────────────────────────────
-	Ui::AddDivider(content);
-	Ui::AddSkip(content, st::settingsThumbSkip);
-	addSection(u"🤝 Mutual-Contact Indikatori"_q);
+	// 2-bo'lim: Mutual-Contact Indikatori (Standart yopiq)
+	const auto s2 = AddCollapsibleSection(content, u"🤝 Mutual-Contact Indikatori"_q, false);
+
 	{
-		const auto desc = content->add(
+		const auto desc = s2->add(
 			object_ptr<Ui::FlatLabel>(
-				content,
+				s2,
 				rpl::single(u"Sizni ham qaytarib contact'ga qo'shgan odamlar ismi "
 					"yoniga belgi qo'yadi. Har bir joy uchun mustaqil yoqish va "
 					"mustaqil belgi (emoji) tanlash mumkin."_q),
 				st::customModHintLabel),
 			st::boxRowPadding,
 			style::al_justify);
-		content->widthValue() | rpl::on_next([=](int w) {
+		s2->widthValue() | rpl::on_next([=](int w) {
 			const auto lw = w
 				- st::boxRowPadding.left()
 				- st::boxRowPadding.right();
@@ -190,86 +183,90 @@ void fillAppearanceTab(not_null<Ui::VerticalLayout*> content) {
 		}, desc->lifetime());
 	}
 
-	Ui::AddSkip(content, 8);
+	Ui::AddSkip(s2, 8);
 	addToggle(
+		s2,
 		u"mutualContactShowInChatList"_q,
 		u"Chat ro'yxatida ko'rsatish"_q,
 		QString());
-	content->add(
+	s2->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
+			s2,
 			rpl::single(u"Belgi (chat ro'yxati uchun):"_q),
 			st::defaultSubsectionTitle),
 		st::defaultSubsectionTitlePadding);
-	const auto chatListEmojiInput = content->add(
+	const auto chatListEmojiInput = s2->add(
 		object_ptr<Ui::InputField>(
-			content,
+			s2,
 			st::defaultInputField,
 			rpl::single(u"Emoji"_q),
 			CustomSettings::MutualContactChatListEmoji()),
 		st::boxRowPadding);
 
-	Ui::AddSkip(content, 8);
+	Ui::AddSkip(s2, 8);
 	addToggle(
+		s2,
 		u"mutualContactShowInContactsList"_q,
 		u"Contacts ro'yxatida ko'rsatish"_q,
 		QString());
-	content->add(
+	s2->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
+			s2,
 			rpl::single(u"Belgi (Contacts ro'yxati uchun):"_q),
 			st::defaultSubsectionTitle),
 		st::defaultSubsectionTitlePadding);
-	const auto contactsListEmojiInput = content->add(
+	const auto contactsListEmojiInput = s2->add(
 		object_ptr<Ui::InputField>(
-			content,
+			s2,
 			st::defaultInputField,
 			rpl::single(u"Emoji"_q),
 			CustomSettings::MutualContactContactsListEmoji()),
 		st::boxRowPadding);
 
-	Ui::AddSkip(content, 8);
+	Ui::AddSkip(s2, 8);
 	addToggle(
+		s2,
 		u"mutualContactShowInProfile"_q,
 		u"Profil sarlavhasida ko'rsatish"_q,
 		QString());
-	content->add(
+	s2->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
+			s2,
 			rpl::single(u"Belgi (Profil uchun):"_q),
 			st::defaultSubsectionTitle),
 		st::defaultSubsectionTitlePadding);
-	const auto profileEmojiInput = content->add(
+	const auto profileEmojiInput = s2->add(
 		object_ptr<Ui::InputField>(
-			content,
+			s2,
 			st::defaultInputField,
 			rpl::single(u"Emoji"_q),
 			CustomSettings::MutualContactProfileEmoji()),
 		st::boxRowPadding);
 
-	Ui::AddSkip(content, 8);
+	Ui::AddSkip(s2, 8);
 	addToggle(
+		s2,
 		u"mutualContactShowInMembersList"_q,
 		u"Guruh a'zolari ro'yxatida ko'rsatish"_q,
 		QString());
-	content->add(
+	s2->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
+			s2,
 			rpl::single(u"Belgi (Guruh a'zolari ro'yxati uchun):"_q),
 			st::defaultSubsectionTitle),
 		st::defaultSubsectionTitlePadding);
-	const auto membersListEmojiInput = content->add(
+	const auto membersListEmojiInput = s2->add(
 		object_ptr<Ui::InputField>(
-			content,
+			s2,
 			st::defaultInputField,
 			rpl::single(u"Emoji"_q),
 			CustomSettings::MutualContactMembersListEmoji()),
 		st::boxRowPadding);
 
-	Ui::AddSkip(content, 8);
-	content->add(
+	Ui::AddSkip(s2, 8);
+	s2->add(
 		object_ptr<Ui::RoundButton>(
-			content,
+			s2,
 			rpl::single(u"💾 Saqlash (belgilar)"_q),
 			st::defaultBoxButton),
 		st::boxRowPadding)
@@ -289,21 +286,19 @@ void fillAppearanceTab(not_null<Ui::VerticalLayout*> content) {
 		Ui::Toast::Show(u"Saqlandi!"_q);
 	});
 
-	// ── Branding sektsiyasi ──────────────────────────────────────────
-	Ui::AddDivider(content);
-	Ui::AddSkip(content, st::settingsThumbSkip);
-	addSection(u"🎨 Branding"_q);
+	// 3-bo'lim: Branding (Standart yopiq)
+	const auto s3 = AddCollapsibleSection(content, u"🎨 Branding"_q, false);
 
 	{
-		const auto desc = content->add(
+		const auto desc = s3->add(
 			object_ptr<Ui::FlatLabel>(
-				content,
+				s3,
 				rpl::single(u"Oyna nomi va icon ni o'zgartirish. "
 					"Barcha o'zgartirishlar uchun dasturni qayta yoqing."_q),
 				st::customModHintLabel),
 			st::boxRowPadding,
 			style::al_justify);
-		content->widthValue() | rpl::on_next([=](int w) {
+		s3->widthValue() | rpl::on_next([=](int w) {
 			const auto lw = w
 				- st::boxRowPadding.left()
 				- st::boxRowPadding.right();
@@ -314,54 +309,54 @@ void fillAppearanceTab(not_null<Ui::VerticalLayout*> content) {
 		}, desc->lifetime());
 	}
 
-	Ui::AddSkip(content, 8);
+	Ui::AddSkip(s3, 8);
 
-	content->add(
+	s3->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
+			s3,
 			rpl::single(u"Asosiy oyna nomi:"_q),
 			st::defaultSubsectionTitle),
 		st::defaultSubsectionTitlePadding);
-	const auto titleInput = content->add(
+	const auto titleInput = s3->add(
 		object_ptr<Ui::InputField>(
-			content,
+			s3,
 			st::defaultInputField,
 			rpl::single(u"Masalan: MyChat"_q),
 			CustomBranding::Get().windowTitle),
 		st::boxRowPadding);
 
-	content->add(
+	s3->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
+			s3,
 			rpl::single(u"Sozlamalar oyna nomi:"_q),
 			st::defaultSubsectionTitle),
 		st::defaultSubsectionTitlePadding);
-	const auto modInput = content->add(
+	const auto modInput = s3->add(
 		object_ptr<Ui::InputField>(
-			content,
+			s3,
 			st::defaultInputField,
 			rpl::single(u"Masalan: Mening Sozlamalarim"_q),
 			CustomBranding::Get().customModTitle),
 		st::boxRowPadding);
 
-	content->add(
+	s3->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
+			s3,
 			rpl::single(u"Icon fayl yo'li (PNG yoki ICO):"_q),
 			st::defaultSubsectionTitle),
 		st::defaultSubsectionTitlePadding);
-	const auto iconInput = content->add(
+	const auto iconInput = s3->add(
 		object_ptr<Ui::InputField>(
-			content,
+			s3,
 			st::defaultInputField,
 			rpl::single(u"Bo'sh = standart icon"_q),
 			CustomBranding::Get().iconPath),
 		st::boxRowPadding);
 
-	Ui::AddSkip(content, 4);
-	content->add(
+	Ui::AddSkip(s3, 4);
+	s3->add(
 		object_ptr<Ui::RoundButton>(
-			content,
+			s3,
 			rpl::single(u"📁 Icon faylini tanlash"_q),
 			st::defaultBoxButton),
 		st::boxRowPadding)
@@ -377,10 +372,10 @@ void fillAppearanceTab(not_null<Ui::VerticalLayout*> content) {
 		}
 	});
 
-	Ui::AddSkip(content, 4);
-	content->add(
+	Ui::AddSkip(s3, 4);
+	s3->add(
 		object_ptr<Ui::RoundButton>(
-			content,
+			s3,
 			rpl::single(u"🗑️ Iconni tozalash"_q),
 			st::attentionBoxButton),
 		st::boxRowPadding)
@@ -388,10 +383,10 @@ void fillAppearanceTab(not_null<Ui::VerticalLayout*> content) {
 		iconInput->setText(QString());
 	});
 
-	Ui::AddSkip(content, 12);
-	content->add(
+	Ui::AddSkip(s3, 12);
+	s3->add(
 		object_ptr<Ui::RoundButton>(
-			content,
+			s3,
 			rpl::single(u"💾 Saqlash"_q),
 			st::defaultBoxButton),
 		st::boxRowPadding)

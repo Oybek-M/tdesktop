@@ -4,17 +4,13 @@ void fillActivityTab(
 		not_null<Ui::VerticalLayout*> content,
 		not_null<Window::SessionController*> controller,
 		Fn<void()> onRebuild) {
-	content->add(
-		object_ptr<Ui::FlatLabel>(
-			content,
-			rpl::single(u"🕒 Activity History"_q),
-			st::defaultSubsectionTitle),
-		st::defaultSubsectionTitlePadding);
+	// 1-bo'lim: Faollik tarixi va sozlamalari (Standart ochiq)
+	const auto s1 = AddCollapsibleSection(content, u"⏱️ Faollik tarixi va sozlamalari"_q, true);
 
 	{
-		const auto desc = content->add(
+		const auto desc = s1->add(
 			object_ptr<Ui::FlatLabel>(
-				content,
+				s1,
 				rpl::single(u"Kontaktlarning ism, username, rasm va "
 					"last-seen o'zgarishlarini vaqt bilan saqlaydi — faqat "
 					"ilova legal ravishda qabul qilgan ma'lumot, hech qanday "
@@ -22,7 +18,7 @@ void fillActivityTab(
 				st::customModHintLabel),
 			st::boxRowPadding,
 			style::al_justify);
-		content->widthValue() | rpl::on_next([=](int w) {
+		s1->widthValue() | rpl::on_next([=](int w) {
 			const auto lw = w
 				- st::boxRowPadding.left()
 				- st::boxRowPadding.right();
@@ -33,12 +29,12 @@ void fillActivityTab(
 		}, desc->lifetime());
 	}
 
-	// ── Global toggle ─────────────────────────────────────────────
-	Ui::AddSkip(content, 8);
+	// Global toggle
+	Ui::AddSkip(s1, 8);
 	{
-		const auto btn = content->add(
+		const auto btn = s1->add(
 			object_ptr<Ui::SettingsButton>(
-				content,
+				s1,
 				rpl::single(u"Barcha Contact'larni kuzatish"_q),
 				st::settingsButtonNoIcon));
 		btn->toggleOn(rpl::single(
@@ -53,17 +49,17 @@ void fillActivityTab(
 			}, btn->lifetime());
 	}
 
-	// ── Vaqtinchalik bufer (daqiqa) ──────────────────────────────
-	Ui::AddSkip(content, 12);
-	content->add(
+	// Vaqtinchalik bufer (daqiqa)
+	Ui::AddSkip(s1, 12);
+	s1->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
+			s1,
 			rpl::single(u"Vaqtinchalik bufer (daqiqa)"_q),
 			st::defaultSubsectionTitle),
 		st::defaultSubsectionTitlePadding);
-	content->add(
+	s1->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
+			s1,
 			rpl::single(u"Kuzatilmayotgan odamlarning faolligi shu muddat davomida xotirada saqlanadi. Odamni kuzatuvga qo'shsangiz, shu davrdagi yozuvlar tiklanadi."_q),
 			st::customModHintLabel),
 		st::boxRowPadding);
@@ -81,10 +77,10 @@ void fillActivityTab(
 	const auto selectedBufferMinutes = std::make_shared<rpl::variable<int>>(
 		CustomSettings::ActivityBufferMinutes());
 
-	const auto customBufferWrap = content->add(
+	const auto customBufferWrap = s1->add(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
-			content,
-			object_ptr<Ui::VerticalLayout>(content)),
+			s1,
+			object_ptr<Ui::VerticalLayout>(s1)),
 		style::margins(0, 0, 0, 0));
 	const auto customBufferForm = customBufferWrap->entity();
 	const auto customBufferInput = customBufferForm->add(
@@ -116,9 +112,9 @@ void fillActivityTab(
 	for (const auto &preset : kBufferPresets) {
 		const auto minutes = preset.minutes;
 		const auto label = preset.label;
-		content->add(
+		s1->add(
 			object_ptr<Ui::RoundButton>(
-				content,
+				s1,
 				selectedBufferMinutes->value() | rpl::map([=](int current) {
 					return (current == minutes)
 						? (u"✓ "_q + label)
@@ -133,9 +129,9 @@ void fillActivityTab(
 			Ui::Toast::Show(u"Bufer muddati saqlandi."_q);
 		});
 	}
-	content->add(
+	s1->add(
 		object_ptr<Ui::RoundButton>(
-			content,
+			s1,
 			rpl::single(u"Boshqa..."_q),
 			st::defaultBoxButton),
 		st::boxRowPadding)
@@ -145,19 +141,26 @@ void fillActivityTab(
 			anim::type::normal);
 	});
 
-	// ── Include List ──────────────────────────────────────────────
-	Ui::AddSkip(content, 12);
-	content->add(
+	// Qo'lda yozuv kiritish
+	Ui::AddSkip(s1, 12);
+	s1->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
-			rpl::single(u"Include List — standart holatdan qat'iy nazar "
-				"har doim kuzatiladi:"_q),
+			s1,
+			rpl::single(u"✍️ Qo'lda faollik yozuvi kiritish"_q),
+			st::defaultSubsectionTitle),
+		st::defaultSubsectionTitlePadding);
+	s1->add(
+		object_ptr<Ui::FlatLabel>(
+			s1,
+			rpl::single(u"Offline paytda yoki boshqa manbadan bilgan faollik "
+				"vaqtingizni qo'lda kiritish mumkin. Bu yozuv faollik "
+				"tarixida '✍️ qo'lda kiritilgan' belgisi bilan saqlanadi."_q),
 			st::customModHintLabel),
 		st::boxRowPadding);
-	content->add(
+	s1->add(
 		object_ptr<Ui::RoundButton>(
-			content,
-			rpl::single(u"Chat tanlash — Include"_q),
+			s1,
+			rpl::single(u"Qo'lda yozuv kiritish..."_q),
 			st::defaultBoxButton),
 		st::boxRowPadding)
 	->addClickHandler([=] {
@@ -167,105 +170,49 @@ void fillActivityTab(
 			[=](not_null<Data::Thread*> thread) -> bool {
 				const auto peer = thread->peer();
 				if (!peer->isUser()) {
-					Ui::Toast::Show(
-						u"Faqat shaxsiy chatlar (User) kuzatiladi."_q);
-					return true;
-				}
-				const auto peerId = QString::number(peer->id.value);
-				const auto name = peer->name();
-				if (CustomSettings::IsInActivityInclude(peerId)) {
-					Ui::Toast::Show(u"Bu chat allaqachon Include List'da."_q);
-					return true;
-				}
-				CustomSettings::AddToActivityInclude(peerId, name);
-				Ui::Toast::Show(name + u" Include List'ga qo'shildi."_q);
-				if (onRebuild) onRebuild();
-				return true;
-			},
-			rpl::single(u"Include List'ga qo'shish"_q)));
-	});
-	for (const auto &e : CustomSettings::GetActivityInclude()) {
-		const auto peerId = e.first;
-		const auto name = e.second;
-		AddAvatarPeerRow(content, controller, peerId, name, [=] {
-			CustomSettings::RemoveFromActivityInclude(peerId);
-			Ui::Toast::Show(name + u" Include List'dan olib tashlandi."_q);
-			if (onRebuild) onRebuild();
-		});
-		const auto historyRow = content->add(
-			object_ptr<Ui::SettingsButton>(
-				content,
-				rpl::single(u"📜 Tarixni ko'rish — "_q + name),
-				st::settingsButtonNoIcon));
-		historyRow->addClickHandler([=] {
-			if (!gInstance) return;
-			gInstance->showBox(CustomActivityHistory::MakeHistoryBox(
-				&controller->session(), peerId, name));
-		});
-	}
-
-	// ── Qo'lda faollik yozuvi qo'shish (A16 §2) ───────────────────
-	Ui::AddSkip(content, 12);
-	content->add(
-		object_ptr<Ui::RoundButton>(
-			content,
-			rpl::single(u"✍️ Qo'lda faollik yozuvi qo'shish"_q),
-			st::defaultBoxButton),
-		st::boxRowPadding)
-	->addClickHandler([=] {
-		if (!gInstance) return;
-		gInstance->showBox(ChoosePeerBox(
-			&controller->session(),
-			[=](not_null<Data::Thread*> thread) -> bool {
-				const auto peer = thread->peer();
-				if (!peer->isUser()) {
-					Ui::Toast::Show(
-						u"Faqat shaxsiy chatlar (User) uchun faollik kiritiladi."_q);
+					Ui::Toast::Show(u"Faqat shaxsiy chatlar (User) uchun kiritish mumkin."_q);
 					return true;
 				}
 				const auto peerId = QString::number(peer->id.value);
 				const auto name = peer->name();
 
-				if (!gInstance) return true;
 				gInstance->showBox(Box([=](not_null<Ui::GenericBox*> box) {
-					box->setTitle(rpl::single(u"Qo'lda faollik yozish — "_q + name));
-					const auto form = box->verticalLayout();
-
-					form->add(
+					box->setTitle(rpl::single(u"Qo'lda yozuv — "_q + name));
+					Ui::AddSkip(box->verticalLayout(), 8);
+					box->verticalLayout()->add(
 						object_ptr<Ui::FlatLabel>(
-							form,
-							rpl::single(u"Sana va vaqt (dd.MM.yyyy HH:mm):"_q),
+							box->verticalLayout(),
+							rpl::single(u"Online bo'lgan vaqti (dd.MM.yyyy HH:mm):"_q),
 							st::defaultSubsectionTitle),
 						st::defaultSubsectionTitlePadding);
-
 					const auto nowStr = QDateTime::currentDateTime().toString(u"dd.MM.yyyy HH:mm"_q);
-					const auto timeInput = form->add(
+					const auto timeInput = box->verticalLayout()->add(
 						object_ptr<Ui::InputField>(
-							form,
+							box->verticalLayout(),
 							st::defaultInputField,
 							rpl::single(u"dd.MM.yyyy HH:mm"_q),
 							nowStr),
 						st::boxRowPadding);
 
-					form->add(
+					box->verticalLayout()->add(
 						object_ptr<Ui::FlatLabel>(
-							form,
-							rpl::single(u"Davomiyligi (soniya, 0 = faqat online):"_q),
+							box->verticalLayout(),
+							rpl::single(u"Davomiyligi (sekund, 0 = aniq lahza):"_q),
 							st::defaultSubsectionTitle),
 						st::defaultSubsectionTitlePadding);
-
-					const auto durationInput = form->add(
+					const auto durationInput = box->verticalLayout()->add(
 						object_ptr<Ui::InputField>(
-							form,
+							box->verticalLayout(),
 							st::defaultInputField,
-							rpl::single(u"Soniya (standart 30)"_q),
+							rpl::single(u"Sekund (masalan: 30)"_q),
 							u"30"_q),
 						st::boxRowPadding);
 
 					box->addButton(rpl::single(u"Saqlash"_q), [=] {
-						const auto dt = QDateTime::fromString(timeInput->getLastText().trimmed(), u"dd.MM.yyyy HH:mm"_q);
+						const auto text = timeInput->getLastText().trimmed();
+						const auto dt = QDateTime::fromString(text, u"dd.MM.yyyy HH:mm"_q);
 						if (!dt.isValid()) {
-							Ui::Toast::Show(u"Noto'g'ri sana formati! Masalan: 28.08.2026 17:03"_q);
+							Ui::Toast::Show(u"Vaqt formati noto'g'ri (dd.MM.yyyy HH:mm bo'lishi kerak)."_q);
 							return;
 						}
 						bool ok = false;
@@ -317,17 +264,74 @@ void fillActivityTab(
 			rpl::single(u"Qo'lda yozuv — chat tanlash"_q)));
 	});
 
-	// ── Exclude List ──────────────────────────────────────────────
-	Ui::AddSkip(content, 12);
-	content->add(
+	// 2-bo'lim: Include List (Standart yopiq)
+	const auto s2 = AddCollapsibleSection(content, u"📋 Include List (Majburiy kuzatuv)"_q, false);
+	s2->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
-			rpl::single(u"Exclude List — hech qachon kuzatilmaydi:"_q),
+			s2,
+			rpl::single(u"Global toggle o'chiq bo'lsa ham, bu odamlar doimiy kuzatiladi:"_q),
 			st::customModHintLabel),
 		st::boxRowPadding);
-	content->add(
+	s2->add(
 		object_ptr<Ui::RoundButton>(
-			content,
+			s2,
+			rpl::single(u"Chat tanlash — Include"_q),
+			st::defaultBoxButton),
+		st::boxRowPadding)
+	->addClickHandler([=] {
+		if (!gInstance) return;
+		gInstance->showBox(ChoosePeerBox(
+			&controller->session(),
+			[=](not_null<Data::Thread*> thread) -> bool {
+				const auto peer = thread->peer();
+				if (!peer->isUser()) {
+					Ui::Toast::Show(u"Faqat shaxsiy chatlar (User) kuzatiladi."_q);
+					return true;
+				}
+				const auto peerId = QString::number(peer->id.value);
+				const auto name = peer->name();
+				if (CustomSettings::IsInActivityInclude(peerId)) {
+					Ui::Toast::Show(u"Bu chat allaqachon Include List'da."_q);
+					return true;
+				}
+				CustomSettings::AddToActivityInclude(peerId, name);
+				Ui::Toast::Show(name + u" Include List'ga qo'shildi."_q);
+				if (onRebuild) onRebuild();
+				return true;
+			},
+			rpl::single(u"Include List'ga qo'shish"_q)));
+	});
+	for (const auto &e : CustomSettings::GetActivityInclude()) {
+		const auto peerId = e.first;
+		const auto name = e.second;
+		AddAvatarPeerRow(s2, controller, peerId, name, [=] {
+			CustomSettings::RemoveFromActivityInclude(peerId);
+			Ui::Toast::Show(name + u" Include List'dan olib tashlandi."_q);
+			if (onRebuild) onRebuild();
+		});
+		const auto historyRow = s2->add(
+			object_ptr<Ui::SettingsButton>(
+				s2,
+				rpl::single(u"📜 Tarixni ko'rish — "_q + name),
+				st::settingsButtonNoIcon));
+		historyRow->addClickHandler([=] {
+			if (!gInstance) return;
+			gInstance->showBox(Box<CustomActivityHistoryBox>(
+				&controller->session(), peerId, name));
+		});
+	}
+
+	// 3-bo'lim: Exclude List (Standart yopiq)
+	const auto s3 = AddCollapsibleSection(content, u"🚫 Exclude List (Kuzatilmaydiganlar)"_q, false);
+	s3->add(
+		object_ptr<Ui::FlatLabel>(
+			s3,
+			rpl::single(u"Barcha contactlar yoqilgan bo'lsa ham, bu odamlar hech qachon kuzatilmaydi:"_q),
+			st::customModHintLabel),
+		st::boxRowPadding);
+	s3->add(
+		object_ptr<Ui::RoundButton>(
+			s3,
 			rpl::single(u"Chat tanlash — Exclude"_q),
 			st::defaultBoxButton),
 		st::boxRowPadding)
@@ -338,8 +342,7 @@ void fillActivityTab(
 			[=](not_null<Data::Thread*> thread) -> bool {
 				const auto peer = thread->peer();
 				if (!peer->isUser()) {
-					Ui::Toast::Show(
-						u"Faqat shaxsiy chatlar (User) kuzatiladi."_q);
+					Ui::Toast::Show(u"Faqat shaxsiy chatlar (User) kuzatiladi."_q);
 					return true;
 				}
 				const auto peerId = QString::number(peer->id.value);
@@ -358,23 +361,22 @@ void fillActivityTab(
 	for (const auto &e : CustomSettings::GetActivityExclude()) {
 		const auto peerId = e.first;
 		const auto name = e.second;
-		AddAvatarPeerRow(content, controller, peerId, name, [=] {
+		AddAvatarPeerRow(s3, controller, peerId, name, [=] {
 			CustomSettings::RemoveFromActivityExclude(peerId);
 			Ui::Toast::Show(name + u" Exclude List'dan olib tashlandi."_q);
 			if (onRebuild) onRebuild();
 		});
-		const auto historyRow = content->add(
+		const auto historyRow = s3->add(
 			object_ptr<Ui::SettingsButton>(
-				content,
+				s3,
 				rpl::single(u"📜 Tarixni ko'rish — "_q + name),
 				st::settingsButtonNoIcon));
 		historyRow->addClickHandler([=] {
 			if (!gInstance) return;
-			gInstance->showBox(CustomActivityHistory::MakeHistoryBox(
+			gInstance->showBox(Box<CustomActivityHistoryBox>(
 				&controller->session(), peerId, name));
 		});
 	}
 
 	Ui::AddSkip(content, st::settingsThumbSkip);
 }
-

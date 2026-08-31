@@ -267,3 +267,26 @@ void AddAvatarPeerRow(
 	}
 }
 
+
+not_null<Ui::VerticalLayout*> AddCollapsibleSection(
+		not_null<Ui::VerticalLayout*> container,
+		const QString &title,
+		bool initialOpen) {
+	Ui::AddSkip(container, st::settingsThumbSkip);
+	const auto titleLabel = Ui::AddSubsectionTitle(
+		container,
+		rpl::single(title));
+	titleLabel->setCursor(Qt::PointingHandCursor);
+
+	const auto wrap = container->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			container,
+			object_ptr<Ui::VerticalLayout>(container)));
+	wrap->toggle(initialOpen, anim::type::instant);
+
+	titleLabel->setClickedCallback([=] {
+		wrap->toggle(!wrap->toggled(), anim::type::normal);
+	});
+
+	return wrap->entity();
+}
