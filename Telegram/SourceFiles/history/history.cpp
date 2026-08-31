@@ -2559,6 +2559,16 @@ void History::outboxRead(MsgId upTo) {
 	}
 	updateChatListEntry();
 	session().changes().historyUpdated(this, UpdateFlag::OutboxRead);
+
+	// A17: suhbatdosh qaysi lahzada o'qiganini AYNAN SHU YERDA bilamiz —
+	// keyinroq `getOutboxReadDate` so'rasak `MESSAGE_TOO_OLD` kelishi
+	// mumkin. Shuning uchun arxivdagi yozuvlarni shu zahoti belgilaymiz.
+	// Faqat shaxsiy chat, faqat chiquvchi xabar (v1 qamrovi).
+	if (peer->isUser()) {
+		const auto key = CustomDB::Key(session(), peer->id);
+		const auto now = qint64(base::unixtime::now());
+		CustomDB::MarkOutgoingReadUpTo(key, upTo.bare, now);
+	}
 }
 
 void History::outboxRead(not_null<const HistoryItem*> wasRead) {
