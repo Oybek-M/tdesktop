@@ -4,35 +4,82 @@ Bu fayl qaysi ish **hozir faol**, qaysi biri **to'xtatib qo'yilgan** va
 qaysi biri **hali muhokama bosqichida** ekanini ko'rsatadi. Yangi
 sessiya boshlanganda birinchi shu yerga qarang.
 
-Oxirgi yangilanish: 2026-08-28
+Oxirgi yangilanish: 2026-09-01
 
 ---
 
-# ✅ TDESKTOP TOMONI TOZA (2026-08-30)
+# 🔴 SHU YERDAN BOSHLANG (2026-09-01) — BUILD KUTILMOQDA
 
-**Barcha ochiq ishlar yopildi, build va sinovdan o'tdi.**
+**Katta partiya kod tayyor va `origin/Oybek` da, lekin HALI BUILD
+QILINMAGAN.** Oxirgi `Telegram.exe` — 2026-08-30 15:11, undan keyin
+**20 dan ortiq commit** qo'shilgan.
 
-Build: 2026-08-30 15:11 (`Pictures\Release\Telegram.exe`).
-Jonli baza sxemasi: **v12**, `integrity: ok`.
+Jonli baza sxemasi hozir **v12**. Yangi build birinchi ishga
+tushganda **v13** migratsiyasi qo'llanadi (avtomatik
+`.premigrate-v12-*.bak` zaxirasi olinadi).
 
-| Ish | Holat |
+## Build'ga tushadigan ishlar
+
+| Ish | Nima qiladi | Sinov |
+|---|---|---|
+| **A17** — `read_at` (sxema v13) | Xabar o'qilgan vaqti saqlanadi. Real-vaqt manba: `History::outboxRead()` hook'i | Arxivda `✓✓ o'qilgan: ...` chiqsin |
+| **A14** — o'qilgan vaqt → faollik | O'qish lahzasi `source='read'` nuqtasi bo'lib yoziladi | Faollik tarixida `✓✓` belgili nuqta |
+| **A18a** — screenshot bypass | `AllowsForwardingValue()` ga bypass qo'shildi | Private kanalda screenshot **oyna bilan** olinsin |
+| **A18b** — rasm forward | 4-manba: `PhotoMedia::saveToFile()` | Private kanaldan **rasm** forward bo'lsin (video allaqachon ishlaydi) |
+| **A19** — "Joriy holat" keshi | Kesh manbaga emas, **vaqtga** qarab yangilanadi | Yorliq "Eng so'nggi aniqlangan holat", qiymat eng yangi yozuvga mos |
+| **A20** — lahza-nuqtalar | Juftisiz `online:` endi lahza sifatida ko'rinadi | `31.08 15:03 — 📖 hikoya qo'ygan` qatori |
+| **UX** — 7 tab | 3383 qatorli fayl 9 ta faylga bo'lindi, 22 ta yopiladigan bo'lim | Barcha tab va bo'limlar ochilsin |
+
+## Sinov ro'yxati (build'dan keyin)
+
+1. **Migratsiya** — v13 toza o'tsin, `integrity: ok`
+2. **7 tab** — Yashirinlik, Ko'rinish, Chatlar, Faollik, Arxiv, Ombor, Tizim
+3. `⚠️ Xavfli hudud` **yopiq** turishi kerak
+4. **Tizim** tabida "Oxirgi tekshiruv: ..." qatori bo'lsin (u bir marta yo'qolib, tiklangan)
+5. Private kanalda **screenshot** va **rasm forward**
+6. Faollik tarixida `📖 ✍️ ⏱ ✓✓` belgilari — **lahzalarda ham, davrlarda ham**
+
+---
+
+## Sxema versiyalari — BAND
+
+| Versiya | Nima uchun |
 |---|---|
-| **A16 §1** — story vaqti `status` shkalasiga | ✅ 92 nuqta, 📖 belgisi bilan |
-| **A16 §2** — qo'lda yozuv + `🗑 O'chirish` | ✅ o'chirish faqat retroaktiv yozuvlarda chiqadi |
-| **A16 §3** — tez tugma + vaqtinchalik bufer | ✅ |
-| **A15** — bot token | ✅ savol yopildi: `BOT_METHOD_INVALID`. Kod ogohlantirish bilan saqlandi |
-| Sxema **v11** (`source`) va **v12** (story backfill) | ✅ ikkala migratsiya toza o'tdi |
-| Kompaksiya xatosi | ✅ shovqin filtri retroaktiv yozuvlarni yeb qo'yardi — tuzatildi va isbotlandi (23 → 0) |
+| v9 | placeholder tozalash |
+| v10 | `account_id` (akkaunt izolyatsiyasi) |
+| v11 | `activity_history.source` |
+| v12 | story backfill |
+| **v13** | **`actioned_messages.read_at` (A17)** |
+| **v14** | ← Track C (`sync_outbox`, `sync_state`) uchun keyingi bo'sh |
 
-Track C uchun keyingi bo'sh sxema versiyasi — **v13**.
+🔴 **Track C sessiyasi diqqatiga:** v13 BAND. `STATUS.md` bir marta
+qayta yozilib bu rezervatsiya bekor bo'lgan edi — tiklandi.
 
-## Yaqinda YOPILGAN ishlar
+---
 
-- ✅ **Sxema v10 — akkaunt izolyatsiyasi** (build o'tdi, sinovdan o'tdi)
+## Qolgan ishlar (build va sinovdan KEYIN)
+
+| № | Ish | Izoh |
+|---|---|---|
+| 1 | **TTL/media ko'rgich screenshot** | A18 spec §2 da "ko'rib chiqilsin". Rasmni to'liq ekranda ochganda screenshot ishlaydimi — **sinovdan keyin** hal qilinadi |
+| 2 | **`chats` (802) va `storage` (594) hajmi** | Spec'dagi "400 qatordan oshmasin" maqsadidan katta. Bo'limlarga ajratilgach o'qish osonlashdi; yana bo'lish kerakmi — keyin |
+| 3 | **Reliz yuklashni API ga o'tkazish** | `customsync-server` tayyor bo'lgach |
+| 4 | **S1 — story fonining miltillashi** | GL/RHI, vaqtinchalik yechim bor (OpenGL o'chirish) |
+| 5 | **Priority lazy loader** | Shoshilinch emas |
+| 6 | **A10 — bitta tugmali sync+build+publish** | |
+| 7 | **`media_index` uchun sha256 backfill** | Track C ga kerak |
+
+---
+
+## Yaqinda YOPILGAN (build va sinovdan o'tgan)
+
+- ✅ **Sxema v10** — akkaunt izolyatsiyasi
 - ✅ **Arvoh yozuvlar** — Akam chatida 218 → 15
-  (`specs/2026-08-27-legacy-ghost-rows-followup.md`)
-- ✅ **Baza buzilishi tuzatildi** — `EnsureArchiveLayout` begona WAL/SHM
-  ni ko'chirardi; migratsiyadan oldin avtomatik zaxira qo'shildi
+- ✅ **Baza buzilishi** — `EnsureArchiveLayout` begona WAL/SHM ni ko'chirardi
+- ✅ **A15** — bot token: `BOT_METHOD_INVALID`, to'liq klient MUMKIN EMAS,
+  kod ogohlantirish bilan saqlandi
+- ✅ **A16** §1/§2/§3 — story, qo'lda yozuv, tugma+bufer
+- ✅ **Kompaksiya xatosi** — shovqin filtri retroaktiv yozuvlarni yeb qo'yardi
 
 ---
 
