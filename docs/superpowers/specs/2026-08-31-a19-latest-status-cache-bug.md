@@ -157,18 +157,25 @@ Aslida u **bazadan** (`GetLatestActivityHistoryValue`) o'qiladi.
 Dalil: `Guli` (5882234960) uchun oyna 30.08 19:01 ko'rsatgan, Telegram
 profilida esa "last seen recently" turgan.
 
-**Ikki yo'ldan biri tanlansin:**
+**QAROR (2026-08-31, foydalanuvchi aniqlashtirgandan keyin): B varianti**
 
-**A. Yorliqni haqiqatga keltirish (tavsiya)** — "Joriy holat" ni
-jonli `user->lastseen()` dan olish. Shunda u Telegram bilan HAR DOIM
-mos bo'ladi va bazadagi kesh muammosidan mustaqil bo'ladi.
+Foydalanuvchi story nuqtasi "Joriy holat" ga ham tushishini kutadi —
+ya'ni bu qator BYPASS natijasini ko'rsatishi kerak, Telegram'ning
+o'z qiymatini emas.
 
-**B. Matnni to'g'rilash** — "Joriy holat" o'rniga "Oxirgi yozib
-olingan holat" deb yozish.
+Sabab: Telegram'ning qiymati profilda allaqachon ko'rinadi
+("last seen recently"). Bu oynaning butun qiymati — Telegram
+yashirgan narsani ko'rsatishda. Agar "Joriy holat" ham "recently"
+desa, qator befoyda bo'lib qoladi.
 
-A varianti to'g'riroq: foydalanuvchi bu qatordan aynan Telegram
-ko'rsatayotgan narsani kutadi. Bazadagi tarix esa pastdagi jurnal.
+**Bajariladi:**
 
-⚠️ A varianti tanlansa ham, 2-5 bo'limlardagi kesh tuzatishi
-BARIBIR kerak — kesh `RecordField` da `hadPrevious` ni aniqlash
-uchun ishlatiladi, ya'ni u yozishga ham ta'sir qiladi.
+1. Matn "Joriy holat" → **"Eng so'nggi aniqlangan holat"**
+2. Tushuntirishdagi "Telegram'dan olingan alohida qiymat" jumlasi
+   olib tashlanadi — u yolg'on
+3. 2-5 bo'limlardagi kesh tuzatishi (vaqt bo'yicha) — shundan keyin
+   story nuqtasi eng yangi bo'lgani uchun o'z-o'zidan bu qatorga
+   chiqadi
+
+**Rad etilgan variant (A):** jonli `user->lastseen()` dan olish —
+Telegram bilan mos bo'lardi, lekin bypass natijasini yashirardi.
