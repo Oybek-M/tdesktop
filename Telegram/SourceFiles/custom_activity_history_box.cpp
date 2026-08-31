@@ -89,14 +89,30 @@ QString FormatEntryLine(const CustomDB::ActivityHistoryEntry &entry) {
 struct OnlinePeriod {
 	qint64 from = 0;
 	qint64 to = 0;
+	bool instant = false;   // true = juftisiz nuqta (davr emas, LAHZA)
+	QString source;         // "observed" | "story" | "manual" | "buffer"
 };
 
+QString FormatInstantLabel(const OnlinePeriod &p) {
+	const auto when = QDateTime::fromSecsSinceEpoch(p.from)
+		.toString(u"dd.MM HH:mm"_q);
+	if (p.source == u"story"_q) {
+		return when + u" — 📖 hikoya qo'ygan"_q;
+	} else if (p.source == u"manual"_q) {
+		return when + u" — ✍️ qo'lda kiritilgan"_q;
+	} else if (p.source == u"buffer"_q) {
+		return when + u" — ⏱ buferdan tiklangan"_q;
+	}
+	return when + u" — aniq lahza"_q;
+}
+
 // T1 (online-observed) dan keyingi birinchi T2 (offline-observed) bilan
-// juftlaydi. entries — GetActivityHistory() natijasi (newest-first).
+// juftlaydi. Juftisiz online yozuvlari (story, manual, yoki offline kelmagan holatlar)
+// alohida LAHZA (instant=true) sifatida saqlanadi.
+// entries — GetActivityHistory() natijasi (newest-first).
 QVector<OnlinePeriod> ReconstructOnlinePeriods(
 		const QVector<CustomDB::ActivityHistoryEntry> &entries) {
-	// Chronological tartibga o'tkazamiz (eskisidan yangisiga), algoritm
-	// shunday ishlashi osonroq.
+	// Chronological tartibga o'tkazamiz (eskisidan yangisiga).
 	QVector<CustomDB::ActivityHistoryEntry> chrono;
 	chrono.reserve(entries.size());
 	for (auto it = entries.crbegin(); it != entries.crend(); ++it) {
@@ -105,19 +121,29 @@ QVector<OnlinePeriod> ReconstructOnlinePeriods(
 
 	QVector<OnlinePeriod> result;
 	qint64 openFrom = 0;
+	QString openSource;
 	for (const auto &e : chrono) {
 		if (e.newValue.startsWith(u"online:"_q)) {
-			openFrom = e.observedAt; // ketma-ket online — oxirgisi ustun oladi
-		} else if (e.newValue.startsWith(u"offline:"_q) && openFrom > 0) {
-			const auto till = e.newValue.mid(8).toLongLong();
-			result.append({ openFrom, till > 0 ? till : e.observedAt });
-			openFrom = 0;
+			// Agar oldingi online: uchun offline: kelmasdan yangi online: kelsa,
+			// avvalgi ochiq qolgan yozuvni alohida LAHZA sifatida saqlaymiz.
+			if (openFrom > 0) {
+				result.append({ openFrom, openFrom, true, openSource });
+			}
+			openFrom = e.observedAt;
+			openSource = e.source;
+		} else if (e.newValue.startsWith(u"offline:"_q)) {
+			if (openFrom > 0) {
+				const auto till = e.newValue.mid(8).toLongLong();
+				const auto toTime = (till > 0) ? till : e.observedAt;
+				result.append({ openFrom, toTime, false, openSource });
+				openFrom = 0;
+				openSource.clear();
+			}
 		}
 	}
-	// Eslatma: agar loop tugaganda openFrom hali ham > 0 bo'lsa (ya'ni oxirgi
-	// status yozuvi "online:" bo'lib, undan keyin "offline:" kelmagan bo'lsa),
-	// bu ochiq davr e'tiborga olinmaydi. v1 uchun qabul qilinadi — "hozirgi
-	// vaqt = now()" kodlanmaydi.
+	if (openFrom > 0) {
+		result.append({ openFrom, openFrom, true, openSource });
+	}
 	return result;
 }
 
@@ -199,6 +225,11 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 			shortCount = 0;
 		};
 		for (const auto &p : allPeriods) {
+			if (p.instant) {
+				flushShort();
+				rows.append(FormatInstantLabel(p));
+				continue;
+			}
 			if (p.to - p.from >= kMinMeaningfulOnlineSeconds) {
 				flushShort();
 				const auto from = QDateTime::fromSecsSinceEpoch(p.from);

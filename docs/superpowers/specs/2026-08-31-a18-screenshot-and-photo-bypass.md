@@ -142,3 +142,10 @@ shu faylni yuklash. Aniq API tekshiruvdan keyin belgilanadi.
 2. Rasm forward (3-bo'lim) — avval tashxis, keyin implement
 
 Ikkinchisi birinchisiga bog'liq emas, alohida bajarilishi mumkin.
+
+---
+
+## 5. Bajarildi (2026-08-31)
+
+- `Telegram/SourceFiles/data/data_peer_values.cpp` dagi `AllowsForwardingValue` funksiyasi boshiga `CustomSettings::BypassRestrictions()` tekshiruvi qo'shildi.
+- Commit: `f675f7bd8d` (`feat(restriction): bypass screenshot restriction in AllowsForwardingValue (A18)`).

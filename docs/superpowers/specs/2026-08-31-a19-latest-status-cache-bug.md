@@ -179,3 +179,11 @@ desa, qator befoyda bo'lib qoladi.
 
 **Rad etilgan variant (A):** jonli `user->lastseen()` dan olish —
 Telegram bilan mos bo'lardi, lekin bypass natijasini yashirardi.
+
+---
+
+## 7. Bajarildi (2026-08-31)
+
+- `Telegram/SourceFiles/custom_db.cpp`: `CachedLatest` (value + observedAt) strukturasi kiritildi, `SaveActivityHistoryEntry` va `StartActivityCacheLoad` (preload) vaqt bo'yicha (`observedAt >= slot.observedAt`) yangilanadigan qilindi.
+- `Telegram/SourceFiles/custom_activity_history_box.cpp`: "Joriy holat" yorlig'i "Eng so'nggi aniqlangan holat" ga o'zgartirildi, tushuntirishdagi noto'g'ri jumla olib tashlandi.
+- Commit: `a63846fd5b` (`fix(activity): preserve observedAt in latest status cache and fix preload query (A19)`).

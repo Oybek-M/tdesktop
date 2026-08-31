@@ -118,3 +118,11 @@ Sxema o'zgarishi **kerak emas** — faqat kod.
   qatori paydo bo'lsin
 - "Eng so'nggi aniqlangan holat" ham shu nuqtani ko'rsatsin (A19)
 - `30.08 12:16` qatori `✍️ qo'lda kiritilgan` deb belgilansin
+
+---
+
+## 8. Bajarildi (2026-08-31)
+
+- `Telegram/SourceFiles/custom_activity_history_box.cpp`: `OnlinePeriod` struct'iga `instant` va `source` maydonlari qo'shildi.
+- `ReconstructOnlinePeriods`: ketma-ket yoki juftisiz qolgan `online:` yozuvlari `instant = true` (lahza) sifatida saqlanadigan qilindi.
+- "Online bo'lgan davrlar" ro'yxatida lahza yozuvlari manba belgisi bilan (`📖 hikoya qo'ygan`, `✍️ qo'lda kiritilgan`, `⏱ buferdan tiklangan`, `aniq lahza`) ko'rsatiladi.
