@@ -161,5 +161,5 @@ Ikkinchisi birinchisiga bog'liq emas, alohida bajarilishi mumkin.
 
 ## 5. Bajarildi (2026-08-31)
 
-- `Telegram/SourceFiles/data/data_peer_values.cpp` dagi `AllowsForwardingValue` funksiyasi boshiga `CustomSettings::BypassRestrictions()` tekshiruvi qo'shildi.
-- Commit: `f675f7bd8d` (`feat(restriction): bypass screenshot restriction in AllowsForwardingValue (A18)`).
+- **A18a (Screenshot bypass):** `Telegram/SourceFiles/data/data_peer_values.cpp` dagi `AllowsForwardingValue` funksiyasi boshiga `CustomSettings::BypassRestrictions()` tekshiruvi qo'shildi (Commit: `f675f7bd8d`).
+- **A18b (Rasm forward bypass):** `Telegram/SourceFiles/apiwrap.cpp` dagi rasm shoxiga to'rtinchi manba sifatida `photo->createMediaView()->saveToFile(tempPath)` ulandi. Vaqtinchalik fayl `QDir::tempPath()` papkasida `td_photo_bypass_<msgId>_<photoId>.jpg` nomi bilan yaratiladi.

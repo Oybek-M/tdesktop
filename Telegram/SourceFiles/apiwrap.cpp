@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "custom_db.h"
 #include "custom_peer_key.h"
 #include <QtCore/QFile>
+#include <QtCore/QDir>
 #include <QtCore/QDateTime>
 
 #include "api/api_authorizations.h"
@@ -56,6 +57,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_changes.h"
 #include "data/data_drafts.h"
 #include "data/data_media_types.h"
+#include "data/data_photo_media.h"
 #include "data/data_web_page.h"
 #include "data/data_folder.h"
 #include "data/data_forum_topic.h"
@@ -3967,6 +3969,30 @@ void ApiWrap::bypassForwardItem(
 			if (localPath.isEmpty()) {
 				localPath = CustomDB::GetArchivedMediaPath(
 					CustomDB::Key(item), srcMsgId);
+			}
+			// A18b (2026-08-31): to'rtinchi manba — Telegram'ning O'Z rasm keshi.
+			//
+			// Nima uchun kerak: yuqoridagi uchta manba faqat rasm QO'LDA
+			// saqlangan yoki arxivlangan bo'lsa to'ladi. Private kanaldagi
+			// oddiy rasm uchun uchalasi ham bo'sh bo'lib chiqadi — shuning
+			// uchun video o'tib, rasm o'tmasdi.
+			//
+			// PhotoMedia::saveToFile() uch bosqichli zaxiraga ega
+			// (video → xom baytlar → render), ya'ni kesh qanday holatda
+			// bo'lsa ham natija beradi.
+			std::shared_ptr<Data::PhotoMedia> photoMediaView;
+			if (localPath.isEmpty() || !QFile::exists(localPath)) {
+				photoMediaView = photo->createMediaView();
+				const auto tempDir = QDir::tempPath();
+				const auto tempPath = tempDir
+					+ u"/td_photo_bypass_"_q
+					+ QString::number(srcMsgId)
+					+ u"_"_q
+					+ QString::number(photo->id)
+					+ u".jpg"_q;
+				if (photoMediaView && photoMediaView->saveToFile(tempPath)) {
+					localPath = tempPath;
+				}
 			}
 			if (!localPath.isEmpty() && QFile::exists(localPath)) {
 				// Fresh upload — never gets stuck.
