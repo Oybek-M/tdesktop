@@ -191,6 +191,28 @@ void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content) {
 				? u"Avtomatik tekshirish yoqildi ✓"_q
 				: u"Avtomatik tekshirish o'chirildi"_q);
 		}, autoBtn->lifetime());
+
+	// Oxirgi tekshiruv vaqti.
+	//
+	// 2026-08-31: bu blok bo'limlarga o'rash paytida tasodifan
+	// tushib qolgan edi — tiklandi. Foydalanuvchi uchun muhim:
+	// avtomatik tekshiruv haqiqatan ishlayotganini faqat shu
+	// qatordan bilish mumkin.
+	Ui::AddSkip(content, 8);
+	{
+		const auto lastAt = CustomSettings::UpstreamLastCheckedAt();
+		const auto text = (lastAt > 0)
+			? (u"Oxirgi tekshiruv: "_q
+				+ QDateTime::fromSecsSinceEpoch(lastAt)
+					.toString(u"yyyy-MM-dd HH:mm"_q))
+			: u"Oxirgi tekshiruv: hali yo'q"_q;
+		content->add(
+			object_ptr<Ui::FlatLabel>(
+				content,
+				rpl::single(text),
+				st::customModHintLabel),
+			st::boxRowPadding);
+	}
 }
 
 void fillSystemTab(
