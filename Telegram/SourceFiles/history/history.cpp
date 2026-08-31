@@ -2564,10 +2564,27 @@ void History::outboxRead(MsgId upTo) {
 	// keyinroq `getOutboxReadDate` so'rasak `MESSAGE_TOO_OLD` kelishi
 	// mumkin. Shuning uchun arxivdagi yozuvlarni shu zahoti belgilaymiz.
 	// Faqat shaxsiy chat, faqat chiquvchi xabar (v1 qamrovi).
-	if (peer->isUser()) {
+	if (const auto user = peer->asUser()) {
 		const auto key = CustomDB::Key(session(), peer->id);
 		const auto now = qint64(base::unixtime::now());
 		CustomDB::MarkOutgoingReadUpTo(key, upTo.bare, now);
+
+		// A14: o'qilgan lahza — odam FAOL bo'lganining mustaqil isboti.
+		// Last-seen yashirilgan bo'lsa ham bu signal ishlaydi.
+		// A16 §1 dagi story naqshining aynan o'zi.
+		const auto peerId = QString::number(peer->id.value);
+		if (CustomSettings::ShouldTrackActivity(peerId, user->isContact())) {
+			if (!CustomDB::HasActivityEntryAt(peerId, u"status"_q, now)) {
+				CustomDB::SaveActivityHistoryEntry(
+					key,
+					u"status"_q,
+					false,
+					QString(),
+					u"online:"_q + QString::number(now),
+					now,
+					u"read"_q);
+			}
+		}
 	}
 }
 
