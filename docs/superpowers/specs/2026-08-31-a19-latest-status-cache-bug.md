@@ -144,3 +144,31 @@ WHERE field='status' AND a.id = (
 
 Oynadagi "Joriy holat" shu qiymatga MOS kelishi kerak.
 Sxema o'zgarishi **kerak emas** — faqat kod.
+
+---
+
+## 6. Qo'shimcha topilma (2026-08-31): "Joriy holat" yorlig'i noto'g'ri
+
+Oynadagi tushuntirish matni shunday deydi:
+
+> "...yuqoridagi 'Joriy holat' esa Telegram'dan olingan alohida qiymat"
+
+Aslida u **bazadan** (`GetLatestActivityHistoryValue`) o'qiladi.
+Dalil: `Guli` (5882234960) uchun oyna 30.08 19:01 ko'rsatgan, Telegram
+profilida esa "last seen recently" turgan.
+
+**Ikki yo'ldan biri tanlansin:**
+
+**A. Yorliqni haqiqatga keltirish (tavsiya)** — "Joriy holat" ni
+jonli `user->lastseen()` dan olish. Shunda u Telegram bilan HAR DOIM
+mos bo'ladi va bazadagi kesh muammosidan mustaqil bo'ladi.
+
+**B. Matnni to'g'rilash** — "Joriy holat" o'rniga "Oxirgi yozib
+olingan holat" deb yozish.
+
+A varianti to'g'riroq: foydalanuvchi bu qatordan aynan Telegram
+ko'rsatayotgan narsani kutadi. Bazadagi tarix esa pastdagi jurnal.
+
+⚠️ A varianti tanlansa ham, 2-5 bo'limlardagi kesh tuzatishi
+BARIBIR kerak — kesh `RecordField` da `hadPrevious` ni aniqlash
+uchun ishlatiladi, ya'ni u yozishga ham ta'sir qiladi.
