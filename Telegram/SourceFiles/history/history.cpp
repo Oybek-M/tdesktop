@@ -2549,6 +2549,11 @@ void History::inboxRead(not_null<const HistoryItem*> wasRead) {
 }
 
 void History::outboxRead(MsgId upTo) {
+	// A14: o'qish chegarasi HAQIQATAN oldinga siljiganini bilish uchun
+	// eski qiymatni oldindan olamiz. `updateReadHistoryOutbox` bir xil
+	// `upTo` bilan bir necha marta kelishi mumkin — har safar faollik
+	// nuqtasi yozilsa, jurnal shovqinga to'lib ketardi.
+	const auto readTillBefore = outboxReadTillId();
 	setOutboxReadTill(upTo);
 	if (const auto last = chatListMessage()) {
 		if (last->out() && last->isRegular() && last->id <= upTo) {
@@ -2573,7 +2578,10 @@ void History::outboxRead(MsgId upTo) {
 		// Last-seen yashirilgan bo'lsa ham bu signal ishlaydi.
 		// A16 §1 dagi story naqshining aynan o'zi.
 		const auto peerId = QString::number(peer->id.value);
-		if (CustomSettings::ShouldTrackActivity(peerId, user->isContact())) {
+		if (upTo > readTillBefore
+			&& CustomSettings::ShouldTrackActivity(
+				peerId,
+				user->isContact())) {
 			if (!CustomDB::HasActivityEntryAt(peerId, u"status"_q, now)) {
 				CustomDB::SaveActivityHistoryEntry(
 					key,

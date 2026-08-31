@@ -30,7 +30,7 @@ Oxirgi yangilanish: **2026-08-29**
 | Nima | Holat |
 |---|---|
 | `qtwebsockets` moduli | ✅ qurildi va sinovdan o'tdi (2026-08-25) |
-| Sxema versiyasi | **v11** qo'llangan va tasdiqlangan (2026-08-29). **v12** (story backfill, A16 §1) build qilingan, birinchi ishga tushirishda qo'llanadi. Track C uchun keyingi bo'sh versiya — **v13** |
+| Sxema versiyasi | **v12** qo'llangan va tasdiqlangan (2026-08-30). **v13** (`actioned_messages.read_at`, A17) kodda tayyor, build kutilmoqda. 🔴 Track C uchun keyingi bo'sh versiya — **v14** (v13 BAND) |
 | `account_id` (ko'p akkaunt) | ✅ **BOR** — 5 ta jadvalda. `activity_history` ataylab FILTRLANMAYDI (spec §0.13) |
 | `media_index` jadvali | ✅ mavjud, 1543 yozuv |
 | `sha256` maydoni | ❌ **BO'SH** — hisoblash hali yozilmagan |
