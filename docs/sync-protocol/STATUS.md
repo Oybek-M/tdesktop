@@ -1,11 +1,12 @@
 # Loyihalar holati — HAR SESSIYA SHU YERDAN BOSHLANADI
 
-Oxirgi yangilanish: **2026-08-26**
+Oxirgi yangilanish: **2026-08-29**
 
-> 🔴 **DIQQAT:** 2026-08-26 da ko'p akkauntli aralashuv xatosi topildi.
-> U `record_id` formulasiga ham tegadi va `customsync-server` implement'idan
-> OLDIN hal qilinishi shart. To'liq tashxis:
-> [`../superpowers/specs/2026-08-26-multi-account-db-isolation-design.md`](../superpowers/specs/2026-08-26-multi-account-db-isolation-design.md)
+> ✅ **2026-08-26 dagi ko'p akkauntli aralashuv xatosi HAL QILINDI.**
+> Protokol tomoni: spec §0.12 (`record_id` ga `account_hash`),
+> `test-vectors.json` qayta generatsiya qilindi, .NET tasdiqladi.
+> tdesktop tomoni: sxema v10 (`account_id`) qurildi.
+> Tashxis: [`../superpowers/specs/2026-08-26-multi-account-db-isolation-design.md`](../superpowers/specs/2026-08-26-multi-account-db-isolation-design.md)
 
 > Bu fayl bir nechta loyiha o'rtasida "kim nimani bajardi" ni
 > ko'rsatadi. Sessiya boshida o'qing, oxirida yangilang.
@@ -17,7 +18,7 @@ Oxirgi yangilanish: **2026-08-26**
 | Loyiha | Holat | Keyingi qadam |
 |---|---|---|
 | **tdesktop** (CustomMod) | 🟢 v7.1.1 chiqarildi, ishlab turibdi | ✅ Sxema v10 (`account_id`) qurildi — keyin sync agenti (plan 02) |
-| **customsync-server** | 🟡 01a: 7 task'dan 4 tasi | Plan 01a Task 5 — qurilma ro'yxati + JWT (`customsync-server/PROGRESS.md`) |
+| **customsync-server** | 🟢 01a tugadi, 01b: 9 dan 8 tasi | Plan 01b Task 9 (deployment) — oxirgisi |
 | **server-controller** | ⚪ boshlanmagan | 01a/01b tugagach |
 | **tmobile-android** | ⚪ muhokama qilinmagan | — |
 | **tmobile-ios** | ⚪ muhokama qilinmagan | — |
@@ -68,44 +69,44 @@ yo'qotish — tiklab bo'lmaydi.
 ## customsync-server — implement holati
 
 **Papka:** `Projects programming\Telegram\customsync-server`
-**Branch:** `Oybek`
+**Branch:** `Oybek` — `dotnet test`: **105 test, hammasi o'tadi**
 
 🔴 **Aniq holat va keyingi qadam shu loyihaning `PROGRESS.md`
-faylida.** Quyidagisi faqat qisqacha ko'rinish va ESKIRISHI mumkin —
-ziddiyat bo'lsa `PROGRESS.md` ustun turadi.
+faylida.** Quyidagisi faqat qisqacha.
 
 | Plan | Holat |
 |---|---|
-| **01a** — backend poydevori | ✅ TUGADI (7/7 task) |
-| **01b** — sync yadrosi | 🟡 Task 1-5 ✅, **Task 6 (WebSocket) — keyingi** |
-| 02 — tdesktop agenti | ⚪ |
-| 03 — web controller | ⚪ |
-| 04 — storage lifecycle | ⚪ |
-| 05 — always-on capture (TDLib) | ⚪ |
-| 06 — reliz boshqaruvi | ⚪ |
+| **01a** — backend poydevori | ✅ 7 task + rejadan tashqari 6b (rol avtorizatsiyasi) |
+| **01b** — sync yadrosi | 🟡 9 task'dan 8 tasi. Qolgani: Task 9 (deployment) |
+| 02 — tdesktop agenti | ⚪ boshlanmagan — **shu repoda bajariladi** |
+| 03 — web controller | ⚪ boshlanmagan |
+| 04, 05, 06 | ⚪ boshlanmagan |
 
-`dotnet test`: **85 test, hammasi o'tadi** (2026-08-28 holati).
+### 01b da nima ishlaydi
 
-**Keyingi qadam:** plan 01b Task 6 — `NotifyHub` stub'i haqiqiy
-WebSocket implementatsiyasiga almashtiriladi (`SyncEndpoints` uni
-allaqachon chaqiradi).
+`seq` cursor (commit tartibi kafolati) · push/pull · tombstone (ikki
+yo'nalishli) · kontent-adresli media + kvota · kalit o'ramlari + rate
+limiting · keyset pagination + statistika · WebSocket bildirishnoma ·
+`.cmx` import/eksport · platformalararo kripto vektorlari.
 
-⚠️ `PROGRESS.md` dagi uchta ogohlantirishni implementdan oldin o'qing:
-`record_id` endi `account_hash` oladi (§0.12), ustunlar `snake_case`,
-va testlarda `pull?since=0` ishlatilmaydi.
+### 🔴 Plan 02 (tdesktop agenti) boshlashdan oldin bilish shart
 
-**Tartib:** 01a → 01b → 02 → 03 → 04 → 05 → 06
+- **`record_id` formulasi o'zgargan** — spec §0.12, `account_hash`
+  qo'shildi. `activity` kind uchun u **bo'sh satr**.
+- **`peer_hash` formulasi o'zgarmagan.**
+- **`tombstone` push qilganda `target_record_id` OCHIQ maydonda ham
+  yuborilishi shart** — spec §0.13. Server `payload` ni o'qiy olmaydi.
+- **`sha256` ochiq matn ustidan**, shifrlashdan OLDIN (§0.5).
+- Beshala vektor oilasi .NET da tasdiqlangan — C++ tomoni ham
+  `test-vectors.json` ga qarshi tekshirilishi shart.
 
-⚠️ **Implement davom ettirishdan OLDIN** spec **§0 REVIZIYA** ni
-o'qing — 11 ta qaror bor va ular asosiy matndan ustun turadi.
+### tdesktop'da Track C uchun QOLGAN ishlar
 
-### .NET tomonda tasdiqlangan
-
-`RecordId` referens implementatsiyasi (`CustomSync.Core`) vektorlardagi
-7 ta holatni ham aynan qayta hosil qiladi — **ikkita manfiy `msg_id`
-holati ham**. Ya'ni .NET va Python generatori bayt-ma-bayt mos.
-
----
+1. ✅ Sxema v10 (`account_id`) — qurildi.
+2. **`sha256` hisoblash** — `media_index` ga to'ldirish (yangi fayllar
+   + mavjud 1543 ta uchun backfill).
+3. **Sxema v11** — `sync_outbox` + `sync_state` (v10 endi `account_id`).
+4. `CustomSync` moduli — plan 02.
 
 ## Kelishilgan qarorlar (qisqacha)
 
