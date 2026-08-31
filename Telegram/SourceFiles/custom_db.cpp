@@ -655,6 +655,20 @@ void RunMigrations() {
             "      AND x.observed_at = CAST(s.new_value AS INTEGER))");
     }
 
+    // v12 → v13: xabarning o'qilgan vaqti (A17).
+    //
+    // Nima uchun: AntiDelete xabar matnini saqlaydi, lekin suhbatdosh uni
+    // qachon o'qigani yo'qolardi. Bu arxiv to'liqligi uchun ham, A14
+    // (o'qilgan vaqt orqali faollik) uchun ham kerak.
+    //
+    // Qiymat: 0 = noma'lum, >0 = unix vaqt, -1 = maxfiylik cheklovi,
+    // -2 = xabar juda eski. Manfiy qiymatlar "urinib ko'rildi, bo'lmadi"
+    // degani — takroriy so'rovning oldini oladi.
+    if (version < 13) {
+        execSql("ALTER TABLE actioned_messages "
+                "ADD COLUMN read_at INTEGER NOT NULL DEFAULT 0");
+    }
+
     // Update version stamp.
     {
         sqlite3_stmt *stmt = nullptr;
@@ -997,7 +1011,7 @@ QVector<DeletedMessage> GetDeletedMessages(const PeerKey &key) {
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
             "SELECT msg_id, media_path, is_out, msg_date, original_text, "
-            "sender_id, is_media, account_id "
+            "sender_id, is_media, account_id, read_at "
             "FROM actioned_messages "
             "WHERE peer_id = ? AND type = 'deleted' AND account_id IN (0, ?)",
             -1, &stmt, nullptr) == SQLITE_OK) {
@@ -1013,6 +1027,7 @@ QVector<DeletedMessage> GetDeletedMessages(const PeerKey &key) {
             dm.senderId  = colText(stmt, 5);
             dm.isMedia   = sqlite3_column_int(stmt, 6) != 0;
             dm.accountId = sqlite3_column_int64(stmt, 7);
+            dm.readAt    = sqlite3_column_int64(stmt, 8);
             result.push_back(dm);
         }
         sqlite3_finalize(stmt);
@@ -1085,7 +1100,7 @@ QVector<DeletedMessageWithPeer> GetAllDeletedMessages(int limit) {
 
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
-            "SELECT peer_id, msg_id, original_text, media_path, is_out, msg_date, sender_id, is_media "
+            "SELECT peer_id, msg_id, original_text, media_path, is_out, msg_date, sender_id, is_media, read_at "
             "FROM actioned_messages "
             "WHERE type = 'deleted' "
             "ORDER BY msg_date DESC "
@@ -1102,6 +1117,7 @@ QVector<DeletedMessageWithPeer> GetAllDeletedMessages(int limit) {
             dm.date      = static_cast<unsigned int>(sqlite3_column_int64(stmt, 5));
             dm.senderId  = colText(stmt, 6);
             dm.isMedia   = sqlite3_column_int(stmt, 7) != 0;
+            dm.readAt    = sqlite3_column_int64(stmt, 8);
             result.push_back(dm);
         }
         sqlite3_finalize(stmt);
@@ -1211,8 +1227,8 @@ void SaveActionedMessage(const ActionedMessage &msg) {
     if (sqlite3_prepare_v2(gDb,
             "INSERT INTO actioned_messages "
             "(peer_id, msg_id, type, original_text, new_text, media_path, is_out, "
-            "msg_date, timestamp, sender_id, is_media, account_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "msg_date, timestamp, sender_id, is_media, account_id, read_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             -1, &stmt, nullptr) == SQLITE_OK) {
         bindText(stmt, 1, msg.peerId);
         sqlite3_bind_int64(stmt, 2, msg.msgId);
@@ -1226,6 +1242,7 @@ void SaveActionedMessage(const ActionedMessage &msg) {
         bindText(stmt, 10, msg.senderId);
         sqlite3_bind_int(stmt, 11, msg.isMedia ? 1 : 0);
         sqlite3_bind_int64(stmt, 12, msg.accountId);
+        sqlite3_bind_int64(stmt, 13, msg.readAt);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }
@@ -1244,8 +1261,8 @@ void FlushPendingWrites() {
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
             "INSERT OR IGNORE INTO actioned_messages "
-            "(peer_id, msg_id, type, original_text, is_out, msg_date, timestamp, account_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "(peer_id, msg_id, type, original_text, is_out, msg_date, timestamp, account_id, read_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             -1, &stmt, nullptr) == SQLITE_OK) {
         for (const ActionedMessage &msg : std::as_const(gPendingWrites)) {
             sqlite3_reset(stmt);
@@ -1257,6 +1274,7 @@ void FlushPendingWrites() {
             sqlite3_bind_int64(stmt, 6, static_cast<sqlite3_int64>(msg.msgDate));
             bindText(stmt, 7, dtToStr(msg.timestamp));
             sqlite3_bind_int64(stmt, 8, msg.accountId);
+            sqlite3_bind_int64(stmt, 9, msg.readAt);
             sqlite3_step(stmt);
         }
         sqlite3_finalize(stmt);

@@ -47,13 +47,15 @@ struct ActionedMessage {
     QDateTime timestamp;
     QString senderId;       // v5: guruhda haqiqiy yuboruvchi peer id (bo'sh = noma'lum)
     bool isMedia = false;   // v5: media xabar (matn bo'sh bo'lsa ham o'chirilganini biламiz)
+    qint64 readAt = 0;      // A17: o'qilgan vaqt (0 = noma'lum)
 };
 
 // E19: Schema version constant — increment when adding new columns/tables.
 // RunMigrations() is called inside Init() automatically.
 // v11 (A16 §1): activity_history ga source ustuni
 // v12 (A16 §1): mavjud story yozuvlarini status shkalasiga ko'chirish (backfill)
-constexpr int kCurrentSchemaVersion = 12;
+// v13 (A17): actioned_messages ga read_at ustuni
+constexpr int kCurrentSchemaVersion = 13;
 
 void Init();
 
@@ -125,6 +127,7 @@ struct DeletedMessage {
     QString senderId;       // v5: guruhda haqiqiy yuboruvchi (bo'sh = noma'lum)
     bool isMedia = false;   // v5: media xabar edi
     qint64 accountId = 0;   // v10: 0 = egasi noma'lum (v10 dan oldingi yozuv)
+    qint64 readAt = 0;      // A17: o'qilgan vaqt (0 = noma'lum)
 };
 QVector<DeletedMessage> GetDeletedMessages(const PeerKey &key);
 
@@ -139,6 +142,7 @@ struct DeletedMessageWithPeer {
     unsigned int date = 0;
     QString senderId;       // v5: guruhda haqiqiy yuboruvchi
     bool isMedia = false;   // v5: media xabar (mediaPath bo'lmasa ham)
+    qint64 readAt = 0;      // A17: o'qilgan vaqt (0 = noma'lum)
 };
 QVector<DeletedMessageWithPeer> GetAllDeletedMessages(int limit = 300);
 
