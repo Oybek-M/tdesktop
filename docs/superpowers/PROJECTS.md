@@ -57,6 +57,28 @@ qayta yozilib bu rezervatsiya bekor bo'lgan edi — tiklandi.
 
 ---
 
+## 🔴 2026-09-01: plan 05 (always-on capture) uchun DALIL
+
+`Zulayxo` chatida 6 ta o'chirilgan xabar yo'qolgan edi. Uchta
+nazariya (AntiDelete o'chiq, akkaunt mos emas, `msg_date=0`)
+tekshirilib **rad etildi** — matn, sana, jo'natuvchi `text_cache`
+da to'liq turgan edi.
+
+Haqiqiy sabab: ilova **oflayn** turgan paytdagi o'chirishlar uchun
+Telegram `updateDeleteMessages` ni qayta yubormaydi. Bu klient-asosli
+yondashuvning tub cheklovi, kodimizdagi xato emas.
+
+NovaGram (telefonda, doimiy ulangan) o'sha xabarlarni ushlab qolgan.
+Ya'ni **doimiy ulangan manba muammoni hal qiladi** — aynan plan 05
+qiladigan ish.
+
+Batafsil: [`specs/2026-09-01-offline-deletion-gap-evidence.md`](specs/2026-09-01-offline-deletion-gap-evidence.md)
+
+⚠️ Ochiq savol: AntiDelete sozlamasi qachon va nega `false` bo'lib
+qolgan — kodda sabab topilmadi. Yana takrorlansa alohida tashxis kerak.
+
+---
+
 ## Qolgan ishlar (build va sinovdan KEYIN)
 
 | № | Ish | Izoh |
