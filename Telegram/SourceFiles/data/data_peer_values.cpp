@@ -19,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_app_config.h"
 #include "ui/image/image_prepare.h"
 #include "base/unixtime.h"
+#include "custom_settings.h"
 
 namespace Data {
 namespace {
@@ -375,6 +376,14 @@ rpl::producer<bool> CanPinMessagesValue(not_null<PeerData*> peer) {
 }
 
 rpl::producer<bool> AllowsForwardingValue(not_null<PeerData*> peer) {
+	// 2026-08-31: bool variantida (data_peer.cpp:1739) bypass allaqachon
+	// bor edi, bu reaktiv variantda esa unutilgan. Natijada ikkalasi
+	// bir-biriga ZID javob berardi va screenshot himoyasi
+	// (window_session_controller.cpp:1922) aynan shu variantni
+	// ishlatgani uchun bypass ishlamasdi.
+	if (::CustomSettings::BypassRestrictions()) {
+		return rpl::single(true);
+	}
 	if (const auto user = peer->asUser()) {
 		return rpl::combine(
 			PeerFlagValue(user, UserDataFlag::NoForwardsMyEnabled),
