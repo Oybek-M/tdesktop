@@ -53,16 +53,19 @@ constexpr auto kShortGroupGapSeconds = 30 * 60;
 	return QFile::exists(path) ? path : QString();
 }
 
+[[nodiscard]] QString SourceMarker(const QString &source) {
+	if (source == u"story"_q) return u"📖"_q;
+	if (source == u"manual"_q) return u"✍️"_q;
+	if (source == u"buffer"_q) return u"⏱"_q;
+	if (source == u"read"_q) return u"✓✓"_q;
+	return QString();
+}
+
 QString FormatEntryLine(const CustomDB::ActivityHistoryEntry &entry) {
 	const auto when = QDateTime::fromSecsSinceEpoch(entry.observedAt)
 		.toString(u"dd.MM.yyyy HH:mm"_q);
-	const auto sourcePrefix = [&] {
-		if (entry.source == u"story"_q) return u"📖 "_q;
-		if (entry.source == u"manual"_q) return u"✍️ "_q;
-		if (entry.source == u"buffer"_q) return u"⏱ "_q;
-		if (entry.source == u"read"_q) return u"✓✓ "_q;
-		return QString();
-	}();
+	const auto marker = SourceMarker(entry.source);
+	const auto sourcePrefix = marker.isEmpty() ? QString() : (marker + u" "_q);
 	const auto fieldLabel = [&] {
 		if (entry.field == u"name"_q) return u"Ism"_q;
 		if (entry.field == u"username"_q) return u"Username"_q;
@@ -91,7 +94,7 @@ struct OnlinePeriod {
 	qint64 from = 0;
 	qint64 to = 0;
 	bool instant = false;   // true = juftisiz nuqta (davr emas, LAHZA)
-	QString source;         // "observed" | "story" | "manual" | "buffer"
+	QString source;         // "observed" | "story" | "manual" | "buffer" | "read"
 };
 
 QString FormatInstantLabel(const OnlinePeriod &p) {
@@ -238,9 +241,12 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 				const auto from = QDateTime::fromSecsSinceEpoch(p.from);
 				const auto to = QDateTime::fromSecsSinceEpoch(p.to);
 				const auto minutes = std::max<qint64>(0, (p.to - p.from) / 60);
+				const auto marker = SourceMarker(p.source);
+				const auto suffix = marker.isEmpty() ? QString() : (u"  "_q + marker);
 				rows.append(from.toString(u"dd.MM HH:mm"_q) + u" - "_q
 					+ to.toString(u"HH:mm"_q) + u" ("_q
-					+ QString::number(minutes) + u" daqiqa)"_q);
+					+ QString::number(minutes) + u" daqiqa)"_q
+					+ suffix);
 				continue;
 			}
 			// Qisqa ulanish — guruhga qo'shamiz.
