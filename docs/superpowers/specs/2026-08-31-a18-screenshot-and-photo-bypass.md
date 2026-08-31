@@ -128,13 +128,27 @@ uchala manba ham bo'sh bo'lib chiqadi.
 ⚠️ **Bu TAXMIN.** Implementdan oldin tekshirilsin: private kanaldagi
 rasm uchun uchala manba ham haqiqatan bo'shmi? Log qo'yib aniqlansin.
 
-### Yo'nalish (tasdiqlangach)
+### YECHIM TOPILDI (2026-08-31) — taxmin emas
 
-Rasm uchun to'rtinchi manba: Telegram'ning o'z rasm keshidan
-(`Image`/`PhotoMedia`) baytlarni olib vaqtinchalik faylga yozish va
-shu faylni yuklash. Aniq API tekshiruvdan keyin belgilanadi.
+`Data::PhotoMedia` da tayyor funksiya bor:
+`data/data_photo_media.h:50` — `bool saveToFile(const QString &path)`
 
----
+Uning ichida uch bosqichli zaxira bor
+(`data_photo_media.cpp:203`):
+
+1. `videoContent(Large)` — jonli rasm (video) bo'lsa
+2. `imageBytes(Large)` — xom JPEG baytlari
+3. `image(Large)->original()` — render qilingan rasmni JPG qilib saqlash
+
+Ya'ni rasm keshda qanday ko'rinishda bo'lsa ham, funksiya uni faylga
+yozib beradi. Aynan shu yetishmayotgan to'rtinchi manba.
+
+`PhotoMedia` obyekti `photo->createMediaView()` bilan olinadi
+(namuna: `api/api_chat_invite.cpp:269`).
+
+⚠️ **Muhim:** `createMediaView()` qaytargan `shared_ptr` **ushlab
+turilishi** kerak — qo'yib yuborilsa kesh bo'shab ketishi mumkin.
+Yuklash tugaguncha saqlansin.
 
 ## 4. Tartib
 
