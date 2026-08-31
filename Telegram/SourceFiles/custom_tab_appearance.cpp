@@ -166,9 +166,7 @@ void fillAppearanceTab(not_null<Ui::VerticalLayout*> content) {
 		const auto desc = s2->add(
 			object_ptr<Ui::FlatLabel>(
 				s2,
-				rpl::single(u"Sizni ham qaytarib contact'ga qo'shgan odamlar ismi "
-					"yoniga belgi qo'yadi. Har bir joy uchun mustaqil yoqish va "
-					"mustaqil belgi (emoji) tanlash mumkin."_q),
+				rpl::single(u"Sizni contact'ga qo'shgan suhbatdoshlar ismi yoniga belgi (emoji) qo'yadi."_q),
 				st::customModHintLabel),
 			st::boxRowPadding,
 			style::al_justify);
@@ -293,8 +291,7 @@ void fillAppearanceTab(not_null<Ui::VerticalLayout*> content) {
 		const auto desc = s3->add(
 			object_ptr<Ui::FlatLabel>(
 				s3,
-				rpl::single(u"Oyna nomi va icon ni o'zgartirish. "
-					"Barcha o'zgartirishlar uchun dasturni qayta yoqing."_q),
+				rpl::single(u"Oyna nomi va belgisini o'zgartirish (qayta ishga tushirish talab etiladi)."_q),
 				st::customModHintLabel),
 			st::boxRowPadding,
 			style::al_justify);

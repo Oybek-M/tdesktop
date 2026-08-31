@@ -12,10 +12,7 @@ void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content) {
 		const auto desc = content->add(
 			object_ptr<Ui::FlatLabel>(
 				content,
-				rpl::single(u"Rasmiy telegramdesktop/tdesktop'da yangi "
-					"reliz chiqqanini tekshiradi va bildiradi. Hech qanday "
-					"avtomatik yangilash yoki build qilmaydi — faqat "
-					"xabardor qiladi."_q),
+				rpl::single(u"Rasmiy tdesktop relizlarini tekshiradi va xabardor qiladi."_q),
 				st::customModHintLabel),
 			st::boxRowPadding,
 			style::al_justify);

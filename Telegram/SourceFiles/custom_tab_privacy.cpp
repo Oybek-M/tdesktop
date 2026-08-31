@@ -60,7 +60,7 @@ void fillPrivacyTab(not_null<Ui::VerticalLayout*> content) {
 		s1,
 		u"ghostMode"_q,
 		u"Ghost Mode"_q,
-		u"Online holatini, yozmoqda belgisini va xabar o'qildi bildirishnomasini yashiradi.\n\nYoqilgach, to'liq kuchga kirishi uchun 1-2 daqiqa ketishi mumkin."_q);
+		u"Online, yozmoqda va o'qildi belgilarini yashiradi."_q);
 	addToggle(
 		s1,
 		u"storyAnonymousView"_q,
@@ -70,7 +70,7 @@ void fillPrivacyTab(not_null<Ui::VerticalLayout*> content) {
 		s1,
 		u"storyMediaBackupEnabled"_q,
 		u"Hikoya media'sini saqlash"_q,
-		u"Kuzatilayotgan userlarning hikoya (story) rasmi/videosi avtomatik, ko'rmasdan lokal saqlanadi. Disk joyini sarflaydi, standart holatda o'chirilgan."_q);
+		u"Hikoya rasmi/videosi avtomatik saqlanadi (disk joyini sarflaydi)."_q);
 	addToggle(
 		s1,
 		u"bypassRestrictions"_q,

@@ -449,10 +449,7 @@ void fillPerChatSection(
 		const auto desc = content->add(
 			object_ptr<Ui::FlatLabel>(
 				content,
-				rpl::single(u"Agar biror chat uchun faqat bitta funksiyani (masalan "
-					"faqat Ghost Mode) alohida sozlamoqchi bo'lsangiz — shu yerdan "
-					"qo'shing. Bu ro'yxat White/Black List'dan KEYIN tekshiriladi "
-					"(ular ustunroq)."_q),
+				rpl::single(u"Alohida chatlar uchun individual sozlamalar (White/Black List ustunroq)."_q),
 				st::customModHintLabel),
 			st::boxRowPadding,
 			style::al_justify);

@@ -169,3 +169,21 @@ Tab soni 7 ga chiqdi. Agar 7 ta ko'p bo'lsa, muqobil: **Ombor**ni
 (u holda 6 tab, lekin Arxiv ~950 qator).
 
 Tavsiyam — 7 tab.
+
+---
+
+## 7. Bajarildi (2026-08-31)
+
+Barcha 4 bosqich to'liq amalga oshirildi:
+
+1. **Bosqich 1 (Fayllarga ajratish):**
+   - Commit: `ede1c9e636` (`refactor(window): split custom_mod_window into per-tab files`)
+2. **Bosqich 2 (7 tabga qayta bo'lish):**
+   - Commit: `da1ea72460` (`feat(window): regroup settings into seven function-based tabs`)
+   - 7 tab: Yashirinlik, Ko'rinish, Chatlar, Faollik, Arxiv, Ombor, Tizim.
+3. **Bosqich 3 (Sarlavhalar va yopiq bo'limlar):**
+   - Commit: `411da60c23` (`feat(window): add subsection titles and collapse sections by default`)
+   - `AddCollapsibleSection` orqali barcha bo'limlar sarlavhalandi va har tabning 1-bo'limidan tashqari barchasi standart yopiq qilindi.
+4. **Bosqich 4 (Matnlarni qisqartirish):**
+   - Uzun tushuntirishlar ixchamlashtirildi.
+

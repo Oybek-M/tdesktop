@@ -47,13 +47,7 @@ void fillStorageTab(
 	content->add(
 		object_ptr<Ui::FlatLabel>(
 			content,
-			rpl::single(u"Eksport ZIP fayli QUYIDAGILARNI saqlaydi:\n"
-				"• O'chirilgan/tahrirlangan xabarlar bazasi\n"
-				"• Bomb media (rasm/video)\n"
-				"• White/Black List (peer_lists.json)\n"
-				"• Branding sozlamalari (branding.json)\n"
-				"• Ghost/AntiDelete/AntiEdit togglelar va Per-Chat (registry)\n\n"
-				"Import — barchasini tiklaydi va dastur AVTOMATIK qayta yuklanadi."_q),
+			rpl::single(u"Baza, media, ro'yxatlar va sozlamalarni ZIP zaxiraga saqlash va tiklash."_q),
 			st::customModHintLabel),
 		st::defaultSubsectionTitlePadding);
 
@@ -71,11 +65,7 @@ void fillStorageTab(
 	content->add(
 		object_ptr<Ui::FlatLabel>(
 			content,
-			rpl::single(u"Barcha saqlanadigan ma'lumotlar shu yerda: "_q
-				+ CustomSettings::ArchiveRoot()
-				+ u"  —  ichida: medias/ (fayllar), db/ (baza), "
-				  "config/ (sozlamalar), backups/ (avtomatik zaxiralar), "
-				  "bombmedia/."_q),
+			rpl::single(u"Arxiv joylashuvi: "_q + CustomSettings::ArchiveRoot()),
 			st::customModHintLabel),
 		st::boxRowPadding);
 	content->add(

@@ -11,10 +11,7 @@ void fillActivityTab(
 		const auto desc = s1->add(
 			object_ptr<Ui::FlatLabel>(
 				s1,
-				rpl::single(u"Kontaktlarning ism, username, rasm va "
-					"last-seen o'zgarishlarini vaqt bilan saqlaydi — faqat "
-					"ilova legal ravishda qabul qilgan ma'lumot, hech qanday "
-					"maxfiylik cheklovi aylanib o'tilmaydi."_q),
+				rpl::single(u"Kontaktlarning ism, rasm va last-seen o'zgarishlarini vaqt bilan saqlaydi."_q),
 				st::customModHintLabel),
 			st::boxRowPadding,
 			style::al_justify);
@@ -60,7 +57,7 @@ void fillActivityTab(
 	s1->add(
 		object_ptr<Ui::FlatLabel>(
 			s1,
-			rpl::single(u"Kuzatilmayotgan odamlarning faolligi shu muddat davomida xotirada saqlanadi. Odamni kuzatuvga qo'shsangiz, shu davrdagi yozuvlar tiklanadi."_q),
+			rpl::single(u"Kuzatuvga qo'shilganda o'tgan muddatdagi faollik yozuvlarini tiklaydi."_q),
 			st::customModHintLabel),
 		st::boxRowPadding);
 
@@ -152,9 +149,7 @@ void fillActivityTab(
 	s1->add(
 		object_ptr<Ui::FlatLabel>(
 			s1,
-			rpl::single(u"Offline paytda yoki boshqa manbadan bilgan faollik "
-				"vaqtingizni qo'lda kiritish mumkin. Bu yozuv faollik "
-				"tarixida '✍️ qo'lda kiritilgan' belgisi bilan saqlanadi."_q),
+			rpl::single(u"Oflayn/tashqi manbadan bilgan faollik vaqtingizni qo'lda kiritish."_q),
 			st::customModHintLabel),
 		st::boxRowPadding);
 	s1->add(
