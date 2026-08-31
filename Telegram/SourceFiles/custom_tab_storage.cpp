@@ -4,32 +4,19 @@ void fillStorageTab(
 		not_null<Ui::VerticalLayout*> content,
 		QWidget *dialogParent,
 		Fn<void()> onArchiveChanged) {
-	// 2026-08-15: alpha build'da AppVersionStr rasmiy raqam bo'lib
-	// qolaveradi ("7.0.9"), ya'ni ikkita custom build'ni ajratib
-	// bo'lmaydi. Alpha raqami aynan shu uchun ko'rsatiladi.
-	content->add(
-		object_ptr<Ui::FlatLabel>(
-			content,
-			rpl::single(AppAlphaVersion
-				? (u"CustomMod %1 · alpha %2"_q
-					.arg(QString::fromUtf8(AppVersionStr))
-					.arg(int(AppAlphaVersion % 1000)))
-				: (u"CustomMod %1"_q
-					.arg(QString::fromUtf8(AppVersionStr)))),
-			st::customModHintLabel),
-		st::boxRowPadding);
+	// 1-bo'lim: Zaxira nusxa (Standart ochiq)
+	const auto s1 = AddCollapsibleSection(content, u"📦 Zaxira nusxa"_q, true);
 
 	const auto stats0 = CustomDB::GetArchiveStats();
-	const auto statsLabel = content->add(
+	const auto statsLabel = s1->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
+			s1,
 			rpl::single(
 				u"🗄️ Arxiv holati: %1 o'chirilgan • %2 tahrirlangan"_q
 				.arg(stats0.deletedCount).arg(stats0.editedCount)),
 			st::customModHintLabel),
 		st::defaultSubsectionTitlePadding);
 
-	// Arxiv statistikasini yangilash uchun yordamchi.
 	const auto refreshStats = [statsLabel]() {
 		const auto s = CustomDB::GetArchiveStats();
 		statsLabel->setText(
@@ -37,40 +24,23 @@ void fillStorageTab(
 				.arg(s.deletedCount).arg(s.editedCount));
 	};
 
-	content->add(
+	s1->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
-			rpl::single(u"📦 Zaxira nusxa"_q),
-			st::defaultSubsectionTitle),
-		st::defaultSubsectionTitlePadding);
-
-	content->add(
-		object_ptr<Ui::FlatLabel>(
-			content,
+			s1,
 			rpl::single(u"Baza, media, ro'yxatlar va sozlamalarni ZIP zaxiraga saqlash va tiklash."_q),
 			st::customModHintLabel),
 		st::defaultSubsectionTitlePadding);
 
-	// ── Arxiv papkasi (2026-08-15) ─────────────────────────────
-	// AntiDelete va zaxira uchun saqlanadigan HAMMA narsa shu ildiz
-	// ostida: medias/, db/, config/, backups/. Ilgari ular ikkiga
-	// bo'lingan edi (~/customizationMainFolder va %APPDATA%/CustomMod).
-	Ui::AddSkip(content, 8);
-	content->add(
+	Ui::AddSkip(s1, 8);
+	s1->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
-			rpl::single(u"Arxiv papkasi"_q),
-			st::defaultSubsectionTitle),
-		st::defaultSubsectionTitlePadding);
-	content->add(
-		object_ptr<Ui::FlatLabel>(
-			content,
+			s1,
 			rpl::single(u"Arxiv joylashuvi: "_q + CustomSettings::ArchiveRoot()),
 			st::customModHintLabel),
 		st::boxRowPadding);
-	content->add(
+	s1->add(
 		object_ptr<Ui::RoundButton>(
-			content,
+			s1,
 			rpl::single(u"📁 Papkani o'zgartirish"_q),
 			st::defaultBoxButton),
 		st::boxRowPadding
@@ -90,8 +60,7 @@ void fillStorageTab(
 		moveBox.setText(
 			u"Eski: "_q + current
 			+ u"\nYangi: "_q + QDir::cleanPath(chosen)
-			+ u"\n\nMavjud ma'lumotlarni yangi papkaga "
-			  "ko'chiraymi?"_q);
+			+ u"\n\nMavjud ma'lumotlarni yangi papkaga ko'chiraymi?"_q);
 		const auto moveBtn = moveBox.addButton(
 			u"📦 Ko'chirish"_q, QMessageBox::AcceptRole);
 		moveBox.addButton(
@@ -104,32 +73,21 @@ void fillStorageTab(
 		const auto role = moveBox.buttonRole(moveBox.clickedButton());
 		if (role != QMessageBox::AcceptRole
 			&& role != QMessageBox::DestructiveRole) {
-			return; // Cancel
+			return;
 		}
 		if (role == QMessageBox::AcceptRole) {
-			// Ko'chirishning O'ZI keyingi ishga tushishda bajariladi:
-			// hozir baza ochiq va uni ko'chirish xavfli bo'lardi.
 			CustomSettings::ScheduleArchiveRootMove(current);
 		}
 		CustomSettings::SetArchiveRoot(chosen);
 		Ui::Toast::Show(
 			(role == QMessageBox::AcceptRole)
-				? u"Papka o'zgartirildi. Ma'lumotlar qayta ishga "
-				  "tushganda ko'chiriladi. Dastur 3 soniyada qayta "
-				  "yuklanadi..."_q
-				: u"Papka o'zgartirildi. Dastur 3 soniyada qayta "
-				  "yuklanadi..."_q);
+				? u"Papka o'zgartirildi. Ma'lumotlar qayta ishga tushganda ko'chiriladi. Dastur 3 soniyada qayta yuklanadi..."_q
+				: u"Papka o'zgartirildi. Dastur 3 soniyada qayta yuklanadi..."_q);
 		QTimer::singleShot(3000, [] { Core::Restart(); });
 	});
 
-	// ── Katta media backup sozlamalari (2026-08-14) ─────────────────────
-	Ui::AddSkip(content, 8);
-	content->add(
-		object_ptr<Ui::FlatLabel>(
-			content,
-			rpl::single(u"Katta media backup"_q),
-			st::defaultSubsectionTitle),
-		st::defaultSubsectionTitlePadding);
+	// 2-bo'lim: Media backup (Standart yopiq)
+	const auto s2 = AddCollapsibleSection(content, u"🎞 Media backup"_q, false);
 	{
 		const auto used = CustomMediaQuota::UsedBytes();
 		const auto limit = CustomMediaQuota::LimitBytes();
@@ -137,36 +95,32 @@ void fillStorageTab(
 			return QString::number(
 				double(bytes) / (1024.0 * 1024 * 1024), 'f', 1);
 		};
-		content->add(
+		s2->add(
 			object_ptr<Ui::FlatLabel>(
-				content,
-				rpl::single(u"White List'dagi yoki 'Media Backup' yoqilgan "
-					"chatlarda media oldindan yuklab olinadi.\n"
-					"Ishlatilgan: "_q + gb(used) + u" GB / "_q
-					+ gb(limit) + u" GB"_q),
+				s2,
+				rpl::single(u"White List'dagi yoki 'Media Backup' yoqilgan chatlarda media oldindan yuklab olinadi.\nIshlatilgan: "_q
+					+ gb(used) + u" GB / "_q + gb(limit) + u" GB"_q),
 				st::customModHintLabel),
 			st::boxRowPadding);
 
-		const auto maxInput = content->add(
+		const auto maxInput = s2->add(
 			object_ptr<Ui::InputField>(
-				content,
+				s2,
 				st::defaultInputField,
 				rpl::single(u"Bitta fayl chegarasi, MB (10–4096)"_q),
 				QString::number(CustomSettings::MediaBackupMaxFileMb())),
 			st::boxRowPadding);
-		// Kvota ichkarida MB'da saqlanadi, UI'da esa GB — shuning uchun
-		// "5.5" kabi kasrli qiymat kiritish mumkin.
-		const auto quotaInput = content->add(
+		const auto quotaInput = s2->add(
 			object_ptr<Ui::InputField>(
-				content,
+				s2,
 				st::defaultInputField,
 				rpl::single(u"Umumiy kvota, GB (0.1–500, kasr mumkin: 5.5)"_q),
 				QString::number(
 					CustomSettings::MediaBackupQuotaMb() / 1024.0, 'f', 2)),
 			st::boxRowPadding);
-		content->add(
+		s2->add(
 			object_ptr<Ui::RoundButton>(
-				content,
+				s2,
 				rpl::single(u"💾 Saqlash"_q),
 				st::defaultBoxButton),
 			st::boxRowPadding
@@ -174,12 +128,8 @@ void fillStorageTab(
 			auto ok = false;
 			const auto maxMb = maxInput->getLastText().trimmed().toInt(&ok);
 			if (ok) {
-				// Chegaralar CustomSettings::UpdateInt() da qisiladi.
 				CustomSettings::SetInt(u"mediaBackupMaxFileMb"_q, maxMb);
 			}
-			// Kasrli GB qabul qilamiz ("5.5"), MB'ga aylantirib saqlaymiz.
-			// Vergul ham ishlaydi — klaviatura tilida nuqta o'rniga
-			// vergul chiqishi odatiy hol.
 			auto quotaText = quotaInput->getLastText().trimmed();
 			quotaText.replace(u',', u'.');
 			const auto quotaGb = quotaText.toDouble(&ok);
@@ -196,13 +146,74 @@ void fillStorageTab(
 			Ui::Toast::Show(u"Saqlandi ✓"_q);
 		});
 
-		// ── Bir martalik backfill skaneri ───────────────────────────
-		// media_index v7 da paydo bo'ldi, ya'ni undan OLDIN arxivlangan
-		// fayllar indeksda yo'q va shuning uchun eksportga tushmaydi.
-		// Dalillar yo'qolmasligi uchun ularni indeksga kiritish kerak.
-		const auto scanBtn = content->add(
+		const auto addStorageToggle = [&](
+				const QString &id,
+				const QString &text,
+				const QString &description) {
+			const auto &val = CustomSettings::Get();
+			auto current = false;
+			if (id == u"mediaBackupVoice"_q) current = val.mediaBackupVoice;
+			else if (id == u"mediaBackupVideoNote"_q) current = val.mediaBackupVideoNote;
+			else if (id == u"mediaBackupPhoto"_q) current = val.mediaBackupPhoto;
+			else if (id == u"mediaBackupVideo"_q) current = val.mediaBackupVideo;
+			else if (id == u"mediaBackupDocument"_q) current = val.mediaBackupDocument;
+			else if (id == u"mediaQuotaAutoClean"_q) current = val.mediaQuotaAutoClean;
+
+			const auto btn = s2->add(
+				object_ptr<Ui::SettingsButton>(
+					s2,
+					rpl::single(text),
+					st::settingsButtonNoIcon));
+			btn->toggleOn(rpl::single(current));
+
+			btn->toggledValue()
+				| rpl::skip(1)
+				| rpl::on_next([=](bool on) {
+				CustomSettings::Set(id, on);
+				Ui::Toast::Show(
+					on ? (text + u" yoqildi ✓"_q)
+					   : (text + u" o'chirildi"_q));
+			}, btn->lifetime());
+
+			if (!description.isEmpty()) {
+				const auto descLabel = s2->add(
+					object_ptr<Ui::FlatLabel>(
+						s2,
+						rpl::single(description),
+						st::customModHintLabel),
+					st::boxRowPadding,
+					style::al_justify);
+				s2->widthValue() | rpl::on_next([=](int w) {
+					const auto lw = w
+						- st::boxRowPadding.left()
+						- st::boxRowPadding.right();
+					if (lw > 0) {
+						descLabel->resizeToWidth(lw);
+						descLabel->update();
+					}
+				}, descLabel->lifetime());
+			}
+			return btn;
+		};
+
+		addStorageToggle(
+			u"mediaQuotaAutoClean"_q,
+			u"Avtomatik kvota tozalash"_q,
+			u"Limit to'lganda eng eski medialarni avtomatik o'chiradi."_q);
+
+		addStorageToggle(u"mediaBackupPhoto"_q, u"Rasmlar zaxirasi"_q, QString());
+		addStorageToggle(u"mediaBackupVideo"_q, u"Videolar zaxirasi"_q, QString());
+		addStorageToggle(u"mediaBackupVoice"_q, u"Ovozli xabarlar zaxirasi"_q, QString());
+		addStorageToggle(u"mediaBackupVideoNote"_q, u"Video xabarlar (dumaloq) zaxirasi"_q, QString());
+		addStorageToggle(u"mediaBackupDocument"_q, u"Hujjatlar zaxirasi"_q, QString());
+	}
+
+	// 3-bo'lim: Indekslash va tuzatish (Standart yopiq)
+	const auto s3 = AddCollapsibleSection(content, u"🔍 Indekslash va tuzatish"_q, false);
+	{
+		const auto scanBtn = s3->add(
 			object_ptr<Ui::RoundButton>(
-				content,
+				s3,
 				rpl::single(u"🔍 Eski media fayllarni indekslash va tuzatish"_q),
 				st::defaultBoxButton),
 			st::boxRowPadding);
@@ -211,14 +222,9 @@ void fillStorageTab(
 			Ui::Toast::Show(u"Skanerlanmoqda, biroz kuting..."_q);
 			const auto weak = base::make_weak(content);
 
-			// 1-bosqich: indeksga yetishmayotgan fayllarni qo'shish.
 			CustomDB::ScanArchiveMediaAsync([=](int added) {
 				if (!weak) return;
 
-				// 2-bosqich: TUZATISHNI avval quruq (dry-run) chopamiz.
-				// Fayllarni qayta nomlash va ko'chirish qaytarib
-				// bo'lmaydigan amal, shuning uchun foydalanuvchi avval
-				// nima o'zgarishini KO'RADI va o'zi tasdiqlaydi.
 				CustomDB::RepairArchiveMediaAsync(true, [=](
 						CustomDB::RepairReport preview) {
 					if (!weak) return;
@@ -268,366 +274,320 @@ void fillStorageTab(
 		});
 	}
 
-	// ── Media eksport tanlovi (2026-08-14) ──────────────────────────────
-	//
-	// Ro'yxat media_index dan tuziladi — ya'ni faqat HAQIQATAN media'si
-	// bor chatlar ko'rinadi (odatda 3-7 qator, yuzlab emas), har birida
-	// hajmi bilan. Shunda "bu 8 GB, keyingi safar" deb qaror qilish
-	// mumkin. Bu "Individual sozlamalar"dan olinmaydi: u toggle
-	// ARXIVLASHNI boshqaradi, EKSPORTNI emas — 10 ta chatni arxivlab
-	// ulardan 2 tasini eksport qilish mutlaqo normal.
-	Ui::AddSkip(content, 8);
-	content->add(
-		object_ptr<Ui::FlatLabel>(
-			content,
-			rpl::single(u"Media eksporti"_q),
-			st::customModHintLabel),
-		st::defaultSubsectionTitlePadding);
-
-	struct MediaExportState {
-		bool includeAll = false;
-		// QStringList (QVector<QString> emas) — join() kerak. Qt6'da
-		// QVector = QList, shuning uchun ExportOptions::mediaPeerIds ga
-		// to'g'ridan-to'g'ri berish mumkin.
-		QStringList selected;
-		long long allBytes = 0;
-		Ui::FlatLabel *totalLabel = nullptr;
-	};
-	const auto mediaState = content->lifetime()
-		.make_state<MediaExportState>();
-
-	const auto summaries = CustomDB::GetMediaPeerSummaries();
-	for (const auto &s : summaries) {
-		mediaState->allBytes += s.totalBytes;
-	}
-	const auto formatSize = [](long long bytes) {
-		if (bytes >= 1024LL * 1024 * 1024) {
-			return QString::number(
-				double(bytes) / (1024.0 * 1024 * 1024), 'f', 1) + u" GB"_q;
-		}
-		return QString::number(
-			double(bytes) / (1024.0 * 1024), 'f', 1) + u" MB"_q;
-	};
-
-	// Oxirgi tanlovni eslab qolamiz — takroriy eksport bir bosishda.
+	// 4-bo'lim: Eksport va tiklash (Standart yopiq)
+	const auto s4 = AddCollapsibleSection(content, u"📤 Eksport va tiklash"_q, false);
 	{
-		QSettings s("CustomMod", "TelegramDesktop");
-		mediaState->includeAll = s.value("mediaExportIncludeAll", false).toBool();
-		const auto saved = s.value("mediaExportPeers", QString()).toString();
-		if (!saved.isEmpty()) {
-			mediaState->selected = saved.split(u',', Qt::SkipEmptyParts);
-		}
-	}
-	const auto saveSelection = [=] {
-		QSettings s("CustomMod", "TelegramDesktop");
-		s.setValue("mediaExportIncludeAll", mediaState->includeAll);
-		s.setValue("mediaExportPeers", mediaState->selected.join(u','));
-	};
-
-	const auto selectedBytes = [=] {
-		if (mediaState->includeAll) return mediaState->allBytes;
-		auto total = 0LL;
-		for (const auto &s : summaries) {
-			if (mediaState->selected.contains(s.peerId)) total += s.totalBytes;
-		}
-		return total;
-	};
-
-	if (summaries.isEmpty()) {
-		content->add(
-			object_ptr<Ui::FlatLabel>(
-				content,
-				rpl::single(u"Arxivda media fayllar yo'q — eksport faqat "
-					"indeks va sozlamalarni oladi."_q),
-				st::customModHintLabel),
-			st::boxRowPadding);
-	} else {
-		const auto totalLabel = content->add(
-			object_ptr<Ui::FlatLabel>(
-				content,
-				rpl::single(QString()),
-				st::customModHintLabel),
-			st::boxRowPadding);
-		mediaState->totalLabel = totalLabel;
-		const auto refreshTotal = [=] {
-			const auto bytes = selectedBytes();
-			totalLabel->setText(bytes > 0
-				? (u"Tanlangan: "_q + formatSize(bytes))
-				: u"Tanlangan: yo'q — faqat indeks eksport qilinadi"_q);
+		struct MediaExportState {
+			bool includeAll = false;
+			QStringList selected;
+			long long allBytes = 0;
+			Ui::FlatLabel *totalLabel = nullptr;
 		};
-		refreshTotal();
+		const auto mediaState = s4->lifetime().make_state<MediaExportState>();
 
-		const auto allBtn = content->add(
-			object_ptr<Ui::SettingsButton>(
-				content,
-				rpl::single(u"Hammasi ("_q
-					+ formatSize(mediaState->allBytes) + u")"_q),
-				st::settingsButtonNoIcon));
-		allBtn->toggleOn(rpl::single(mediaState->includeAll));
-		allBtn->toggledValue()
-			| rpl::skip(1)
-			| rpl::on_next([=](bool on) {
-				mediaState->includeAll = on;
-				saveSelection();
-				refreshTotal();
-			}, allBtn->lifetime());
+		const auto summaries = CustomDB::GetMediaPeerSummaries();
+		for (const auto &s : summaries) {
+			mediaState->allBytes += s.totalBytes;
+		}
+		const auto formatSize = [](long long bytes) {
+			if (bytes >= 1024LL * 1024 * 1024) {
+				return QString::number(
+					double(bytes) / (1024.0 * 1024 * 1024), 'f', 1) + u" GB"_q;
+			}
+			return QString::number(
+				double(bytes) / (1024.0 * 1024), 'f', 1) + u" MB"_q;
+		};
 
-		for (const auto &summary : summaries) {
-			auto name = CustomSettings::GetPeerDisplayName(summary.peerId);
-			if (summary.peerId == u"0"_q) {
-				// Backfill skaneri: fayl nomidan peer aniqlanmagan eski
-				// fayllar shu guruhda. Ular ham eksport qilinishi kerak.
-				name = u"Noma'lum (eski fayllar)"_q;
-			} else if (name.isEmpty()) {
-				// 2026-08-15: GetPeerDisplayName() faqat White/Black List
-				// va per-chat ro'yxatlariga qaraydi, shuning uchun oddiy
-				// shaxsiy chatlar "ID 620565940" bo'lib chiqardi.
-				// Haqiqiy nomni sessiyadan olamiz.
-				auto ok = false;
-				const auto rawId = summary.peerId.toULongLong(&ok);
-				if (ok && rawId) {
-					if (const auto window = Core::App().activeWindow()) {
-						if (const auto c = window->sessionController()) {
-							const auto peer = c->session().data().peerLoaded(
-								PeerId(rawId));
-							if (peer) {
-								name = peer->name();
-								// Keyingi safar sessiyaga bog'liq
-								// bo'lmasin — nomni saqlab qo'yamiz.
-								CustomSettings::RememberPeerName(
-									summary.peerId, name);
+		{
+			QSettings s("CustomMod", "TelegramDesktop");
+			mediaState->includeAll = s.value("mediaExportIncludeAll", false).toBool();
+			const auto saved = s.value("mediaExportPeers", QString()).toString();
+			if (!saved.isEmpty()) {
+				mediaState->selected = saved.split(u',', Qt::SkipEmptyParts);
+			}
+		}
+		const auto saveSelection = [=] {
+			QSettings s("CustomMod", "TelegramDesktop");
+			s.setValue("mediaExportIncludeAll", mediaState->includeAll);
+			s.setValue("mediaExportPeers", mediaState->selected.join(u','));
+		};
+
+		const auto selectedBytes = [=] {
+			if (mediaState->includeAll) return mediaState->allBytes;
+			auto total = 0LL;
+			for (const auto &s : summaries) {
+				if (mediaState->selected.contains(s.peerId)) total += s.totalBytes;
+			}
+			return total;
+		};
+
+		if (summaries.isEmpty()) {
+			s4->add(
+				object_ptr<Ui::FlatLabel>(
+					s4,
+					rpl::single(u"Arxivda media fayllar yo'q — eksport faqat indeks va sozlamalarni oladi."_q),
+					st::customModHintLabel),
+				st::boxRowPadding);
+		} else {
+			const auto totalLabel = s4->add(
+				object_ptr<Ui::FlatLabel>(
+					s4,
+					rpl::single(QString()),
+					st::customModHintLabel),
+				st::boxRowPadding);
+			mediaState->totalLabel = totalLabel;
+			const auto refreshTotal = [=] {
+				const auto bytes = selectedBytes();
+				totalLabel->setText(bytes > 0
+					? (u"Tanlangan: "_q + formatSize(bytes))
+					: u"Tanlangan: yo'q — faqat indeks eksport qilinadi"_q);
+			};
+			refreshTotal();
+
+			const auto allBtn = s4->add(
+				object_ptr<Ui::SettingsButton>(
+					s4,
+					rpl::single(u"Hammasi ("_q
+						+ formatSize(mediaState->allBytes) + u")"_q),
+					st::settingsButtonNoIcon));
+			allBtn->toggleOn(rpl::single(mediaState->includeAll));
+			allBtn->toggledValue()
+				| rpl::skip(1)
+				| rpl::on_next([=](bool on) {
+					mediaState->includeAll = on;
+					saveSelection();
+					refreshTotal();
+				}, allBtn->lifetime());
+
+			for (const auto &summary : summaries) {
+				auto name = CustomSettings::GetPeerDisplayName(summary.peerId);
+				if (summary.peerId == u"0"_q) {
+					name = u"Noma'lum (eski fayllar)"_q;
+				} else if (name.isEmpty()) {
+					auto ok = false;
+					const auto rawId = summary.peerId.toULongLong(&ok);
+					if (ok && rawId) {
+						if (const auto window = Core::App().activeWindow()) {
+							if (const auto c = window->sessionController()) {
+								const auto peer = c->session().data().peerLoaded(PeerId(rawId));
+								if (peer) {
+									name = peer->name();
+									CustomSettings::RememberPeerName(summary.peerId, name);
+								}
 							}
 						}
 					}
+					if (name.isEmpty()) {
+						name = u"ID "_q + summary.peerId;
+					}
 				}
-				if (name.isEmpty()) {
-					name = u"ID "_q + summary.peerId; // hali yuklanmagan
+				const auto btn = s4->add(
+					object_ptr<Ui::SettingsButton>(
+						s4,
+						rpl::single(name
+							+ u"  —  "_q + formatSize(summary.totalBytes)
+							+ u" ("_q + QString::number(summary.fileCount)
+							+ u" fayl)"_q),
+						st::settingsButtonNoIcon));
+				if (summary.peerId != u"0"_q) {
+					s4->add(
+						object_ptr<Ui::FlatLabel>(
+							s4,
+							rpl::single(u"ID: "_q + summary.peerId),
+							st::customModHintLabel),
+						st::boxRowPadding);
 				}
+				const auto peerId = summary.peerId;
+				btn->toggleOn(rpl::single(mediaState->selected.contains(peerId)));
+				btn->toggledValue()
+					| rpl::skip(1)
+					| rpl::on_next([=](bool on) {
+						mediaState->selected.removeAll(peerId);
+						if (on) mediaState->selected.append(peerId);
+						saveSelection();
+						refreshTotal();
+					}, btn->lifetime());
 			}
-			const auto btn = content->add(
-				object_ptr<Ui::SettingsButton>(
-					content,
-					rpl::single(name
-						+ u"  —  "_q + formatSize(summary.totalBytes)
-						+ u" ("_q + QString::number(summary.fileCount)
-						+ u" fayl)"_q),
-					st::settingsButtonNoIcon));
-			// Ikkinchi qator: ID kichik shriftda, nom ostida.
-			// SettingsButton bir qatorli, shuning uchun alohida label —
-			// bu to'liq custom widget yozishdan ancha arzon va vizual
-			// natija bir xil.
-			if (summary.peerId != u"0"_q) {
-				content->add(
-					object_ptr<Ui::FlatLabel>(
-						content,
-						rpl::single(u"ID: "_q + summary.peerId),
-						st::customModHintLabel),
-					st::boxRowPadding);
-			}
-			const auto peerId = summary.peerId;
-			btn->toggleOn(rpl::single(mediaState->selected.contains(peerId)));
-			btn->toggledValue()
-				| rpl::skip(1)
-				| rpl::on_next([=](bool on) {
-					mediaState->selected.removeAll(peerId);
-					if (on) mediaState->selected.append(peerId);
-					saveSelection();
-					refreshTotal();
-				}, btn->lifetime());
-		}
-	}
-	Ui::AddSkip(content, 8);
-
-	const auto exportBtn = content->add(
-		object_ptr<Ui::RoundButton>(
-			content,
-			rpl::single(u"📤 To'liq zaxira nusxa olish"_q),
-			st::defaultBoxButton),
-		st::boxRowPadding);
-	exportBtn->addClickHandler([=] {
-		const auto dir = QFileDialog::getExistingDirectory(
-			dialogParent,
-			u"Saqlash papkasini tanlang"_q,
-			QDir::homePath());
-		if (dir.isEmpty()) return;
-
-		// Eksport fon (background) thread'da ishlaydi — UI qotib qolmaydi.
-		exportBtn->setDisabled(true);
-		Ui::Toast::Show(u"Zaxira nusxa olinmoqda, biroz kuting..."_q);
-
-		auto options = CustomDB::ExportOptions();
-		options.includeAllMedia = mediaState->includeAll;
-		if (!mediaState->includeAll) {
-			options.mediaPeerIds = mediaState->selected;
 		}
 
-		const auto weak = base::make_weak(content);
-		CustomDB::ExportFullBackupAsync(
-			dir,
-			options,
-			[=](const CustomDB::ExportResult &result) {
-				if (!weak) return; // Oyna yopilgan bo'lishi mumkin.
-				exportBtn->setDisabled(false);
-				if (result.mainZipPath.isEmpty()) {
-					Ui::Toast::Show(u"Eksport amalga oshmadi."_q);
-				} else if (result.mediaZipPath.isEmpty()) {
-					Ui::Toast::Show(u"Eksport saqlandi (media'siz): "_q
-						+ result.mainZipPath);
-				} else {
-					Ui::Toast::Show(u"Eksport saqlandi: "_q
-						+ result.mainZipPath
-						+ u"\n+ media: "_q + result.mediaZipPath);
-				}
-			},
-			[=](const QString &stage, int percent) {
-				if (!weak) return;
-				Ui::Toast::Show(u"%1... (%2%)"_q.arg(stage).arg(percent));
-			});
-	});
-
-	const auto importBtn = content->add(
-		object_ptr<Ui::RoundButton>(
-			content,
-			rpl::single(u"📥 Zaxira nusxadan tiklash"_q),
-			st::defaultBoxButton),
-		st::boxRowPadding);
-	importBtn->addClickHandler([=] {
-		const auto path = QFileDialog::getOpenFileName(
-			dialogParent,
-			u"Zaxira faylini tanlang (.zip)"_q,
-			QDir::homePath(),
-			u"Zaxira fayllari (*.zip);;Barcha fayllar (*)"_q);
-		const auto source = path.isEmpty()
-			? QFileDialog::getExistingDirectory(
+		Ui::AddSkip(s4, 8);
+		const auto exportFullBtn = s4->add(
+			object_ptr<Ui::RoundButton>(
+				s4,
+				rpl::single(u"📤 To'liq zaxira nusxa olish"_q),
+				st::defaultBoxButton),
+			st::boxRowPadding);
+		exportFullBtn->addClickHandler([=] {
+			const auto dir = QFileDialog::getExistingDirectory(
 				dialogParent,
-				u"Zaxira papkasini tanlang"_q,
-				QDir::homePath())
-			: path;
-		if (source.isEmpty()) return;
+				u"Saqlash papkasini tanlang"_q,
+				QDir::homePath());
+			if (dir.isEmpty()) return;
 
-		// Rejim tanlash: Merge (birlashtirish) yoki To'liq almashtirish.
-		QMessageBox modeBox(dialogParent);
-		modeBox.setWindowTitle(u"Zaxiradan tiklash rejimi"_q);
-		modeBox.setText(u"Tiklash rejimini tanlang:"_q);
-		const auto mergeBtn = modeBox.addButton(
-			u"🔗 Birlashtirish"_q, QMessageBox::AcceptRole);
-		modeBox.addButton(
-			u"🔄 To'liq almashtirish"_q, QMessageBox::DestructiveRole);
-		modeBox.addButton(QMessageBox::Cancel);
-		modeBox.setDefaultButton(mergeBtn);
-		modeBox.exec();
+			exportFullBtn->setDisabled(true);
+			Ui::Toast::Show(u"Zaxira nusxa olinmoqda, biroz kuting..."_q);
 
-		// buttonRole() orqali solishtirish — QPushButton*/QAbstractButton*
-		// pointer taqqoslashdan ko'ra ishonchliroq (MSVC ba'zan bu ikki tur
-		// orasidagi standart yuqoriga cast'ni comparison operatorида
-		// tan olmaydi, garchi QPushButton QAbstractButton'dan meros bo'lsa ham).
-		const auto role = modeBox.buttonRole(modeBox.clickedButton());
-		if (role != QMessageBox::AcceptRole
-				&& role != QMessageBox::DestructiveRole) {
-			return; // Cancel yoki oyna yopildi.
-		}
-		const bool fullReplace = (role == QMessageBox::DestructiveRole);
-
-		const auto reply = QMessageBox::warning(
-			dialogParent,
-			u"Zaxiradan tiklash"_q,
-			fullReplace
-				? u"DIQQAT! Joriy arxivdagi BARCHA ma'lumotlar\n"
-				  "(o'chirilgan/tahrirlangan xabarlar, media) O'CHIRILADI\n"
-				  "va tanlangan zaxira bilan to'liq almashtiriladi.\n\n"
-				  "Bu amalni ortga qaytarib bo'lmaydi. Davom etasizmi?"_q
-				: u"Tanlangan zaxiradagi ma'lumotlar JORIY arxivga QO'SHILADI\n"
-				  "(birlashtiriladi) — hozirgi qurilmadagi o'chirilgan/tahrirlangan\n"
-				  "xabarlar va media saqlanib qoladi, o'chirilmaydi.\n\n"
-				  "Davom etasizmi?"_q,
-			QMessageBox::Yes | QMessageBox::Cancel,
-			QMessageBox::Cancel);
-		if (reply != QMessageBox::Yes) return;
-
-		// Tiklash fon (background) thread'da ishlaydi — UI qotib qolmaydi.
-		importBtn->setDisabled(true);
-		Ui::Toast::Show(u"Zaxiradan tiklanmoqda, biroz kuting..."_q);
-
-		const auto weak = base::make_weak(content);
-		CustomDB::ImportFullBackupAsync(source, fullReplace, [=](bool ok) {
-			if (!weak) return; // Oyna yopilgan bo'lishi mumkin.
-			importBtn->setDisabled(false);
-			if (ok) {
-				refreshStats();
-				if (onArchiveChanged) onArchiveChanged();
-				const auto s = CustomDB::GetArchiveStats();
-				Ui::Toast::Show(
-					(fullReplace
-						? u"To'liq almashtirish muvaffaqiyatli! "_q
-						: u"Tiklash muvaffaqiyatli! "_q)
-					+ u"%1 o'chirilgan, %2 tahrirlangan. "
-					  "Dastur 3 soniya ichida qayta yuklanadi..."_q
-						.arg(s.deletedCount).arg(s.editedCount));
-				// Registry va JSON sozlamalar yangi qiymatlar bilan to'liq
-				// qo'llanishi uchun avtomatik restart. 3 soniya — foydalanuvchi
-				// toast o'qisin uchun.
-				QTimer::singleShot(3000, [] { Core::Restart(); });
-			} else {
-				Ui::Toast::Show(u"Tiklash amalga oshmadi. Fayl/papkani tekshiring."_q);
+			auto options = CustomDB::ExportOptions();
+			options.includeAllMedia = mediaState->includeAll;
+			if (!mediaState->includeAll) {
+				options.mediaPeerIds = mediaState->selected;
 			}
+
+			const auto weak = base::make_weak(content);
+			CustomDB::ExportFullBackupAsync(
+				dir,
+				options,
+				[=](const CustomDB::ExportResult &result) {
+					if (!weak) return;
+					exportFullBtn->setDisabled(false);
+					if (result.mainZipPath.isEmpty()) {
+						Ui::Toast::Show(u"Eksport amalga oshmadi."_q);
+					} else if (result.mediaZipPath.isEmpty()) {
+						Ui::Toast::Show(u"Eksport saqlandi (media'siz): "_q + result.mainZipPath);
+					} else {
+						Ui::Toast::Show(u"Eksport saqlandi: "_q + result.mainZipPath + u"\n+ media: "_q + result.mediaZipPath);
+					}
+				},
+				[=](const QString &stage, int percent) {
+					if (!weak) return;
+					Ui::Toast::Show(u"%1... (%2%)"_q.arg(stage).arg(percent));
+				});
 		});
-	});
 
-	// ── Media arxivini alohida import qilish (2026-08-14) ───────────────
-	// Eksport ikkita faylga bo'linadi, shuning uchun media'ni asosiy
-	// tiklashdan KEYIN, istalgan vaqtda qo'shish mumkin bo'lishi kerak.
-	// Qayta ishga tushirish shart emas — faqat fayllar joyiga qo'yiladi
-	// va indeks 'present' ga qaytariladi.
-	const auto importMediaBtn = content->add(
-		object_ptr<Ui::RoundButton>(
-			content,
-			rpl::single(u"🎞 Media arxivini qo'shish (CustomModMedia_*.zip)"_q),
-			st::defaultBoxButton),
-		st::boxRowPadding);
-	importMediaBtn->addClickHandler([=] {
-		const auto path = QFileDialog::getOpenFileName(
-			dialogParent,
-			u"Media arxivini tanlang (.zip)"_q,
-			QDir::homePath(),
-			u"Media arxivi (CustomModMedia_*.zip);;Barcha fayllar (*)"_q);
-		if (path.isEmpty()) return;
+		Ui::AddSkip(s4, 4);
+		const auto importFullBtn = s4->add(
+			object_ptr<Ui::RoundButton>(
+				s4,
+				rpl::single(u"📥 Zaxira nusxadan tiklash"_q),
+				st::defaultBoxButton),
+			st::boxRowPadding);
+		importFullBtn->addClickHandler([=] {
+			const auto path = QFileDialog::getOpenFileName(
+				dialogParent,
+				u"Zaxira faylini tanlang (.zip)"_q,
+				QDir::homePath(),
+				u"Zaxira fayllari (*.zip);;Barcha fayllar (*)"_q);
+			const auto source = path.isEmpty()
+				? QFileDialog::getExistingDirectory(
+					dialogParent,
+					u"Zaxira papkasini tanlang"_q,
+					QDir::homePath())
+				: path;
+			if (source.isEmpty()) return;
 
-		importMediaBtn->setDisabled(true);
-		Ui::Toast::Show(u"Media arxivi ochilmoqda, biroz kuting..."_q);
+			QMessageBox modeBox(dialogParent);
+			modeBox.setWindowTitle(u"Zaxiradan tiklash rejimi"_q);
+			modeBox.setText(u"Tiklash rejimini tanlang:"_q);
+			const auto mergeBtn = modeBox.addButton(
+				u"🔗 Birlashtirish"_q, QMessageBox::AcceptRole);
+			modeBox.addButton(
+				u"🔄 To'liq almashtirish"_q, QMessageBox::DestructiveRole);
+			modeBox.addButton(QMessageBox::Cancel);
+			modeBox.setDefaultButton(mergeBtn);
+			modeBox.exec();
 
-		const auto weak = base::make_weak(content);
-		CustomDB::ImportMediaArchiveAsync(path, [=](bool ok) {
-			if (!weak) return;
-			importMediaBtn->setDisabled(false);
-			Ui::Toast::Show(ok
-				? u"Media arxivi qo'shildi ✓"_q
-				: u"Media arxivini qo'shib bo'lmadi."_q);
+			const auto role = modeBox.buttonRole(modeBox.clickedButton());
+			if (role != QMessageBox::AcceptRole
+					&& role != QMessageBox::DestructiveRole) {
+				return;
+			}
+			const bool fullReplace = (role == QMessageBox::DestructiveRole);
+
+			const auto reply = QMessageBox::warning(
+				dialogParent,
+				u"Zaxiradan tiklash"_q,
+				fullReplace
+					? u"DIQQAT! Joriy arxivdagi BARCHA ma'lumotlar\n(o'chirilgan/tahrirlangan xabarlar, media) O'CHIRILADI\nva tanlangan zaxira bilan to'liq almashtiriladi.\n\nBu amalni ortga qaytarib bo'lmaydi. Davom etasizmi?"_q
+					: u"Tanlangan zaxiradagi ma'lumotlar JORIY arxivga QO'SHILADI\n(birlashtiriladi) — hozirgi qurilmadagi o'chirilgan/tahrirlangan\nxabarlar va media saqlanib qoladi, o'chirilmaydi.\n\nDavom etasizmi?"_q,
+				QMessageBox::Yes | QMessageBox::Cancel,
+				QMessageBox::Cancel);
+			if (reply != QMessageBox::Yes) return;
+
+			importFullBtn->setDisabled(true);
+			Ui::Toast::Show(u"Zaxiradan tiklanmoqda, biroz kuting..."_q);
+
+			const auto weak = base::make_weak(content);
+			CustomDB::ImportFullBackupAsync(source, fullReplace, [=](bool ok) {
+				if (!weak) return;
+				importFullBtn->setDisabled(false);
+				if (ok) {
+					refreshStats();
+					if (onArchiveChanged) onArchiveChanged();
+					const auto s = CustomDB::GetArchiveStats();
+					Ui::Toast::Show(
+						(fullReplace
+							? u"To'liq almashtirish muvaffaqiyatli! "_q
+							: u"Tiklash muvaffaqiyatli! "_q)
+						+ u"%1 o'chirilgan, %2 tahrirlangan. Dastur 3 soniya ichida qayta yuklanadi..."_q
+							.arg(s.deletedCount).arg(s.editedCount));
+					QTimer::singleShot(3000, [] { Core::Restart(); });
+				} else {
+					Ui::Toast::Show(u"Tiklash amalga oshmadi. Fayl/papkani tekshiring."_q);
+				}
+			});
 		});
-	});
 
-	Ui::AddSkip(content, st::settingsThumbSkip);
+		Ui::AddSkip(s4, 4);
+		const auto importMediaArchiveBtn = s4->add(
+			object_ptr<Ui::RoundButton>(
+				s4,
+				rpl::single(u"🎞 Media arxivini qo'shish (CustomModMedia_*.zip)"_q),
+				st::defaultBoxButton),
+			st::boxRowPadding);
+		importMediaArchiveBtn->addClickHandler([=] {
+			const auto path = QFileDialog::getOpenFileName(
+				dialogParent,
+				u"Media arxivini tanlang (.zip)"_q,
+				QDir::homePath(),
+				u"Media arxivi (CustomModMedia_*.zip);;Barcha fayllar (*)"_q);
+			if (path.isEmpty()) return;
 
-	content->add(
+			importMediaArchiveBtn->setDisabled(true);
+			Ui::Toast::Show(u"Media arxivi ochilmoqda, biroz kuting..."_q);
+
+			const auto weak = base::make_weak(content);
+			CustomDB::ImportMediaArchiveAsync(path, [=](bool ok) {
+				if (!weak) return;
+				importMediaArchiveBtn->setDisabled(false);
+				Ui::Toast::Show(ok
+					? u"Media arxivi qo'shildi ✓"_q
+					: u"Media arxivini qo'shib bo'lmadi."_q);
+			});
+		});
+	}
+
+	// 5-bo'lim: Arxiv boshqaruvi (Standart yopiq)
+	const auto s5 = AddCollapsibleSection(content, u"📊 Arxiv boshqaruvi"_q, false);
+	s5->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
-			rpl::single(u"📊 Arxiv boshqaruvi"_q),
-			st::defaultSubsectionTitle),
-		st::defaultSubsectionTitlePadding);
-
-	content->add(
+			s5,
+			rpl::single(u"Arxiv statistikasi va holatini yangilash."_q),
+			st::customModHintLabel),
+		st::boxRowPadding);
+	s5->add(
 		object_ptr<Ui::RoundButton>(
-			content,
-			rpl::single(u"💣 Vaqtinchalik media papkasi"_q),
+			s5,
+			rpl::single(u"🔄 Statistikani yangilash"_q),
 			st::defaultBoxButton),
 		st::boxRowPadding)
 	->addClickHandler([=] {
-		const auto bombDir =
-			CustomSettings::ArchiveRoot()
-			+ u"/bombmedia/"_q; // 2026-08-15: yagona arxiv ildizi ostida
+		refreshStats();
+		Ui::Toast::Show(u"Statistika yangilandi ✓"_q);
+	});
+
+	// 6-bo'lim: Vaqtinchalik media papkasi (Standart yopiq)
+	const auto s6 = AddCollapsibleSection(content, u"💣 Vaqtinchalik media papkasi"_q, false);
+	s6->add(
+		object_ptr<Ui::RoundButton>(
+			s6,
+			rpl::single(u"💣 Vaqtinchalik media papkasini ochish"_q),
+			st::defaultBoxButton),
+		st::boxRowPadding)
+	->addClickHandler([=] {
+		const auto bombDir = CustomSettings::ArchiveRoot() + u"/bombmedia/"_q;
 		QDir().mkpath(bombDir);
 		QDesktopServices::openUrl(QUrl::fromLocalFile(bombDir));
 	});
 
-	
 	Ui::AddSkip(content, st::settingsThumbSkip);
 }

@@ -15,13 +15,7 @@ void fillPeerSection(
 	};
 	const auto state = content->lifetime().make_state<State>();
 
-	// ── Section header ───────────────────────────────────────────
-	content->add(
-		object_ptr<Ui::FlatLabel>(
-			content,
-			rpl::single(isWhitelist ? u"White List"_q : u"Black List"_q),
-			st::defaultSubsectionTitle),
-		st::defaultSubsectionTitlePadding);
+
 
 	{
 		const auto sectionDesc = content->add(
@@ -437,13 +431,7 @@ void fillPerChatSection(
 	};
 	const auto state = content->lifetime().make_state<State>();
 
-	// ── Header ────────────────────────────────────────────────────
-	content->add(
-		object_ptr<Ui::FlatLabel>(
-			content,
-			rpl::single(u"⚙️ Individual sozlamalar (istisnolar)"_q),
-			st::defaultSubsectionTitle),
-		st::defaultSubsectionTitlePadding);
+
 
 	{
 		const auto desc = content->add(
@@ -717,22 +705,23 @@ void fillChatsTab(
 		not_null<Ui::VerticalLayout*> content,
 		not_null<Window::SessionController*> controller,
 		Fn<void()> onRebuild) {
-	Ui::AddSkip(content, st::settingsThumbSkip);
+	// 1-bo'lim: Global rejim (Standart ochiq)
+	const auto s1 = AddCollapsibleSection(content, u"🌐 Global rejim"_q, true);
 	{
-		const auto lbl = content->add(
+		const auto lbl = s1->add(
 			object_ptr<Ui::FlatLabel>(
-				content,
+				s1,
 				rpl::single(u"AntiDelete / AntiEdit uchun global rejim:"_q),
 				st::customModHintLabel),
 			st::boxRowPadding);
-		content->widthValue() | rpl::on_next([=](int w) {
+		s1->widthValue() | rpl::on_next([=](int w) {
 			const auto lw = w - st::boxRowPadding.left() - st::boxRowPadding.right();
 			if (lw > 0) { lbl->resizeToWidth(lw); lbl->update(); }
 		}, lbl->lifetime());
 	}
 
-	const auto modeWrap = content->add(
-		object_ptr<Ui::VerticalLayout>(content));
+	const auto modeWrap = s1->add(
+		object_ptr<Ui::VerticalLayout>(s1));
 	const auto modeGroup = std::make_shared<Ui::RadiobuttonGroup>(
 		int(CustomSettings::GetPeerListMode()));
 
@@ -764,11 +753,10 @@ void fillChatsTab(
 		Ui::Toast::Show(u"Rejim saqlandi ✓"_q);
 	});
 
-	Ui::AddDivider(content);
-	Ui::AddSkip(content, st::settingsThumbSkip);
-
+	// 2-bo'lim: Include ro'yxati (Standart yopiq)
+	const auto s2 = AddCollapsibleSection(content, u"✅ Include ro'yxati (White List)"_q, false);
 	fillPeerSection(
-		content,
+		s2,
 		controller,
 		u"White List (Ruxsat berilganlar)"_q,
 		u"Faqat shu chatlarda AntiDelete/AntiEdit ishlaydi."_q,
@@ -785,11 +773,10 @@ void fillChatsTab(
 		CustomSettings::IsInBlackList,
 		u"Black List");
 
-	Ui::AddDivider(content);
-	Ui::AddSkip(content, st::settingsThumbSkip);
-
+	// 3-bo'lim: Exclude ro'yxati (Standart yopiq)
+	const auto s3 = AddCollapsibleSection(content, u"🚫 Exclude ro'yxati (Black List)"_q, false);
 	fillPeerSection(
-		content,
+		s3,
 		controller,
 		u"Black List (Taqiqlanganlar)"_q,
 		u"Bu chatlarda AntiDelete/AntiEdit ISHLAMAYDI."_q,
@@ -806,8 +793,9 @@ void fillChatsTab(
 		CustomSettings::IsInWhiteList,
 		u"White List");
 
-	Ui::AddDivider(content);
-	Ui::AddSkip(content, st::settingsThumbSkip);
-	fillPerChatSection(content, controller);
+	// 4-bo'lim: Individual sozlamalar (Standart yopiq)
+	const auto s4 = AddCollapsibleSection(content, u"⚙️ Individual sozlamalar (istisnolar)"_q, false);
+	fillPerChatSection(s4, controller);
+
 	Ui::AddSkip(content, st::settingsThumbSkip);
 }

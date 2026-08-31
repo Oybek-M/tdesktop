@@ -1,13 +1,6 @@
 #include "custom_tab_common.h"
 
 void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content) {
-	content->add(
-		object_ptr<Ui::FlatLabel>(
-			content,
-			rpl::single(u"🔔 Rasmiy versiya tekshiruvi"_q),
-			st::defaultSubsectionTitle),
-		st::defaultSubsectionTitlePadding);
-
 	{
 		const auto desc = content->add(
 			object_ptr<Ui::FlatLabel>(
@@ -29,7 +22,6 @@ void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content) {
 
 	Ui::AddSkip(content, 8);
 
-	// ── Status qatori ────────────────────────────────────────────────
 	auto statusText = std::make_shared<rpl::variable<QString>>(
 		u"Hali tekshirilmagan"_q);
 	content->add(
@@ -39,7 +31,6 @@ void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content) {
 			st::boxLabel),
 		st::boxRowPadding);
 
-	// ── GitHub'da ko'rish tugmasi (faqat yangilanish bo'lsa ko'rinadi) ──
 	const auto linkWrap = content->add(
 		object_ptr<Ui::SlideWrap<Ui::RoundButton>>(
 			content,
@@ -74,7 +65,6 @@ void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content) {
 	};
 	applyResult(CustomUpstream::LastResult());
 
-	// ── "Hozir tekshirish" tugmasi ──────────────────────────────────
 	Ui::AddSkip(content, 4);
 	content->add(
 		object_ptr<Ui::RoundButton>(
@@ -87,7 +77,6 @@ void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content) {
 		CustomUpstream::CheckNow(crl::guard(content, applyResult));
 	});
 
-	// ── Avtomatik tekshirish toggle ───────────────────────────────────
 	Ui::AddSkip(content, 12);
 	const auto autoBtn = content->add(
 		object_ptr<Ui::SettingsButton>(
@@ -96,7 +85,6 @@ void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content) {
 			st::settingsButtonNoIcon));
 	autoBtn->toggleOn(rpl::single(CustomSettings::UpstreamCheckEnabled()));
 
-	// ── Chastota tanlovi (auto yoqilgandagina ko'rinadi) ──────────────
 	const auto freqWrap = content->add(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 			content,
@@ -177,6 +165,7 @@ void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content) {
 			Ui::Toast::Show(u"Chastota saqlandi."_q);
 		});
 	}
+
 	freqForm->add(
 		object_ptr<Ui::RoundButton>(
 			freqForm,
@@ -184,11 +173,14 @@ void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content) {
 			st::defaultBoxButton),
 		st::boxRowPadding)
 	->addClickHandler([=] {
-		customWrap->toggle(true, anim::type::normal);
+		customWrap->toggle(
+			!customWrap->toggled(),
+			anim::type::normal);
 	});
 
-	freqWrap->toggle(CustomSettings::UpstreamCheckEnabled(), anim::type::instant);
-
+	freqWrap->toggle(
+		CustomSettings::UpstreamCheckEnabled(),
+		anim::type::instant);
 	autoBtn->toggledValue()
 		| rpl::skip(1)
 		| rpl::on_next([=](bool on) {
@@ -196,38 +188,21 @@ void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content) {
 			CustomUpstream::UpdateAutoTimer();
 			freqWrap->toggle(on, anim::type::normal);
 			Ui::Toast::Show(on
-				? u"Avtomatik tekshirish yoqildi"_q
+				? u"Avtomatik tekshirish yoqildi ✓"_q
 				: u"Avtomatik tekshirish o'chirildi"_q);
 		}, autoBtn->lifetime());
-
-	// ── Oxirgi tekshiruv vaqti ──────────────────────────────────────
-	Ui::AddSkip(content, 8);
-	{
-		const auto lastAt = CustomSettings::UpstreamLastCheckedAt();
-		const auto text = (lastAt > 0)
-			? (u"Oxirgi tekshiruv: "_q
-				+ QDateTime::fromSecsSinceEpoch(lastAt)
-					.toString(u"yyyy-MM-dd HH:mm"_q))
-			: u"Oxirgi tekshiruv: hali yo'q"_q;
-		content->add(
-			object_ptr<Ui::FlatLabel>(
-				content,
-				rpl::single(text),
-				st::customModHintLabel),
-			st::boxRowPadding);
-	}
 }
-
-
 
 void fillSystemTab(
 		not_null<Ui::VerticalLayout*> content,
 		QWidget *dialogParent,
 		Fn<void()> onArchiveChanged) {
-	// Dastur versiyasi
-	content->add(
+	// 1-bo'lim: Dastur haqida (Standart ochiq)
+	const auto s1 = AddCollapsibleSection(content, u"ℹ️ Dastur haqida"_q, true);
+
+	s1->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
+			s1,
 			rpl::single(AppAlphaVersion
 				? (u"CustomMod %1 · alpha %2"_q
 					.arg(QString::fromUtf8(AppVersionStr))
@@ -237,39 +212,32 @@ void fillSystemTab(
 			st::customModHintLabel),
 		st::boxRowPadding);
 
-	Ui::AddSkip(content, st::settingsThumbSkip);
-	Ui::AddDivider(content);
-	Ui::AddSkip(content, st::settingsThumbSkip);
-
-	// Rasmiy versiya tekshiruvi
-	fillUpstreamCheckSection(content);
-
-	Ui::AddSkip(content, st::settingsThumbSkip);
-	Ui::AddDivider(content);
-	Ui::AddSkip(content, st::settingsThumbSkip);
-
-	// ── Arxiv statistikasi yangilash yordamchisi ──
-	const auto refreshStats = []() {};
-
-	// ⚠️ XAVFLI HUDUD
-	content->add(
+	s1->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
-			rpl::single(u"⚠️  XAVFLI HUDUD  ⚠️"_q),
-			st::defaultSubsectionTitle),
-		st::defaultSubsectionTitlePadding);
+			s1,
+			rpl::single(u"Telegram Desktop uchun CustomMod forki.\n"
+				"Ghost Mode, Anti-Delete, Anti-Edit, Faollik kuzatuv va Media Backup imkoniyatlari."_q),
+			st::customModHintLabel),
+		st::boxRowPadding);
 
-	content->add(
+	// 2-bo'lim: Rasmiy versiya tekshiruvi (Standart yopiq)
+	const auto s2 = AddCollapsibleSection(content, u"🔔 Rasmiy versiya tekshiruvi"_q, false);
+	fillUpstreamCheckSection(s2);
+
+	// 3-bo'lim: ⚠️ Xavfli hudud (HAR DOIM YOPIQ!)
+	const auto s3 = AddCollapsibleSection(content, u"⚠️  XAVFLI HUDUD  ⚠️"_q, false);
+
+	s3->add(
 		object_ptr<Ui::FlatLabel>(
-			content,
+			s3,
 			rpl::single(u"Quyidagi amallar arxiv ma'lumotlarini BUTUNLAY o'chiradi.\n"
 				"Bu amalni bekor qilib bo'lmaydi. Tasdiqlash talab qilinadi."_q),
 			st::customModHintLabel),
 		st::defaultSubsectionTitlePadding);
 
-	content->add(
+	s3->add(
 		object_ptr<Ui::RoundButton>(
-			content,
+			s3,
 			rpl::single(u"🗑️  O'chirilganlar arxivini tozalash"_q),
 			st::attentionBoxButton),
 		st::boxRowPadding)
@@ -283,14 +251,13 @@ void fillSystemTab(
 			QMessageBox::Cancel);
 		if (reply != QMessageBox::Yes) return;
 		CustomDB::ClearDeletedArchive();
-		refreshStats();
 		if (onArchiveChanged) onArchiveChanged();
 		Ui::Toast::Show(u"🗑️ O'chirilganlar arxivi tozalandi."_q);
 	});
 
-	content->add(
+	s3->add(
 		object_ptr<Ui::RoundButton>(
-			content,
+			s3,
 			rpl::single(u"✏️  Tahrir tarixi arxivini tozalash"_q),
 			st::attentionBoxButton),
 		st::boxRowPadding)
@@ -304,14 +271,13 @@ void fillSystemTab(
 			QMessageBox::Cancel);
 		if (reply != QMessageBox::Yes) return;
 		CustomDB::ClearEditedArchive();
-		refreshStats();
 		if (onArchiveChanged) onArchiveChanged();
 		Ui::Toast::Show(u"✏️ Tahrir tarixi arxivi tozalandi."_q);
 	});
 
-	content->add(
+	s3->add(
 		object_ptr<Ui::RoundButton>(
-			content,
+			s3,
 			rpl::single(u"☠️  BARCHA arxivni tozalash (O'chirilgan + Tahrir)"_q),
 			st::attentionBoxButton),
 		st::boxRowPadding)
@@ -336,11 +302,9 @@ void fillSystemTab(
 			QMessageBox::Cancel);
 		if (second != QMessageBox::Yes) return;
 		CustomDB::ClearAllArchive();
-		refreshStats();
 		if (onArchiveChanged) onArchiveChanged();
 		Ui::Toast::Show(u"☠️ Barcha arxiv ma'lumotlari tozalandi."_q);
 	});
 
 	Ui::AddSkip(content, st::settingsThumbSkip);
-
 }
