@@ -174,7 +174,7 @@ Tavsiyam — 7 tab.
 
 ## 7. Bajarildi (2026-08-31)
 
-Barcha 4 bosqich to'liq amalga oshirildi:
+Barcha 4 bosqich to'liq amalga oshirildi va barcha 7 tabga tatbiq etildi:
 
 1. **Bosqich 1 (Fayllarga ajratish):**
    - Commit: `ede1c9e636` (`refactor(window): split custom_mod_window into per-tab files`)
@@ -182,8 +182,17 @@ Barcha 4 bosqich to'liq amalga oshirildi:
    - Commit: `da1ea72460` (`feat(window): regroup settings into seven function-based tabs`)
    - 7 tab: Yashirinlik, Ko'rinish, Chatlar, Faollik, Arxiv, Ombor, Tizim.
 3. **Bosqich 3 (Sarlavhalar va yopiq bo'limlar):**
-   - Commit: `411da60c23` (`feat(window): add subsection titles and collapse sections by default`)
-   - `AddCollapsibleSection` orqali barcha bo'limlar sarlavhalandi va har tabning 1-bo'limidan tashqari barchasi standart yopiq qilindi.
+   - Commit: `411da60c23` va `b1c4d5e4d5` (`feat(window): collapse remaining tabs into titled sections`)
+   - `AddCollapsibleSection` barcha 7 tabga to'liq qo'llandi (har bir tabning 1-bo'limi ochiq, qolganlari yopiq, `⚠️ Xavfli hudud` har doim yopiq):
+     - **Yashirinlik:** 1 bo'lim (`🛡️ Yashirinlik va Maxfiylik`)
+     - **Ko'rinish:** 3 bo'lim (`📱 Qurilma ko'rinishi`, `🤝 Mutual-Contact`, `🎨 Branding`)
+     - **Chatlar:** 4 bo'lim (`🌐 Global rejim`, `✅ Include ro'yxati`, `🚫 Exclude ro'yxati`, `⚙️ Individual sozlamalar`)
+     - **Faollik:** 3 bo'lim (`⏱️ Faollik tarixi va sozlamalari`, `📋 Include List`, `🚫 Exclude List`)
+     - **Arxiv:** 2 bo'lim (`🗑️ O'chirilgan xabarlar`, `✏️ Tahrirlangan xabarlar`)
+     - **Ombor:** 6 bo'lim (`📦 Zaxira nusxa`, `🎞 Media backup`, `🔍 Indekslash va tuzatish`, `📤 Eksport va tiklash`, `📊 Arxiv boshqaruvi`, `💣 Vaqtinchalik media papkasi`)
+     - **Tizim:** 3 bo'lim (`ℹ️ Dastur haqida`, `🔔 Rasmiy versiya tekshiruvi`, `⚠️ Xavfli hudud`)
 4. **Bosqich 4 (Matnlarni qisqartirish):**
-   - Uzun tushuntirishlar ixchamlashtirildi.
+   - Commit: `91c53ce16d` (`feat(window): shorten long descriptions, move details behind help buttons`)
+   - Uzun tushuntirishlar 2 qatordan oshmaydigan qilib ixchamlashtirildi.
+
 
