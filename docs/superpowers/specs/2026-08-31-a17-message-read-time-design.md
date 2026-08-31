@@ -156,4 +156,31 @@ Bu qoida `docs/sync-protocol/` ga yozilishi kerak.
 - Kiruvchi xabarlarning o'qilgan vaqti
 - Eski, allaqachon arxivlangan xabarlar uchun backfill
   (`MESSAGE_TOO_OLD` tufayli baribir ishlamaydi)
-- A14 ning o'zi (alohida ish)
+
+---
+
+## 9. Bajarildi (2026-08-31)
+
+A17 va A14 to'liq implement qilindi:
+
+1. **Sxema v13 (`actioned_messages.read_at`):**
+   - `read_at INTEGER NOT NULL DEFAULT 0` ustuni qo'shildi.
+   - `custom_db.h` da `kCurrentSchemaVersion = 13` ga oshirildi.
+   - `ActionedMessage`, `DeletedMessage`, `DeletedMessageWithPeer` struct'lariga `readAt` maydoni qo'shildi.
+   - `GetDeletedMessages`, `GetAllDeletedMessages`, `SaveActionedMessage`, `FlushPendingWrites` da `read_at` o'qish/yozish ulandi.
+
+2. **Yozish funksiyalari:**
+   - `CustomDB::MarkMessageRead(const PeerKey &key, long long msgId, qint64 readAt)`
+   - `CustomDB::MarkOutgoingReadUpTo(const PeerKey &key, long long upToMsgId, qint64 readAt)` (o'zgargan qatorlar sonini qaytaradi).
+
+3. **Real-vaqt hook (A17):**
+   - `History::outboxRead(MsgId upTo)` ichida shaxsiy chatdagi chiquvchi xabarlar uchun `MarkOutgoingReadUpTo` orqali xabarlar shu zahoti `read_at` bilan belgilanadi.
+
+4. **Faollik shkalasiga aylantirish (A14):**
+   - `History::outboxRead` da xabar o'qilgan lahzada `CustomSettings::ShouldTrackActivity` tekshirilib, `SaveActivityHistoryEntry` orqali `status` (`online:<now>`, `source = 'read'`) nuqtasi yoziladi.
+
+5. **Ko'rsatish:**
+   - `custom_mod_window.cpp` (`fillArchiveTab`): `read_at > 0` bo'lsa `✓✓ o'qilgan: dd.MM.yyyy HH:mm`, `read_at == -1` bo'lsa `✓✓ o'qilgan vaqti yashirilgan` ko'rsatiladi.
+   - `custom_activity_history_box.cpp`: `FormatEntryLine` da `✓✓ ` belgisi va `FormatInstantLabel` da `✓✓ xabarni o'qigan` ko'rsatiladi.
+
+**Qamrov chegarasi:** faqat shaxsiy chatlar va faqat chiquvchi xabarlar (v1 qamrovi).

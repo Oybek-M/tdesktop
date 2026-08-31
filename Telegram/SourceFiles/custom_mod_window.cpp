@@ -2522,6 +2522,14 @@ void fillArchiveTab(
 			if (body.isEmpty() && msg.isMedia) body = u"(media xabar)"_q;
 			if (body.isEmpty()) body = u"(empty)"_q;
 
+			if (msg.readAt > 0) {
+				const auto readStr = QDateTime::fromSecsSinceEpoch(msg.readAt)
+					.toString(u"dd.MM.yyyy HH:mm"_q);
+				body += u"\n✓✓ o'qilgan: "_q + readStr;
+			} else if (msg.readAt == -1) {
+				body += u"\n✓✓ o'qilgan vaqti yashirilgan"_q;
+			}
+
 			content->add(
 				object_ptr<Ui::FlatLabel>(
 					content,

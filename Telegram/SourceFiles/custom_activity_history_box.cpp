@@ -60,6 +60,7 @@ QString FormatEntryLine(const CustomDB::ActivityHistoryEntry &entry) {
 		if (entry.source == u"story"_q) return u"📖 "_q;
 		if (entry.source == u"manual"_q) return u"✍️ "_q;
 		if (entry.source == u"buffer"_q) return u"⏱ "_q;
+		if (entry.source == u"read"_q) return u"✓✓ "_q;
 		return QString();
 	}();
 	const auto fieldLabel = [&] {
@@ -102,6 +103,8 @@ QString FormatInstantLabel(const OnlinePeriod &p) {
 		return when + u" — ✍️ qo'lda kiritilgan"_q;
 	} else if (p.source == u"buffer"_q) {
 		return when + u" — ⏱ buferdan tiklangan"_q;
+	} else if (p.source == u"read"_q) {
+		return when + u" — ✓✓ xabarni o'qigan"_q;
 	}
 	return when + u" — aniq lahza"_q;
 }
