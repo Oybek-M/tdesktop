@@ -19,8 +19,8 @@ private:
 	void setupContent(not_null<Window::SessionController*> controller);
 
 	CustomTabBar *_tabBar = nullptr;
-	std::array<Ui::ScrollArea*, 4> _panels = {};
-	std::array<QPointer<Ui::VerticalLayout>, 4> _inners = {};
+	std::array<Ui::ScrollArea*, 7> _panels = {};
+	std::array<QPointer<Ui::VerticalLayout>, 7> _inners = {};
 	std::unique_ptr<Ui::LayerManager> _layerManager;
 };
 
@@ -28,7 +28,6 @@ CustomModWindow::CustomModWindow(
 	not_null<Window::SessionController*> controller)
 : Ui::RpWidget(nullptr) {
 	setWindowFlags(Qt::Window);
-	// CustomMod: title branding.json dan
 	setWindowTitle(CustomBranding::Get().customModTitle);
 	setMinimumSize(480, 400);
 	setAttribute(Qt::WA_OpaquePaintEvent);
@@ -42,26 +41,33 @@ CustomModWindow::CustomModWindow(
 	auto s = QSettings(u"CustomMod"_q, u"TelegramDesktop"_q);
 	const auto geom = s.value(u"WindowGeometry"_q).toByteArray();
 	if (geom.isEmpty()) {
-		resize(560, 700);
+		resize(600, 720);
 		const auto screen = QGuiApplication::primaryScreen()
 			->availableGeometry();
-		move(screen.center() - QPoint(280, 350));
+		move(screen.center() - QPoint(300, 360));
 	} else {
 		restoreGeometry(geom);
 	}
 
 	_tabBar = new CustomTabBar(
 		this,
-		{ u"General"_q, u"Peers"_q, u"Archive"_q, u"About"_q });
+		{
+			u"Yashirinlik"_q,
+			u"Ko'rinish"_q,
+			u"Chatlar"_q,
+			u"Faollik"_q,
+			u"Arxiv"_q,
+			u"Ombor"_q,
+			u"Tizim"_q,
+		});
 
-	for (auto i = 0; i < 4; ++i) {
+	for (auto i = 0; i < 7; ++i) {
 		_panels[i] = new Ui::ScrollArea(this);
 	}
 
 	setupContent(controller);
 	switchTab(0);
 
-	// LayerManager: "Chat tanlash" box shu window ichida ochiladi.
 	_layerManager = std::make_unique<Ui::LayerManager>(this);
 
 	std::move(_tabBar->tabSelected()) | rpl::on_next([=](int idx) {
@@ -81,37 +87,59 @@ void CustomModWindow::setupContent(
 		return inner;
 	};
 
-	fillGeneralTab(makeInner(0));
+	// 1. Yashirinlik
+	fillPrivacyTab(makeInner(0));
 
-	// Peers tab — White/Black List konflikti hal qilinganda to'liq qayta quriladi.
-	const auto panel1 = _panels[1];
-	const auto rebuildPeers = std::make_shared<Fn<void()>>();
-	*rebuildPeers = [=]() {
-		const auto inner = panel1->setOwnedWidget(
-			object_ptr<Ui::VerticalLayout>(panel1));
-		_inners[1] = inner;
-		panel1->widthValue() | rpl::on_next([=](int w) {
+	// 2. Ko'rinish
+	fillAppearanceTab(makeInner(1));
+
+	// 3. Chatlar
+	const auto panelChats = _panels[2];
+	const auto rebuildChats = std::make_shared<Fn<void()>>();
+	*rebuildChats = [=]() {
+		const auto inner = panelChats->setOwnedWidget(
+			object_ptr<Ui::VerticalLayout>(panelChats));
+		_inners[2] = inner;
+		panelChats->widthValue() | rpl::on_next([=](int w) {
 			inner->resizeToWidth(w);
 		}, inner->lifetime());
-		fillPeersTab(inner, controller, *rebuildPeers);
+		fillChatsTab(inner, controller, *rebuildChats);
 	};
-	(*rebuildPeers)();
+	(*rebuildChats)();
 
-	// Archive tab — yangilash tugmasi bosilganda to'liq qayta quriladi.
-	const auto panel2 = _panels[2];
+	// 4. Faollik
+	const auto panelAct = _panels[3];
+	const auto rebuildAct = std::make_shared<Fn<void()>>();
+	*rebuildAct = [=]() {
+		const auto inner = panelAct->setOwnedWidget(
+			object_ptr<Ui::VerticalLayout>(panelAct));
+		_inners[3] = inner;
+		panelAct->widthValue() | rpl::on_next([=](int w) {
+			inner->resizeToWidth(w);
+		}, inner->lifetime());
+		fillActivityTab(inner, controller, *rebuildAct);
+	};
+	(*rebuildAct)();
+
+	// 5. Arxiv
+	const auto panelArch = _panels[4];
 	const auto rebuildArchive = std::make_shared<Fn<void()>>();
 	*rebuildArchive = [=]() {
-		const auto inner = panel2->setOwnedWidget(
-			object_ptr<Ui::VerticalLayout>(panel2));
-		_inners[2] = inner;
-		panel2->widthValue() | rpl::on_next([=](int w) {
+		const auto inner = panelArch->setOwnedWidget(
+			object_ptr<Ui::VerticalLayout>(panelArch));
+		_inners[4] = inner;
+		panelArch->widthValue() | rpl::on_next([=](int w) {
 			inner->resizeToWidth(w);
 		}, inner->lifetime());
 		fillArchiveTab(inner, *rebuildArchive);
 	};
 	(*rebuildArchive)();
 
-	fillAboutTab(makeInner(3), this, *rebuildArchive);
+	// 6. Ombor
+	fillStorageTab(makeInner(5), this, *rebuildArchive);
+
+	// 7. Tizim
+	fillSystemTab(makeInner(6), this, *rebuildArchive);
 }
 
 void CustomModWindow::resizeEvent(QResizeEvent *) {
@@ -119,16 +147,13 @@ void CustomModWindow::resizeEvent(QResizeEvent *) {
 	_tabBar->setGeometry(0, 0, width(), tabH);
 	const auto panelW = width();
 	const auto panelH = height() - tabH;
-	for (auto i = 0; i < 4; ++i) {
+	for (auto i = 0; i < 7; ++i) {
 		_panels[i]->setGeometry(0, tabH, panelW, panelH);
 		if (const auto inner = _inners[i].data(); inner && panelW > 0) {
 			inner->resizeToWidth(panelW);
-			// Qt faqat yangi exposed area ni qayta chizadi — window toraytirilganda
-			// FlatLabel lar ko'rinishini yangilamaydi. update() buni majburlaydi.
 			if (_panels[i]->isVisible()) inner->update();
 		}
 	}
-	// LayerManager (LayerStackWidget) panellar ustida turishi kerak.
 	if (_layerManager) _layerManager->raise();
 }
 
@@ -145,14 +170,11 @@ void CustomModWindow::paintEvent(QPaintEvent *) {
 
 void CustomModWindow::showEvent(QShowEvent *e) {
 	Ui::RpWidget::showEvent(e);
-	// Oyna birinchi marta ko'rsatilganda barcha inner layoutlarni majburan
-	// resize qilamiz. Yashirin panellar startup vaqtida QResizeEvent olmaydi —
-	// shu sababli entries (whitelist, blacklist) noto'g'ri kenglikda qolishi mumkin.
 	if (_tabBar) {
 		const auto panelW = width();
 		const auto panelH = height() - _tabBar->height();
 		if (panelW > 0 && panelH > 0) {
-			for (auto i = 0; i < 4; ++i) {
+			for (auto i = 0; i < 7; ++i) {
 				if (const auto inner = _inners[i].data()) {
 					inner->resizeToWidth(panelW);
 					inner->update();
@@ -167,17 +189,14 @@ void CustomModWindow::showEvent(QShowEvent *e) {
 
 void CustomModWindow::switchTab(int index) {
 	_tabBar->setActiveTab(index);
-	for (auto i = 0; i < 4; ++i) {
+	for (auto i = 0; i < 7; ++i) {
 		_panels[i]->setVisible(i == index);
 	}
-	// Ko'rinadigan panel o'zgarganda inner layoutni majburan resize qilamiz.
-	// Qt hidden widget larga QResizeEvent yubormaydi — shu sababli widthValue()
-	// reactive chain ishlamagan bo'lishi mumkin. To'g'ridan-to'g'ri chaqiramiz.
 	if (const auto inner = _inners[index].data()) {
 		const auto panelW = width();
 		if (panelW > 0) {
 			inner->resizeToWidth(panelW);
-			inner->update(); // Paint event ni majburlash
+			inner->update();
 		}
 	}
 }
@@ -185,8 +204,6 @@ void CustomModWindow::switchTab(int index) {
 void CustomModWindow::showBox(object_ptr<Ui::BoxContent> box) {
 	_layerManager->showBox(std::move(box));
 }
-
-
 
 namespace CustomMod {
 

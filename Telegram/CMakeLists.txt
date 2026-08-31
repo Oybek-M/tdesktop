@@ -1148,14 +1148,15 @@ PRIVATE
     custom_branding.h
     custom_mod_window.cpp
     custom_mod_window.h
-    custom_tab_about.cpp
     custom_tab_activity.cpp
+    custom_tab_appearance.cpp
     custom_tab_archive.cpp
+    custom_tab_chats.cpp
     custom_tab_common.cpp
     custom_tab_common.h
-    custom_tab_general.cpp
-    custom_tab_peers.cpp
-    custom_tab_upstream.cpp
+    custom_tab_privacy.cpp
+    custom_tab_storage.cpp
+    custom_tab_system.cpp
     history/view/history_view_welcome_messages_section.cpp
     history/view/history_view_welcome_messages_section.h
     history/history.cpp

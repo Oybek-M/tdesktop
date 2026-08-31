@@ -1,6 +1,6 @@
 #include "custom_tab_common.h"
 
-void fillAboutTab(
+void fillStorageTab(
 		not_null<Ui::VerticalLayout*> content,
 		QWidget *dialogParent,
 		Fn<void()> onArchiveChanged) {
@@ -638,96 +638,6 @@ void fillAboutTab(
 		QDesktopServices::openUrl(QUrl::fromLocalFile(bombDir));
 	});
 
-	Ui::AddSkip(content, st::settingsThumbSkip);
-
-	content->add(
-		object_ptr<Ui::FlatLabel>(
-			content,
-			rpl::single(u"⚠️  XAVFLI HUDUD  ⚠️"_q),
-			st::defaultSubsectionTitle),
-		st::defaultSubsectionTitlePadding);
-
-	content->add(
-		object_ptr<Ui::FlatLabel>(
-			content,
-			rpl::single(u"Quyidagi amallar arxiv ma'lumotlarini BUTUNLAY o'chiradi.\n"
-				"Bu amalni bekor qilib bo'lmaydi. Tasdiqlash talab qilinadi."_q),
-			st::customModHintLabel),
-		st::defaultSubsectionTitlePadding);
-
-	content->add(
-		object_ptr<Ui::RoundButton>(
-			content,
-			rpl::single(u"🗑️  O'chirilganlar arxivini tozalash"_q),
-			st::attentionBoxButton),
-		st::boxRowPadding)
-	->addClickHandler([=] {
-		const auto reply = QMessageBox::warning(
-			dialogParent,
-			u"O'chirilganlar arxivini tozalash"_q,
-			u"Bu amal BARCHA saqlangan o'chirilgan xabarlarni o'chiradi.\n\n"
-			"Bu amalni bekor qilib bo'lmaydi.\n\nDavom etasizmi?"_q,
-			QMessageBox::Yes | QMessageBox::Cancel,
-			QMessageBox::Cancel);
-		if (reply != QMessageBox::Yes) return;
-		CustomDB::ClearDeletedArchive();
-		refreshStats();
-		if (onArchiveChanged) onArchiveChanged();
-		Ui::Toast::Show(u"🗑️ O'chirilganlar arxivi tozalandi."_q);
-	});
-
-	content->add(
-		object_ptr<Ui::RoundButton>(
-			content,
-			rpl::single(u"✏️  Tahrir tarixi arxivini tozalash"_q),
-			st::attentionBoxButton),
-		st::boxRowPadding)
-	->addClickHandler([=] {
-		const auto reply = QMessageBox::warning(
-			dialogParent,
-			u"Tahrir tarixini tozalash"_q,
-			u"Bu amal BARCHA saqlangan tahrir yozuvlarini o'chiradi.\n\n"
-			"Bu amalni bekor qilib bo'lmaydi.\n\nDavom etasizmi?"_q,
-			QMessageBox::Yes | QMessageBox::Cancel,
-			QMessageBox::Cancel);
-		if (reply != QMessageBox::Yes) return;
-		CustomDB::ClearEditedArchive();
-		refreshStats();
-		if (onArchiveChanged) onArchiveChanged();
-		Ui::Toast::Show(u"✏️ Tahrir tarixi arxivi tozalandi."_q);
-	});
-
-	content->add(
-		object_ptr<Ui::RoundButton>(
-			content,
-			rpl::single(u"☠️  BARCHA arxivni tozalash (O'chirilgan + Tahrir)"_q),
-			st::attentionBoxButton),
-		st::boxRowPadding)
-	->addClickHandler([=] {
-		const auto first = QMessageBox::warning(
-			dialogParent,
-			u"BARCHA arxivni tozalash"_q,
-			u"Bu amal BARCHA arxiv ma'lumotlarini o'chiradi:\n"
-			"  • Barcha o'chirilgan xabar yozuvlari\n"
-			"  • Barcha tahrir tarixi yozuvlari\n\n"
-			"Bu amalni bekor qilib bo'lmaydi."_q,
-			QMessageBox::Yes | QMessageBox::Cancel,
-			QMessageBox::Cancel);
-		if (first != QMessageBox::Yes) return;
-		const auto second = QMessageBox::critical(
-			dialogParent,
-			u"Yakuniy tasdiqlash"_q,
-			u"HAQIQATAN HAM ishonchingiz komilmi?\n\n"
-			"Barcha o'chirilgan xabar va tahrir yozuvlari\n"
-			"BUTUNLAY yo'qoladi."_q,
-			QMessageBox::Yes | QMessageBox::Cancel,
-			QMessageBox::Cancel);
-		if (second != QMessageBox::Yes) return;
-		CustomDB::ClearAllArchive();
-		refreshStats();
-		if (onArchiveChanged) onArchiveChanged();
-		Ui::Toast::Show(u"☠️ Barcha arxiv ma'lumotlari tozalandi."_q);
-	});
-
+	
 	Ui::AddSkip(content, st::settingsThumbSkip);
 }

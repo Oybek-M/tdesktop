@@ -715,7 +715,8 @@ void fillPerChatSection(
 // ── Activity History Log: kuzatish qamrovi + kuzatilayotganlar ro'yxati ──
 
 
-void fillPeersTab(
+
+void fillChatsTab(
 		not_null<Ui::VerticalLayout*> content,
 		not_null<Window::SessionController*> controller,
 		Fn<void()> onRebuild) {
@@ -724,59 +725,92 @@ void fillPeersTab(
 		const auto lbl = content->add(
 			object_ptr<Ui::FlatLabel>(
 				content,
-				rpl::single(u"Ghost Mode, Anti-Delete va Anti-Edit funksiyalari "
-					"qaysi chatlar uchun ishlashini bu yerdan boshqaring."_q),
-				st::boxLabel),
-			st::boxRowPadding,
-			style::al_justify);
+				rpl::single(u"AntiDelete / AntiEdit uchun global rejim:"_q),
+				st::customModHintLabel),
+			st::boxRowPadding);
 		content->widthValue() | rpl::on_next([=](int w) {
-			const auto lw = w
-				- st::boxRowPadding.left()
-				- st::boxRowPadding.right();
-			if (lw > 0) {
-				lbl->resizeToWidth(lw);
-				lbl->update();
-			}
+			const auto lw = w - st::boxRowPadding.left() - st::boxRowPadding.right();
+			if (lw > 0) { lbl->resizeToWidth(lw); lbl->update(); }
 		}, lbl->lifetime());
 	}
 
-	Ui::AddSkip(content, 4);
-	{
-		const auto hint = content->add(
-			object_ptr<Ui::FlatLabel>(
-				content,
-				rpl::single(u"💡 \"Chat tanlash\" tugmasi bosilganda asosiy Telegram oynasida "
-					"chat tanlash oynasi ochiladi. Tanlagandan so'ng bu oyna avvalgi holatiga "
-					"qaytadi."_q),
-				st::customModHintLabel),
-			st::boxRowPadding,
-			style::al_justify);
-		content->widthValue() | rpl::on_next([=](int w) {
-			const auto lw = w
-				- st::boxRowPadding.left()
-				- st::boxRowPadding.right();
-			if (lw > 0) {
-				hint->resizeToWidth(lw);
-				hint->update();
-			}
-		}, hint->lifetime());
-	}
+	const auto modeWrap = content->add(
+		object_ptr<Ui::VerticalLayout>(content));
+	const auto modeGroup = std::make_shared<Ui::RadiobuttonGroup>(
+		int(CustomSettings::GetPeerListMode()));
+
+	const auto rAll = modeWrap->add(
+		object_ptr<Ui::Radiobutton>(
+			modeWrap,
+			modeGroup,
+			int(CustomSettings::PeerListMode::All),
+			u"Barcha chatlar (standart)"_q),
+		st::boxRowPadding);
+	const auto rWhite = modeWrap->add(
+		object_ptr<Ui::Radiobutton>(
+			modeWrap,
+			modeGroup,
+			int(CustomSettings::PeerListMode::WhiteList),
+			u"Faqat White List chatlari"_q),
+		st::boxRowPadding);
+	const auto rBlack = modeWrap->add(
+		object_ptr<Ui::Radiobutton>(
+			modeWrap,
+			modeGroup,
+			int(CustomSettings::PeerListMode::BlackList),
+			u"Black List'dan tashqari barcha chatlar"_q),
+		st::boxRowPadding);
+
+	modeGroup->setChangedCallback([=](int value) {
+		CustomSettings::SetPeerListMode(
+			static_cast<CustomSettings::PeerListMode>(value));
+		Ui::Toast::Show(u"Rejim saqlandi ✓"_q);
+	});
+
 	Ui::AddDivider(content);
 	Ui::AddSkip(content, st::settingsThumbSkip);
 
-	fillPeerSection(content, controller, true, onRebuild);
+	fillPeerSection(
+		content,
+		controller,
+		u"White List (Ruxsat berilganlar)"_q,
+		u"Faqat shu chatlarda AntiDelete/AntiEdit ishlaydi."_q,
+		true,
+		CustomSettings::IsInWhiteList,
+		CustomSettings::AddToWhiteList,
+		CustomSettings::RemoveFromWhiteList,
+		CustomSettings::GetWhiteList,
+		[=](const QString &id) {
+			CustomSettings::RemoveFromBlackList(id);
+			Ui::Toast::Show(u"Black List'dan olib tashlandi."_q);
+			if (onRebuild) onRebuild();
+		},
+		CustomSettings::IsInBlackList,
+		u"Black List");
 
 	Ui::AddDivider(content);
 	Ui::AddSkip(content, st::settingsThumbSkip);
 
-	fillPeerSection(content, controller, false, onRebuild);
+	fillPeerSection(
+		content,
+		controller,
+		u"Black List (Taqiqlanganlar)"_q,
+		u"Bu chatlarda AntiDelete/AntiEdit ISHLAMAYDI."_q,
+		false,
+		CustomSettings::IsInBlackList,
+		CustomSettings::AddToBlackList,
+		CustomSettings::RemoveFromBlackList,
+		CustomSettings::GetBlackList,
+		[=](const QString &id) {
+			CustomSettings::RemoveFromWhiteList(id);
+			Ui::Toast::Show(u"White List'dan olib tashlandi."_q);
+			if (onRebuild) onRebuild();
+		},
+		CustomSettings::IsInWhiteList,
+		u"White List");
 
 	Ui::AddDivider(content);
 	Ui::AddSkip(content, st::settingsThumbSkip);
 	fillPerChatSection(content, controller);
 	Ui::AddSkip(content, st::settingsThumbSkip);
-
-	Ui::AddDivider(content);
-	Ui::AddSkip(content, st::settingsThumbSkip);
-	fillActivityHistorySection(content, controller, onRebuild);
 }

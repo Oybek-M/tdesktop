@@ -1,6 +1,6 @@
 #include "custom_tab_common.h"
 
-void fillActivityHistorySection(
+void fillActivityTab(
 		not_null<Ui::VerticalLayout*> content,
 		not_null<Window::SessionController*> controller,
 		Fn<void()> onRebuild) {

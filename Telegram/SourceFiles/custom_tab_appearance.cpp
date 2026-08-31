@@ -1,6 +1,6 @@
 #include "custom_tab_common.h"
 
-void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
+void fillAppearanceTab(not_null<Ui::VerticalLayout*> content) {
 	const auto addSection = [&](const QString &title) {
 		content->add(
 			object_ptr<Ui::FlatLabel>(
@@ -16,14 +16,7 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 			const QString &description) {
 		const auto &val = CustomSettings::Get();
 		auto current = false;
-		if (id == u"ghostMode"_q) current = val.ghostMode;
-		else if (id == u"bypassRestrictions"_q) current = val.bypassRestrictions;
-		else if (id == u"offlineDb"_q) current = val.offlineDb;
-		else if (id == u"antiDelete"_q) current = val.antiDelete;
-		else if (id == u"antiEdit"_q) current = val.antiEdit;
-		else if (id == u"spoofMobile"_q) current = val.spoofMobile;
-		else if (id == u"storyAnonymousView"_q) current = val.storyAnonymousView;
-		else if (id == u"storyMediaBackupEnabled"_q) current = val.storyMediaBackupEnabled;
+		if (id == u"spoofMobile"_q) current = val.spoofMobile;
 		else if (id == u"mutualContactShowInChatList"_q) current = val.mutualContactShowInChatList;
 		else if (id == u"mutualContactShowInContactsList"_q) current = val.mutualContactShowInContactsList;
 		else if (id == u"mutualContactShowInProfile"_q) current = val.mutualContactShowInProfile;
@@ -36,8 +29,6 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 				st::settingsButtonNoIcon));
 		btn->toggleOn(rpl::single(current));
 
-		// rpl::skip(1) — startup da dastlabki emit o'tkazib yuboriladi.
-		// Faqat foydalanuvchi toggle bosganida Set() va toast ishlaydi.
 		btn->toggledValue()
 			| rpl::skip(1)
 			| rpl::on_next([=](bool on) {
@@ -55,8 +46,6 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 					st::customModHintLabel),
 				st::boxRowPadding,
 				style::al_justify);
-			// Belt-and-suspenders: al_justify + manual resize → har qanday
-			// oyna kengligi o'zgarganda text wrap to'g'ri ishlaydi.
 			content->widthValue() | rpl::on_next([=](int w) {
 				const auto lw = w
 					- st::boxRowPadding.left()
@@ -79,7 +68,6 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 
 	Ui::AddSkip(content, 8);
 
-	// C22: Dynamic device spoof — spoofMobile OFF bo'lganda forma yashirinadi.
 	const auto spoofFormWrap = content->add(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 			content,
@@ -176,65 +164,6 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 		| rpl::on_next([=](bool on) {
 			spoofFormWrap->toggle(on, anim::type::normal);
 		}, spoofFormWrap->lifetime());
-
-	Ui::AddDivider(content);
-	Ui::AddSkip(content, st::settingsThumbSkip);
-	addSection(u"🛡️ Privacy & Custom Mods"_q);
-	addToggle(
-		u"ghostMode"_q,
-		u"Ghost Mode"_q,
-		u"Online holatini, yozmoqda belgisini va xabar o'qildi bildirishnomasini yashiradi.\n\nYoqilgach, to'liq kuchga kirishi uchun 1-2 daqiqa ketishi mumkin."_q);
-	addToggle(
-		u"storyAnonymousView"_q,
-		u"Hikoyalarni anonim ko'rish"_q,
-		u"Hikoyani ko'rganingiz haqida egasiga bildirish yuborilmaydi."_q);
-	addToggle(
-		u"storyMediaBackupEnabled"_q,
-		u"Hikoya media'sini saqlash"_q,
-		u"Kuzatilayotgan userlarning hikoya (story) rasmi/videosi avtomatik, ko'rmasdan lokal saqlanadi. Disk joyini sarflaydi, standart holatda o'chirilgan."_q);
-	addToggle(
-		u"bypassRestrictions"_q,
-		u"Cheklangan chatda nusxalash va yuborish"_q,
-		u"Cheklov qo'yilgan chatlardagi xabarlarni boshqaga yuborish yoki nusxa olishga ruxsat beradi."_q);
-	addToggle(
-		u"antiDelete"_q,
-		u"Anti-Delete"_q,
-		u"O'chirilgan xabarlarni ko'rinishda qoldiradi."_q);
-	addToggle(
-		u"antiEdit"_q,
-		u"Anti-Edit"_q,
-		u"Tahrirdan oldingi matnni ko'rsatadi."_q);
-	addToggle(
-		u"offlineDb"_q,
-		u"Offline xabar bazasi"_q,
-		u"Xabarlar va medialarni internet bo'lmaganda ham ko'rish uchun qurilmada saqlaydi."_q);
-
-	// A13/K6.3: arxiv statistikasi — foydalanuvchi arxiv haqiqatan
-	// to'layotganini va qancha joy egallayotganini ko'rib tursin.
-	{
-		const auto archived = CustomDB::ArchivedMessageCount();
-		const auto sizeMb = CustomDB::DatabaseSizeBytes() / (1024 * 1024);
-		const auto stats = content->add(
-			object_ptr<Ui::FlatLabel>(
-				content,
-				rpl::single(u"Arxivda "_q
-					+ QString::number(archived)
-					+ u" ta xabar saqlangan. Baza hajmi: "_q
-					+ QString::number(sizeMb)
-					+ u" MB."_q),
-				st::customModHintLabel),
-			st::boxRowPadding,
-			style::al_justify);
-		content->widthValue() | rpl::on_next([=](int w) {
-			const auto lw = w
-				- st::boxRowPadding.left()
-				- st::boxRowPadding.right();
-			if (lw > 0) {
-				stats->resizeToWidth(lw);
-				stats->update();
-			}
-		}, stats->lifetime());
-	}
 
 	// ── Mutual-Contact Indikatori ─────────────────────────────────────
 	Ui::AddDivider(content);
@@ -387,7 +316,6 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 
 	Ui::AddSkip(content, 8);
 
-	// 1) Asosiy oyna nomi
 	content->add(
 		object_ptr<Ui::FlatLabel>(
 			content,
@@ -402,7 +330,6 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 			CustomBranding::Get().windowTitle),
 		st::boxRowPadding);
 
-	// 2) Custom oyna nomi
 	content->add(
 		object_ptr<Ui::FlatLabel>(
 			content,
@@ -417,7 +344,6 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 			CustomBranding::Get().customModTitle),
 		st::boxRowPadding);
 
-	// 3) Icon path
 	content->add(
 		object_ptr<Ui::FlatLabel>(
 			content,
@@ -432,7 +358,6 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 			CustomBranding::Get().iconPath),
 		st::boxRowPadding);
 
-	// Icon tanlash + tozalash tugmalari
 	Ui::AddSkip(content, 4);
 	content->add(
 		object_ptr<Ui::RoundButton>(
@@ -463,7 +388,6 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 		iconInput->setText(QString());
 	});
 
-	// Saqlash tugmasi
 	Ui::AddSkip(content, 12);
 	content->add(
 		object_ptr<Ui::RoundButton>(
@@ -479,10 +403,4 @@ void fillGeneralTab(not_null<Ui::VerticalLayout*> content) {
 	});
 
 	Ui::AddSkip(content, st::settingsThumbSkip);
-	Ui::AddDivider(content);
-	Ui::AddSkip(content, st::settingsThumbSkip);
-	fillUpstreamCheckSection(content);
-
-	Ui::AddSkip(content, st::settingsThumbSkip);
 }
-

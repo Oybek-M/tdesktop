@@ -97,7 +97,10 @@ class CustomTabBar final : public Ui::RpWidget {
 public:
 	CustomTabBar(QWidget *parent, std::initializer_list<QString> names);
 
-	[[nodiscard]] rpl::producer<int> tabSelected() const;
+	[[nodiscard]] rpl::producer<int> tabSelected() const {
+		return _tabSelected.events();
+	}
+
 	void setActiveTab(int index);
 
 protected:
@@ -110,37 +113,25 @@ private:
 	rpl::event_stream<int> _tabSelected;
 };
 
-// Tab Builders
-void fillGeneralTab(not_null<Ui::VerticalLayout*> content);
-void fillUpstreamCheckSection(not_null<Ui::VerticalLayout*> content);
-void fillPeerSection(
-	not_null<Ui::VerticalLayout*> content,
-	not_null<Window::SessionController*> controller,
-	const QString &title,
-	const QString &description,
-	bool isWhiteList,
-	Fn<bool(const QString&)> containsFn,
-	Fn<void(const QString&, const QString&)> addFn,
-	Fn<void(const QString&)> removeFn,
-	Fn<std::vector<std::pair<QString, QString>>()> getAllFn,
-	Fn<void(const QString&)> conflictFn,
-	Fn<bool(const QString&)> conflictContainsFn,
-	const QString &conflictName);
-void fillPerChatSection(
-	not_null<Ui::VerticalLayout*> content,
-	not_null<Window::SessionController*> controller);
-void fillActivityHistorySection(
+// ── 7 Tab Builders ───────────────────────────────────────────────────
+void fillPrivacyTab(not_null<Ui::VerticalLayout*> content);
+void fillAppearanceTab(not_null<Ui::VerticalLayout*> content);
+void fillChatsTab(
 	not_null<Ui::VerticalLayout*> content,
 	not_null<Window::SessionController*> controller,
 	Fn<void()> onRebuild);
-void fillPeersTab(
+void fillActivityTab(
 	not_null<Ui::VerticalLayout*> content,
 	not_null<Window::SessionController*> controller,
 	Fn<void()> onRebuild);
 void fillArchiveTab(
 	not_null<Ui::VerticalLayout*> content,
 	Fn<void()> onRefresh);
-void fillAboutTab(
+void fillStorageTab(
+	not_null<Ui::VerticalLayout*> content,
+	QWidget *dialogParent,
+	Fn<void()> onArchiveChanged);
+void fillSystemTab(
 	not_null<Ui::VerticalLayout*> content,
 	QWidget *dialogParent,
 	Fn<void()> onArchiveChanged);
