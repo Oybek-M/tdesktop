@@ -146,66 +146,12 @@ void fillStorageTab(
 			Ui::Toast::Show(u"Saqlandi ✓"_q);
 		});
 
-		const auto addStorageToggle = [&](
-				const QString &id,
-				const QString &text,
-				const QString &description) {
-			const auto &val = CustomSettings::Get();
-			auto current = false;
-			if (id == u"mediaBackupVoice"_q) current = val.mediaBackupVoice;
-			else if (id == u"mediaBackupVideoNote"_q) current = val.mediaBackupVideoNote;
-			else if (id == u"mediaBackupPhoto"_q) current = val.mediaBackupPhoto;
-			else if (id == u"mediaBackupVideo"_q) current = val.mediaBackupVideo;
-			else if (id == u"mediaBackupDocument"_q) current = val.mediaBackupDocument;
-			else if (id == u"mediaQuotaAutoClean"_q) current = val.mediaQuotaAutoClean;
-
-			const auto btn = s2->add(
-				object_ptr<Ui::SettingsButton>(
-					s2,
-					rpl::single(text),
-					st::settingsButtonNoIcon));
-			btn->toggleOn(rpl::single(current));
-
-			btn->toggledValue()
-				| rpl::skip(1)
-				| rpl::on_next([=](bool on) {
-				CustomSettings::Set(id, on);
-				Ui::Toast::Show(
-					on ? (text + u" yoqildi ✓"_q)
-					   : (text + u" o'chirildi"_q));
-			}, btn->lifetime());
-
-			if (!description.isEmpty()) {
-				const auto descLabel = s2->add(
-					object_ptr<Ui::FlatLabel>(
-						s2,
-						rpl::single(description),
-						st::customModHintLabel),
-					st::boxRowPadding,
-					style::al_justify);
-				s2->widthValue() | rpl::on_next([=](int w) {
-					const auto lw = w
-						- st::boxRowPadding.left()
-						- st::boxRowPadding.right();
-					if (lw > 0) {
-						descLabel->resizeToWidth(lw);
-						descLabel->update();
-					}
-				}, descLabel->lifetime());
-			}
-			return btn;
-		};
-
-		addStorageToggle(
-			u"mediaQuotaAutoClean"_q,
-			u"Avtomatik kvota tozalash"_q,
-			u"Limit to'lganda eng eski medialarni avtomatik o'chiradi."_q);
-
-		addStorageToggle(u"mediaBackupPhoto"_q, u"Rasmlar zaxirasi"_q, QString());
-		addStorageToggle(u"mediaBackupVideo"_q, u"Videolar zaxirasi"_q, QString());
-		addStorageToggle(u"mediaBackupVoice"_q, u"Ovozli xabarlar zaxirasi"_q, QString());
-		addStorageToggle(u"mediaBackupVideoNote"_q, u"Video xabarlar (dumaloq) zaxirasi"_q, QString());
-		addStorageToggle(u"mediaBackupDocument"_q, u"Hujjatlar zaxirasi"_q, QString());
+		// Eslatma: bu yerda ilgari media turlari bo'yicha alohida
+		// (rasm/video/ovoz/hujjat) zaxira tugmalari bor edi — ular
+		// `CustomSettings::Values` da MAVJUD BO'LMAGAN maydonlarga
+		// murojaat qilardi va kompilyatsiya bo'lmasdi. Haqiqiy
+		// sozlamalar: `mediaBackupEnabled`, `mediaBackupMaxFileMb`,
+		// `mediaBackupQuotaMb` — ular yuqorida boshqariladi.
 	}
 
 	// 3-bo'lim: Indekslash va tuzatish (Standart yopiq)

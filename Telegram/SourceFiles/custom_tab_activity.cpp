@@ -159,8 +159,7 @@ void fillActivityTab(
 			st::defaultBoxButton),
 		st::boxRowPadding)
 	->addClickHandler([=] {
-		if (!gInstance) return;
-		gInstance->showBox(ChoosePeerBox(
+		ShowCustomBox(ChoosePeerBox(
 			&controller->session(),
 			[=](not_null<Data::Thread*> thread) -> bool {
 				const auto peer = thread->peer();
@@ -171,7 +170,7 @@ void fillActivityTab(
 				const auto peerId = QString::number(peer->id.value);
 				const auto name = peer->name();
 
-				gInstance->showBox(Box([=](not_null<Ui::GenericBox*> box) {
+				ShowCustomBox(Box([=](not_null<Ui::GenericBox*> box) {
 					box->setTitle(rpl::single(u"Qo'lda yozuv — "_q + name));
 					Ui::AddSkip(box->verticalLayout(), 8);
 					box->verticalLayout()->add(
@@ -274,8 +273,7 @@ void fillActivityTab(
 			st::defaultBoxButton),
 		st::boxRowPadding)
 	->addClickHandler([=] {
-		if (!gInstance) return;
-		gInstance->showBox(ChoosePeerBox(
+		ShowCustomBox(ChoosePeerBox(
 			&controller->session(),
 			[=](not_null<Data::Thread*> thread) -> bool {
 				const auto peer = thread->peer();
@@ -310,8 +308,7 @@ void fillActivityTab(
 				rpl::single(u"📜 Tarixni ko'rish — "_q + name),
 				st::settingsButtonNoIcon));
 		historyRow->addClickHandler([=] {
-			if (!gInstance) return;
-			gInstance->showBox(Box<CustomActivityHistoryBox>(
+			ShowCustomBox(CustomActivityHistory::MakeHistoryBox(
 				&controller->session(), peerId, name));
 		});
 	}
@@ -331,8 +328,7 @@ void fillActivityTab(
 			st::defaultBoxButton),
 		st::boxRowPadding)
 	->addClickHandler([=] {
-		if (!gInstance) return;
-		gInstance->showBox(ChoosePeerBox(
+		ShowCustomBox(ChoosePeerBox(
 			&controller->session(),
 			[=](not_null<Data::Thread*> thread) -> bool {
 				const auto peer = thread->peer();
@@ -367,8 +363,7 @@ void fillActivityTab(
 				rpl::single(u"📜 Tarixni ko'rish — "_q + name),
 				st::settingsButtonNoIcon));
 		historyRow->addClickHandler([=] {
-			if (!gInstance) return;
-			gInstance->showBox(Box<CustomActivityHistoryBox>(
+			ShowCustomBox(CustomActivityHistory::MakeHistoryBox(
 				&controller->session(), peerId, name));
 		});
 	}

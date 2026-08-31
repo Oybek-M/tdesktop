@@ -1,13 +1,11 @@
 #include "custom_tab_common.h"
-#include "custom_mod_window.h"
 
-QPointer<CustomModWindow> gInstance;
-
-void ShowCustomBox(object_ptr<Ui::BoxContent> box) {
-	if (gInstance) {
-		gInstance->showBox(std::move(box));
-	}
-}
+// Eslatma: `gInstance` va `ShowCustomBox()` ATAYLAB shu yerda emas,
+// `custom_mod_window.cpp` da ta'riflangan. Sabab: `CustomModWindow`
+// klassi faqat o'sha faylda to'liq ko'rinadi (sarlavhada faqat
+// oldindan e'lon bor), shuning uchun `showBox()` ni chaqirish uchun
+// to'liq tur kerak. Tab fayllari esa faqat `ShowCustomBox()` ni
+// biladi va klassga bog'liq emas.
 
 QColor AvatarFallbackColor(int idx) {
 	static const QColor kColors[kAvatarColorsCount] = {
@@ -124,7 +122,6 @@ void ApplyTitleBar(QWidget *w) {
 	}
 }
 
-}
 #endif
 
 CustomTabBar::CustomTabBar(QWidget *parent, std::initializer_list<QString> names)
@@ -272,11 +269,15 @@ not_null<Ui::VerticalLayout*> AddCollapsibleSection(
 		not_null<Ui::VerticalLayout*> container,
 		const QString &title,
 		bool initialOpen) {
+	// Sarlavha `Ui::SettingsButton` — `AddSubsectionTitle` FlatLabel
+	// qaytaradi, u esa tugma emas va bosilishni qabul qilmaydi.
 	Ui::AddSkip(container, st::settingsThumbSkip);
-	const auto titleLabel = Ui::AddSubsectionTitle(
-		container,
-		rpl::single(title));
-	titleLabel->setCursor(Qt::PointingHandCursor);
+
+	const auto header = container->add(
+		object_ptr<Ui::SettingsButton>(
+			container,
+			rpl::single(title),
+			st::settingsButtonNoIcon));
 
 	const auto wrap = container->add(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
@@ -284,7 +285,7 @@ not_null<Ui::VerticalLayout*> AddCollapsibleSection(
 			object_ptr<Ui::VerticalLayout>(container)));
 	wrap->toggle(initialOpen, anim::type::instant);
 
-	titleLabel->setClickedCallback([=] {
+	header->setClickedCallback([=] {
 		wrap->toggle(!wrap->toggled(), anim::type::normal);
 	});
 

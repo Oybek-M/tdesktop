@@ -15,7 +15,13 @@ void fillPeerSection(
 	};
 	const auto state = content->lifetime().make_state<State>();
 
-
+	// ── Section header ───────────────────────────────────────────
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(isWhitelist ? u"White List"_q : u"Black List"_q),
+			st::defaultSubsectionTitle),
+		st::defaultSubsectionTitlePadding);
 
 	{
 		const auto sectionDesc = content->add(
@@ -93,9 +99,8 @@ void fillPeerSection(
 			st::defaultBoxButton),
 		st::boxRowPadding)
 	->addClickHandler([=] {
-		if (!gInstance) return;
 		// Box custom window ichida ochiladi (LayerManager orqali).
-		gInstance->showBox(ChoosePeerBox(
+		ShowCustomBox(ChoosePeerBox(
 			&controller->session(),
 			[=](not_null<Data::Thread*> thread) -> bool {
 				const auto peer = thread->peer();
@@ -431,13 +436,22 @@ void fillPerChatSection(
 	};
 	const auto state = content->lifetime().make_state<State>();
 
-
+	// ── Header ────────────────────────────────────────────────────
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			rpl::single(u"⚙️ Individual sozlamalar (istisnolar)"_q),
+			st::defaultSubsectionTitle),
+		st::defaultSubsectionTitlePadding);
 
 	{
 		const auto desc = content->add(
 			object_ptr<Ui::FlatLabel>(
 				content,
-				rpl::single(u"Alohida chatlar uchun individual sozlamalar (White/Black List ustunroq)."_q),
+				rpl::single(u"Agar biror chat uchun faqat bitta funksiyani (masalan "
+					"faqat Ghost Mode) alohida sozlamoqchi bo'lsangiz — shu yerdan "
+					"qo'shing. Bu ro'yxat White/Black List'dan KEYIN tekshiriladi "
+					"(ular ustunroq)."_q),
 				st::customModHintLabel),
 			st::boxRowPadding,
 			style::al_justify);
@@ -461,8 +475,7 @@ void fillPerChatSection(
 			st::defaultBoxButton),
 		st::boxRowPadding)
 	->addClickHandler([=] {
-		if (!gInstance) return;
-		gInstance->showBox(ChoosePeerBox(
+		ShowCustomBox(ChoosePeerBox(
 			&controller->session(),
 			[=](not_null<Data::Thread*> thread) -> bool {
 				const auto peer = thread->peer();
@@ -699,103 +712,50 @@ void fillPerChatSection(
 
 // ── Activity History Log: kuzatish qamrovi + kuzatilayotganlar ro'yxati ──
 
-
-
 void fillChatsTab(
 		not_null<Ui::VerticalLayout*> content,
 		not_null<Window::SessionController*> controller,
 		Fn<void()> onRebuild) {
-	// 1-bo'lim: Global rejim (Standart ochiq)
-	const auto s1 = AddCollapsibleSection(content, u"🌐 Global rejim"_q, true);
+	// 1-bo'lim: Include ro'yxati (standart OCHIQ)
+	const auto s1 = AddCollapsibleSection(
+		content,
+		u"\u2705 Include ro'yxati"_q,
+		true);
 	{
-		const auto lbl = s1->add(
+		const auto hint = s1->add(
 			object_ptr<Ui::FlatLabel>(
 				s1,
-				rpl::single(u"AntiDelete / AntiEdit uchun global rejim:"_q),
+				rpl::single(u"\U0001F4A1 \"Chat tanlash\" tugmasi bosilganda asosiy "
+					"Telegram oynasida chat tanlash oynasi ochiladi."_q),
 				st::customModHintLabel),
-			st::boxRowPadding);
+			st::boxRowPadding,
+			style::al_justify);
 		s1->widthValue() | rpl::on_next([=](int w) {
-			const auto lw = w - st::boxRowPadding.left() - st::boxRowPadding.right();
-			if (lw > 0) { lbl->resizeToWidth(lw); lbl->update(); }
-		}, lbl->lifetime());
+			const auto lw = w
+				- st::boxRowPadding.left()
+				- st::boxRowPadding.right();
+			if (lw > 0) {
+				hint->resizeToWidth(lw);
+				hint->update();
+			}
+		}, hint->lifetime());
 	}
+	Ui::AddSkip(s1, st::settingsThumbSkip);
+	fillPeerSection(s1, controller, true, onRebuild);
 
-	const auto modeWrap = s1->add(
-		object_ptr<Ui::VerticalLayout>(s1));
-	const auto modeGroup = std::make_shared<Ui::RadiobuttonGroup>(
-		int(CustomSettings::GetPeerListMode()));
+	// 2-bo'lim: Exclude ro'yxati (standart YOPIQ)
+	const auto s2 = AddCollapsibleSection(
+		content,
+		u"\U0001F6AB Exclude ro'yxati"_q,
+		false);
+	fillPeerSection(s2, controller, false, onRebuild);
 
-	const auto rAll = modeWrap->add(
-		object_ptr<Ui::Radiobutton>(
-			modeWrap,
-			modeGroup,
-			int(CustomSettings::PeerListMode::All),
-			u"Barcha chatlar (standart)"_q),
-		st::boxRowPadding);
-	const auto rWhite = modeWrap->add(
-		object_ptr<Ui::Radiobutton>(
-			modeWrap,
-			modeGroup,
-			int(CustomSettings::PeerListMode::WhiteList),
-			u"Faqat White List chatlari"_q),
-		st::boxRowPadding);
-	const auto rBlack = modeWrap->add(
-		object_ptr<Ui::Radiobutton>(
-			modeWrap,
-			modeGroup,
-			int(CustomSettings::PeerListMode::BlackList),
-			u"Black List'dan tashqari barcha chatlar"_q),
-		st::boxRowPadding);
-
-	modeGroup->setChangedCallback([=](int value) {
-		CustomSettings::SetPeerListMode(
-			static_cast<CustomSettings::PeerListMode>(value));
-		Ui::Toast::Show(u"Rejim saqlandi ✓"_q);
-	});
-
-	// 2-bo'lim: Include ro'yxati (Standart yopiq)
-	const auto s2 = AddCollapsibleSection(content, u"✅ Include ro'yxati (White List)"_q, false);
-	fillPeerSection(
-		s2,
-		controller,
-		u"White List (Ruxsat berilganlar)"_q,
-		u"Faqat shu chatlarda AntiDelete/AntiEdit ishlaydi."_q,
-		true,
-		CustomSettings::IsInWhiteList,
-		CustomSettings::AddToWhiteList,
-		CustomSettings::RemoveFromWhiteList,
-		CustomSettings::GetWhiteList,
-		[=](const QString &id) {
-			CustomSettings::RemoveFromBlackList(id);
-			Ui::Toast::Show(u"Black List'dan olib tashlandi."_q);
-			if (onRebuild) onRebuild();
-		},
-		CustomSettings::IsInBlackList,
-		u"Black List");
-
-	// 3-bo'lim: Exclude ro'yxati (Standart yopiq)
-	const auto s3 = AddCollapsibleSection(content, u"🚫 Exclude ro'yxati (Black List)"_q, false);
-	fillPeerSection(
-		s3,
-		controller,
-		u"Black List (Taqiqlanganlar)"_q,
-		u"Bu chatlarda AntiDelete/AntiEdit ISHLAMAYDI."_q,
-		false,
-		CustomSettings::IsInBlackList,
-		CustomSettings::AddToBlackList,
-		CustomSettings::RemoveFromBlackList,
-		CustomSettings::GetBlackList,
-		[=](const QString &id) {
-			CustomSettings::RemoveFromWhiteList(id);
-			Ui::Toast::Show(u"White List'dan olib tashlandi."_q);
-			if (onRebuild) onRebuild();
-		},
-		CustomSettings::IsInWhiteList,
-		u"White List");
-
-	// 4-bo'lim: Individual sozlamalar (Standart yopiq)
-	const auto s4 = AddCollapsibleSection(content, u"⚙️ Individual sozlamalar (istisnolar)"_q, false);
-	fillPerChatSection(s4, controller);
+	// 3-bo'lim: Individual sozlamalar (standart YOPIQ)
+	const auto s3 = AddCollapsibleSection(
+		content,
+		u"\u2699\uFE0F Individual sozlamalar (istisnolar)"_q,
+		false);
+	fillPerChatSection(s3, controller);
 
 	Ui::AddSkip(content, st::settingsThumbSkip);
 }

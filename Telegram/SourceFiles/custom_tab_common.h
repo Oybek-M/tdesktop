@@ -57,8 +57,8 @@
 #include <dwmapi.h>
 #endif
 
-class CustomModWindow;
-extern QPointer<CustomModWindow> gInstance;
+// Custom Window ichida oyna ko'rsatish. Tab fayllari `CustomModWindow`
+// klassini KO'RMAYDI — u faqat `custom_mod_window.cpp` da to'liq.
 
 void ShowCustomBox(object_ptr<Ui::BoxContent> box);
 

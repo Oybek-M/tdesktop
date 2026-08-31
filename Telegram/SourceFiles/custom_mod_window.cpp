@@ -75,6 +75,14 @@ CustomModWindow::CustomModWindow(
 	}, lifetime());
 }
 
+QPointer<CustomModWindow> gInstance;
+
+void ShowCustomBox(object_ptr<Ui::BoxContent> box) {
+	if (gInstance) {
+		gInstance->showBox(std::move(box));
+	}
+}
+
 void CustomModWindow::setupContent(
 		not_null<Window::SessionController*> controller) {
 	const auto makeInner = [&](int idx) -> not_null<Ui::VerticalLayout*> {
