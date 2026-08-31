@@ -300,6 +300,7 @@ shuning uchun birga qilinadi.
 | 2 | **S1 — story fonining miltillashi** | GL/RHI yo'liga qamalgan. Vaqtinchalik yechim bor (OpenGL o'chirish), ya'ni bloklamaydi. Eng noaniq ish. |
 | 3 | **Priority lazy loader** | Tanlangan chat yuqori prioritetga, chat almashganda prioritet ko'chadi. Hozircha shoshilinch emas — og'ir yuk fonga ko'chirilgan. |
 | 4 | **A10 — bitta tugmali sync+build+publish** | A9 ustiga quriladi. Har upstream sync'da qo'lda 4-5 qadam bajarilmoqda. |
+| 0 | 🔴 **A18 — screenshot bloki + rasm forward bypass** 🆕 | **ENG USTUVOR** (2026-08-31). Private kanalda screenshot olinmaydi. **Ildiz sabab topildi:** `AllowsForwardingValue()` da bypass yo'q (bool variantida bor). Rasm forward'i alohida tashxis talab qiladi. Batafsil: [`specs/2026-08-31-a18-screenshot-and-photo-bypass.md`](specs/2026-08-31-a18-screenshot-and-photo-bypass.md) |
 | 0 | 🔴 **A17 — xabarning o'qilgan vaqtini saqlash** 🆕 | **ENG USTUVOR** (2026-08-31). AntiDelete xabarni saqlaydi, lekin o'qilgan vaqtini yo'qotadi. Sxema **v13** (`read_at`). A14 uchun poydevor. Ikkala loyihaga ham tegishli. Batafsil: [`specs/2026-08-31-a17-message-read-time-design.md`](specs/2026-08-31-a17-message-read-time-design.md) |
 | 5 | **A14 — o'qilgan vaqt orqali faollik** | A17 dan KEYIN — u tugagach bu arzon ishga aylanadi. Foydalanuvchi 2026-08-25 da topdi, pastda batafsil. |
 | 6 | **Reliz yuklashni API ga o'tkazish** 🆕 | SSH/scp o'rniga `customsync-server` API. Yuqorida batafsil. |
