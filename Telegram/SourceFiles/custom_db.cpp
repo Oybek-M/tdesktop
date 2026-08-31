@@ -1284,6 +1284,62 @@ void FlushPendingWrites() {
     gPendingWrites.clear();
 }
 
+// ---------------------------------------------------------------------------
+// Message read status (A17)
+// ---------------------------------------------------------------------------
+
+void MarkMessageRead(
+        const PeerKey &key,
+        long long msgId,
+        qint64 readAt) {
+    Init();
+    if (!gDb) return;
+
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "UPDATE actioned_messages "
+            "SET read_at = ?1 "
+            "WHERE peer_id = ?2 AND msg_id = ?3 AND account_id IN (0, ?4) "
+            "  AND (read_at = 0 "
+            "       OR (?1 > 0 AND read_at < 0) "
+            "       OR (?1 > 0 AND read_at > 0 AND ?1 < read_at))",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, readAt);
+        bindText(stmt, 2, key.peerId);
+        sqlite3_bind_int64(stmt, 3, msgId);
+        sqlite3_bind_int64(stmt, 4, key.accountId);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+}
+
+int MarkOutgoingReadUpTo(
+        const PeerKey &key,
+        long long upToMsgId,
+        qint64 readAt) {
+    Init();
+    if (!gDb) return 0;
+
+    int changed = 0;
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "UPDATE actioned_messages "
+            "SET read_at = ?1 "
+            "WHERE peer_id = ?2 AND account_id IN (0, ?3) "
+            "  AND is_out = 1 AND msg_id <= ?4 AND read_at = 0",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, readAt);
+        bindText(stmt, 2, key.peerId);
+        sqlite3_bind_int64(stmt, 3, key.accountId);
+        sqlite3_bind_int64(stmt, 4, upToMsgId);
+        if (sqlite3_step(stmt) == SQLITE_DONE) {
+            changed = sqlite3_changes(gDb);
+        }
+        sqlite3_finalize(stmt);
+    }
+    return changed;
+}
+
 void SaveMessage(HistoryItem *item) {
     if (!item) return;
 

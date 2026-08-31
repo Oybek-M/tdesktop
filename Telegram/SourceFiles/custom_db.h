@@ -118,6 +118,25 @@ void PermanentlyDeleteMessage(const PeerKey &key, long long msgId);
 void SaveActionedMessage(const ActionedMessage &msg);
 QString GetMessageHistory(long long msgId, const PeerKey &key);
 
+// A17: bitta xabarning o'qilgan vaqtini belgilaydi.
+//
+// FAQAT "yaxshiroq" qiymat yoziladi:
+//   - musbat qiymat 0 va manfiydan ustun
+//   - ikkalasi musbat bo'lsa — KICHIKROG'I qoladi (o'qilgan lahza
+//     bitta; kichikroq qiymat haqiqatga yaqinroq)
+// Shu sabab qayta-qayta chaqirish xavfsiz.
+void MarkMessageRead(
+    const PeerKey &key,
+    long long msgId,
+    qint64 readAt);
+
+// A17: `upToMsgId` gacha bo'lgan CHIQUVCHI xabarlarni o'qilgan deb
+// belgilaydi. Belgilangan yozuvlar sonini qaytaradi.
+int MarkOutgoingReadUpTo(
+    const PeerKey &key,
+    long long upToMsgId,
+    qint64 readAt);
+
 struct DeletedMessage {
     long long msgId;
     QString mediaPath;
