@@ -142,7 +142,7 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 		content->add(
 			object_ptr<Ui::FlatLabel>(
 				content,
-				rpl::single(u"Joriy holat: "_q + (hasStatus
+				rpl::single(u"Eng so'nggi aniqlangan holat: "_q + (hasStatus
 					? DecodeStatusLabel(latestStatus)
 					: u"noma'lum (hali kuzatilmagan)"_q)),
 				st::boxLabel),
@@ -226,9 +226,7 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 					content,
 					rpl::single(u"(hali ma'lumot yo'q — bu ro'yxat faqat "
 						"ilova ochiq turgan paytda kuzatilgan online→"
-						"offline juftliklaridan tuziladi; yuqoridagi "
-						"\"Joriy holat\" esa Telegram'dan olingan "
-						"alohida qiymat)"_q),
+						"offline juftliklaridan tuziladi)"_q),
 					st::boxLabel),
 				st::boxRowPadding);
 		}

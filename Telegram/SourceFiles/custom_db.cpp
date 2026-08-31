@@ -48,11 +48,16 @@ static QHash<PeerKey, QHash<long long, QString>> gEditedCache;
 // explicitly loaded; EnsurePeerCacheLoaded() merges rather than overwrites,
 // so that's safe either way.
 static QSet<PeerKey> gLoadedPeers;
-// Activity History Log: peerId -> field -> latest new_value. Same lazy
-// per-peer-load pattern as gDeletedCache/gEditedCache above (see
-// StartActivityCacheLoad below) — added to fix a first-start
-// performance regression (repeated per-field SQLite reads with no cache).
-static QHash<QString, QHash<QString, QString>> gActivityLatestCache;
+// Activity History Log: peerId -> field -> latest CachedLatest (value + observedAt).
+// A19: qiymat bilan birga uning KUZATILGAN VAQTI ham saqlanadi.
+// Kesh faqat YANGIROQ yozuvda yangilanadi — shunda retroaktiv
+// yozuvlar (story/manual) eng so'nggi holatni buzmaydi, lekin
+// yaqinda kuzatilgan `buffer` yozuvlari o'z o'rnini oladi.
+struct CachedLatest {
+    QString value;
+    qint64 observedAt = 0;
+};
+static QHash<QString, QHash<QString, CachedLatest>> gActivityLatestCache;
 static QSet<QString> gActivityLoadedPeers;
 // 2026-08-24: butun activity keshi bir marta yuklanadi (peer-bo'yicha emas).
 static bool gActivityCacheLoadedAll = false;
@@ -3013,12 +3018,16 @@ void SaveActivityHistoryEntry(
 
     // Keep the in-memory cache in sync so repeat lookups this session see
     // the new value without another SQLite round-trip.
-    // Faqat tizim hozir kuzatgan ('observed') yozuvlar keshni yangilaydi —
-    // o'tmishdagi retrospektiv nuqtalar (masalan story) joriy eng so'nggi
-    // holatni buzmasligi kerak.
-    if (source == u"observed"_q) {
+    // A19: manbaga emas, VAQTGA qarab yangilanadi — faqat observedAt >= slot.observedAt
+    // bo'lgandagina kesh yangilanadi. Shunda yangi buffer yozuvlari keshga tushadi,
+    // lekin o'tmishdagi retroaktiv yozuvlar (story/manual) joriy holatni buzmaydi.
+    {
         QMutexLocker locker(&gCacheMutex);
-        gActivityLatestCache[key.peerId][field] = newValue;
+        auto &slot = gActivityLatestCache[key.peerId][field];
+        if (observedAt >= slot.observedAt) {
+            slot.value = newValue;
+            slot.observedAt = observedAt;
+        }
         gActivityLoadedPeers.insert(key.peerId);
     }
 }
@@ -3091,24 +3100,35 @@ static void StartActivityCacheLoad() {
             gActivityCacheLoading = false;
             return;
         }
-        QHash<QString, QHash<QString, QString>> all;
+        QHash<QString, QHash<QString, CachedLatest>> all;
         sqlite3_stmt *stmt = nullptr;
         if (sqlite3_prepare_v2(gDb,
-                "SELECT peer_id, field, new_value FROM activity_history "
-                "WHERE id IN (SELECT MAX(id) FROM activity_history "
-                "             GROUP BY peer_id, field)",
+                "SELECT peer_id, field, new_value, observed_at "
+                "FROM activity_history a "
+                "WHERE a.id = ("
+                "    SELECT b.id FROM activity_history b "
+                "    WHERE b.peer_id = a.peer_id AND b.field = a.field "
+                "    ORDER BY b.observed_at DESC, b.id DESC "
+                "    LIMIT 1)",
                 -1, &stmt, nullptr) == SQLITE_OK) {
             while (sqlite3_step(stmt) == SQLITE_ROW) {
-                all[colText(stmt, 0)][colText(stmt, 1)] = colText(stmt, 2);
+                const auto peerId = colText(stmt, 0);
+                const auto field = colText(stmt, 1);
+                const auto val = colText(stmt, 2);
+                const auto obsAt = sqlite3_column_int64(stmt, 3);
+                all[peerId][field] = CachedLatest{ val, obsAt };
             }
             sqlite3_finalize(stmt);
         }
         QMutexLocker locker(&gCacheMutex);
-        // Yuklash davomida yozilgan qiymatlar YANGIROQ — ustidan yozmaymiz.
+        // Yuklash davomida yozilgan qiymatlar YANGIROQ — faqat observedAt kattaroq bo'lsa yozamiz.
         for (auto it = all.constBegin(); it != all.constEnd(); ++it) {
             auto &target = gActivityLatestCache[it.key()];
             for (auto f = it->constBegin(); f != it->constEnd(); ++f) {
-                if (!target.contains(f.key())) target[f.key()] = f.value();
+                auto &slot = target[f.key()];
+                if (f.value().observedAt >= slot.observedAt) {
+                    slot = f.value();
+                }
             }
         }
         gActivityCacheLoadedAll = true;
@@ -3248,7 +3268,7 @@ bool GetLatestActivityHistoryValue(
     if (peerIt == gActivityLatestCache.constEnd()) return false;
     const auto fieldIt = peerIt->constFind(field);
     if (fieldIt == peerIt->constEnd()) return false;
-    outValue = fieldIt.value();
+    outValue = fieldIt.value().value;
     return true;
 }
 
