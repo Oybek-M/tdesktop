@@ -8,52 +8,52 @@ Oxirgi yangilanish: 2026-09-01
 
 ---
 
-# 🔴 SHU YERDAN BOSHLANG (2026-09-01) — BUILD KUTILMOQDA
+# ✅ BUILD O'TDI VA SINOVDAN O'TDI (2026-09-01)
 
-**Katta partiya kod tayyor va `origin/Oybek` da, lekin HALI BUILD
-QILINMAGAN.** Oxirgi `Telegram.exe` — 2026-08-30 15:11, undan keyin
-**20 dan ortiq commit** qo'shilgan.
+Build: **2026-09-01 01:24**. Jonli baza sxemasi **v13**,
+`integrity: ok`. Barcha ishlar `origin/Oybek` da.
 
-Jonli baza sxemasi hozir **v12**. Yangi build birinchi ishga
-tushganda **v13** migratsiyasi qo'llanadi (avtomatik
-`.premigrate-v12-*.bak` zaxirasi olinadi).
+## Sinov natijalari
 
-## Build'ga tushadigan ishlar
-
-| Ish | Nima qiladi | Sinov |
-|---|---|---|
-| **A17** — `read_at` (sxema v13) | Xabar o'qilgan vaqti saqlanadi. Real-vaqt manba: `History::outboxRead()` hook'i | Arxivda `✓✓ o'qilgan: ...` chiqsin |
-| **A14** — o'qilgan vaqt → faollik | O'qish lahzasi `source='read'` nuqtasi bo'lib yoziladi | Faollik tarixida `✓✓` belgili nuqta |
-| **A18a** — screenshot bypass | `AllowsForwardingValue()` ga bypass qo'shildi | Private kanalda screenshot **oyna bilan** olinsin |
-| **A18b** — rasm forward | 4-manba: `PhotoMedia::saveToFile()` | Private kanaldan **rasm** forward bo'lsin (video allaqachon ishlaydi) |
-| **A19** — "Joriy holat" keshi | Kesh manbaga emas, **vaqtga** qarab yangilanadi | Yorliq "Eng so'nggi aniqlangan holat", qiymat eng yangi yozuvga mos |
-| **A20** — lahza-nuqtalar | Juftisiz `online:` endi lahza sifatida ko'rinadi | `31.08 15:03 — 📖 hikoya qo'ygan` qatori |
-| **UX** — 7 tab | 3383 qatorli fayl 9 ta faylga bo'lindi, 22 ta yopiladigan bo'lim | Barcha tab va bo'limlar ochilsin |
-
-## Sinov ro'yxati (build'dan keyin)
-
-1. **Migratsiya** — v13 toza o'tsin, `integrity: ok`
-2. **7 tab** — Yashirinlik, Ko'rinish, Chatlar, Faollik, Arxiv, Ombor, Tizim
-3. `⚠️ Xavfli hudud` **yopiq** turishi kerak
-4. **Tizim** tabida "Oxirgi tekshiruv: ..." qatori bo'lsin (u bir marta yo'qolib, tiklangan)
-5. Private kanalda **screenshot** va **rasm forward**
-6. Faollik tarixida `📖 ✍️ ⏱ ✓✓` belgilari — **lahzalarda ham, davrlarda ham**
-
----
-
-## Sxema versiyalari — BAND
-
-| Versiya | Nima uchun |
+| Ish | Natija |
 |---|---|
-| v9 | placeholder tozalash |
-| v10 | `account_id` (akkaunt izolyatsiyasi) |
-| v11 | `activity_history.source` |
-| v12 | story backfill |
-| **v13** | **`actioned_messages.read_at` (A17)** |
-| **v14** | ← Track C (`sync_outbox`, `sync_state`) uchun keyingi bo'sh |
+| **UX** — 7 tab | ✅ ishlaydi. "Hozircha yetadi, keyinroq yana qayta ko'ramiz" |
+| **A18a** — screenshot bypass | ✅ private kanalda screenshot olinmoqda |
+| **A18b** — rasm forward | ✅ ishlaydi |
+| **A19** — "Eng so'nggi aniqlangan holat" | ✅ ishlaydi |
+| **A20** — lahza-nuqtalar | ✅ `📖 hikoya qo'ygan` qatori chiqdi |
+| **A17/A14** — o'qilgan vaqt | ⚠️ **hali ko'rinmadi** — pastga qarang |
+| Sxema **v13** migratsiyasi | ✅ toza o'tdi |
 
-🔴 **Track C sessiyasi diqqatiga:** v13 BAND. `STATUS.md` bir marta
-qayta yozilib bu rezervatsiya bekor bo'lgan edi — tiklandi.
+## 🔴 Ochiq savollar
+
+1. **A17/A14 belgilari (`✓✓`) hali ko'rinmadi.** Kod build'da bor.
+   Sabab ehtimoli: suhbatdosh hali xabar o'qimagan (hook faqat
+   `updateReadHistoryOutbox` kelganda ishlaydi), yoki ko'rsatish
+   qismida nuqson. **Kuzatib borish kerak** — bir necha kun ichida
+   o'z-o'zidan paydo bo'lishi mumkin.
+
+2. **Faollik tarixi oynasi redesign talab qiladi** — foydalanuvchi:
+   "ko'rinish o'qishga biroz noqulay".
+
+3. **Arxiv tabi bo'limlarga o'ralmagan** (qolgan 6 tasi o'ralgan).
+   Sabab: Gemini uni buzgan edi, ishlaydigan holatga qaytarildi.
+
+4. **AntiDelete sozlamasi `false` bo'lib qolgan edi** — kodda sabab
+   topilmadi. Yana takrorlansa alohida tashxis kerak.
+
+## 🔴 Gemini bilan ishlashda MAJBURIY tekshiruv
+
+2-bosqichda Gemini **mavjud bo'lmagan API'lar bilan kod o'ylab
+topdi** (butun "Global rejim" bo'limi, `EditRecord` ning yo'q
+maydonlari, 6 ta media tugmasi). Hisobotida "ishonchsiz joylar yo'q"
+deb yozgan edi. Build 100+ xato bilan yiqildi.
+
+**Diffni o'qish YETARLI EMAS** (bitta faylda 786 qator o'zgargan
+edi). Ishlaydigan usul: har fayldagi foydalanuvchiga ko'rinadigan
+**satrlar to'plamini** eski/yangi holatda solishtirish.
+
+Batafsil: [`specs/2026-08-31-custom-window-ux-redesign-design.md`](specs/2026-08-31-custom-window-ux-redesign-design.md) §7
 
 ---
 
