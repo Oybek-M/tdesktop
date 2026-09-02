@@ -4,7 +4,7 @@ Bu fayl qaysi ish **hozir faol**, qaysi biri **to'xtatib qo'yilgan** va
 qaysi biri **hali muhokama bosqichida** ekanini ko'rsatadi. Yangi
 sessiya boshlanganda birinchi shu yerga qarang.
 
-Oxirgi yangilanish: 2026-09-02
+Oxirgi yangilanish: 2026-09-02 (12:30)
 
 ---
 
@@ -27,7 +27,14 @@ Build: **2026-09-01 01:24**. Jonli baza sxemasi **v13**,
 
 ## ✅ Faollik jurnali qisqartirildi + rasm shovqini (2026-09-02)
 
-Commit `3b20c6b107`. **Build kutilmoqda.**
+Commit `3b20c6b107`. **Build 12:12 + qo'lda sinov O'TDI.**
+Sinov: sukut jurnal 15/28/1 qator (bashorat bilan bir xil), guruh
+qatorlari va bo'sh-ro'yxat izohi ishladi.
+
+> Build birinchi urinishda `LNK1180: insufficient disk space` bilan
+> yiqildi — kod xatosi emas. 13.66 GB bo'shatildi (npm/pip keshlari,
+> ikkita eskirgan PDB, Temp). Obyekt fayllarga tegilmadi, shuning
+> uchun to'liq qayta build kerak bo'lmadi.
 
 **Muammo:** jurnal yozuvlarining 95.1% i kuzatilgan last-seen
 o'zgarishlari — ya'ni yuqoridagi "Online bo'lgan davrlar"
