@@ -17,7 +17,7 @@ Oxirgi yangilanish: **2026-09-02**
 
 | Loyiha | Holat | Keyingi qadam |
 |---|---|---|
-| **tdesktop** (CustomMod) | 🟢 v7.1.1 chiqarildi, ishlab turibdi | Plan 02 Task 3 (sxema migratsiyasi — **v14**) |
+| **tdesktop** (CustomMod) | 🟢 v7.1.1 chiqarildi, ishlab turibdi | Plan 02 Task 4 (outbox qatlami va enqueue nuqtalari) |
 | **customsync-server** | ✅ 01a va 01b TUGADI | — |
 | **server-controller** | ⚪ boshlanmagan | 01a/01b tugagach |
 | **tmobile-android** | ⚪ muhokama qilinmagan | — |
@@ -78,7 +78,7 @@ faylida.** Quyidagisi faqat qisqacha.
 |---|---|
 | **01a** — backend poydevori | ✅ 7 task + rejadan tashqari 6b (rol avtorizatsiyasi) |
 | **01b** — sync yadrosi | ✅ 9 task'ning hammasi, deploy fayllari bilan |
-| 02 — tdesktop agenti | 🟡 11 task'dan 2 tasi. Beshala vektor oilasi C++ da tasdiqlandi |
+| 02 — tdesktop agenti | 🟡 11 task'dan 3 tasi. Vektorlar C++ da tasdiqlandi, sxema v14 qurildi |
 | 03 — web controller | ⚪ boshlanmagan |
 | 04, 05, 06 | ⚪ boshlanmagan |
 
