@@ -32,6 +32,23 @@
 .PARAMETER GithubRepo
     owner/repo for the private releases mirror, e.g. Oybek-M/tdesktop-releases.
 
+.PARAMETER Api
+    Base URL of customsync-server. When given, the mirror fan-out goes
+    through its Releases API (resumable chunked upload, idempotent
+    re-runs, per-mirror status) instead of scp + git push. Without it
+    the original scp path runs unchanged - deliberately kept as the
+    fallback for when the backend is down.
+
+.PARAMETER Token
+    Bearer token for -Api. Keep it in an environment variable rather
+    than shell history: -Token $env:CUSTOMSYNC_TOKEN.
+
+.PARAMETER OnlyMirror
+    API mode only. Re-publish to a single mirror by name, e.g.
+    -OnlyMirror vps-secure. This is the case the API exists for: a run
+    where two mirrors succeeded and one did not should not re-upload
+    52 MB to fix the third.
+
 .PARAMETER DryRun
     Sign and build the manifest, but skip every upload. Use this to
     verify Packer + the key still work without touching any mirror.
@@ -63,6 +80,15 @@ param(
 
     [Parameter(Mandatory = $false)]
     [string]$GithubRepo = "Oybek-M/tdesktop-releases",
+
+    [Parameter(Mandatory = $false)]
+    [string]$Api = "",
+
+    [Parameter(Mandatory = $false)]
+    [string]$Token = "",
+
+    [Parameter(Mandatory = $false)]
+    [string]$OnlyMirror = "",
 
     [switch]$DryRun
 )
@@ -103,6 +129,12 @@ if (-not (Test-Path $StagingDir)) {
 }
 if (-not (Test-Path $SecretsFile)) {
     Fail "Secrets file not found at $SecretsFile (expected secure_user=, secure_pass=, pub_prefix= lines)."
+}
+if ($OnlyMirror -and -not $Api) {
+    Fail "-OnlyMirror only applies to the API path. Pass -Api as well, or drop -OnlyMirror."
+}
+if ($Api -and -not $Token) {
+    Fail "-Api needs -Token. Keep the token in an environment variable: -Token `$env:CUSTOMSYNC_TOKEN"
 }
 
 $Secrets = @{}
@@ -212,6 +244,26 @@ function Upload-Vps($label, $remotePath) {
     }
 }
 
+# API path (plan 06). Publish-ReleaseViaApi returns the same $results
+# shape this script already builds, and the server reports its mirrors
+# under the same names used below ("vps-secure", "vps-pub", "github"),
+# so Steps 5 and 6 work for both paths without a second code path.
+if ($Api) {
+    . (Join-Path $PSScriptRoot "release-api.ps1")
+    try {
+        $results = Publish-ReleaseViaApi `
+            -Api $Api `
+            -Token $Token `
+            -Version $version `
+            -PackagePath $packagePath `
+            -PackageName $packageName `
+            -Sha256 $localHash `
+            -OnlyMirror $OnlyMirror
+    } catch {
+        Fail "API publish failed: $_"
+    }
+} else {
+
 Upload-Vps "vps-secure" "/var/www/updates/secure"
 Upload-Vps "vps-pub"    "/var/www/updates/$($Secrets.pub_prefix)"
 
@@ -238,6 +290,8 @@ try {
     Write-Host "  Warning: GitHub upload failed - $_" -ForegroundColor Yellow
     $results["github"] = @{ ok = $false; error = $_.ToString() }
 }
+
+} # end of the scp path
 
 $anySucceeded = ($results.Values | Where-Object { $_.ok }).Count -gt 0
 if (-not $anySucceeded) {

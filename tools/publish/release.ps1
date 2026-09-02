@@ -19,6 +19,17 @@
 .PARAMETER GithubRepo
     Passed through to publish.ps1. See publish.ps1 -GithubRepo.
 
+.PARAMETER Api
+    Passed through to publish.ps1. Publishes through customsync-server's
+    Releases API instead of scp + git push. Omit it and the original
+    scp path runs unchanged.
+
+.PARAMETER Token
+    Passed through to publish.ps1. Bearer token for -Api.
+
+.PARAMETER OnlyMirror
+    Passed through to publish.ps1. Re-publish to one mirror only.
+
 .PARAMETER DryRun
     Passed through to publish.ps1. Stages the files and signs with
     Packer, but skips every upload.
@@ -28,12 +39,22 @@
 
 .EXAMPLE
     .\tools\publish\release.ps1 -DryRun
+
+.EXAMPLE
+    .\tools\publish\release.ps1 -Api https://sync.2007.uz -Token $env:CUSTOMSYNC_TOKEN
+
+.EXAMPLE
+    # One mirror failed; retry just that one without re-uploading 52 MB.
+    .\tools\publish\release.ps1 -Api https://sync.2007.uz -Token $env:CUSTOMSYNC_TOKEN -OnlyMirror vps-secure
 #>
 
 [CmdletBinding()]
 param(
     [string]$SshHost = "customsync-vps",
     [string]$GithubRepo = "Oybek-M/tdesktop-releases",
+    [string]$Api = "",
+    [string]$Token = "",
+    [string]$OnlyMirror = "",
     [switch]$DryRun
 )
 
@@ -81,7 +102,10 @@ $publishArgs = @{
     SshHost    = $SshHost
     GithubRepo = $GithubRepo
 }
-if ($DryRun) { $publishArgs["DryRun"] = $true }
+if ($Api)        { $publishArgs["Api"] = $Api }
+if ($Token)      { $publishArgs["Token"] = $Token }
+if ($OnlyMirror) { $publishArgs["OnlyMirror"] = $OnlyMirror }
+if ($DryRun)     { $publishArgs["DryRun"] = $true }
 
 & $PublishPs1 @publishArgs
 exit $LASTEXITCODE
