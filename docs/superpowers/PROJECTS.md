@@ -25,9 +25,14 @@ Build: **2026-09-01 01:24**. Jonli baza sxemasi **v13**,
 | **A17/A14** — o'qilgan vaqt | ⚠️ **hali ko'rinmadi** — pastga qarang |
 | Sxema **v13** migratsiyasi | ✅ toza o'tdi |
 
-## ✅ A17/A14 — YOPILDI (2026-09-02, build kutilmoqda)
+## ✅ A17/A14 — YOPILDI VA SINOVDAN O'TDI (2026-09-02)
 
-Baza tekshiruvi savolni hal qildi: **yozish qismi benuqson** —
+**Build:** 2026-09-02 09:47, `13 succeeded, 0 failed`.
+**Qo'lda sinov:** ikkala tekshiruv ham o'tdi — arxiv filtri 232 + 185
+yozuvni ko'rsatdi, faollik tarixida qisqa ulanish qatorida `✓✓` chiqdi.
+
+
+Baza tekshiruvi asosiy savolni hal qildi: **yozish qismi benuqson** —
 417 ta `read_at`, hammasi `is_out=1`; 6 ta haqiqiy o'qish hodisasi;
 1 ta `source='read'` faollik nuqtasi.
 
@@ -47,8 +52,6 @@ Lekin yo'l-yo'lakay **3 ta haqiqiy nuqson** topildi va tuzatildi
 Filtr yoqilganda: 232 o'chirilgan + 185 tahrirlangan = **417** —
 `read_at>0` yozuvlarning to'liq soni. Barcha 4 SQL varianti jonli
 bazada sinaldi.
-
-⏳ **Build qilinmagan** — vizual tasdiq qolgan.
 
 ## 🔴 Ochiq savollar
 
