@@ -1,6 +1,6 @@
 # Loyihalar holati — HAR SESSIYA SHU YERDAN BOSHLANADI
 
-Oxirgi yangilanish: **2026-08-29**
+Oxirgi yangilanish: **2026-09-02**
 
 > ✅ **2026-08-26 dagi ko'p akkauntli aralashuv xatosi HAL QILINDI.**
 > Protokol tomoni: spec §0.12 (`record_id` ga `account_hash`),
@@ -18,7 +18,7 @@ Oxirgi yangilanish: **2026-08-29**
 | Loyiha | Holat | Keyingi qadam |
 |---|---|---|
 | **tdesktop** (CustomMod) | 🟢 v7.1.1 chiqarildi, ishlab turibdi | ✅ Sxema v10 (`account_id`) qurildi — keyin sync agenti (plan 02) |
-| **customsync-server** | 🟢 01a tugadi, 01b: 9 dan 8 tasi | Plan 01b Task 9 (deployment) — oxirgisi |
+| **customsync-server** | ✅ 01a va 01b TUGADI | Plan tanlash — tavsiya: 02 (tdesktop agenti) |
 | **server-controller** | ⚪ boshlanmagan | 01a/01b tugagach |
 | **tmobile-android** | ⚪ muhokama qilinmagan | — |
 | **tmobile-ios** | ⚪ muhokama qilinmagan | — |
@@ -77,8 +77,8 @@ faylida.** Quyidagisi faqat qisqacha.
 | Plan | Holat |
 |---|---|
 | **01a** — backend poydevori | ✅ 7 task + rejadan tashqari 6b (rol avtorizatsiyasi) |
-| **01b** — sync yadrosi | 🟡 9 task'dan 8 tasi. Qolgani: Task 9 (deployment) |
-| 02 — tdesktop agenti | ⚪ boshlanmagan — **shu repoda bajariladi** |
+| **01b** — sync yadrosi | ✅ 9 task'ning hammasi, deploy fayllari bilan |
+| 02 — tdesktop agenti | 🔴 **KEYINGI** — **shu repoda bajariladi** |
 | 03 — web controller | ⚪ boshlanmagan |
 | 04, 05, 06 | ⚪ boshlanmagan |
 
@@ -97,6 +97,9 @@ limiting · keyset pagination + statistika · WebSocket bildirishnoma ·
 - **`tombstone` push qilganda `target_record_id` OCHIQ maydonda ham
   yuborilishi shart** — spec §0.13. Server `payload` ni o'qiy olmaydi.
 - **`sha256` ochiq matn ustidan**, shifrlashdan OLDIN (§0.5).
+- **Sxema versiyasi v13 band** — A17 (`actioned_messages.read_at`).
+  `sync_outbox` + `sync_state` migratsiyasi **v14** bo'ladi.
+  Batafsil: `../superpowers/specs/2026-08-31-a17-message-read-time-design.md`
 - Beshala vektor oilasi .NET da tasdiqlangan — C++ tomoni ham
   `test-vectors.json` ga qarshi tekshirilishi shart.
 
