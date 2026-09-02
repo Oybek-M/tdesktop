@@ -17,7 +17,7 @@ Oxirgi yangilanish: **2026-09-02**
 
 | Loyiha | Holat | Keyingi qadam |
 |---|---|---|
-| **tdesktop** (CustomMod) | 🟢 v7.1.1 chiqarildi, ishlab turibdi | Plan 02 Task 4 (outbox qatlami va enqueue nuqtalari) |
+| **tdesktop** (CustomMod) | 🟢 v7.1.1 chiqarildi, ishlab turibdi | Plan 02 Task 5 (OS keystore) |
 | **customsync-server** | ✅ 01a va 01b TUGADI | — |
 | **server-controller** | ⚪ boshlanmagan | 01a/01b tugagach |
 | **tmobile-android** | ⚪ muhokama qilinmagan | — |
@@ -52,6 +52,22 @@ arxivda YO'Q. Ular `media_index` da ham yo'q, ya'ni sync ularni
 "yo'qolgan" deb ham ko'rsata olmaydi. Bu qabul qilingan
 yo'qotish — tiklab bo'lmaydi.
 
+### 🔴 Plan 02 da ataylab qoldirilgan ikkita ish
+
+1. **`peer_directory` enqueue nuqtasi.** `CustomSettings::RememberPeerName(peerId, name)`
+   da akkaunt konteksti yo'q, to'rtta chaqiruvchisi bor
+   (`custom_archive.cpp` ×3, `custom_tab_storage.cpp`). Akkauntni
+   taxmin qilish noto'g'ri `account_hash` beradi, ya'ni hech bir qurilma
+   takrorlay olmaydigan `record_id`. Push yo'li paydo bo'lganda hal qilinadi.
+
+2. **`Outbox::Enqueue` hozircha inert.** `KeysAvailable()` doim `false`
+   qaytaradi, chunki master kalit Task 5 da paydo bo'ladi. Task 5 da uni
+   `true` ga o'tkazayotgan odam **`record_id` hisoblashini ham qo'shishi
+   shart** — aks holda bo'sh `record_id` bilan `INSERT OR REPLACE`
+   hamma yozuvni bitta `''` kalitiga uradi. Kodda ikkinchi qulf bor
+   (bo'sh `recordId` da darhol qaytadi), lekin u xatoni yashiradi emas,
+   to'xtatadi xolos.
+
 ### tdesktop'da Track C uchun QOLGAN ishlar
 
 1. ✅ **Sxema v10 — `account_id`** (5 ta jadval) + media tuzatishlari — kod tayyor, build o'tdi.
@@ -78,7 +94,7 @@ faylida.** Quyidagisi faqat qisqacha.
 |---|---|
 | **01a** — backend poydevori | ✅ 7 task + rejadan tashqari 6b (rol avtorizatsiyasi) |
 | **01b** — sync yadrosi | ✅ 9 task'ning hammasi, deploy fayllari bilan |
-| 02 — tdesktop agenti | 🟡 11 task'dan 3 tasi. Vektorlar C++ da tasdiqlandi, sxema v14 qurildi |
+| 02 — tdesktop agenti | 🟡 11 task'dan 4 tasi. Outbox qatlami tayyor, hozircha inert (kalit yo'q) |
 | 03 — web controller | ⚪ boshlanmagan |
 | 04, 05, 06 | ⚪ boshlanmagan |
 

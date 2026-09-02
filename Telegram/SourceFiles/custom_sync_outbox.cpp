@@ -67,6 +67,16 @@ void Enqueue(
     // Hozir bu kodga kirmaydi (KeysAvailable() == false).
     QString recordId;
 
+    // Ikkinchi qulf. KeysAvailable() Task 5 da true ga o'tkaziladi; agar
+    // o'sha paytda yuqoridagi hisoblash qo'shilmay qolsa, bu yerda
+    // recordId bo'sh satr bo'lardi va INSERT OR REPLACE hamma yozuvni
+    // bitta '' kalitiga urib, oldingisini har safar o'chirib tashlardi --
+    // navbatda doim bitta qator qolardi. Bu dublikatdan ham yomonroq:
+    // jimgina ma'lumot yo'qolishi.
+    if (recordId.isEmpty()) {
+        return;
+    }
+
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(db,
             "INSERT OR REPLACE INTO sync_outbox ("
