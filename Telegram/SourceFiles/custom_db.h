@@ -549,9 +549,14 @@ bool GetLatestActivityHistoryValue(
 // limit — nechta ENG SO'NGGI yozuv qaytarilsin. Cheklov SHART: eng faol
 // kontaktda 13 333 qator bor edi va Faollik tarixi oynasi har qator uchun
 // alohida widget yaratadi. Butun tarix kerak bo'lsa limit oshiriladi.
+// includeObservedStatus = false bo'lsa kuzatilgan last-seen o'zgarishlari
+// tashlab yuboriladi (yozuvlarning ~95% i shular). Qo'lda kiritilgan,
+// hikoyadan olingan, buferdan tiklangan va o'qishdan aniqlangan nuqtalar
+// `field = 'status'` bo'lsa ham SAQLANADI.
 [[nodiscard]] QVector<ActivityHistoryEntry> GetActivityHistory(
     const QString &peerId,
-    int limit = 300);
+    int limit = 300,
+    bool includeObservedStatus = true);
 
 // Delete activity_history entries older than |days| days.
 // SaveActivityHistoryEntry() soatiga bir marta chaqiradi; ishga tushishda

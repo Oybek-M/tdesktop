@@ -13,6 +13,7 @@
 #include "styles/style_layers.h"
 #include "styles/style_boxes.h"
 #include "styles/style_settings.h"
+#include "styles/style_custom_mod.h" // customModHintLabel
 #include "lang/lang_keys.h"
 #include <QtCore/QDateTime>
 #include <QtCore/QFile>
@@ -38,6 +39,16 @@ constexpr auto kMinMeaningfulOnlineSeconds = 60;
 // Ketma-ket qisqa ulanishlar shu oraliqdan yaqin bo'lsa bitta guruhga
 // yig'iladi (30 daqiqa).
 constexpr auto kShortGroupGapSeconds = 30 * 60;
+
+// Jurnalda ketma-ket kelgan kuzatilgan last-seen yozuvlari shu sondan
+// ko'p bo'lsa bitta guruh qatoriga yig'iladi. 2 ta yozuv uchun ham
+// guruhlash foydali: ikki qator o'rniga bitta qator qoladi.
+constexpr auto kMinGroupedStatusRun = 2;
+
+// Jurnalda kuzatilgan last-seen o'zgarishlarini ko'rsatish. Bu ko'rish
+// filtri, sozlama emas — registrga yozilmaydi, ilova qayta ishga
+// tushganda o'chiq holatda boshlanadi.
+bool gShowObservedStatus = false;
 
 // 2026-08-15: arxivda saqlangan profil rasmining yo'li (yo'q bo'lsa bo'sh).
 // Nom sxemasi custom_activity_history.cpp dagi MaybeBackupUserpic() bilan
@@ -297,42 +308,43 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 				st::boxRowPadding);
 		}
 
-		// ── 4) To'liq o'zgarishlar jurnali ───────────────────────────
-		// 2026-08-24: ro'yxat 300 ta bilan cheklangan. Ilgari cheklov yo'q
-		// edi va eng faol kontaktda 12 000 dan ortiq widget yaratilardi —
-		// oyna ochilishi sekinlashardi. Foydalanuvchi cheklovni bilib
-		// tursin, aks holda "tarix yo'qolibdi" deb o'ylashi mumkin.
-		const auto capped = (entries.size() >= kActivityHistoryLimit);
+		// ── 4) O'zgarishlar jurnali ──────────────────────────────────
+		// 2026-08-24: ro'yxat 300 ta bilan cheklangan (widget soni).
+		// 2026-09-02: cheklovning o'zi yetarli emas edi — yozuvlarning
+		// ~95% i kuzatilgan last-seen o'zgarishlari bo'lgani uchun ular
+		// LIMIT ni to'ldirib, kamyob ism/username o'zgarishlarini siqib
+		// chiqarardi (bir peerda 266 tadan atigi 10 tasi ko'rinardi).
+		// Shuning uchun ular sukut bo'yicha YASHIRILADI, yoqilganda esa
+		// ketma-ketlari bitta qatorga guruhlanadi.
 		content->add(
 			object_ptr<Ui::FlatLabel>(
 				content,
-				rpl::single(capped
-					? (u"O'zgarishlar jurnali (so'nggi "_q
-						+ QString::number(kActivityHistoryLimit)
-						+ u" ta):"_q)
-					: u"To'liq o'zgarishlar jurnali:"_q),
+				rpl::single(u"O'zgarishlar jurnali:"_q),
 				st::defaultSubsectionTitle),
 			st::defaultSubsectionTitlePadding);
-		if (entries.isEmpty()) {
-			content->add(
+
+		const auto statusToggle = content->add(
+			object_ptr<Ui::SettingsButton>(
+				content,
+				rpl::single(u"Last-seen o'zgarishlarini ham ko'rsatish"_q),
+				st::settingsButtonNoIcon));
+		const auto journal = content->add(
+			object_ptr<Ui::VerticalLayout>(content));
+
+		// Bitta yozuv qatori + unga tegishli havolalar.
+		const auto addEntryRow = [=](
+				const CustomDB::ActivityHistoryEntry &e) {
+			const auto label = journal->add(
 				object_ptr<Ui::FlatLabel>(
-					content,
-					rpl::single(u"(hali hech qanday yozuv yo'q)"_q),
-					st::boxLabel),
-				st::boxRowPadding);
-		}
-		for (const auto &e : entries) {
-			const auto label = content->add(
-				object_ptr<Ui::FlatLabel>(
-					content,
+					journal,
 					rpl::single(FormatEntryLine(e)),
 					st::boxLabel),
 				st::boxRowPadding);
 
 			if (e.source != u"observed"_q) {
-				const auto delLink = content->add(
+				const auto delLink = journal->add(
 					object_ptr<Ui::LinkButton>(
-						content,
+						journal,
 						u"🗑 O'chirish"_q),
 					st::boxRowPadding);
 				delLink->setClickedCallback([=] {
@@ -350,21 +362,103 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 			// imkoni. Ilgari avatar faqat diskda yotardi va uni faqat
 			// papkani qo'lda ochib ko'rish mumkin edi.
 			if (e.field != u"photo"_q) {
-				continue;
+				return;
 			}
 			const auto path = ArchivedAvatarPath(peerId, e.newValue);
 			if (path.isEmpty()) {
-				continue;
+				return;
 			}
-			const auto open = content->add(
+			const auto open = journal->add(
 				object_ptr<Ui::LinkButton>(
-					content,
+					journal,
 					u"🖼 Saqlangan rasmni ochish"_q),
 				st::boxRowPadding);
 			open->setClickedCallback([=] {
 				QDesktopServices::openUrl(QUrl::fromLocalFile(path));
 			});
-		}
+		};
+
+		const auto addHint = [=](const QString &text) {
+			journal->add(
+				object_ptr<Ui::FlatLabel>(
+					journal,
+					rpl::single(text),
+					st::customModHintLabel),
+				st::boxRowPadding);
+		};
+
+		const auto rebuildJournal = [=] {
+			journal->clear();
+
+			const auto list = CustomDB::GetActivityHistory(
+				peerId,
+				kActivityHistoryLimit,
+				gShowObservedStatus);
+
+			if (list.isEmpty()) {
+				// Bo'sh ro'yxat nosozlikka o'xshab ko'rinmasin — sabab
+				// aytiladi, aks holda "tarix yo'qolibdi" deb o'ylanadi.
+				addHint(gShowObservedStatus
+					? u"(hali hech qanday yozuv yo'q)"_q
+					: u"Ism, username, rasm yoki hikoya o'zgarishi qayd "
+						"etilmagan. Bu kontaktda faqat last-seen "
+						"kuzatilgan — uni ko'rish uchun yuqoridagi "
+						"tugmani yoqing."_q);
+				return;
+			}
+			if (list.size() >= kActivityHistoryLimit) {
+				addHint(u"So'nggi %1 ta yozuv ko'rsatilmoqda."_q
+					.arg(kActivityHistoryLimit));
+			}
+
+			// Ketma-ket kelgan kuzatilgan last-seen yozuvlarini bitta
+			// qatorga yig'amiz. Ular qiymati emas, SONI ma'noli — aniq
+			// vaqtlar yuqoridagi "Online bo'lgan davrlar" ro'yxatida.
+			const auto groupable = [&](int at) {
+				return (list[at].field == u"status"_q)
+					&& (list[at].source == u"observed"_q);
+			};
+			auto i = 0;
+			while (i < list.size()) {
+				if (!groupable(i)) {
+					addEntryRow(list[i]);
+					++i;
+					continue;
+				}
+				auto j = i;
+				while (j < list.size() && groupable(j)) {
+					++j;
+				}
+				const auto count = j - i;
+				if (count < kMinGroupedStatusRun) {
+					for (auto k = i; k < j; ++k) {
+						addEntryRow(list[k]);
+					}
+					i = j;
+					continue;
+				}
+				// Ro'yxat eng yangisidan boshlanadi, shuning uchun
+				// oraliqning boshi — oxirgi element.
+				const auto oldest = QDateTime::fromSecsSinceEpoch(
+					list[j - 1].observedAt);
+				const auto newest = QDateTime::fromSecsSinceEpoch(
+					list[i].observedAt);
+				addHint(oldest.toString(u"dd.MM HH:mm"_q) + u" - "_q
+					+ newest.toString(u"dd.MM HH:mm"_q) + u"  ·  "_q
+					+ QString::number(count)
+					+ u" ta last-seen o'zgarishi"_q);
+				i = j;
+			}
+		};
+
+		statusToggle->toggleOn(rpl::single(gShowObservedStatus));
+		statusToggle->toggledValue()
+			| rpl::skip(1)
+			| rpl::on_next([=](bool on) {
+				gShowObservedStatus = on;
+				rebuildJournal();
+			}, statusToggle->lifetime());
+		rebuildJournal();
 
 		box->addButton(tr::lng_close(), [=] { box->closeBox(); });
 	});

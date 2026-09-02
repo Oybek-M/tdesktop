@@ -544,16 +544,35 @@ void Init(not_null<Main::Session*> session) {
 			}
 		}
 		if (update.flags & Flag::Photo) {
-			const auto value = user->hasUserpic()
-				? QString::number(user->userpicPhotoId())
-				: u"empty"_q;
-			if (isTracking) {
-				RecordField(session, peerId, u"photo"_q, value, now);
-				// Rasm ID'sining o'zi yetarli emas — eski rasm
-				// almashtirilsa yo'qoladi. Rasmning O'ZINI ham saqlaymiz.
-				MaybeBackupUserpic(session, user);
-			} else {
-				PushToActivityBuffer(peerId, u"photo"_q, QString(), value, now);
+			// `hasUserpic()` rasm YUKLANGANINI bildiradi, rasm
+			// BORLIGINI emas — u `_userpic.empty()` ga qaraydi va rasm
+			// qayta yuklanayotganda vaqtincha false bo'ladi. Natijada
+			// har yuklanishda soxta "rasm o'chirildi -> rasm qaytdi"
+			// juftligi yozilardi.
+			//
+			// Dalil (haqiqiy DB, 2026-09-02): 10 151 ta photo yozuvining
+			// 98.9% i aynan shu shovqin. Ko'pchilik kontaktda bor-yo'g'i
+			// IKKI xil qiymat aylanib turardi va oraliq 3 soniya edi:
+			//   15:03:39 empty -> <id>    15:03:43 empty -> <id>
+			//   15:03:42 <id>  -> empty   15:03:46 <id>  -> empty
+			//
+			// To'g'ri manba — `userpicPhotoId()`. U uch holatni ajratadi:
+			// noma'lum (ma'lumot hali kelmagan), 0 (rasm haqiqatan yo'q),
+			// ID (rasm bor). Noma'lum holatda UMUMAN yozmaymiz — aks
+			// holda uni "rasm o'chirildi" deb talqin qilgan bo'lardik.
+			if (!user->userpicPhotoUnknown()) {
+				const auto photoId = user->userpicPhotoId();
+				const auto value = photoId
+					? QString::number(photoId)
+					: u"empty"_q;
+				if (isTracking) {
+					RecordField(session, peerId, u"photo"_q, value, now);
+					// Rasm ID'sining o'zi yetarli emas — eski rasm
+					// almashtirilsa yo'qoladi. Rasmning O'ZINI ham saqlaymiz.
+					MaybeBackupUserpic(session, user);
+				} else {
+					PushToActivityBuffer(peerId, u"photo"_q, QString(), value, now);
+				}
 			}
 		}
 		if (update.flags & Flag::OnlineStatus) {

@@ -3366,18 +3366,34 @@ bool GetLatestActivityHistoryValue(
 
 QVector<ActivityHistoryEntry> GetActivityHistory(
         const QString &peerId,
-        int limit) {
+        int limit,
+        bool includeObservedStatus) {
     Init();
     QVector<ActivityHistoryEntry> result;
     if (!gDb) return result;
 
+    // Jurnal filtri SQL darajasida bo'lishi SHART: yozuvlarning ~95% i
+    // kuzatilgan last-seen o'zgarishlari va ular LIMIT ni to'ldirib,
+    // kamyob ism/username o'zgarishlarini siqib chiqarardi (bir peerda
+    // 266 ta yozuvdan atigi 10 tasi ko'rinardi).
+    //
+    // `source <> 'observed'` sharti ataylab: qo'lda kiritilgan, hikoyadan
+    // olingan, buferdan tiklangan va o'qishdan aniqlangan nuqtalar
+    // `field = 'status'` bo'lsa ham HAR DOIM ko'rsatiladi — ular
+    // shovqin emas, aynan biz izlayotgan signal.
+    const auto sql = includeObservedStatus
+        ? "SELECT id, field, old_value, new_value, observed_at, source "
+          "FROM activity_history WHERE peer_id = ? "
+          "ORDER BY observed_at DESC, id DESC "
+          "LIMIT ?"
+        : "SELECT id, field, old_value, new_value, observed_at, source "
+          "FROM activity_history WHERE peer_id = ? "
+          "  AND (field <> 'status' OR source <> 'observed') "
+          "ORDER BY observed_at DESC, id DESC "
+          "LIMIT ?";
+
     sqlite3_stmt *stmt = nullptr;
-    if (sqlite3_prepare_v2(gDb,
-            "SELECT id, field, old_value, new_value, observed_at, source "
-            "FROM activity_history WHERE peer_id = ? "
-            "ORDER BY observed_at DESC, id DESC "
-            "LIMIT ?",
-            -1, &stmt, nullptr) == SQLITE_OK) {
+    if (sqlite3_prepare_v2(gDb, sql, -1, &stmt, nullptr) == SQLITE_OK) {
         bindText(stmt, 1, peerId);
         sqlite3_bind_int(stmt, 2, (limit > 0) ? limit : -1);
         while (sqlite3_step(stmt) == SQLITE_ROW) {
