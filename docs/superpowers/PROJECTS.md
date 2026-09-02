@@ -25,6 +25,47 @@ Build: **2026-09-01 01:24**. Jonli baza sxemasi **v13**,
 | **A17/A14** — o'qilgan vaqt | ⚠️ **hali ko'rinmadi** — pastga qarang |
 | Sxema **v13** migratsiyasi | ✅ toza o'tdi |
 
+## 🟢 Plan 06 (reliz API) — Task 5 TUGADI (2026-09-02)
+
+Commit `106bab1ba1` + `3b6d0b1616`. **Build kerak emas** (PowerShell).
+
+`release.ps1 -Api <url> -Token <token>` — mirror tarqatish
+`customsync-server` Releases API orqali. `-Api` berilmasa **eski scp
+yo'li o'zgarishsiz** ishlaydi (diff: 79 qo'shish, scp/ssh/gh
+satrlaridan birortasi ham o'chirilmagan).
+
+Imzolash tegilmadi — `Packer.exe` lokalda, serverga faqat tayyor
+imzolangan paket va sha256 boradi.
+
+**Soxta server bilan sinaldi** (`tools/publish/test-release-api.ps1`,
+backend kerak emas):
+
+| Stsenariy | Natija |
+|---|---|
+| Toza yuklash | 3 bo'lak, serverdagi fayl sha256 MOS |
+| Uzilish (server bo'lakning YARMINI yozib 500 qaytaradi) | 6291456 dan davom etdi, yakuniy fayl MOS |
+| Idempotentlik | `already_exists`, PUT umuman ketmadi |
+| `?only=vps-secure` | bitta mirror qaytdi |
+
+🔴 **Uzilish sinovi HAQIQIY xatoni topdi.** Dastlabki kod uzilgan
+bo'lakni ayni offsetdan qayta yuborardi; server esa allaqachon
+oldinga siljigani uchun 416 bilan rad etardi va yuklash butunlay
+yiqilardi. Server bilan holat solishtirish faqat muvaffaqiyat
+yo'lida bor edi — aynan kerak bo'lgan joyda yo'q. Endi har
+iteratsiya `GET` bilan haqiqiy holatni so'raydi.
+
+### Keyingi qadam — server tomoni
+
+Task 1-4 `customsync-server` repo'sida. Prompt tayyor:
+[`06-task1-4-prompt.md`](plans/06-task1-4-prompt.md). Task 6 (web
+app) undan keyin.
+
+⚠️ **Diqqat:** boshqa sessiya shu repoda **plan 02** ustida ishlamoqda
+(`custom_db.cpp/.h` da commit qilinmagan v14 sync_outbox/sync_state).
+Commit qilganda faqat o'z fayllaringizni staging qiling.
+
+---
+
 ## ✅ Faollik jurnali qisqartirildi + rasm shovqini (2026-09-02)
 
 Commit `3b20c6b107`. **Build 12:12 + qo'lda sinov O'TDI.**
