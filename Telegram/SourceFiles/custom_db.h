@@ -163,7 +163,12 @@ struct DeletedMessageWithPeer {
     bool isMedia = false;   // v5: media xabar (mediaPath bo'lmasa ham)
     qint64 readAt = 0;      // A17: o'qilgan vaqt (0 = noma'lum)
 };
-QVector<DeletedMessageWithPeer> GetAllDeletedMessages(int limit = 300);
+// onlyRead = faqat o'qilgani ANIQ bo'lgan yozuvlar, o'qilgan vaqti bo'yicha
+// saralangan. Oddiy ro'yxat xabar sanasi bo'yicha kesilgani uchun eski, lekin
+// o'qilgani ma'lum xabarlar unga tushmay qolardi.
+QVector<DeletedMessageWithPeer> GetAllDeletedMessages(
+    int limit = 300,
+    bool onlyRead = false);
 
 // Arxivdagi (media_index) faylning to'liq yo'li, yoki bo'sh.
 // GetSavedMediaPath() dan farqi — u faqat O'CHIRILGAN xabarlarga
@@ -284,8 +289,12 @@ struct EditRecord {
     QString newText;      // text after this edit (may be empty if not captured)
     unsigned int msgDate = 0;
     QDateTime editedAt;   // when the edit was recorded locally
+    qint64 readAt = 0;      // A17: o'qilgan vaqt (0 = noma'lum)
 };
-QVector<EditRecord> GetAllEditedMessages(int limit = 300);
+// onlyRead = faqat o'qilgani ANIQ bo'lgan yozuvlar, o'qilgan vaqti bo'yicha
+// saralangan. Oddiy ro'yxat vaqt bo'yicha kesilgani uchun eski, lekin
+// o'qilgani ma'lum xabarlar unga tushmay qolardi.
+QVector<EditRecord> GetAllEditedMessages(int limit = 300, bool onlyRead = false);
 
 void SaveMessage(HistoryItem *item);
 

@@ -1093,19 +1093,28 @@ QString GetArchivedMediaPath(const PeerKey &key, long long msgId) {
     return QFile::exists(full) ? full : QString();
 }
 
-QVector<DeletedMessageWithPeer> GetAllDeletedMessages(int limit) {
+QVector<DeletedMessageWithPeer> GetAllDeletedMessages(int limit, bool onlyRead) {
     Init();
     QVector<DeletedMessageWithPeer> result;
     if (!gDb) return result;
 
+    // U1: filtr SQL darajasida bo'lishi SHART. C++ da 300 ta kesilgan
+    // qatordan filtrlasak, o'qilgani ma'lum eski xabarlar baribir
+    // ko'rinmasdi — aynan shu muammoni hal qilmoqchimiz.
+    const auto sql = onlyRead
+        ? "SELECT peer_id, msg_id, original_text, media_path, is_out, msg_date, sender_id, is_media, read_at "
+          "FROM actioned_messages "
+          "WHERE type = 'deleted' AND read_at <> 0 "
+          "ORDER BY read_at DESC "
+          "LIMIT ?"
+        : "SELECT peer_id, msg_id, original_text, media_path, is_out, msg_date, sender_id, is_media, read_at "
+          "FROM actioned_messages "
+          "WHERE type = 'deleted' "
+          "ORDER BY msg_date DESC "
+          "LIMIT ?";
+
     sqlite3_stmt *stmt = nullptr;
-    if (sqlite3_prepare_v2(gDb,
-            "SELECT peer_id, msg_id, original_text, media_path, is_out, msg_date, sender_id, is_media, read_at "
-            "FROM actioned_messages "
-            "WHERE type = 'deleted' "
-            "ORDER BY msg_date DESC "
-            "LIMIT ?",
-            -1, &stmt, nullptr) == SQLITE_OK) {
+    if (sqlite3_prepare_v2(gDb, sql, -1, &stmt, nullptr) == SQLITE_OK) {
         sqlite3_bind_int(stmt, 1, limit);
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             DeletedMessageWithPeer dm;
@@ -1125,20 +1134,28 @@ QVector<DeletedMessageWithPeer> GetAllDeletedMessages(int limit) {
     return result;
 }
 
-QVector<EditRecord> GetAllEditedMessages(int limit) {
+QVector<EditRecord> GetAllEditedMessages(int limit, bool onlyRead) {
     Init();
     QVector<EditRecord> result;
     if (!gDb) return result;
 
     // 'backup' records are pre-edit snapshots; 'edited' are edit events.
+    // D1: read_at ustuni ilgari bu yerda O'QILMAS edi — shu sababli
+    // tahrirlangan xabarlarda "o'qilgan" belgisi hech qachon chiqmagan.
+    const auto sql = onlyRead
+        ? "SELECT peer_id, msg_id, original_text, new_text, msg_date, timestamp, read_at "
+          "FROM actioned_messages "
+          "WHERE type IN ('edited', 'backup') AND read_at <> 0 "
+          "ORDER BY read_at DESC "
+          "LIMIT ?"
+        : "SELECT peer_id, msg_id, original_text, new_text, msg_date, timestamp, read_at "
+          "FROM actioned_messages "
+          "WHERE type IN ('edited', 'backup') "
+          "ORDER BY timestamp DESC "
+          "LIMIT ?";
+
     sqlite3_stmt *stmt = nullptr;
-    if (sqlite3_prepare_v2(gDb,
-            "SELECT peer_id, msg_id, original_text, new_text, msg_date, timestamp "
-            "FROM actioned_messages "
-            "WHERE type IN ('edited', 'backup') "
-            "ORDER BY timestamp DESC "
-            "LIMIT ?",
-            -1, &stmt, nullptr) == SQLITE_OK) {
+    if (sqlite3_prepare_v2(gDb, sql, -1, &stmt, nullptr) == SQLITE_OK) {
         sqlite3_bind_int(stmt, 1, limit);
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             EditRecord rec;
@@ -1148,6 +1165,7 @@ QVector<EditRecord> GetAllEditedMessages(int limit) {
             rec.newText      = colText(stmt, 3);
             rec.msgDate      = static_cast<unsigned int>(sqlite3_column_int64(stmt, 4));
             rec.editedAt     = strToDt(colText(stmt, 5));
+            rec.readAt       = sqlite3_column_int64(stmt, 6);
             result.push_back(rec);
         }
         sqlite3_finalize(stmt);

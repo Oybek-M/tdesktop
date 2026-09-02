@@ -217,18 +217,29 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 		auto shortFrom = qint64(0);
 		auto shortTo = qint64(0);
 		auto shortCount = 0;
+		// D2: guruhga tushgan davrlarning manba belgilari. Ilgari guruh
+		// qatori belgisiz chiqardi, natijada `read` va `story` kabi eng
+		// qimmatli signallar butunlay ko'rinmay qolardi — ular tabiatan
+		// qisqa (o'qish ham, hikoya qo'yish ham bir lahzalik), ya'ni
+		// deyarli HAR DOIM aynan shu guruhga tushadi.
+		auto shortMarkers = QString();
 		const auto flushShort = [&] {
 			if (!shortCount) return;
 			const auto a = QDateTime::fromSecsSinceEpoch(shortFrom);
 			const auto b = QDateTime::fromSecsSinceEpoch(shortTo);
-			rows.append((shortCount == 1)
+			auto line = QString((shortCount == 1)
 				? (a.toString(u"dd.MM HH:mm:ss"_q)
 					+ u" - qisqa ulanish"_q)
 				: (a.toString(u"dd.MM HH:mm"_q) + u" - "_q
 					+ b.toString(u"HH:mm"_q) + u": "_q
 					+ QString::number(shortCount)
 					+ u" ta qisqa ulanish"_q));
+			if (!shortMarkers.isEmpty()) {
+				line += u"  "_q + shortMarkers;
+			}
+			rows.append(line);
 			shortCount = 0;
+			shortMarkers.clear();
 		};
 		for (const auto &p : allPeriods) {
 			if (p.instant) {
@@ -257,6 +268,13 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 			if (!shortCount) shortFrom = p.from;
 			shortTo = p.to;
 			++shortCount;
+			// Bir xil belgi takrorlanmasin — guruhda 20 ta "observed" va
+			// bitta "read" bo'lsa, faqat ✓✓ ko'rinishi kifoya.
+			const auto marker = SourceMarker(p.source);
+			if (!marker.isEmpty() && !shortMarkers.contains(marker)) {
+				if (!shortMarkers.isEmpty()) shortMarkers += u" "_q;
+				shortMarkers += marker;
+			}
 		}
 		flushShort();
 

@@ -1,5 +1,13 @@
 #include "custom_tab_common.h"
 
+namespace {
+
+// U1: ko'rish filtri, sozlama emas — shuning uchun registrga yozilmaydi
+// va ilova qayta ishga tushganda o'chiq holatda boshlanadi.
+bool gOnlyRead = false;
+
+} // namespace
+
 void fillArchiveTab(
 		not_null<Ui::VerticalLayout*> content,
 		Fn<void()> onRefresh) {
@@ -14,6 +22,29 @@ void fillArchiveTab(
 	->addClickHandler([onRefresh] {
 		if (onRefresh) onRefresh();
 	});
+
+	// ── U1: "faqat o'qilgani ma'lum" filtri ──────────────────────────
+	// Oddiy ro'yxat xabar sanasi bo'yicha 300 ta bilan kesiladi, shu
+	// sababli o'qilgani aniqlangan eski xabarlar unga tushmay qolardi.
+	// Filtr yoqilganda saralash o'qilgan vaqti bo'yicha ketadi.
+	Ui::AddSkip(content, 8);
+	{
+		const auto btn = content->add(
+			object_ptr<Ui::SettingsButton>(
+				content,
+				rpl::single(u"✓✓ Faqat o'qilgani ma'lum xabarlar"_q),
+				st::settingsButtonNoIcon));
+		btn->toggleOn(rpl::single(gOnlyRead));
+		btn->toggledValue()
+			| rpl::skip(1)
+			| rpl::on_next([onRefresh](bool on) {
+				gOnlyRead = on;
+				// Ro'yxatni qayta qurish shu tugmaning o'zini yo'q qiladi,
+				// shuning uchun joriy signal tugagach chaqiramiz.
+				if (onRefresh) crl::on_main([onRefresh] { onRefresh(); });
+			}, btn->lifetime());
+	}
+
 	Ui::AddDivider(content);
 	Ui::AddSkip(content, st::settingsThumbSkip);
 
@@ -31,7 +62,9 @@ void fillArchiveTab(
 			content->add(
 				object_ptr<Ui::FlatLabel>(
 					content,
-					rpl::single(u"Arxivda xabarlar yo'q."_q),
+					rpl::single(gOnlyRead
+						? u"O'qilgani ma'lum xabar yo'q."_q
+						: u"Arxivda xabarlar yo'q."_q),
 					st::boxLabel),
 				st::boxRowPadding);
 			return;
@@ -40,7 +73,9 @@ void fillArchiveTab(
 		content->add(
 			object_ptr<Ui::FlatLabel>(
 				content,
-				rpl::single(u"%1 ta xabar — eng yangidan."_q
+				rpl::single((gOnlyRead
+						? u"%1 ta xabar — o'qilgan vaqti bo'yicha."_q
+						: u"%1 ta xabar — eng yangidan."_q)
 					.arg(messages.size())),
 				st::customModHintLabel),
 			st::defaultSubsectionTitlePadding);
@@ -108,13 +143,13 @@ void fillArchiveTab(
 
 	addMessageRows(
 		u"🗑️ O'chirilgan xabarlar"_q,
-		CustomDB::GetAllDeletedMessages(300));
+		CustomDB::GetAllDeletedMessages(300, gOnlyRead));
 
 	Ui::AddDivider(content);
 	Ui::AddSkip(content, st::settingsThumbSkip);
 
 	{
-		const auto records = CustomDB::GetAllEditedMessages(300);
+		const auto records = CustomDB::GetAllEditedMessages(300, gOnlyRead);
 		content->add(
 			object_ptr<Ui::FlatLabel>(
 				content,
@@ -126,14 +161,18 @@ void fillArchiveTab(
 			content->add(
 				object_ptr<Ui::FlatLabel>(
 					content,
-					rpl::single(u"Arxivda tahrir yozuvlari yo'q."_q),
+					rpl::single(gOnlyRead
+						? u"O'qilgani ma'lum tahrir yozuvi yo'q."_q
+						: u"Arxivda tahrir yozuvlari yo'q."_q),
 					st::boxLabel),
 				st::boxRowPadding);
 		} else {
 			content->add(
 				object_ptr<Ui::FlatLabel>(
 					content,
-					rpl::single(u"%1 ta tahrir yozuvi — eng yangidan."_q
+					rpl::single((gOnlyRead
+							? u"%1 ta tahrir yozuvi — o'qilgan vaqti bo'yicha."_q
+							: u"%1 ta tahrir yozuvi — eng yangidan."_q)
 						.arg(records.size())),
 					st::customModHintLabel),
 				st::defaultSubsectionTitlePadding);
@@ -195,6 +234,21 @@ void fillArchiveTab(
 								st::customModHintLabel),
 							st::boxRowPadding);
 					}
+				}
+
+				// D1: o'chirilgan xabarlardagi bilan bir xil belgi.
+				if (rec.readAt != 0) {
+					const auto readLine = (rec.readAt > 0)
+						? (u"✓✓ o'qilgan: "_q
+							+ QDateTime::fromSecsSinceEpoch(rec.readAt)
+								.toString(u"dd.MM.yyyy HH:mm"_q))
+						: u"✓✓ o'qilgan vaqti yashirilgan"_q;
+					content->add(
+						object_ptr<Ui::FlatLabel>(
+							content,
+							rpl::single(readLine),
+							st::boxLabel),
+						st::boxRowPadding);
 				}
 
 				Ui::AddSkip(content, 6);
