@@ -81,10 +81,11 @@ hex. Iterate the keys of `derived`. There is no `salt_hex` field and no
 `expected_key_hex` field.
 
 **The salt is 32 ZERO BYTES**, always, for every derivation. It is not
-in the file because it never varies. "No salt" and "32 zero bytes" are
-NOT the same thing to every library — that difference is a classic
-silent interop break, which is exactly why the plan's header comment
-insists the salt be passed explicitly. Pass `QByteArray(32, '\0')`.
+in the file because it never varies. Pass `QByteArray(32, '\0')`
+explicitly rather than relying on your library's default. RFC 5869 does
+define the absent-salt default as HashLen zeros (32 for SHA-256), so a
+conformant library agrees either way — but do not make another
+platform's binding prove that for you.
 
 **There are FOUR info strings, not three.** Spec section 5's diagram
 shows only three (content, media, peer); `customsync-account-v1` was

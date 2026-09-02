@@ -25,9 +25,14 @@ namespace CustomSync::Crypto {
 
 // HKDF-SHA256. Master kalitdan maqsadga xos kichik kalitlar chiqarish.
 //
-// MUHIM: salt HAR DOIM oshkora beriladi (32 baytlik nol) — "salt yo'q"
-// holatini kutubxonalar turlicha talqin qiladi va bu jimgina interop
-// buzilishiga olib keladi.
+// Salt HAR DOIM oshkora beriladi: 32 baytlik nol.
+//
+// Aniqlik uchun: RFC 5869 salt berilmagan holatni HashLen ta nol bayt
+// deb belgilaydi, SHA-256 uchun bu aynan 32 ta nol. Ya'ni "salt yo'q"
+// va "32 bayt nol" RFC ga mos kutubxonalarda BIR XIL natija beradi --
+// 2026-09-02 da OpenSSL'da amalda tekshirildi. Bu yerda uni oshkora
+// berishimizning sababi boshqa: boshqa platforma kutubxonasi bu
+// standart qiymatni o'zi qo'llashiga tayanib qolmaslik uchun.
 [[nodiscard]] QByteArray HkdfSha256(
     const QByteArray &masterKey,
     const QByteArray &salt,
