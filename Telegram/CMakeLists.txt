@@ -1142,6 +1142,8 @@ PRIVATE
     custom_sync_crypto.h
     custom_sync_outbox.cpp
     custom_sync_outbox.h
+    custom_sync_keystore.cpp
+    custom_sync_keystore.h
     custom_settings.cpp
     custom_settings.h
     custom_upstream_checker.cpp

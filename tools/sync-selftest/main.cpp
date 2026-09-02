@@ -13,6 +13,7 @@
 
 #include "custom_sync_record.h"
 #include "custom_sync_crypto.h"
+#include "custom_sync_keystore.h"
 
 namespace {
 
@@ -353,6 +354,78 @@ int main(int argc, char *argv[]) {
     qInfo().noquote() << QStringLiteral("pbkdf2 natijasi: %1/%2 holat muvaffaqiyatli o'tdi.")
         .arg(pbkdf2Passed)
         .arg(pbkdf2Checked);
+
+#ifdef Q_OS_WIN
+    qInfo().noquote() << "\nOS Keystore (Windows DPAPI) tekshirilmoqda:";
+    int keystoreChecked = 0;
+    const int keystoreFailuresBefore = gFailures;
+
+    // 1. Round-trip: 32 random bytes
+    {
+        keystoreChecked++;
+        const auto random = CustomSync::Crypto::RandomBytes(32);
+        const auto protectedBlob = CustomSync::Keystore::ProtectBytes(random);
+        const auto recovered = protectedBlob.has_value()
+            ? CustomSync::Keystore::UnprotectBytes(*protectedBlob)
+            : std::nullopt;
+        check("keystore/roundtrip (32 bayt random)",
+              recovered.value_or(QByteArray()).toHex(),
+              random.toHex());
+    }
+
+    // 2. Empty input: bo'sh QByteArray
+    {
+        keystoreChecked++;
+        const auto emptyPlain = QByteArray();
+        const auto protectedBlob = CustomSync::Keystore::ProtectBytes(emptyPlain);
+        const auto recovered = protectedBlob.has_value()
+            ? CustomSync::Keystore::UnprotectBytes(*protectedBlob)
+            : std::nullopt;
+        check("keystore/empty (bo'sh bayt to'g'ri qaytdi)",
+              recovered.has_value() ? QString::fromLatin1(recovered->toHex()) : QStringLiteral("<nullopt>"),
+              QStringLiteral(""));
+    }
+
+    // 3. Tampered blob: o'rtadagi bitta baytni o'zgartirish
+    {
+        keystoreChecked++;
+        const auto random = CustomSync::Crypto::RandomBytes(32);
+        const auto protectedBlob = CustomSync::Keystore::ProtectBytes(random);
+        std::optional<QByteArray> result;
+        if (protectedBlob.has_value() && protectedBlob->size() >= 10) {
+            auto tampered = *protectedBlob;
+            tampered[tampered.size() / 2] = tampered[tampered.size() / 2] ^ 0xFF;
+            result = CustomSync::Keystore::UnprotectBytes(tampered);
+        }
+        check("keystore/tamper (buzilgan blob rad etildi)",
+              result.has_value() ? QStringLiteral("accepted") : QStringLiteral("rejected"),
+              QStringLiteral("rejected"));
+    }
+
+    // 4. Not-a-blob: 16 bayt axlat
+    {
+        keystoreChecked++;
+        const QByteArray junk(16, 'x');
+        const auto result = CustomSync::Keystore::UnprotectBytes(junk);
+        check("keystore/junk (not-a-blob rad etildi)",
+              result.has_value() ? QStringLiteral("accepted") : QStringLiteral("rejected"),
+              QStringLiteral("rejected"));
+    }
+
+    constexpr int kExpectedKeystoreCases = 4;
+    if (keystoreChecked != kExpectedKeystoreCases) {
+        qWarning().noquote() << QStringLiteral("XATO: %1 ta keystore holati kutilgan edi, lekin %2 ta tekshirildi!")
+            .arg(kExpectedKeystoreCases)
+            .arg(keystoreChecked);
+        return 1;
+    }
+    const int keystorePassed = keystoreChecked - (gFailures - keystoreFailuresBefore);
+    qInfo().noquote() << QStringLiteral("keystore natijasi: %1/%2 holat muvaffaqiyatli o'tdi.")
+        .arg(keystorePassed)
+        .arg(keystoreChecked);
+#else
+    qInfo().noquote() << "\nOS Keystore: Windows bo'lmagan platforma (skipped).";
+#endif
 
     if (gFailures == 0) {
         qInfo().noquote() << "\nBarcha vektorlar va tekshiruvlar mos keldi.";

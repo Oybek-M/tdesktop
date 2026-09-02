@@ -42,7 +42,7 @@ int CurrentAttempts(sqlite3 *db, const QString &recordId) {
 namespace Outbox {
 
 bool KeysAvailable() {
-    // Task 5 da to'ldiriladi (CustomSync::Keystore orqali tekshirish).
+    // Task 6 da to'ldiriladi (qurilma enrollment va master key ulanganda).
     // Hozircha doim false qaytaradi -- soxta record_id yozilishining oldini oladi (K5).
     return false;
 }
@@ -63,11 +63,11 @@ void Enqueue(
 
     const auto observedAt = QDateTime::currentSecsSinceEpoch();
 
-    // Task 5 da master kalit mavjud bo'lganda record_id hisoblanadi.
+    // Task 6 da master kalit mavjud bo'lganda record_id hisoblanadi.
     // Hozir bu kodga kirmaydi (KeysAvailable() == false).
     QString recordId;
 
-    // Ikkinchi qulf. KeysAvailable() Task 5 da true ga o'tkaziladi; agar
+    // Ikkinchi qulf. KeysAvailable() Task 6 da true ga o'tkaziladi; agar
     // o'sha paytda yuqoridagi hisoblash qo'shilmay qolsa, bu yerda
     // recordId bo'sh satr bo'lardi va INSERT OR REPLACE hamma yozuvni
     // bitta '' kalitiga urib, oldingisini har safar o'chirib tashlardi --
