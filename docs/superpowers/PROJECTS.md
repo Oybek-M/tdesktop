@@ -4,7 +4,7 @@ Bu fayl qaysi ish **hozir faol**, qaysi biri **to'xtatib qo'yilgan** va
 qaysi biri **hali muhokama bosqichida** ekanini ko'rsatadi. Yangi
 sessiya boshlanganda birinchi shu yerga qarang.
 
-Oxirgi yangilanish: 2026-09-01
+Oxirgi yangilanish: 2026-09-02
 
 ---
 
@@ -25,21 +25,40 @@ Build: **2026-09-01 01:24**. Jonli baza sxemasi **v13**,
 | **A17/A14** — o'qilgan vaqt | ⚠️ **hali ko'rinmadi** — pastga qarang |
 | Sxema **v13** migratsiyasi | ✅ toza o'tdi |
 
+## ✅ A17/A14 — YOPILDI (2026-09-02, build kutilmoqda)
+
+Baza tekshiruvi savolni hal qildi: **yozish qismi benuqson** —
+417 ta `read_at`, hammasi `is_out=1`; 6 ta haqiqiy o'qish hodisasi;
+1 ta `source='read'` faollik nuqtasi.
+
+**Nega sinovda ko'rinmagan:** birinchi o'qish hodisasi 01.09 19:04 da
+bo'lgan, sinov esa ~01:30 da o'tkazilgan. O'sha paytda bazada
+ko'rsatadigan bitta ham yozuv yo'q edi.
+
+Lekin yo'l-yo'lakay **3 ta haqiqiy nuqson** topildi va tuzatildi
+(commit `9bc6ed9931`):
+
+| | Nuqson | Ta'sir |
+|---|---|---|
+| **D1** | `GetAllEditedMessages` `read_at` ni SELECT qilmasdi, `EditRecord` da maydon yo'q edi | 185 ta yozuvda belgi **hech qachon** chiqmagan |
+| **D2** | `flushShort()` `SourceMarker` ni chaqirmasdi | `read`/`story` nuqtalari tabiatan qisqa → deyarli har doim guruhga tushib, belgisi yo'qolardi |
+| **U1** | `msg_date` bo'yicha 300 talik kesim | 232 ta yozuvdan atigi **4 tasi** ko'rinardi. Endi "faqat o'qilgani ma'lum" filtri bor (SQL darajasida) |
+
+Filtr yoqilganda: 232 o'chirilgan + 185 tahrirlangan = **417** —
+`read_at>0` yozuvlarning to'liq soni. Barcha 4 SQL varianti jonli
+bazada sinaldi.
+
+⏳ **Build qilinmagan** — vizual tasdiq qolgan.
+
 ## 🔴 Ochiq savollar
 
-1. **A17/A14 belgilari (`✓✓`) hali ko'rinmadi.** Kod build'da bor.
-   Sabab ehtimoli: suhbatdosh hali xabar o'qimagan (hook faqat
-   `updateReadHistoryOutbox` kelganda ishlaydi), yoki ko'rsatish
-   qismida nuqson. **Kuzatib borish kerak** — bir necha kun ichida
-   o'z-o'zidan paydo bo'lishi mumkin.
-
-2. **Faollik tarixi oynasi redesign talab qiladi** — foydalanuvchi:
+1. **Faollik tarixi oynasi redesign talab qiladi** — foydalanuvchi:
    "ko'rinish o'qishga biroz noqulay".
 
-3. **Arxiv tabi bo'limlarga o'ralmagan** (qolgan 6 tasi o'ralgan).
+2. **Arxiv tabi bo'limlarga o'ralmagan** (qolgan 6 tasi o'ralgan).
    Sabab: Gemini uni buzgan edi, ishlaydigan holatga qaytarildi.
 
-4. **AntiDelete sozlamasi `false` bo'lib qolgan edi** — kodda sabab
+3. **AntiDelete sozlamasi `false` bo'lib qolgan edi** — kodda sabab
    topilmadi. Yana takrorlansa alohida tashxis kerak.
 
 ## 🔴 Gemini bilan ishlashda MAJBURIY tekshiruv
