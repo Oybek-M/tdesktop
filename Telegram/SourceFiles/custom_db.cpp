@@ -2,6 +2,8 @@
 #include "custom_archive.h" // ExtensionForMime / KindForMime (tuzatish)
 #include "custom_settings.h"
 #include "custom_peer_key.h"
+#include "custom_sync_outbox.h"
+#include "custom_sync_record.h"
 #include "sqlite3.h"
 #include <QtCore/QMimeDatabase>
 #include <QtCore/QStandardPaths>
@@ -33,6 +35,11 @@ namespace CustomDB {
 // ---------------------------------------------------------------------------
 
 static sqlite3 *gDb = nullptr;
+
+sqlite3 *RawHandle() {
+    Init();
+    return gDb;
+}
 
 // In-memory caches for O(1) lookups, populated lazily per-peer (see
 // EnsurePeerCacheLoaded()) rather than in bulk for the whole archive at
@@ -869,6 +876,8 @@ void SaveGhostRead(const PeerKey &key, long long msgId) {
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }
+
+    CustomSync::Outbox::Enqueue(CustomSync::Kind::GhostRead, key.accountId, key.peerId, msgId, QDateTime::currentSecsSinceEpoch());
 }
 
 long long GetGhostRead(const PeerKey &key) {
@@ -1017,6 +1026,8 @@ void MarkDeleted(
     msg.isMedia = isMedia;
     msg.timestamp = QDateTime::currentDateTime();
     SaveActionedMessage(msg);
+
+    CustomSync::Outbox::Enqueue(CustomSync::Kind::Deleted, key.accountId, key.peerId, msgId, msgDate > 0 ? qint64(msgDate) : QDateTime::currentSecsSinceEpoch());
 }
 
 // ---------------------------------------------------------------------------
@@ -1296,6 +1307,10 @@ void SaveActionedMessage(const ActionedMessage &msg) {
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }
+
+    if (msg.type == u"edited"_q) {
+        CustomSync::Outbox::Enqueue(CustomSync::Kind::Edited, msg.accountId, msg.peerId, msg.msgId, msg.msgDate > 0 ? qint64(msg.msgDate) : msg.timestamp.toSecsSinceEpoch());
+    }
 }
 
 void FlushPendingWrites() {
@@ -1539,6 +1554,8 @@ void UpsertMediaIndex(const PeerKey &key, const MediaIndexEntry &entry) {
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }
+
+    CustomSync::Outbox::Enqueue(CustomSync::Kind::MediaIndex, key.accountId, entry.peerId, entry.msgId, entry.msgDate > 0 ? qint64(entry.msgDate) : (entry.archivedAt > 0 ? qint64(entry.archivedAt) : QDateTime::currentSecsSinceEpoch()));
 }
 
 void SetMediaIndexStatus(
@@ -3154,6 +3171,8 @@ void SaveActivityHistoryEntry(
         }
         gActivityLoadedPeers.insert(key.peerId);
     }
+
+    CustomSync::Outbox::Enqueue(CustomSync::Kind::Activity, key.accountId, key.peerId, CustomSync::DiscriminatorFor(field), observedAt);
 }
 
 bool HasActivityEntryAt(

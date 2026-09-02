@@ -8,8 +8,13 @@
 #include <functional>
 
 class HistoryItem;
+struct sqlite3; // oldindan e'lon -- sqlite3.h sarlavhaga kirmasin
 
 namespace CustomDB {
+
+// FAQAT sync outbox uchun. Boshqa modul bu tutqichni olmasin --
+// baza ulanishining egasi custom_db.cpp bo'lib qoladi.
+[[nodiscard]] sqlite3 *RawHandle();
 
 // Akkaunt + peer juftligi. Nima uchun alohida tur: 12 ta akkaunt
 // bitta bazaga yozadi, fon akkauntlari ham. Bitta QString peerId

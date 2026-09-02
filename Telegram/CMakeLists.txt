@@ -1136,6 +1136,12 @@ PRIVATE
     custom_db.h
     custom_peer_key.cpp
     custom_peer_key.h
+    custom_sync_record.cpp
+    custom_sync_record.h
+    custom_sync_crypto.cpp
+    custom_sync_crypto.h
+    custom_sync_outbox.cpp
+    custom_sync_outbox.h
     custom_settings.cpp
     custom_settings.h
     custom_upstream_checker.cpp
