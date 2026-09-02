@@ -25,6 +25,56 @@ Build: **2026-09-01 01:24**. Jonli baza sxemasi **v13**,
 | **A17/A14** — o'qilgan vaqt | ⚠️ **hali ko'rinmadi** — pastga qarang |
 | Sxema **v13** migratsiyasi | ✅ toza o'tdi |
 
+## ✅ Faollik jurnali qisqartirildi + rasm shovqini (2026-09-02)
+
+Commit `3b20c6b107`. **Build kutilmoqda.**
+
+**Muammo:** jurnal yozuvlarining 95.1% i kuzatilgan last-seen
+o'zgarishlari — ya'ni yuqoridagi "Online bo'lgan davrlar"
+ro'yxatining xom takrori. Ular 300 talik LIMIT ni to'ldirib,
+kamyob ism/username o'zgarishlarini siqib chiqarardi (bir peerda
+266 tadan atigi 10 tasi ko'rinardi).
+
+**Yechim:** filtr (SQL darajasida, LIMIT filtrdan KEYIN) +
+ketma-ket last-seen yozuvlarini guruhlash. Jonli ma'lumotda
+simulyatsiya qilingan: **300 -> 16..31 qator**.
+
+`read`/`story`/`manual`/`buffer` nuqtalari `field='status'` bo'lsa
+ham HECH QACHON yashirilmaydi — ular shovqin emas, signal.
+
+### 🔴 Yo'l-yo'lakay topilgan ildiz: rasm yozuvlarining 98.9% i soxta
+
+`hasUserpic()` rasm YUKLANGANINI bildiradi, rasm BORLIGINI emas
+(`!_userpic.empty()`). Qayta yuklanishda vaqtincha `false` bo'lib,
+soxta "rasm o'chirildi -> qaytdi" juftligini yozardi.
+
+**Qat'iy dalil:** bitta soniyada 50+ turli kontakt "avatarini
+o'chirgan", va bu turli sanalarda takrorlangan. Odamlar emas —
+klientning userpic keshi tozalanishi.
+
+Tuzatma: `userpicPhotoId()` ishlatiladi (uch holatni ajratadi:
+noma'lum / 0 / ID), "noma'lum" holatda umuman yozilmaydi.
+
+**Baza tozalandi** (2026-09-02 10:25, zaxira
+`actioned_messages.db.photo-cleanup-20260902-102556.bak`):
+
+| | Avval | Keyin |
+|---|---|---|
+| photo yozuvi | 10 151 | **1 458** |
+| `new_value='empty'` | 4 462 | **0** |
+| jadval jami | 211 491 | 202 806 |
+
+`old_value` zanjiri qayta tiklandi (347 ta tuzatish),
+`integrity: ok`, boshqa maydonlar tegilmagan.
+
+### Qoldirilgan (foydalanuvchi qarori)
+
+627 ta yozuv `empty` siz, ikkita HAQIQIY rasm ID orasida aylanadi
+(4 ta kontakt: `7815103103`, `7289943562`, `6062604329`,
+`6480195833`). Vaqt-debounce kerak bo'lardi — hozircha chidaymiz.
+
+---
+
 ## ✅ A17/A14 — YOPILDI VA SINOVDAN O'TDI (2026-09-02)
 
 **Build:** 2026-09-02 09:47, `13 succeeded, 0 failed`.
@@ -55,13 +105,10 @@ bazada sinaldi.
 
 ## 🔴 Ochiq savollar
 
-1. **Faollik tarixi oynasi redesign talab qiladi** — foydalanuvchi:
-   "ko'rinish o'qishga biroz noqulay".
-
-2. **Arxiv tabi bo'limlarga o'ralmagan** (qolgan 6 tasi o'ralgan).
+1. **Arxiv tabi bo'limlarga o'ralmagan** (qolgan 6 tasi o'ralgan).
    Sabab: Gemini uni buzgan edi, ishlaydigan holatga qaytarildi.
 
-3. **AntiDelete sozlamasi `false` bo'lib qolgan edi** — kodda sabab
+2. **AntiDelete sozlamasi `false` bo'lib qolgan edi** — kodda sabab
    topilmadi. Yana takrorlansa alohida tashxis kerak.
 
 ## 🔴 Gemini bilan ishlashda MAJBURIY tekshiruv
