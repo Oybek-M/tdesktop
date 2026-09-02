@@ -12,6 +12,7 @@
 #include <QtCore/QDebug>
 
 #include "custom_sync_record.h"
+#include "custom_sync_crypto.h"
 
 namespace {
 
@@ -104,6 +105,8 @@ int main(int argc, char *argv[]) {
     }
 
     const auto root = QJsonDocument::fromJson(file.readAll()).object();
+
+    // 1. record_id (11 ta holat)
     const auto cases = root.value(QStringLiteral("record_id"))
                            .toObject()
                            .value(QStringLiteral("cases"))
@@ -138,20 +141,218 @@ int main(int argc, char *argv[]) {
         ++checkedCases;
     }
 
-    // Himoya: test-vectors.json ichida aynan 11 ta holat bo'lishi shart.
-    // 0 yoki boshqa son bo'lsa xato hisoblanadi (soxta muvaffaqiyatning oldini olish).
     if (checkedCases != 11) {
-        qCritical().noquote() << "XATO: Aynan 11 ta holat tekshirilishi kerak edi, lekin"
+        qCritical().noquote() << "XATO: Aynan 11 ta record_id holati tekshirilishi kerak edi, lekin"
                               << checkedCases << "ta holat tekshirildi.";
         return 1;
     }
 
     const int passedCases = checkedCases - (gFailures - vectorFailuresBefore);
-    qInfo().noquote() << QStringLiteral("\nrecord_id natijasi: %1/%2 holat muvaffaqiyatli o'tdi.")
+    qInfo().noquote() << QStringLiteral("record_id natijasi: %1/%2 holat muvaffaqiyatli o'tdi.")
         .arg(passedCases)
         .arg(checkedCases);
 
     checkRecordRoundtrip();
+
+    // 2. hkdf (4 ta hosilaviy kalit, salt = 32 ta nol bayt)
+    qInfo() << "\nHKDF-SHA256 vektorlari tekshirilmoqda:";
+    const auto hkdfObj = root.value(QStringLiteral("hkdf")).toObject();
+    const auto masterKeyHex = hkdfObj.value(QStringLiteral("master_key_hex")).toString();
+    const auto masterKey = QByteArray::fromHex(masterKeyHex.toLatin1());
+    const auto salt32Zeros = QByteArray(32, '\0');
+    const auto derivedObj = hkdfObj.value(QStringLiteral("derived")).toObject();
+
+    int hkdfChecked = 0;
+    int hkdfFailuresBefore = gFailures;
+    for (auto it = derivedObj.begin(); it != derivedObj.end(); ++it) {
+        const auto info = it.key();
+        const auto expectedHex = it.value().toString();
+        const auto actual = CustomSync::Crypto::HkdfSha256(
+            masterKey, salt32Zeros, info.toUtf8(), 32);
+        check(info, QString::fromLatin1(actual.toHex()), expectedHex);
+        ++hkdfChecked;
+    }
+
+    if (hkdfChecked != 4) {
+        qCritical().noquote() << "XATO: hkdf uchun 4 ta kalit tekshirilishi kerak edi, lekin"
+                              << hkdfChecked << "ta tekshirildi.";
+        return 1;
+    }
+    const int hkdfPassed = hkdfChecked - (gFailures - hkdfFailuresBefore);
+    qInfo().noquote() << QStringLiteral("hkdf natijasi: %1/%2 holat muvaffaqiyatli o'tdi.")
+        .arg(hkdfPassed)
+        .arg(hkdfChecked);
+
+    // 3. account_hash (3 ta holat)
+    qInfo() << "\naccount_hash vektorlari tekshirilmoqda:";
+    const auto accountKey = CustomSync::Crypto::HkdfSha256(
+        masterKey, salt32Zeros, QByteArrayLiteral("customsync-account-v1"), 32);
+    const auto accountCases = root.value(QStringLiteral("account_hash"))
+                                  .toObject()
+                                  .value(QStringLiteral("cases"))
+                                  .toArray();
+    int accountChecked = 0;
+    int accountFailuresBefore = gFailures;
+    for (const auto &item : accountCases) {
+        const auto entry = item.toObject();
+        const auto accountId = entry.value(QStringLiteral("account_id")).toString();
+        const auto expected = entry.value(QStringLiteral("account_hash")).toString();
+        const auto actual = CustomSync::Crypto::ComputeAccountHash(accountKey, accountId);
+        check(QStringLiteral("account_hash:%1").arg(accountId), actual, expected);
+        ++accountChecked;
+    }
+
+    if (accountChecked != 3) {
+        qCritical().noquote() << "XATO: account_hash uchun 3 ta holat tekshirilishi kerak edi, lekin"
+                              << accountChecked << "ta tekshirildi.";
+        return 1;
+    }
+    const int accountPassed = accountChecked - (gFailures - accountFailuresBefore);
+    qInfo().noquote() << QStringLiteral("account_hash natijasi: %1/%2 holat muvaffaqiyatli o'tdi.")
+        .arg(accountPassed)
+        .arg(accountChecked);
+
+    // 4. peer_hash (3 ta holat)
+    qInfo() << "\npeer_hash vektorlari tekshirilmoqda:";
+    const auto peerKey = CustomSync::Crypto::HkdfSha256(
+        masterKey, salt32Zeros, QByteArrayLiteral("customsync-peer-v1"), 32);
+    const auto peerCases = root.value(QStringLiteral("peer_hash"))
+                               .toObject()
+                               .value(QStringLiteral("cases"))
+                               .toArray();
+    int peerChecked = 0;
+    int peerFailuresBefore = gFailures;
+    for (const auto &item : peerCases) {
+        const auto entry = item.toObject();
+        const auto peerId = entry.value(QStringLiteral("peer_id")).toString();
+        const auto expected = entry.value(QStringLiteral("peer_hash")).toString();
+        const auto actual = CustomSync::Crypto::ComputePeerHash(peerKey, peerId);
+        check(QStringLiteral("peer_hash:%1").arg(peerId), actual, expected);
+        ++peerChecked;
+    }
+
+    if (peerChecked != 3) {
+        qCritical().noquote() << "XATO: peer_hash uchun 3 ta holat tekshirilishi kerak edi, lekin"
+                              << peerChecked << "ta tekshirildi.";
+        return 1;
+    }
+    const int peerPassed = peerChecked - (gFailures - peerFailuresBefore);
+    qInfo().noquote() << QStringLiteral("peer_hash natijasi: %1/%2 holat muvaffaqiyatli o'tdi.")
+        .arg(peerPassed)
+        .arg(peerChecked);
+
+    // 5. aes_gcm (3 ta holat, shifrlash va deshifrlash)
+    qInfo() << "\nAES-256-GCM vektorlari tekshirilmoqda:";
+    const auto aesCases = root.value(QStringLiteral("aes_gcm"))
+                              .toObject()
+                              .value(QStringLiteral("cases"))
+                              .toArray();
+    int aesChecked = 0;
+    int aesFailuresBefore = gFailures;
+    for (const auto &item : aesCases) {
+        const auto entry = item.toObject();
+        const auto name = entry.value(QStringLiteral("name")).toString();
+        const auto key = QByteArray::fromHex(entry.value(QStringLiteral("key_hex")).toString().toLatin1());
+        const auto nonce = QByteArray::fromHex(entry.value(QStringLiteral("nonce_hex")).toString().toLatin1());
+        const auto plaintext = QByteArray::fromHex(entry.value(QStringLiteral("plaintext_hex")).toString().toLatin1());
+        const auto expectedCiphertextHex = entry.value(QStringLiteral("ciphertext_hex")).toString();
+        const auto expectedTagHex = entry.value(QStringLiteral("tag_hex")).toString();
+
+        // Shifrlash tekshiruvi (Seal -> ciphertext || tag)
+        const auto sealed = CustomSync::Crypto::Seal(key, nonce, plaintext);
+        if (sealed.size() < 16) {
+            check(QStringLiteral("aes_gcm/encrypt/%1/length").arg(name),
+                  QString::number(sealed.size()),
+                  QStringLiteral(">= 16"));
+        } else {
+            const auto actualCiphertext = sealed.left(sealed.size() - 16);
+            const auto actualTag = sealed.right(16);
+            check(QStringLiteral("aes_gcm/encrypt/%1/ciphertext").arg(name),
+                  QString::fromLatin1(actualCiphertext.toHex()),
+                  expectedCiphertextHex);
+            check(QStringLiteral("aes_gcm/encrypt/%1/tag").arg(name),
+                  QString::fromLatin1(actualTag.toHex()),
+                  expectedTagHex);
+        }
+
+        // Deshifrlash tekshiruvi (Open <- ciphertext || tag)
+        const auto expectedCiphertext = QByteArray::fromHex(expectedCiphertextHex.toLatin1());
+        const auto expectedTag = QByteArray::fromHex(expectedTagHex.toLatin1());
+        const auto sealedInput = expectedCiphertext + expectedTag;
+        const auto opened = CustomSync::Crypto::Open(key, nonce, sealedInput);
+        if (opened.has_value()) {
+            check(QStringLiteral("aes_gcm/decrypt/%1").arg(name),
+                  QString::fromLatin1(opened->toHex()),
+                  entry.value(QStringLiteral("plaintext_hex")).toString());
+        } else {
+            check(QStringLiteral("aes_gcm/decrypt/%1").arg(name),
+                  QStringLiteral("<DESHIFRLASH_XATOSI>"),
+                  entry.value(QStringLiteral("plaintext_hex")).toString());
+        }
+
+        ++aesChecked;
+    }
+
+    if (aesChecked != 3) {
+        qCritical().noquote() << "XATO: aes_gcm uchun 3 ta holat tekshirilishi kerak edi, lekin"
+                              << aesChecked << "ta tekshirildi.";
+        return 1;
+    }
+
+    // Tamper tekshiruvi: buzilgan tag rad etilishi shart
+    {
+        const QByteArray key(32, '\x11');
+        const QByteArray nonce(12, '\x22');
+        const QByteArray plaintext = "CustomMod sync test payload";
+        const auto sealed = CustomSync::Crypto::Seal(key, nonce, plaintext);
+        auto tampered = sealed;
+        if (tampered.size() > 0) {
+            tampered[tampered.size() - 1] = char(tampered[tampered.size() - 1] ^ 0x01);
+        }
+        const auto tamperedResult = CustomSync::Crypto::Open(key, nonce, tampered);
+        check(QStringLiteral("aes_gcm/tamper (buzilgan tag rad etiladi)"),
+              tamperedResult.has_value() ? QStringLiteral("qabul qilindi") : QStringLiteral("rad etildi"),
+              QStringLiteral("rad etildi"));
+    }
+
+    const int aesPassed = aesChecked - (gFailures - aesFailuresBefore);
+    qInfo().noquote() << QStringLiteral("aes_gcm natijasi: %1/%2 holat muvaffaqiyatli o'tdi.")
+        .arg(aesPassed)
+        .arg(aesChecked);
+
+    // 6. pbkdf2 (3 ta holat, 600k va 2M iteratsiyalar)
+    qInfo() << "\nPBKDF2-HMAC-SHA256 vektorlari tekshirilmoqda:";
+    const auto pbkdf2Cases = root.value(QStringLiteral("pbkdf2"))
+                                 .toObject()
+                                 .value(QStringLiteral("cases"))
+                                 .toArray();
+    int pbkdf2Checked = 0;
+    int pbkdf2FailuresBefore = gFailures;
+    for (const auto &item : pbkdf2Cases) {
+        const auto entry = item.toObject();
+        const auto password = entry.value(QStringLiteral("password")).toString();
+        const auto salt = QByteArray::fromHex(entry.value(QStringLiteral("salt_hex")).toString().toLatin1());
+        const auto iterations = entry.value(QStringLiteral("iterations")).toInteger();
+        const auto expectedKek = entry.value(QStringLiteral("kek_hex")).toString();
+
+        const auto actual = CustomSync::Crypto::Pbkdf2(
+            password.toUtf8(), salt, int(iterations), 32);
+
+        check(QStringLiteral("pbkdf2/%1/%2").arg(password.left(8)).arg(iterations),
+              QString::fromLatin1(actual.toHex()),
+              expectedKek);
+        ++pbkdf2Checked;
+    }
+
+    if (pbkdf2Checked != 3) {
+        qCritical().noquote() << "XATO: pbkdf2 uchun 3 ta holat tekshirilishi kerak edi, lekin"
+                              << pbkdf2Checked << "ta tekshirildi.";
+        return 1;
+    }
+    const int pbkdf2Passed = pbkdf2Checked - (gFailures - pbkdf2FailuresBefore);
+    qInfo().noquote() << QStringLiteral("pbkdf2 natijasi: %1/%2 holat muvaffaqiyatli o'tdi.")
+        .arg(pbkdf2Passed)
+        .arg(pbkdf2Checked);
 
     if (gFailures == 0) {
         qInfo().noquote() << "\nBarcha vektorlar va tekshiruvlar mos keldi.";

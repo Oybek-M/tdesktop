@@ -20,4 +20,4 @@ target_include_directories(sync_selftest PRIVATE
     ../../Telegram/SourceFiles)
 
 target_link_libraries(sync_selftest PRIVATE
-    Qt6::Core OpenSSL::Crypto)
+    Qt6::Core OpenSSL::Crypto crypt32 ws2_32)
