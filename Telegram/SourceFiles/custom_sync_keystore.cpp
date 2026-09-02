@@ -101,10 +101,12 @@ bool Available() {
 }
 
 std::optional<QByteArray> ProtectBytes(const QByteArray &plain) {
+    Q_UNUSED(plain);
     return std::nullopt;
 }
 
 std::optional<QByteArray> UnprotectBytes(const QByteArray &blob) {
+    Q_UNUSED(blob);
     return std::nullopt;
 }
 

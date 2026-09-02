@@ -17,7 +17,7 @@ Oxirgi yangilanish: **2026-09-02**
 
 | Loyiha | Holat | Keyingi qadam |
 |---|---|---|
-| **tdesktop** (CustomMod) | 🟢 v7.1.1 chiqarildi, ishlab turibdi | Plan 02 Task 5 (OS keystore) |
+| **tdesktop** (CustomMod) | 🟢 v7.1.1 chiqarildi, ishlab turibdi | Plan 02 Task 6 (HTTP klient: enroll va push) |
 | **customsync-server** | ✅ 01a va 01b TUGADI | — |
 | **server-controller** | ⚪ boshlanmagan | 01a/01b tugagach |
 | **tmobile-android** | ⚪ muhokama qilinmagan | — |
@@ -61,7 +61,7 @@ yo'qotish — tiklab bo'lmaydi.
    takrorlay olmaydigan `record_id`. Push yo'li paydo bo'lganda hal qilinadi.
 
 2. **`Outbox::Enqueue` hozircha inert.** `KeysAvailable()` doim `false`
-   qaytaradi, chunki master kalit Task 5 da paydo bo'ladi. Task 5 da uni
+   qaytaradi, chunki master kalit Task 6 (enrollment) da paydo bo'ladi. Task 6 da uni
    `true` ga o'tkazayotgan odam **`record_id` hisoblashini ham qo'shishi
    shart** — aks holda bo'sh `record_id` bilan `INSERT OR REPLACE`
    hamma yozuvni bitta `''` kalitiga uradi. Kodda ikkinchi qulf bor
@@ -94,7 +94,7 @@ faylida.** Quyidagisi faqat qisqacha.
 |---|---|
 | **01a** — backend poydevori | ✅ 7 task + rejadan tashqari 6b (rol avtorizatsiyasi) |
 | **01b** — sync yadrosi | ✅ 9 task'ning hammasi, deploy fayllari bilan |
-| 02 — tdesktop agenti | 🟡 11 task'dan 4 tasi. Outbox qatlami tayyor, hozircha inert (kalit yo'q) |
+| 02 — tdesktop agenti | 🟡 11 task'dan 5 tasi. Outbox + DPAPI keystore, hozircha inert (kalit yo'q) |
 | 03 — web controller | ⚪ boshlanmagan |
 | 04, 05, 06 | ⚪ boshlanmagan |
 
