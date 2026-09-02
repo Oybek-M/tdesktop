@@ -55,7 +55,8 @@ struct ActionedMessage {
 // v11 (A16 §1): activity_history ga source ustuni
 // v12 (A16 §1): mavjud story yozuvlarini status shkalasiga ko'chirish (backfill)
 // v13 (A17): actioned_messages ga read_at ustuni
-constexpr int kCurrentSchemaVersion = 13;
+// v14 (sync): sync_outbox + sync_state jadvallari
+constexpr int kCurrentSchemaVersion = 14;
 
 void Init();
 

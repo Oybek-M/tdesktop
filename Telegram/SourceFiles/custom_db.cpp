@@ -669,6 +669,38 @@ void RunMigrations() {
                 "ADD COLUMN read_at INTEGER NOT NULL DEFAULT 0");
     }
 
+    // v13 → v14 (sync): sync_outbox va sync_state jadvallari.
+    //
+    // sync_outbox: serverga hali jo'natilmagan yozuvlar navbati.
+    // Faqat IDENTIFIKATSIYA maydonlari saqlanadi — payload push paytida
+    // mavjud jadvallardan o'qib olinadi. Bu ma'lumot dublikatini va ular
+    // orasidagi nomuvofiqlikni oldini oladi.
+    // account_id: push paytida record_id va payload'ni to'g'ri hisoblash uchun.
+    // target_record_id: tombstone holatida o'chirilgan yozuv ID'si (ochiq matn).
+    // next_retry_at: qayta urinish vaqti saqlanadi (restart'dan keyin ham yo'qolmaydi).
+    //
+    // sync_state: cursor, device_id, tokenlar, oxirgi muvaffaqiyat.
+    if (version < 14) {
+        execSql("CREATE TABLE IF NOT EXISTS sync_outbox ("
+                "record_id TEXT PRIMARY KEY, "
+                "kind TEXT NOT NULL, "
+                "account_id INTEGER NOT NULL DEFAULT 0, "
+                "peer_id TEXT NOT NULL, "
+                "msg_id INTEGER NOT NULL DEFAULT 0, "
+                "occurred_at INTEGER NOT NULL, "
+                "observed_at INTEGER NOT NULL, "
+                "target_record_id TEXT, "
+                "attempts INTEGER NOT NULL DEFAULT 0, "
+                "last_error TEXT, "
+                "next_retry_at INTEGER NOT NULL DEFAULT 0)");
+        execSql("CREATE INDEX IF NOT EXISTS idx_outbox_retry "
+                "ON sync_outbox(next_retry_at)");
+
+        execSql("CREATE TABLE IF NOT EXISTS sync_state ("
+                "key TEXT PRIMARY KEY, "
+                "value TEXT NOT NULL)");
+    }
+
     // Update version stamp.
     {
         sqlite3_stmt *stmt = nullptr;
