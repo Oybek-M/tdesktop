@@ -11,11 +11,16 @@ bool gOnlyRead = false;
 void fillArchiveTab(
 		not_null<Ui::VerticalLayout*> content,
 		Fn<void()> onRefresh) {
-	// ── Yangilash tugmasi ────────────────────────────────────────────
-	Ui::AddSkip(content, st::settingsThumbSkip);
-	content->add(
+	// 1-bo'lim: ko'rish sozlamalari (standart OCHIQ) — kichik va
+	// har safar kerak bo'ladi, shuning uchun yopilmaydi.
+	const auto s0 = AddCollapsibleSection(
+		content,
+		u"🔎 Ko'rish"_q,
+		true);
+
+	s0->add(
 		object_ptr<Ui::RoundButton>(
-			content,
+			s0,
 			rpl::single(u"🔄 Yangilash"_q),
 			st::defaultBoxButton),
 		st::boxRowPadding)
@@ -23,15 +28,15 @@ void fillArchiveTab(
 		if (onRefresh) onRefresh();
 	});
 
-	// ── U1: "faqat o'qilgani ma'lum" filtri ──────────────────────────
-	// Oddiy ro'yxat xabar sanasi bo'yicha 300 ta bilan kesiladi, shu
-	// sababli o'qilgani aniqlangan eski xabarlar unga tushmay qolardi.
-	// Filtr yoqilganda saralash o'qilgan vaqti bo'yicha ketadi.
-	Ui::AddSkip(content, 8);
+	// U1: "faqat o'qilgani ma'lum" filtri. Oddiy ro'yxat xabar sanasi
+	// bo'yicha 300 ta bilan kesiladi, shu sababli o'qilgani aniqlangan
+	// eski xabarlar unga tushmay qolardi. Filtr yoqilganda saralash
+	// o'qilgan vaqti bo'yicha ketadi.
+	Ui::AddSkip(s0, 8);
 	{
-		const auto btn = content->add(
+		const auto btn = s0->add(
 			object_ptr<Ui::SettingsButton>(
-				content,
+				s0,
 				rpl::single(u"✓✓ Faqat o'qilgani ma'lum xabarlar"_q),
 				st::settingsButtonNoIcon));
 		btn->toggleOn(rpl::single(gOnlyRead));
@@ -45,23 +50,13 @@ void fillArchiveTab(
 			}, btn->lifetime());
 	}
 
-	Ui::AddDivider(content);
-	Ui::AddSkip(content, st::settingsThumbSkip);
-
 	const auto addMessageRows = [&](
-			const QString &sectionTitle,
+			not_null<Ui::VerticalLayout*> target,
 			const QVector<CustomDB::DeletedMessageWithPeer> &messages) {
-		content->add(
-			object_ptr<Ui::FlatLabel>(
-				content,
-				rpl::single(sectionTitle),
-				st::defaultSubsectionTitle),
-			st::defaultSubsectionTitlePadding);
-
 		if (messages.isEmpty()) {
-			content->add(
+			target->add(
 				object_ptr<Ui::FlatLabel>(
-					content,
+					target,
 					rpl::single(gOnlyRead
 						? u"O'qilgani ma'lum xabar yo'q."_q
 						: u"Arxivda xabarlar yo'q."_q),
@@ -70,9 +65,9 @@ void fillArchiveTab(
 			return;
 		}
 
-		content->add(
+		target->add(
 			object_ptr<Ui::FlatLabel>(
-				content,
+				target,
 				rpl::single((gOnlyRead
 						? u"%1 ta xabar — o'qilgan vaqti bo'yicha."_q
 						: u"%1 ta xabar — eng yangidan."_q)
@@ -80,7 +75,7 @@ void fillArchiveTab(
 				st::customModHintLabel),
 			st::defaultSubsectionTitlePadding);
 
-		Ui::AddSkip(content, st::settingsThumbSkip);
+		Ui::AddSkip(target, st::settingsThumbSkip);
 
 		for (const auto &msg : messages) {
 			const auto dateStr = msg.date
@@ -96,9 +91,9 @@ void fillArchiveTab(
 			const auto header = u"[%1]  %2  —  Chat: %3"_q
 				.arg(dateStr, arrow, peerDisplay);
 
-			content->add(
+			target->add(
 				object_ptr<Ui::FlatLabel>(
-					content,
+					target,
 					rpl::single(header),
 					st::defaultSubsectionTitle),
 				st::defaultSubsectionTitlePadding);
@@ -130,46 +125,46 @@ void fillArchiveTab(
 				body += u"\n✓✓ o'qilgan vaqti yashirilgan"_q;
 			}
 
-			content->add(
+			target->add(
 				object_ptr<Ui::FlatLabel>(
-					content,
+					target,
 					rpl::single(body),
 					st::boxLabel),
 				st::boxRowPadding);
 
-			Ui::AddSkip(content, 6);
+			Ui::AddSkip(target, 6);
 		}
 	};
 
-	addMessageRows(
+	// 2-bo'lim: o'chirilgan xabarlar (standart OCHIQ) — arxivning
+	// asosiy mazmuni shu.
+	const auto s1 = AddCollapsibleSection(
+		content,
 		u"🗑️ O'chirilgan xabarlar"_q,
-		CustomDB::GetAllDeletedMessages(300, gOnlyRead));
+		true);
+	addMessageRows(s1, CustomDB::GetAllDeletedMessages(300, gOnlyRead));
 
-	Ui::AddDivider(content);
-	Ui::AddSkip(content, st::settingsThumbSkip);
-
+	// 3-bo'lim: tahrirlangan xabarlar (standart YOPIQ) — har yozuv
+	// uchta qator egallaydi, ochiq holda tab juda uzayib ketardi.
+	const auto s2 = AddCollapsibleSection(
+		content,
+		u"✏ Tahrirlangan xabarlar"_q,
+		false);
 	{
 		const auto records = CustomDB::GetAllEditedMessages(300, gOnlyRead);
-		content->add(
-			object_ptr<Ui::FlatLabel>(
-				content,
-				rpl::single(u"✏ Tahrirlangan xabarlar"_q),
-				st::defaultSubsectionTitle),
-			st::defaultSubsectionTitlePadding);
-
 		if (records.isEmpty()) {
-			content->add(
+			s2->add(
 				object_ptr<Ui::FlatLabel>(
-					content,
+					s2,
 					rpl::single(gOnlyRead
 						? u"O'qilgani ma'lum tahrir yozuvi yo'q."_q
 						: u"Arxivda tahrir yozuvlari yo'q."_q),
 					st::boxLabel),
 				st::boxRowPadding);
 		} else {
-			content->add(
+			s2->add(
 				object_ptr<Ui::FlatLabel>(
-					content,
+					s2,
 					rpl::single((gOnlyRead
 							? u"%1 ta tahrir yozuvi — o'qilgan vaqti bo'yicha."_q
 							: u"%1 ta tahrir yozuvi — eng yangidan."_q)
@@ -177,7 +172,7 @@ void fillArchiveTab(
 					st::customModHintLabel),
 				st::defaultSubsectionTitlePadding);
 
-			Ui::AddSkip(content, st::settingsThumbSkip);
+			Ui::AddSkip(s2, st::settingsThumbSkip);
 
 			for (const auto &rec : records) {
 				const auto when = rec.editedAt.isValid()
@@ -196,9 +191,9 @@ void fillArchiveTab(
 						.arg(when, editPeerDisplay)
 						.arg(rec.msgId);
 
-				content->add(
+				s2->add(
 					object_ptr<Ui::FlatLabel>(
-						content,
+						s2,
 						rpl::single(header),
 						st::defaultSubsectionTitle),
 					st::defaultSubsectionTitlePadding);
@@ -206,9 +201,9 @@ void fillArchiveTab(
 				const auto orig = rec.originalText.isEmpty()
 					? u"(empty)"_q
 					: rec.originalText.left(200).replace(u'\n', u' ');
-				content->add(
+				s2->add(
 					object_ptr<Ui::FlatLabel>(
-						content,
+						s2,
 						rpl::single(u"Avvalgi: "_q + orig),
 						st::boxLabel),
 					st::boxRowPadding);
@@ -216,9 +211,9 @@ void fillArchiveTab(
 				if (!rec.newText.isEmpty()) {
 					const auto nw =
 						rec.newText.left(200).replace(u'\n', u' ');
-					content->add(
+					s2->add(
 						object_ptr<Ui::FlatLabel>(
-							content,
+							s2,
 							rpl::single(u"Yangi:  "_q + nw),
 							st::boxLabel),
 						st::boxRowPadding);
@@ -227,9 +222,9 @@ void fillArchiveTab(
 						rec.originalText.left(200).replace(u'\n', u' '),
 						rec.newText.left(200).replace(u'\n', u' '));
 					if (diff != orig) {
-						content->add(
+						s2->add(
 							object_ptr<Ui::FlatLabel>(
-								content,
+								s2,
 								rpl::single(u"Farq:   "_q + diff),
 								st::customModHintLabel),
 							st::boxRowPadding);
@@ -243,15 +238,15 @@ void fillArchiveTab(
 							+ QDateTime::fromSecsSinceEpoch(rec.readAt)
 								.toString(u"dd.MM.yyyy HH:mm"_q))
 						: u"✓✓ o'qilgan vaqti yashirilgan"_q;
-					content->add(
+					s2->add(
 						object_ptr<Ui::FlatLabel>(
-							content,
+							s2,
 							rpl::single(readLine),
 							st::boxLabel),
 						st::boxRowPadding);
 				}
 
-				Ui::AddSkip(content, 6);
+				Ui::AddSkip(s2, 6);
 			}
 		}
 	}
