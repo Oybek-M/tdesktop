@@ -11,6 +11,8 @@
 #include <QtCore/QJsonArray>
 #include <QtCore/QDateTime>
 
+#include <optional>
+
 namespace CustomSync {
 
 EnrollResponse ParseEnrollResponse(const QByteArray &jsonBytes, int httpStatus) {
@@ -377,6 +379,26 @@ void Client::mediaDownload(
     });
 }
 
+namespace {
+
+// Yozuvning shifrlanadigan mazmuni. HALI YOZILMAGAN.
+//
+// Har bir kind uchun mazmun lokal jadvallardan o'qiladi: o'chirilgan
+// xabar matni, tahrir tarixi, faollik qiymatlari, media indeks qatori.
+// Bu Task 7 da yoziladi.
+//
+// Ungacha nullopt qaytaradi va yozuv JO'NATILMAYDI. Bo'sh payload bilan
+// jo'natish qaytarib bo'lmas edi: server "created" qaytaradi, MarkSent
+// yozuvni outbox'dan o'chiradi, record_id esa deterministik bo'lgani
+// uchun keyingi urinish "duplicate" oladi -- ya'ni hodisa butunlay
+// yo'qoladi va uni qayta yuborishning iloji qolmaydi.
+[[nodiscard]] std::optional<QByteArray> BuildPayload(const OutboxEntry &entry) {
+    Q_UNUSED(entry);
+    return std::nullopt;
+}
+
+} // namespace
+
 void Client::pushPending(Fn<void(int sentCount, int failedCount)> done) {
     if (!Outbox::KeysAvailable()) {
         if (done) done(0, 0);
@@ -410,14 +432,27 @@ void Client::pushPending(Fn<void(int sentCount, int failedCount)> done) {
         rec.observedAt = e.observedAt;
         rec.deviceId = deviceId;
         rec.targetRecordId = e.targetRecordId;
-        rec.nonce = Crypto::RandomBytes(12);
-
-        // Bo'sh payload shifrlanadi (hozirgi bosqichda)
-        const auto enc = Crypto::Seal(contentKey, rec.nonce, QByteArray());
-        if (enc.has_value()) {
-            rec.payload = *enc;
+        const auto plain = BuildPayload(e);
+        if (!plain.has_value()) {
+            // Yozuv outbox'da QOLADI -- yo'qolmaydi, payload yozilgach ketadi.
+            continue;
         }
+
+        rec.nonce = Crypto::RandomBytes(12);
+        // Seal() QByteArray qaytaradi, optional emas -- bo'sh natija xatolik
+        // demakdir. (Bo'sh matn shifrlanganda ham 16 baytlik tag qaytadi.)
+        const auto enc = Crypto::Seal(contentKey, rec.nonce, *plain);
+        if (enc.isEmpty()) {
+            continue;
+        }
+        rec.payload = enc;
         records.append(rec);
+    }
+
+    if (records.isEmpty()) {
+        // Jo'natadigan hech nima yo'q (payload hali qurilmaydi).
+        if (done) done(0, 0);
+        return;
     }
 
     push(records, [done](bool success, QVector<PushResult> results, QString error) {
