@@ -58,6 +58,18 @@ struct Record {
     qint64 msgId,
     qint64 occurredAt);
 
+// Master kalitdan to'liq record_id hisoblash:
+// HKDF orqali account_key va peer_key chiqaradi, HMAC-SHA256 orqali
+// hash'larni hisoblaydi va ComputeRecordId'ga uzatadi.
+// spec §0.12: kind == "activity" bo'lsa account_hash bo'sh satr ("") bo'ladi.
+[[nodiscard]] QString ComputeRecordIdFor(
+    const QByteArray &masterKey,
+    const QString &kind,
+    qint64 accountId,
+    const QString &peerId,
+    qint64 msgId,
+    qint64 occurredAt);
+
 // msg_id tabiiy bo'lmagan kind'lar uchun diskriminator:
 // SHA256(text) ning birinchi 8 bayti, int64 sifatida (big-endian).
 // Bitta peer uchun bir soniyada sodir bo'lgan ikki xil hodisa bir xil

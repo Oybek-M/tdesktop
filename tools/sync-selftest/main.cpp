@@ -427,6 +427,67 @@ int main(int argc, char *argv[]) {
     qInfo().noquote() << "\nOS Keystore: Windows bo'lmagan platforma (skipped).";
 #endif
 
+    qInfo().noquote() << "\nrecord_id_from_master vektorlari tekshirilmoqda:";
+    int masterRecordIdChecked = 0;
+    const int masterRecordIdFailuresBefore = gFailures;
+
+    // 1. deleted case (real account_hash path)
+    {
+        masterRecordIdChecked++;
+        const auto actual = CustomSync::ComputeRecordIdFor(
+            masterKey,
+            QString::fromLatin1(CustomSync::Kind::Deleted),
+            111222333LL,
+            QStringLiteral("7053823996"),
+            395278LL,
+            1787000000LL);
+        check("record_id_from_master/deleted",
+              actual,
+              QStringLiteral("25cc97f881e1b7dde2de8b11599e608476d8054e853a92f8d9b6619d6941cc0c"));
+    }
+
+    // 2. activity case (empty account_hash path per spec §0.12)
+    {
+        masterRecordIdChecked++;
+        const auto actual = CustomSync::ComputeRecordIdFor(
+            masterKey,
+            QString::fromLatin1(CustomSync::Kind::Activity),
+            111222333LL,
+            QStringLiteral("7053823996"),
+            0LL,
+            1787000002LL);
+        check("record_id_from_master/activity",
+              actual,
+              QStringLiteral("eea4dc5e11301c50d7460fc9ebc7f86be92f9dbf3b95ab661a004f4c57a3c919"));
+    }
+
+    // 3. media_index case with negative msg_id
+    {
+        masterRecordIdChecked++;
+        const auto actual = CustomSync::ComputeRecordIdFor(
+            masterKey,
+            QString::fromLatin1(CustomSync::Kind::MediaIndex),
+            111222333LL,
+            QStringLiteral("7053823996"),
+            -5190442718973336697LL,
+            1787000004LL);
+        check("record_id_from_master/media_index_negative",
+              actual,
+              QStringLiteral("f18caff74521dde269e0374db680581b1ff05cb8e8c4d54bab060758a6694854"));
+    }
+
+    constexpr int kExpectedMasterRecordIdCases = 3;
+    if (masterRecordIdChecked != kExpectedMasterRecordIdCases) {
+        qWarning().noquote() << QStringLiteral("XATO: %1 ta record_id_from_master holati kutilgan edi, lekin %2 ta tekshirildi!")
+            .arg(kExpectedMasterRecordIdCases)
+            .arg(masterRecordIdChecked);
+        return 1;
+    }
+    const int masterRecordIdPassed = masterRecordIdChecked - (gFailures - masterRecordIdFailuresBefore);
+    qInfo().noquote() << QStringLiteral("record_id_from_master natijasi: %1/%2 holat muvaffaqiyatli o'tdi.")
+        .arg(masterRecordIdPassed)
+        .arg(masterRecordIdChecked);
+
     if (gFailures == 0) {
         qInfo().noquote() << "\nBarcha vektorlar va tekshiruvlar mos keldi.";
         return 0;

@@ -50,5 +50,15 @@ void MarkFailed(const QString &recordId, const QString &error);
 [[nodiscard]] QString GetState(const QString &key, const QString &fallback = {});
 void SetState(const QString &key, const QString &value);
 
+// Master kalit boshqaruvi:
+// Faqat birinchi marta (enroll paytida) yaratiladi, mavjud bo'lsa hech qachon almashtirilmaydi.
+[[nodiscard]] bool EnsureMasterKeyCreated();
+[[nodiscard]] bool LoadMasterKey();
+[[nodiscard]] QByteArray MasterKey();
+[[nodiscard]] QByteArray ContentKey();
+[[nodiscard]] QByteArray PeerKey();
+[[nodiscard]] QByteArray AccountKey();
+[[nodiscard]] QByteArray MediaKey();
+
 } // namespace Outbox
 } // namespace CustomSync

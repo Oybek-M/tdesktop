@@ -68,6 +68,12 @@ struct Values {
     // Story vaqt-kuzatuvidan MUSTAQIL, alohida tugma — disk-sarflovchi
     // funksiya, shuning uchun standart holatda O'CHIRILGAN (opt-in).
     bool storyMediaBackupEnabled = false;
+
+    // ── Multi-device sync (Task 6) ─────────────────────────────────────────
+    bool syncEnabled = false;              // ataylab standart o'chiq (K5)
+    QString syncServerUrl;
+    int syncIntervalSeconds = 30;
+    int syncPushChunkSize = 50;            // server cheklovi (standart 50, max 500)
 };
 
 void Init();
@@ -109,6 +115,12 @@ inline QString UpstreamLastKnownVersion()      { return Get().upstreamLastKnownV
 inline QString UpstreamEtag()                  { return Get().upstreamEtag; }
 inline qint64  UpstreamLastCheckedAt()         { return Get().upstreamLastCheckedAt; }
 inline bool    StoryMediaBackupEnabled()       { return Get().storyMediaBackupEnabled; }
+
+// Multi-device sync getters
+inline bool    SyncEnabled()                   { return Get().syncEnabled; }
+inline QString SyncServerUrl()                 { return Get().syncServerUrl; }
+inline int     SyncIntervalSeconds()           { return Get().syncIntervalSeconds; }
+inline int     SyncPushChunkSize()             { return Get().syncPushChunkSize; }
 // qint64 generic Set/SetInt(int) orqali saqlanolmaydi (32-bit chegara) —
 // shuning uchun alohida, per-peer setter'lar kabi maxsus funksiya.
 void SetUpstreamLastCheckedAt(qint64 timestamp);

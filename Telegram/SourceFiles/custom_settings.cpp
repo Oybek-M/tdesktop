@@ -178,6 +178,7 @@ void UpdateValue(const QString &id, bool value) {
     else if (id == "activityHistoryTrackAllContacts") gValues.activityHistoryTrackAllContacts = value;
     else if (id == "upstreamCheckEnabled") gValues.upstreamCheckEnabled = value;
     else if (id == "storyMediaBackupEnabled") gValues.storyMediaBackupEnabled = value;
+    else if (id == "syncEnabled") gValues.syncEnabled = value;
 }
 
 void UpdateString(const QString &id, const QString &value) {
@@ -189,6 +190,7 @@ void UpdateString(const QString &id, const QString &value) {
     else if (id == "mutualContactMembersListEmoji") gValues.mutualContactMembersListEmoji = value;
     else if (id == "upstreamLastKnownVersion") gValues.upstreamLastKnownVersion = value;
     else if (id == "upstreamEtag") gValues.upstreamEtag = value;
+    else if (id == "syncServerUrl") gValues.syncServerUrl = value;
 }
 
 // Saqlangan (qisilgandan keyingi) qiymatni qaytaradi — SetInt() aynan
@@ -219,6 +221,12 @@ int UpdateInt(const QString &id, int value) {
         // ogohlantirishni tekshirish).
         gValues.mediaBackupQuotaMb = std::clamp(value, 100, 512000);
         return gValues.mediaBackupQuotaMb;
+    } else if (id == "syncIntervalSeconds") {
+        gValues.syncIntervalSeconds = std::clamp(value, 5, 3600);
+        return gValues.syncIntervalSeconds;
+    } else if (id == "syncPushChunkSize") {
+        gValues.syncPushChunkSize = std::clamp(value, 1, 500);
+        return gValues.syncPushChunkSize;
     }
     return value;
 }
@@ -315,6 +323,11 @@ void Init() {
         UpdateInt("mediaBackupQuotaMb", legacyGb * 1024);
         settings.setValue("mediaBackupQuotaMb", gValues.mediaBackupQuotaMb);
     }
+
+    gValues.syncEnabled = settings.value("syncEnabled", false).toBool();
+    gValues.syncServerUrl = settings.value("syncServerUrl", QString()).toString();
+    UpdateInt("syncIntervalSeconds", settings.value("syncIntervalSeconds", 30).toInt());
+    UpdateInt("syncPushChunkSize", settings.value("syncPushChunkSize", 50).toInt());
 
     // Per-peer ghost overrides
     settings.beginGroup("GhostModePerPeer");

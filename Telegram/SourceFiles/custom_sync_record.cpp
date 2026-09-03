@@ -1,4 +1,5 @@
 #include "custom_sync_record.h"
+#include "custom_sync_crypto.h"
 
 #include <QtCore/QCryptographicHash>
 #include <QtCore/QJsonArray>
@@ -30,6 +31,36 @@ QString ComputeRecordId(
 
     return QString::fromLatin1(
         QCryptographicHash::hash(buffer, QCryptographicHash::Sha256).toHex());
+}
+
+QString ComputeRecordIdFor(
+        const QByteArray &masterKey,
+        const QString &kind,
+        qint64 accountId,
+        const QString &peerId,
+        qint64 msgId,
+        qint64 occurredAt) {
+    const QByteArray zeros32(32, '\0');
+    const auto peerKey = Crypto::HkdfSha256(
+        masterKey,
+        zeros32,
+        QByteArrayLiteral("customsync-peer-v1"),
+        32);
+    const auto peerHash = Crypto::ComputePeerHash(peerKey, peerId);
+
+    QString accountHash;
+    if (kind != QLatin1String(Kind::Activity)) {
+        const auto accountKey = Crypto::HkdfSha256(
+            masterKey,
+            zeros32,
+            QByteArrayLiteral("customsync-account-v1"),
+            32);
+        accountHash = Crypto::ComputeAccountHash(
+            accountKey,
+            QString::number(accountId));
+    }
+
+    return ComputeRecordId(kind, accountHash, peerHash, msgId, occurredAt);
 }
 
 qint64 DiscriminatorFor(const QString &text) {

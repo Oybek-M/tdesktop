@@ -1,4 +1,8 @@
 #include "custom_sync_outbox.h"
+#include "custom_sync_record.h"
+#include "custom_sync_crypto.h"
+#include "custom_sync_keystore.h"
+#include "custom_settings.h"
 #include "custom_db.h"
 
 #include <QtCore/QDateTime>
@@ -7,6 +11,13 @@
 
 namespace CustomSync {
 namespace {
+
+QByteArray gMasterKey;
+QByteArray gContentKey;
+QByteArray gPeerKey;
+QByteArray gAccountKey;
+QByteArray gMediaKey;
+bool gMasterKeyLoaded = false;
 
 void bindText(sqlite3_stmt *stmt, int index, const QString &str) {
     if (str.isEmpty()) {
@@ -42,9 +53,9 @@ int CurrentAttempts(sqlite3 *db, const QString &recordId) {
 namespace Outbox {
 
 bool KeysAvailable() {
-    // Task 6 da to'ldiriladi (qurilma enrollment va master key ulanganda).
-    // Hozircha doim false qaytaradi -- soxta record_id yozilishining oldini oladi (K5).
-    return false;
+    return CustomSettings::SyncEnabled()
+        && !CustomSettings::SyncServerUrl().trimmed().isEmpty()
+        && LoadMasterKey();
 }
 
 void Enqueue(
@@ -63,16 +74,16 @@ void Enqueue(
 
     const auto observedAt = QDateTime::currentSecsSinceEpoch();
 
-    // Task 6 da master kalit mavjud bo'lganda record_id hisoblanadi.
-    // Hozir bu kodga kirmaydi (KeysAvailable() == false).
-    QString recordId;
+    const QString recordId = ComputeRecordIdFor(
+        gMasterKey,
+        kind,
+        accountId,
+        peerId,
+        msgId,
+        occurredAt);
 
-    // Ikkinchi qulf. KeysAvailable() Task 6 da true ga o'tkaziladi; agar
-    // o'sha paytda yuqoridagi hisoblash qo'shilmay qolsa, bu yerda
-    // recordId bo'sh satr bo'lardi va INSERT OR REPLACE hamma yozuvni
-    // bitta '' kalitiga urib, oldingisini har safar o'chirib tashlardi --
-    // navbatda doim bitta qator qolardi. Bu dublikatdan ham yomonroq:
-    // jimgina ma'lumot yo'qolishi.
+    // Qulf: agar recordId bo'sh bo'lsa, hech qachon bazaga yozmaymiz
+    // (aks holda bo'sh '' kalitiga urilib navbatdagi hamma yozuv o'chib ketardi).
     if (recordId.isEmpty()) {
         return;
     }
@@ -232,6 +243,96 @@ void SetState(const QString &key, const QString &value) {
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }
+}
+
+// OGOHLANTIRISH / XAVF: Ikkinchi qurilma bugun MUTLAQO BOSHQA master key yaratadi!
+// Bir xil kalitni bir nechta qurilmalar o'rtasida bo'lishish uchun serverdagi
+// passphrase-wrap oqimi (/api/v1/keys/wraps) va parolni kiritish oynasi talab
+// qilinadi (keyingi vazifa). Ungacha ikkinchi qurilmani enroll qilish bir-birining
+// yozuvlarini ocholmaydigan va record_id'lari hech qachon mos kelmaydigan
+// ikkita mustaqil qurilma hosil qiladi — va bu haqda hech narsa ogohlantirmaydi.
+bool EnsureMasterKeyCreated() {
+    // Agar master key allaqachon mavjud bo'lsa, uni HECH QACHON almashtirmaymiz!
+    // Chunki avval yuborilgan barcha yozuvlar shu kalitdan hosil qilingan;
+    // uni almashtirish butun tarixni o'chirib yuboradi (records undecryptable bo'lib qoladi).
+    const auto existingProtected = GetState(QStringLiteral("master_key_protected"));
+    if (!existingProtected.isEmpty()) {
+        return LoadMasterKey();
+    }
+
+    if (!Keystore::Available()) {
+        return false;
+    }
+
+    const auto rawKey = Crypto::RandomBytes(32);
+    if (rawKey.size() != 32) {
+        return false;
+    }
+
+    const auto protectedBlob = Keystore::ProtectBytes(rawKey);
+    if (!protectedBlob.has_value() || protectedBlob->isEmpty()) {
+        return false;
+    }
+
+    SetState(QStringLiteral("master_key_protected"),
+             QString::fromLatin1(protectedBlob->toBase64()));
+
+    return LoadMasterKey();
+}
+
+bool LoadMasterKey() {
+    if (gMasterKeyLoaded && !gMasterKey.isEmpty()) {
+        return true;
+    }
+
+    const auto existingProtected = GetState(QStringLiteral("master_key_protected"));
+    if (existingProtected.isEmpty()) {
+        return false;
+    }
+
+    const auto blob = QByteArray::fromBase64(existingProtected.toLatin1());
+    if (blob.isEmpty()) {
+        return false;
+    }
+
+    const auto plain = Keystore::UnprotectBytes(blob);
+    if (!plain.has_value() || plain->size() != 32) {
+        return false;
+    }
+
+    gMasterKey = *plain;
+    const QByteArray zeros32(32, '\0');
+    gPeerKey = Crypto::HkdfSha256(gMasterKey, zeros32, QByteArrayLiteral("customsync-peer-v1"), 32);
+    gAccountKey = Crypto::HkdfSha256(gMasterKey, zeros32, QByteArrayLiteral("customsync-account-v1"), 32);
+    gContentKey = Crypto::HkdfSha256(gMasterKey, zeros32, QByteArrayLiteral("customsync-content-v1"), 32);
+    gMediaKey = Crypto::HkdfSha256(gMasterKey, zeros32, QByteArrayLiteral("customsync-media-v1"), 32);
+    gMasterKeyLoaded = true;
+    return true;
+}
+
+QByteArray MasterKey() {
+    if (!gMasterKeyLoaded) LoadMasterKey();
+    return gMasterKey;
+}
+
+QByteArray ContentKey() {
+    if (!gMasterKeyLoaded) LoadMasterKey();
+    return gContentKey;
+}
+
+QByteArray PeerKey() {
+    if (!gMasterKeyLoaded) LoadMasterKey();
+    return gPeerKey;
+}
+
+QByteArray AccountKey() {
+    if (!gMasterKeyLoaded) LoadMasterKey();
+    return gAccountKey;
+}
+
+QByteArray MediaKey() {
+    if (!gMasterKeyLoaded) LoadMasterKey();
+    return gMediaKey;
 }
 
 } // namespace Outbox
