@@ -54,11 +54,33 @@ yiqilardi. Server bilan holat solishtirish faqat muvaffaqiyat
 yo'lida bor edi — aynan kerak bo'lgan joyda yo'q. Endi har
 iteratsiya `GET` bilan haqiqiy holatni so'raydi.
 
-### Keyingi qadam — server tomoni
+### Server tomoni (Task 1-4) — TUGADI 2026-09-03
 
-Task 1-4 `customsync-server` repo'sida. Prompt tayyor:
-[`06-task1-4-prompt.md`](plans/06-task1-4-prompt.md). Task 6 (web
-app) undan keyin.
+Gemini bajardi (`a1e7161`, `c38350e`, `1660229`, `d6a7fe4`),
+men tekshirib qabul qildim. **O'zim yugurtirgan tekshiruvlar:**
+`dotnet build` 0 warning, `dotnet test` **109/109**, 7 endpoint'ning
+maydon nomlari klientimnikiga aynan mos.
+
+Eng nozik talab **to'g'ri bajarilgan**: `UploadSessionStore` da
+`Received` DB hisoblagichidan emas, `FileInfo.Length` dan o'qiladi
+va `WriteChunkAsync` ning `finally` bloki uzilishda ham yangilaydi.
+
+**Men tuzatgan joy** (`c8279dd`): Gemini rejadagi "File Structure"
+ro'yxatini fayl NOMLARI darajasida takrorlab, hech qayerda
+ishlatilmaydigan 4 ta fayl yaratgandi (3 ta bo'sh alias klass +
+1 ta `const string` marker). `class Release : ReleaseEntity {}`
+ayniqsa xavfli edi -- modelga qo'shilsa EF Core discriminator
+ustuni yaratib migratsiyani buzardi. O'chirildi, build+test
+o'zgarishsiz o'tdi.
+
+⚠️ **Ochiq test bo'shlig'i:** server tomonidagi resume testi
+"uzilish"ni bo'laklar orasida to'xtash deb tushunadi -- ya'ni toza
+chegarada. **Yarim yozilgan bo'lak** holati sinalmagan, holbuki
+mening klientimdagi haqiqiy xato aynan shundan chiqqandi. Kod
+to'g'ri yozilgan, lekin sinalmagan. Batafsil:
+`customsync-server/PROGRESS.md` 0-bo'lim.
+
+**Qolgan:** Task 6 (web app -- reliz paneli).
 
 ⚠️ **Diqqat:** boshqa sessiya shu repoda **plan 02** ustida ishlamoqda
 (`custom_db.cpp/.h` da commit qilinmagan v14 sync_outbox/sync_state).
