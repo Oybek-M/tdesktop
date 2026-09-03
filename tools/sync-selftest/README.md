@@ -52,3 +52,52 @@ chiqadi, aslida bittasini ham tekshirmagan holda.
 Shuning uchun `main.cpp` aynan **11 ta** holat tekshirilganini talab
 qiladi. Vektorlarga yangi holat qo'shilsa, bu son ham yangilanishi
 kerak — bu ataylab shunday.
+
+## To'liq build'siz sintaksis tekshiruvi
+
+`custom_sync_client.cpp` va `custom_sync_outbox.cpp` selftest'ga
+kirmaydi (birinchisi QtNetwork'ga, ikkinchisi SQLite va `custom_db`'ga
+tayanadi), ya'ni ular faqat 34 daqiqalik to'liq build'da
+kompilyatsiya qilinadi. 2026-09-03 da aynan shu sabab bitta
+kompilyatsiya xatosi commit'ga kirib ketdi.
+
+Ularni build'siz tekshirish mumkin. Fayllar tdesktop'ning PCH'idan
+faqat uchta narsani oladi (`Fn`, `operator""_q`, `not_null`),
+shuning uchun kichik shim yetarli:
+
+```cpp
+// pch_shim.h
+#pragma once
+#include <functional>
+#include <QtCore/QString>
+#include <QtCore/QByteArray>
+template <typename Signature> using Fn = std::function<Signature>;
+[[nodiscard]] inline QByteArray operator""_q(const char *d, std::size_t n) {
+    return QByteArray::fromRawData(d, n);
+}
+[[nodiscard]] inline QString operator""_q(const char16_t *d, std::size_t n) {
+    return QString::fromRawData(reinterpret_cast<const QChar*>(d), n);
+}
+```
+
+```
+cl /nologo /W4 /std:c++20 /Zc:__cplusplus /EHsc /Zs /permissive- ^
+   /DQT_NO_KEYWORDS /DQT_NO_CAST_FROM_BYTEARRAY ^
+   /FI pch_shim.h ^
+   /I Telegram/SourceFiles ^
+   /I Libraries/win64/qt_5.15.18/qtbase/src/3rdparty/sqlite ^
+   /I Libraries/win64/openssl3/include ^
+   /I Telegram/ThirdParty/GSL/include ^
+   /I Libraries/win64/Qt-6.11.1/include ^
+   /I Libraries/win64/Qt-6.11.1/include/QtCore ^
+   /I Libraries/win64/Qt-6.11.1/include/QtNetwork ^
+   Telegram/SourceFiles/custom_sync_client.cpp
+```
+
+`/Zs` — faqat sintaksis, obyekt fayl yozilmaydi. Define'lar muhim:
+`QT_NO_CAST_FROM_BYTEARRAY` va `QT_NO_KEYWORDS` haqiqiy build'da
+yoqilgan va ularsiz tekshiruv haqiqatdan yumshoqroq bo'ladi.
+
+`custom_db.cpp` bu usul bilan tekshirilmaydi — u tdesktop'ning butun
+sarlavha daraxtini tortadi. Undagi chaqiruvlarni alohida kichik probe
+faylida takrorlab tekshirish mumkin.

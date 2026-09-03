@@ -455,7 +455,16 @@ void Client::pushPending(Fn<void(int sentCount, int failedCount)> done) {
         return;
     }
 
-    push(records, [done](bool success, QVector<PushResult> results, QString error) {
+    // Butun to'plam yiqilganda qaysi yozuvlarni belgilashni bilishimiz
+    // uchun id'larni saqlab qo'yamiz -- javobda ular bo'lmaydi.
+    QVector<QString> batchIds;
+    batchIds.reserve(records.size());
+    for (const auto &r : records) {
+        batchIds.append(r.recordId);
+    }
+
+    push(records, [done, batchIds](
+            bool success, QVector<PushResult> results, QString error) {
         int sent = 0;
         int failed = 0;
         if (success) {
@@ -470,6 +479,15 @@ void Client::pushPending(Fn<void(int sentCount, int failedCount)> done) {
                     failed++;
                 }
             }
+        } else {
+            // Tarmoq yoki HTTP xatosi -- javob umuman kelmadi. Har bir
+            // yozuvni MarkFailed qilamiz, aks holda next_retry_at
+            // surilmaydi va orkestrator har siklda o'sha to'plamni
+            // backoff'siz qayta yuboraveradi.
+            for (const auto &id : batchIds) {
+                Outbox::MarkFailed(id, error);
+            }
+            failed = int(batchIds.size());
         }
         if (done) done(sent, failed);
     });

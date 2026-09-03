@@ -311,27 +311,52 @@ bool LoadMasterKey() {
 }
 
 QByteArray MasterKey() {
-    if (!gMasterKeyLoaded) LoadMasterKey();
+    // Yuklash muvaffaqiyatsiz bo'lsa BO'SH qaytaramiz va buni oshkora
+    // qilamiz. Aks holda chaqiruvchi bo'sh kalit bilan HMAC hisoblab,
+    // yaroqli ko'rinadigan, lekin butunlay xato hash olardi.
+    if (!gMasterKeyLoaded && !LoadMasterKey()) {
+        return QByteArray();
+    }
     return gMasterKey;
 }
 
 QByteArray ContentKey() {
-    if (!gMasterKeyLoaded) LoadMasterKey();
+    // Yuklash muvaffaqiyatsiz bo'lsa BO'SH qaytaramiz va buni oshkora
+    // qilamiz. Aks holda chaqiruvchi bo'sh kalit bilan HMAC hisoblab,
+    // yaroqli ko'rinadigan, lekin butunlay xato hash olardi.
+    if (!gMasterKeyLoaded && !LoadMasterKey()) {
+        return QByteArray();
+    }
     return gContentKey;
 }
 
 QByteArray PeerKey() {
-    if (!gMasterKeyLoaded) LoadMasterKey();
+    // Yuklash muvaffaqiyatsiz bo'lsa BO'SH qaytaramiz va buni oshkora
+    // qilamiz. Aks holda chaqiruvchi bo'sh kalit bilan HMAC hisoblab,
+    // yaroqli ko'rinadigan, lekin butunlay xato hash olardi.
+    if (!gMasterKeyLoaded && !LoadMasterKey()) {
+        return QByteArray();
+    }
     return gPeerKey;
 }
 
 QByteArray AccountKey() {
-    if (!gMasterKeyLoaded) LoadMasterKey();
+    // Yuklash muvaffaqiyatsiz bo'lsa BO'SH qaytaramiz va buni oshkora
+    // qilamiz. Aks holda chaqiruvchi bo'sh kalit bilan HMAC hisoblab,
+    // yaroqli ko'rinadigan, lekin butunlay xato hash olardi.
+    if (!gMasterKeyLoaded && !LoadMasterKey()) {
+        return QByteArray();
+    }
     return gAccountKey;
 }
 
 QByteArray MediaKey() {
-    if (!gMasterKeyLoaded) LoadMasterKey();
+    // Yuklash muvaffaqiyatsiz bo'lsa BO'SH qaytaramiz va buni oshkora
+    // qilamiz. Aks holda chaqiruvchi bo'sh kalit bilan HMAC hisoblab,
+    // yaroqli ko'rinadigan, lekin butunlay xato hash olardi.
+    if (!gMasterKeyLoaded && !LoadMasterKey()) {
+        return QByteArray();
+    }
     return gMediaKey;
 }
 
