@@ -17,7 +17,7 @@ Oxirgi yangilanish: **2026-09-02**
 
 | Loyiha | Holat | Keyingi qadam |
 |---|---|---|
-| **tdesktop** (CustomMod) | 🟢 v7.1.1 chiqarildi, ishlab turibdi | Plan 02 Task 6 (HTTP klient: enroll va push) |
+| **tdesktop** (CustomMod) | 🟢 v7.1.1 chiqarildi, ishlab turibdi | 🔴 To'liq build, keyin Task 7 (pull va merge) |
 | **customsync-server** | ✅ 01a va 01b TUGADI | — |
 | **server-controller** | ⚪ boshlanmagan | 01a/01b tugagach |
 | **tmobile-android** | ⚪ muhokama qilinmagan | — |
@@ -60,7 +60,22 @@ yo'qotish — tiklab bo'lmaydi.
    taxmin qilish noto'g'ri `account_hash` beradi, ya'ni hech bir qurilma
    takrorlay olmaydigan `record_id`. Push yo'li paydo bo'lganda hal qilinadi.
 
-2. **`Outbox::Enqueue` hozircha inert.** `KeysAvailable()` doim `false`
+2. **Payload hali QURILMAYDI.** `custom_sync_client.cpp` dagi
+   `BuildPayload()` `nullopt` qaytaradi va bunday yozuv jo'natilmaydi —
+   outbox'da qoladi. Har bir `kind` uchun mazmunni lokal jadvallardan
+   o'qish Task 7 da yoziladi. **Bu seamni olib tashlamang**: bo'sh
+   payload jo'natilsa server `created` qaytaradi, `MarkSent` yozuvni
+   o'chiradi, `record_id` deterministik bo'lgani uchun qayta yuborib
+   ham bo'lmaydi — hodisa butunlay yo'qoladi.
+
+3. 🔴 **`custom_sync_client.cpp` (443 qator) HALI BIR MARTA HAM
+   KOMPILYATSIYA QILINMAGAN.** U selftest'ga kirmaydi va to'liq build
+   qilinmagan. Tekshiruvda bitta aniq kompilyatsiya xatosi topilib
+   tuzatildi (`Crypto::Seal` `QByteArray` qaytaradi, `optional` emas),
+   lekin boshqasi ham bo'lishi mumkin. **Task 7 dan oldin to'liq build
+   qilinsin** (~34 daqiqa).
+
+4. **`Outbox::Enqueue` hozircha inert.** `KeysAvailable()` doim `false`
    qaytaradi, chunki master kalit Task 6 (enrollment) da paydo bo'ladi. Task 6 da uni
    `true` ga o'tkazayotgan odam **`record_id` hisoblashini ham qo'shishi
    shart** — aks holda bo'sh `record_id` bilan `INSERT OR REPLACE`
@@ -94,7 +109,7 @@ faylida.** Quyidagisi faqat qisqacha.
 |---|---|
 | **01a** — backend poydevori | ✅ 7 task + rejadan tashqari 6b (rol avtorizatsiyasi) |
 | **01b** — sync yadrosi | ✅ 9 task'ning hammasi, deploy fayllari bilan |
-| 02 — tdesktop agenti | 🟡 11 task'dan 5 tasi. Outbox + DPAPI keystore, hozircha inert (kalit yo'q) |
+| 02 — tdesktop agenti | 🟡 11 task'dan 6 tasi. HTTP klient tayyor, lekin HALI KOMPILYATSIYA QILINMAGAN |
 | 03 — web controller | ⚪ boshlanmagan |
 | 04, 05, 06 | ⚪ boshlanmagan |
 
