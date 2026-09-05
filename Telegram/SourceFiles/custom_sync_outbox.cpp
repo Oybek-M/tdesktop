@@ -128,6 +128,130 @@ void Enqueue(
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }
+
+    // sync_record_map ni to'ldiramiz (Task 7c)
+    SaveRecordMap(recordId, kind, accountId, peerId, msgId, occurredAt);
+}
+
+void SaveRecordMap(
+        const QString &recordId,
+        const QString &kind,
+        qint64 accountId,
+        const QString &peerId,
+        qint64 msgId,
+        qint64 occurredAt) {
+    if (recordId.isEmpty()) return;
+    auto *db = CustomDB::RawHandle();
+    if (!db) return;
+
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(db,
+            "INSERT OR REPLACE INTO sync_record_map ("
+            "record_id, kind, account_id, peer_id, msg_id, occurred_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        bindText(stmt, 1, recordId);
+        bindText(stmt, 2, kind);
+        sqlite3_bind_int64(stmt, 3, accountId);
+        bindText(stmt, 4, peerId);
+        sqlite3_bind_int64(stmt, 5, msgId);
+        sqlite3_bind_int64(stmt, 6, occurredAt);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+}
+
+std::optional<RecordMapEntry> LookupRecordMap(const QString &recordId) {
+    if (recordId.isEmpty()) return std::nullopt;
+    auto *db = CustomDB::RawHandle();
+    if (!db) return std::nullopt;
+
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(db,
+            "SELECT kind, account_id, peer_id, msg_id, occurred_at "
+            "FROM sync_record_map WHERE record_id = ?",
+            -1, &stmt, nullptr) != SQLITE_OK) {
+        return std::nullopt;
+    }
+    bindText(stmt, 1, recordId);
+    if (sqlite3_step(stmt) != SQLITE_ROW) {
+        sqlite3_finalize(stmt);
+        return std::nullopt;
+    }
+    RecordMapEntry entry;
+    entry.recordId = recordId;
+    entry.kind = colText(stmt, 0);
+    entry.accountId = sqlite3_column_int64(stmt, 1);
+    entry.peerId = colText(stmt, 2);
+    entry.msgId = sqlite3_column_int64(stmt, 3);
+    entry.occurredAt = sqlite3_column_int64(stmt, 4);
+    sqlite3_finalize(stmt);
+    return entry;
+}
+
+QString FindRecordId(
+        const QString &kind,
+        qint64 accountId,
+        const QString &peerId,
+        qint64 occurredAt,
+        qint64 msgId) {
+    auto *db = CustomDB::RawHandle();
+    if (!db) return QString();
+
+    // 1. Avval berilgan account_id bilan (idx_sync_record_map_lookup indeksi bo'yicha)
+    {
+        sqlite3_stmt *stmt = nullptr;
+        const auto sql = (msgId != 0)
+            ? "SELECT record_id FROM sync_record_map "
+              "WHERE kind = ? AND account_id = ? AND peer_id = ? AND occurred_at = ? AND msg_id = ? "
+              "LIMIT 1"
+            : "SELECT record_id FROM sync_record_map "
+              "WHERE kind = ? AND account_id = ? AND peer_id = ? AND occurred_at = ? "
+              "LIMIT 1";
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+            bindText(stmt, 1, kind);
+            sqlite3_bind_int64(stmt, 2, accountId);
+            bindText(stmt, 3, peerId);
+            sqlite3_bind_int64(stmt, 4, occurredAt);
+            if (msgId != 0) {
+                sqlite3_bind_int64(stmt, 5, msgId);
+            }
+            if (sqlite3_step(stmt) == SQLITE_ROW) {
+                const auto recId = colText(stmt, 0);
+                sqlite3_finalize(stmt);
+                return recId;
+            }
+            sqlite3_finalize(stmt);
+        }
+    }
+
+    // 2. Activity kind uchun account_id bo'yicha cheklovsiz qidiruv (spec §0.13: activity birlashgan)
+    if (kind == QLatin1String(Kind::Activity)) {
+        sqlite3_stmt *stmt = nullptr;
+        const auto sql = (msgId != 0)
+            ? "SELECT record_id FROM sync_record_map "
+              "WHERE kind = ? AND peer_id = ? AND occurred_at = ? AND msg_id = ? "
+              "LIMIT 1"
+            : "SELECT record_id FROM sync_record_map "
+              "WHERE kind = ? AND peer_id = ? AND occurred_at = ? "
+              "LIMIT 1";
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+            bindText(stmt, 1, kind);
+            bindText(stmt, 2, peerId);
+            sqlite3_bind_int64(stmt, 3, occurredAt);
+            if (msgId != 0) {
+                sqlite3_bind_int64(stmt, 4, msgId);
+            }
+            if (sqlite3_step(stmt) == SQLITE_ROW) {
+                const auto recId = colText(stmt, 0);
+                sqlite3_finalize(stmt);
+                return recId;
+            }
+            sqlite3_finalize(stmt);
+        }
+    }
+
+    return QString();
 }
 
 QVector<OutboxEntry> Pending(int limit) {

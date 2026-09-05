@@ -2,6 +2,7 @@
 
 #include <QtCore/QString>
 #include <QtCore/QVector>
+#include <optional>
 
 namespace CustomSync {
 
@@ -47,6 +48,36 @@ void Enqueue(
     qint64 msgId,
     qint64 occurredAt,
     const QString &targetRecordId = {});
+
+// sync_record_map yozuvlar strukturasi (Task 7c)
+struct RecordMapEntry {
+    QString recordId;
+    QString kind;
+    qint64 accountId = 0;
+    QString peerId;
+    qint64 msgId = 0;
+    qint64 occurredAt = 0;
+};
+
+// sync_record_map jadvaliga yozish (Enqueue va MergeRecord dan chaqiriladi)
+void SaveRecordMap(
+    const QString &recordId,
+    const QString &kind,
+    qint64 accountId,
+    const QString &peerId,
+    qint64 msgId,
+    qint64 occurredAt);
+
+// Tombstone uchun target_record_id bo'yicha qidiruv
+[[nodiscard]] std::optional<RecordMapEntry> LookupRecordMap(const QString &recordId);
+
+// Producer uchun: (kind, accountId, peerId, occurredAt, msgId) bo'yicha record_id qidiruv
+[[nodiscard]] QString FindRecordId(
+    const QString &kind,
+    qint64 accountId,
+    const QString &peerId,
+    qint64 occurredAt,
+    qint64 msgId = 0);
 
 // Jo'natishga tayyor yozuvlar (next_retry_at <= hozir), eng eskisidan (occurred_at ASC).
 [[nodiscard]] QVector<OutboxEntry> Pending(int limit);

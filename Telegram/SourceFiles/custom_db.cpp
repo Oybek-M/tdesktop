@@ -709,6 +709,23 @@ void RunMigrations() {
                 "value TEXT NOT NULL)");
     }
 
+    // v14 → v15 (sync): sync_record_map jadvali va indeksi.
+    //
+    // record_id -> (kind, account_id, peer_id, msg_id, occurred_at) xaritasi.
+    // Kelgan tombstone'larni lokal qatorlarga bog'lash va teskari lookup
+    // (producer'lar uchun record_id ni topish) uchun xizmat qiladi.
+    if (version < 15) {
+        execSql("CREATE TABLE IF NOT EXISTS sync_record_map ("
+                "record_id TEXT PRIMARY KEY, "
+                "kind TEXT NOT NULL, "
+                "account_id INTEGER NOT NULL DEFAULT 0, "
+                "peer_id TEXT NOT NULL, "
+                "msg_id INTEGER NOT NULL DEFAULT 0, "
+                "occurred_at INTEGER NOT NULL DEFAULT 0)");
+        execSql("CREATE INDEX IF NOT EXISTS idx_sync_record_map_lookup "
+                "ON sync_record_map(kind, account_id, peer_id, occurred_at)");
+    }
+
     // Update version stamp.
     {
         sqlite3_stmt *stmt = nullptr;
@@ -2401,6 +2418,100 @@ void ClearUserDeletePending(const PeerKey &key, long long msgId) {
 }
 
 // ---------------------------------------------------------------------------
+// Tombstone / sync delete support (Task 7c)
+// ---------------------------------------------------------------------------
+
+bool DeleteDeletedMessageForSync(const PeerKey &key, long long msgId) {
+    Init();
+    if (!gDb) return false;
+
+    // 1. SQLite'dan faqat type='deleted' qatorini o'chirish (PermanentlyDeleteMessage ishlatilmaydi)
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "DELETE FROM actioned_messages WHERE account_id = ? AND peer_id = ? AND msg_id = ? AND type = 'deleted'",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, key.accountId);
+        bindText(stmt, 2, key.peerId);
+        sqlite3_bind_int64(stmt, 3, msgId);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+
+    // 2. In-memory keshlarni tozalash (gDeletedCache va gPeersWithDeleted)
+    {
+        QMutexLocker locker(&gCacheMutex);
+        if (gDeletedCache.contains(key)) {
+            gDeletedCache[key].remove(msgId);
+            if (gDeletedCache[key].isEmpty() && gLoadedPeers.contains(key)) {
+                gPeersWithDeleted.remove(key);
+            }
+        }
+    }
+
+    // 3. Hali yozilmagan buferlangan xabarlarni o'chirish
+    gPendingWrites.erase(
+        std::remove_if(gPendingWrites.begin(), gPendingWrites.end(),
+            [&](const ActionedMessage &m) {
+                return m.peerId == key.peerId && m.msgId == msgId && m.accountId == key.accountId && m.type == u"deleted"_q;
+            }),
+        gPendingWrites.end());
+
+    return true;
+}
+
+bool DeleteEditedMessageForSync(const PeerKey &key, long long msgId) {
+    Init();
+    if (!gDb) return false;
+
+    // 1. SQLite'dan faqat type='edited' qatorini o'chirish (PermanentlyDeleteMessage ishlatilmaydi)
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "DELETE FROM actioned_messages WHERE account_id = ? AND peer_id = ? AND msg_id = ? AND type = 'edited'",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, key.accountId);
+        bindText(stmt, 2, key.peerId);
+        sqlite3_bind_int64(stmt, 3, msgId);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+
+    // 2. In-memory keshni tozalash (gEditedCache)
+    {
+        QMutexLocker locker(&gCacheMutex);
+        if (gEditedCache.contains(key)) {
+            gEditedCache[key].remove(msgId);
+        }
+    }
+
+    // 3. Hali yozilmagan buferlangan xabarlarni o'chirish
+    gPendingWrites.erase(
+        std::remove_if(gPendingWrites.begin(), gPendingWrites.end(),
+            [&](const ActionedMessage &m) {
+                return m.peerId == key.peerId && m.msgId == msgId && m.accountId == key.accountId && m.type == u"edited"_q;
+            }),
+        gPendingWrites.end());
+
+    return true;
+}
+
+bool DeleteMediaIndexForSync(const PeerKey &key, long long msgId) {
+    Init();
+    if (!gDb) return false;
+
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "DELETE FROM media_index WHERE account_id = ? AND peer_id = ? AND msg_id = ?",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, key.accountId);
+        bindText(stmt, 2, key.peerId);
+        sqlite3_bind_int64(stmt, 3, msgId);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+    return true;
+}
+
+// ---------------------------------------------------------------------------
 // Export / Import
 // ---------------------------------------------------------------------------
 
@@ -3580,6 +3691,77 @@ bool DeleteActivityEntry(qint64 id) {
             deleted = (sqlite3_changes(gDb) > 0);
         }
         sqlite3_finalize(stmt);
+    }
+    return deleted;
+}
+
+// Task 7c: Sinxronizatsiya orqali kelgan tombstone uchun faollik yozuvini o'chiradi.
+// `source != 'observed'` to'sig'i bu yerda ATAYLAB YO'Q:
+// DeleteActivityEntry() oddiy foydalanuvchi tizim kuzatgan ma'lumotlarni tasodifan
+// o'chirib yubormasligi uchun himoyalangan, ammo tombstone boshqa qurilmada
+// ongli ravishda o'chirilgan yozuvni sinxronlashtiradi.
+// O'chirilgan yozuv eng so'nggi holat keshida bo'lsa, kesh ham yangilanadi.
+bool DeleteActivityEntryForSync(qint64 id) {
+    Init();
+    if (!gDb || id <= 0) return false;
+
+    QString peerId;
+    QString field;
+    qint64 obsAt = 0;
+    {
+        sqlite3_stmt *stmt = nullptr;
+        if (sqlite3_prepare_v2(gDb,
+                "SELECT peer_id, field, observed_at FROM activity_history WHERE id = ?",
+                -1, &stmt, nullptr) == SQLITE_OK) {
+            sqlite3_bind_int64(stmt, 1, id);
+            if (sqlite3_step(stmt) == SQLITE_ROW) {
+                peerId = colText(stmt, 0);
+                field = colText(stmt, 1);
+                obsAt = sqlite3_column_int64(stmt, 2);
+            }
+            sqlite3_finalize(stmt);
+        }
+    }
+
+    bool deleted = false;
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "DELETE FROM activity_history WHERE id = ?",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, id);
+        if (sqlite3_step(stmt) == SQLITE_DONE) {
+            deleted = (sqlite3_changes(gDb) > 0);
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    // In-memory keshni yangilaymiz: agar gActivityLatestCache da shu yozuv saqlangan bo'lsa
+    if (deleted && !peerId.isEmpty() && !field.isEmpty()) {
+        QMutexLocker locker(&gCacheMutex);
+        auto peerIt = gActivityLatestCache.find(peerId);
+        if (peerIt != gActivityLatestCache.end()) {
+            auto fieldIt = peerIt->find(field);
+            if (fieldIt != peerIt->end() && fieldIt.value().observedAt == obsAt) {
+                fieldIt->observedAt = 0;
+                fieldIt->value.clear();
+                sqlite3_stmt *s = nullptr;
+                if (sqlite3_prepare_v2(gDb,
+                        "SELECT new_value, observed_at FROM activity_history "
+                        "WHERE peer_id = ? AND field = ? "
+                        "ORDER BY observed_at DESC, id DESC LIMIT 1",
+                        -1, &s, nullptr) == SQLITE_OK) {
+                    bindText(s, 1, peerId);
+                    bindText(s, 2, field);
+                    if (sqlite3_step(s) == SQLITE_ROW) {
+                        fieldIt->value = colText(s, 0);
+                        fieldIt->observedAt = sqlite3_column_int64(s, 1);
+                    } else {
+                        peerIt->erase(fieldIt);
+                    }
+                    sqlite3_finalize(s);
+                }
+            }
+        }
     }
     return deleted;
 }

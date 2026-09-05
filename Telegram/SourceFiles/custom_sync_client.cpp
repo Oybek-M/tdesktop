@@ -500,6 +500,11 @@ static void bindText(sqlite3_stmt *stmt, int index, const QString &str) {
     }
 }
 
+static QString colText(sqlite3_stmt *stmt, int col) {
+    const auto *text = reinterpret_cast<const char*>(sqlite3_column_text(stmt, col));
+    return text ? QString::fromUtf8(text) : QString();
+}
+
 static bool HasEditedMessage(sqlite3 *db, const CustomDB::PeerKey &key, qint64 msgId) {
     if (!db) return false;
     sqlite3_stmt *stmt = nullptr;
@@ -531,6 +536,86 @@ static void RecordCorrupt(const QString &recordId) {
     Outbox::SetState(QStringLiteral("corrupt_records"), list.join(QLatin1Char(',')));
 }
 
+static void AddPendingTombstone(const QString &targetRecordId) {
+    if (targetRecordId.isEmpty()) return;
+    const auto current = Outbox::GetState(QStringLiteral("pending_tombstones"));
+    auto list = current.isEmpty() ? QStringList() : current.split(QLatin1Char(','));
+    if (!list.contains(targetRecordId)) {
+        list.append(targetRecordId);
+        while (list.size() > 50) {
+            list.removeFirst();
+        }
+        Outbox::SetState(QStringLiteral("pending_tombstones"), list.join(QLatin1Char(',')));
+    }
+}
+
+static bool CheckAndRemovePendingTombstone(const QString &recordId) {
+    if (recordId.isEmpty()) return false;
+    const auto current = Outbox::GetState(QStringLiteral("pending_tombstones"));
+    if (current.isEmpty()) return false;
+    auto list = current.split(QLatin1Char(','));
+    const int removed = list.removeAll(recordId);
+    if (removed > 0) {
+        Outbox::SetState(QStringLiteral("pending_tombstones"), list.join(QLatin1Char(',')));
+        return true;
+    }
+    return false;
+}
+
+static void ApplyTombstone(const Outbox::RecordMapEntry &target) {
+    const CustomDB::PeerKey key{
+        .accountId = target.accountId,
+        .peerId = target.peerId,
+    };
+
+    if (target.kind == QLatin1String(Kind::Deleted)) {
+        CustomDB::DeleteDeletedMessageForSync(key, target.msgId);
+        return;
+    }
+
+    if (target.kind == QLatin1String(Kind::Edited)) {
+        CustomDB::DeleteEditedMessageForSync(key, target.msgId);
+        return;
+    }
+
+    if (target.kind == QLatin1String(Kind::GhostRead)) {
+        CustomDB::ResetGhostRead(key);
+        return;
+    }
+
+    if (target.kind == QLatin1String(Kind::MediaIndex)) {
+        CustomDB::DeleteMediaIndexForSync(key, target.msgId);
+        return;
+    }
+
+    if (target.kind == QLatin1String(Kind::Activity)) {
+        auto *db = CustomDB::RawHandle();
+        if (!db) return;
+        sqlite3_stmt *stmt = nullptr;
+        // DIQQAT: spec §0.13 ga asosan account_id filtrisiz o'qiladi
+        if (sqlite3_prepare_v2(db,
+                "SELECT id, field FROM activity_history WHERE peer_id = ? AND observed_at = ?",
+                -1, &stmt, nullptr) == SQLITE_OK) {
+            bindText(stmt, 1, target.peerId);
+            sqlite3_bind_int64(stmt, 2, target.occurredAt);
+            qint64 matchedId = 0;
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                const qint64 id = sqlite3_column_int64(stmt, 0);
+                const QString field = colText(stmt, 1);
+                if (CustomSync::DiscriminatorFor(field) == target.msgId) {
+                    matchedId = id;
+                    break;
+                }
+            }
+            sqlite3_finalize(stmt);
+            if (matchedId > 0) {
+                CustomDB::DeleteActivityEntryForSync(matchedId);
+            }
+        }
+        return;
+    }
+}
+
 } // namespace
 
 MergeResult MergeRecord(
@@ -538,11 +623,29 @@ MergeResult MergeRecord(
         const QByteArray &contentKey,
         const QByteArray &peerKey,
         const QByteArray &accountKey) {
-    // 0. Tombstone tekshiruvi (Task 7c gacha kechiktirilgan)
+    // 0. Pending tombstones tekshiruvi (§0.13, 3-band)
+    // Agar bu record_id uchun avval tombstone kelgan bo'lsa, merge qilinmaydi,
+    // pending_tombstones ro'yxatidan o'chiriladi va rejected deb hisoblanadi.
+    if (CheckAndRemovePendingTombstone(record.recordId)) {
+        qDebug().noquote() << QStringLiteral("[Sync] Yozuv pending_tombstones ro'yxatida topildi va merge bekor qilindi: record_id=")
+            << record.recordId;
+        return { MergeStatus::Rejected, QStringLiteral("killed_by_pending_tombstone") };
+    }
+
+    // Tombstone yozuvini qayta ishlash (Task 7c)
     if (record.kind == QLatin1String(Kind::Tombstone)) {
-        qWarning().noquote() << QStringLiteral("[Sync] Tombstone yozuvi qabul qilindi lekin hozircha o'tkazib yuborildi (Task 7c da bajariladi): record_id=%1, target=%2")
-            .arg(record.recordId, record.targetRecordId);
-        return { MergeStatus::TombstoneSkipped, QStringLiteral("tombstone_deferred_to_7c") };
+        if (record.targetRecordId.isEmpty()) {
+            return { MergeStatus::Corrupt, QStringLiteral("tombstone_missing_target") };
+        }
+        const auto mapped = Outbox::LookupRecordMap(record.targetRecordId);
+        if (!mapped.has_value()) {
+            // Target hali xaritada yo'q -- kechikib kelishi mumkin (§0.13, 3-band).
+            // pending_tombstones ro'yxatiga saqlaymiz.
+            AddPendingTombstone(record.targetRecordId);
+            return { MergeStatus::Merged, QStringLiteral("tombstone_pending") };
+        }
+        ApplyTombstone(*mapped);
+        return { MergeStatus::Merged, QString() };
     }
 
     // 1. Retention filter (faqat activity va ghost_read uchun!)
@@ -605,6 +708,7 @@ MergeResult MergeRecord(
         const bool isMedia = obj.value(QStringLiteral("is_media")).toBool();
         const auto msgDate = static_cast<unsigned int>(std::max<qint64>(0, record.occurredAt));
         CustomDB::MarkDeleted(record.msgId, key, QString(), text, msgDate, isOut, senderId, isMedia);
+        Outbox::SaveRecordMap(record.recordId, record.kind, key.accountId, key.peerId, record.msgId, record.occurredAt);
         return { MergeStatus::Merged, QString() };
     }
 
@@ -612,6 +716,7 @@ MergeResult MergeRecord(
         auto *db = CustomDB::RawHandle();
         if (HasEditedMessage(db, key, record.msgId)) {
             // Allaqachon mavjud -- qayta insert qilmaymiz (K4 idempotency)
+            Outbox::SaveRecordMap(record.recordId, record.kind, key.accountId, key.peerId, record.msgId, record.occurredAt);
             return { MergeStatus::Merged, QStringLiteral("already_exists") };
         }
         const auto oldText = obj.value(QStringLiteral("old_text")).toString();
@@ -630,6 +735,7 @@ MergeResult MergeRecord(
             ? QDateTime::fromSecsSinceEpoch(record.observedAt)
             : QDateTime::currentDateTime();
         CustomDB::SaveActionedMessage(msg);
+        Outbox::SaveRecordMap(record.recordId, record.kind, key.accountId, key.peerId, record.msgId, record.occurredAt);
         return { MergeStatus::Merged, QString() };
     }
 
@@ -640,14 +746,17 @@ MergeResult MergeRecord(
         const auto newValue = obj.value(QStringLiteral("new_value")).toString();
         if (CustomDB::HasActivityEntryAt(key.peerId, field, record.occurredAt)) {
             // Allaqachon mavjud -- qayta insert qilmaymiz (K4 idempotency)
+            Outbox::SaveRecordMap(record.recordId, record.kind, key.accountId, key.peerId, record.msgId, record.occurredAt);
             return { MergeStatus::Merged, QStringLiteral("already_exists") };
         }
         CustomDB::SaveActivityHistoryEntry(key, field, hasOldValue, oldValue, newValue, record.occurredAt, u"observed"_q);
+        Outbox::SaveRecordMap(record.recordId, record.kind, key.accountId, key.peerId, record.msgId, record.occurredAt);
         return { MergeStatus::Merged, QString() };
     }
 
     if (record.kind == QLatin1String(Kind::GhostRead)) {
         CustomDB::SaveGhostRead(key, record.msgId);
+        Outbox::SaveRecordMap(record.recordId, record.kind, key.accountId, key.peerId, record.msgId, record.occurredAt);
         return { MergeStatus::Merged, QString() };
     }
 
@@ -666,6 +775,7 @@ MergeResult MergeRecord(
         entry.msgDate = static_cast<unsigned int>(obj.value(QStringLiteral("msg_date")).toVariant().toLongLong());
         entry.archivedAt = static_cast<unsigned int>(QDateTime::currentSecsSinceEpoch());
         CustomDB::UpsertMediaIndex(key, entry);
+        Outbox::SaveRecordMap(record.recordId, record.kind, key.accountId, key.peerId, record.msgId, record.occurredAt);
         return { MergeStatus::Merged, QString() };
     }
 
@@ -676,6 +786,11 @@ void Client::pullAndMerge(Fn<void(int merged, int rejected, QString error)> done
     if (!Outbox::KeysAvailable()) {
         if (done) done(0, 0, QString());
         return;
+    }
+
+    if (Outbox::GetState(QStringLiteral("tombstone_backfill_done")) != QStringLiteral("1")) {
+        Outbox::SetState(QStringLiteral("pull_cursor"), QStringLiteral("0"));
+        Outbox::SetState(QStringLiteral("tombstone_backfill_done"), QStringLiteral("1"));
     }
 
     const auto cursorStr = Outbox::GetState(QStringLiteral("pull_cursor"), QStringLiteral("0"));

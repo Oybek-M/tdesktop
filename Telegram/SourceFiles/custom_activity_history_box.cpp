@@ -3,6 +3,8 @@
 #include "custom_activity_history.h"
 #include "custom_db.h"
 #include "custom_settings.h" // ArchiveRoot (saqlangan avatar yo'li)
+#include "custom_sync_outbox.h"
+#include "custom_sync_record.h"
 #include "main/main_session.h"
 #include "ui/layers/generic_box.h"
 #include "ui/widgets/buttons.h" // Ui::LinkButton
@@ -352,6 +354,25 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 						label->hide();
 						delLink->hide();
 						Ui::Toast::Show(u"Yozuv o'chirildi"_q);
+
+						// Task 7c: Tombstone producer -- yagona o'rin (faollik yozuvini o'chirish).
+						// sync_record_map dan target record_id ni topamiz.
+						const auto accountId = qint64(session->userId().bare);
+						const auto targetRecordId = CustomSync::Outbox::FindRecordId(
+							CustomSync::Kind::Activity,
+							accountId,
+							peerId,
+							e.observedAt,
+							CustomSync::DiscriminatorFor(e.field));
+						if (!targetRecordId.isEmpty()) {
+							CustomSync::Outbox::Enqueue(
+								CustomSync::Kind::Tombstone,
+								accountId,
+								peerId,
+								CustomSync::DiscriminatorFor(targetRecordId),
+								QDateTime::currentSecsSinceEpoch(),
+								targetRecordId);
+						}
 					} else {
 						Ui::Toast::Show(u"O'chirib bo'lmadi"_q);
 					}

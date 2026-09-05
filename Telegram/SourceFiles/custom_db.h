@@ -64,7 +64,8 @@ struct ActionedMessage {
 // v12 (A16 §1): mavjud story yozuvlarini status shkalasiga ko'chirish (backfill)
 // v13 (A17): actioned_messages ga read_at ustuni
 // v14 (sync): sync_outbox + sync_state jadvallari
-constexpr int kCurrentSchemaVersion = 14;
+// v15 (sync): sync_record_map jadvali va indeksi
+constexpr int kCurrentSchemaVersion = 15;
 
 void Init();
 
@@ -563,6 +564,17 @@ void SaveActivityHistoryEntry(
 // yozuvlar o'chiriladi — tizim kuzatgan yozuvlarga tegish ma'lumot
 // yaxlitligini buzadi. O'chirilgan bo'lsa true qaytaradi.
 [[nodiscard]] bool DeleteActivityEntry(qint64 id);
+
+// Task 7c: Sinxronizatsiya orqali kelgan tombstone uchun faollik yozuvini o'chiradi.
+// `source != 'observed'` to'sig'i bu yerda ATAYLAB YO'Q: bu amal foydalanuvchi
+// tomonidan boshqa qurilmada qilingan o'chirishni takrorlaydi.
+// O'chirilgan yozuv eng so'nggi holat keshida bo'lsa, kesh ham yangilanadi.
+bool DeleteActivityEntryForSync(qint64 id);
+
+// Tombstone / sync delete va kesh tozalash yordamchilari (Task 7c)
+bool DeleteDeletedMessageForSync(const PeerKey &key, long long msgId);
+bool DeleteEditedMessageForSync(const PeerKey &key, long long msgId);
+bool DeleteMediaIndexForSync(const PeerKey &key, long long msgId);
 
 // Shu peer/field uchun eng oxirgi yozilgan qiymatni qaytaradi.
 // Qaytish qiymati: true — topildi (outValue to'ldirildi), false — hali
