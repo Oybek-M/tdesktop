@@ -24,6 +24,7 @@ Build: **2026-09-01 01:24**. Jonli baza sxemasi **v13**,
 | **A20** — lahza-nuqtalar | ✅ `📖 hikoya qo'ygan` qatori chiqdi |
 | **A17/A14** — o'qilgan vaqt | ⚠️ **hali ko'rinmadi** — pastga qarang |
 | Sxema **v13** migratsiyasi | ✅ toza o'tdi |
+| **A21** — soxta "o'chirilgan" yozuvlari | 🔴 **OCHIQ** — 35 chatda bir daqiqada 781 yozuv; `specs/2026-09-05-a21-false-positive-deletions.md` |
 
 ## 🟢 Plan 06 (reliz API) — Task 5 TUGADI (2026-09-02)
 
