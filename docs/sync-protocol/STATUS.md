@@ -94,6 +94,15 @@ yo'qotish — tiklab bo'lmaydi.
    `ActionedMessage` da esa bunday maydon yo'q. Alohida ish sifatida
    qoldirildi (2026-09-05 da Task 7a tayyorlanayotganda topildi).
 
+6. 🔴 **Tombstone qabul qilish -- Task 7c.** 7b da kelgan tombstone
+   ogohlantirish bilan o'tkazib yuboriladi va **cursor undan o'tib
+   ketadi**, ya'ni u boshqa qayta o'qilmaydi. Hozir hech narsa
+   tombstone enqueue qilmaydi, shuning uchun yo'qotish yo'q. 7c
+   `record_id -> lokal qator` indeksini (sxema **v15**) qo'shadi;
+   o'shanda `pull_cursor` ni bir marta 0 ga qaytarish kerak bo'lishi
+   mumkin, aks holda 7b davrida kelgan tombstone'lar qo'llanmay
+   qoladi.
+
 ### tdesktop'da Track C uchun QOLGAN ishlar
 
 1. ✅ **Sxema v10 — `account_id`** (5 ta jadval) + media tuzatishlari — kod tayyor, build o'tdi.
