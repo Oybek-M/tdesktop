@@ -8,6 +8,7 @@
 #include <QtCore/QMimeDatabase>
 #include <QtCore/QStandardPaths>
 #include <QtCore/QDir>
+#include <QtCore/QCryptographicHash>
 #include <QtCore/QFile>
 #include <QtCore/QFileInfo>
 #include <QtCore/QDirIterator>
@@ -1511,7 +1512,7 @@ QVector<QString> GetPeersWithDeletedMessages(qint64 accountId) {
 // 7.1-eslatma (sha256): hozircha bo'sh qoldiriladi. 100 MB fayl uchun
 // SHA-256 ~0.3 soniya oladi va bu arxivlash paytida UI oqimida bo'lardi.
 // Ustun sxemada bor, shuning uchun keyinchalik fonda to'ldirish mumkin
-// (Track C blob identifikatsiyasi kerak bo'lganda).
+// — buni BackfillMediaSha256() bajaradi (Sozlamalar > Xotira).
 
 void UpsertMediaIndex(const PeerKey &key, const MediaIndexEntry &entry) {
     Init();
@@ -1700,6 +1701,107 @@ int ReconcileMediaIndex(const QString &archiveRoot) {
     }
     execSql("COMMIT");
     return changed;
+}
+
+Sha256Report BackfillMediaSha256(const QString &archiveRoot) {
+	Init();
+	auto report = Sha256Report();
+	if (!gDb) return report;
+
+	// ReconcileMediaIndex'dagi bilan bir xil sabab: SELECT ochiq turganda
+	// UPDATE qilmaymiz -- avval ro'yxatni to'liq o'qib olamiz.
+	struct Row {
+		qint64 accountId;
+		QString peerId;
+		long long msgId;
+		QString relPath;
+	};
+	QVector<Row> rows;
+	{
+		sqlite3_stmt *stmt = nullptr;
+		if (sqlite3_prepare_v2(gDb,
+				"SELECT account_id, peer_id, msg_id, rel_path "
+				"FROM media_index "
+				"WHERE status = 'present' "
+				"  AND LENGTH(rel_path) > 0 "
+				"  AND (sha256 IS NULL OR LENGTH(sha256) = 0)",
+				-1, &stmt, nullptr) == SQLITE_OK) {
+			while (sqlite3_step(stmt) == SQLITE_ROW) {
+				rows.append({
+					sqlite3_column_int64(stmt, 0),
+					colText(stmt, 1),
+					sqlite3_column_int64(stmt, 2),
+					colText(stmt, 3) });
+			}
+			sqlite3_finalize(stmt);
+		}
+	}
+	report.scanned = rows.size();
+
+	// Hisoblash tranzaksiyadan TASHQARIDA: gigabaytlarni o'qish davomida
+	// yozuv qulfini ushlab turish qolgan hamma yozuvni bloklab qo'yardi.
+	// Natijalar to'planib, oxirida bitta tranzaksiyada yoziladi.
+	struct Result {
+		Row row;
+		QString hash;
+	};
+	QVector<Result> results;
+	for (const auto &row : rows) {
+		QFile file(archiveRoot + "/" + row.relPath);
+		if (!file.exists()) {
+			++report.missing;
+			continue;
+		}
+		if (!file.open(QIODevice::ReadOnly)) {
+			++report.failed;
+			continue;
+		}
+		const auto size = file.size();
+		QCryptographicHash hash(QCryptographicHash::Sha256);
+		// addData(QIODevice*) faylni bo'laklab o'qiydi -- kattaligi
+		// o'nlab megabayt bo'lgan videoni ham xotiraga to'liq yuklamaydi.
+		if (!hash.addData(&file)) {
+			++report.failed;
+			continue;
+		}
+		report.bytes += size;
+		results.append({ row, QString::fromLatin1(hash.result().toHex()) });
+	}
+
+	execSql("BEGIN");
+	for (const auto &result : results) {
+		sqlite3_stmt *stmt = nullptr;
+		if (sqlite3_prepare_v2(gDb,
+				"UPDATE media_index SET sha256 = ? "
+				"WHERE account_id = ? AND peer_id = ? AND msg_id = ?",
+				-1, &stmt, nullptr) != SQLITE_OK) {
+			++report.failed;
+			continue;
+		}
+		bindText(stmt, 1, result.hash);
+		sqlite3_bind_int64(stmt, 2, result.row.accountId);
+		bindText(stmt, 3, result.row.peerId);
+		sqlite3_bind_int64(stmt, 4, result.row.msgId);
+		if (sqlite3_step(stmt) == SQLITE_DONE) {
+			++report.hashed;
+		} else {
+			++report.failed;
+		}
+		sqlite3_finalize(stmt);
+	}
+	execSql("COMMIT");
+
+	return report;
+}
+
+void BackfillMediaSha256Async(std::function<void(Sha256Report)> callback) {
+	const auto root = CustomSettings::ArchiveRoot();
+	crl::async([root, callback] {
+		const auto report = BackfillMediaSha256(root);
+		crl::on_main([report, callback] {
+			if (callback) callback(report);
+		});
+	});
 }
 
 int ScanArchiveMedia(const QString &archiveRoot) {

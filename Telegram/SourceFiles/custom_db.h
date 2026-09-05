@@ -203,7 +203,7 @@ struct MediaIndexEntry {
     QString fileName;
     QString relPath;       // arxiv ildizidan nisbiy yo'l
     long long size = 0;
-    QString sha256;        // hozircha bo'sh — 7.1-eslatmaga qarang
+    QString sha256;        // arxivlashda bo'sh — BackfillMediaSha256() to'ldiradi
     unsigned int msgDate = 0;
     unsigned int archivedAt = 0;
     QString layer;         // l1 | l2 | l3
@@ -256,6 +256,25 @@ int ReconcileMediaIndex(const QString &archiveRoot);
 // Nechta YANGI yozuv qo'shilgani qaytadi.
 int ScanArchiveMedia(const QString &archiveRoot);
 void ScanArchiveMediaAsync(std::function<void(int added)> callback);
+
+// -- sha256 backfill (7.1-eslatmaning davomi) -----------------------------
+//
+// 7.1-eslatma sha256'ni arxivlash paytida hisoblashni rad etgan edi:
+// u UI oqimida bo'lardi. Shu sababli ustun bo'sh qolgan. Bu funksiya
+// bo'sh qolganlarni fon oqimida bir yo'la to'ldiradi.
+//
+// Faqat sha256'si BO'SH yozuvlar ko'riladi, shuning uchun takroriy
+// chaqiruv arzon: birinchi yurishdan keyin faqat yangi fayllar qoladi.
+struct Sha256Report {
+	int scanned = 0;    // sha256'siz topilgan yozuvlar
+	int hashed = 0;     // sha256 yozildi
+	int missing = 0;    // fayl diskda yo'q ('present' bo'lsa ham)
+	int failed = 0;     // o'qib/yozib bo'lmadi
+	qint64 bytes = 0;   // o'qilgan umumiy hajm
+};
+
+Sha256Report BackfillMediaSha256(const QString &archiveRoot);
+void BackfillMediaSha256Async(std::function<void(Sha256Report)> callback);
 
 // ── Eski fayllarni TUZATISH (2026-08-15) ─────────────────────────────────
 //

@@ -218,6 +218,49 @@ void fillStorageTab(
 				});
 			});
 		});
+
+		// sha256 backfill: arxivlash paytida ataylab hisoblanmaydi
+		// (UI oqimini bloklardi), shuning uchun bu yerdan qo'lda
+		// ishga tushiriladi. Faqat sha256'si bo'sh yozuvlar ko'riladi.
+		Ui::AddSkip(s3, 8);
+		const auto hashBtn = s3->add(
+			object_ptr<Ui::RoundButton>(
+				s3,
+				rpl::single(u"🔑 Media fayllar uchun sha256 hisoblash"_q),
+				st::defaultBoxButton),
+			st::boxRowPadding);
+		s3->add(
+			object_ptr<Ui::FlatLabel>(
+				s3,
+				rpl::single(u"Nusxa aniqlash va sinxronlash uchun kerak. "
+					"Gigabaytlab fayl bo'lsa bir necha daqiqa ketishi "
+					"mumkin, lekin faqat bir marta: keyingi safar faqat "
+					"yangi fayllar hisoblanadi."_q),
+				st::customModHintLabel),
+			st::boxRowPadding);
+		hashBtn->addClickHandler([=] {
+			hashBtn->setDisabled(true);
+			Ui::Toast::Show(u"Hisoblanmoqda, biroz kuting..."_q);
+			const auto weak = base::make_weak(content);
+			CustomDB::BackfillMediaSha256Async([=](
+					CustomDB::Sha256Report report) {
+				if (!weak) return;
+				hashBtn->setDisabled(false);
+				if (!report.scanned) {
+					Ui::Toast::Show(
+						u"Hamma media fayl allaqachon hisoblangan."_q);
+					return;
+				}
+				const auto mb = double(report.bytes) / (1024.0 * 1024);
+				Ui::Toast::Show(
+					u"sha256: %1 ta yozildi (%2 MB), %3 fayl topilmadi, "
+					 "%4 xato."_q
+						.arg(report.hashed)
+						.arg(QString::number(mb, 'f', 1))
+						.arg(report.missing)
+						.arg(report.failed));
+			});
+		});
 	}
 
 	// 4-bo'lim: Eksport va tiklash (Standart yopiq)
