@@ -84,15 +84,28 @@ template <typename Signature> using Fn = std::function<Signature>;
 cl /nologo /W4 /std:c++20 /Zc:__cplusplus /EHsc /Zs /permissive- ^
    /DQT_NO_KEYWORDS /DQT_NO_CAST_FROM_BYTEARRAY ^
    /FI pch_shim.h ^
-   /I Telegram/SourceFiles ^
-   /I Libraries/win64/qt_5.15.18/qtbase/src/3rdparty/sqlite ^
-   /I Libraries/win64/openssl3/include ^
-   /I Telegram/ThirdParty/GSL/include ^
-   /I Libraries/win64/Qt-6.11.1/include ^
-   /I Libraries/win64/Qt-6.11.1/include/QtCore ^
-   /I Libraries/win64/Qt-6.11.1/include/QtNetwork ^
+   /I C:/TBuild/tdesktop/Telegram/SourceFiles ^
+   /I C:/TBuild/Libraries/win64/qt_5.15.18/qtbase/src/3rdparty/sqlite ^
+   /I C:/TBuild/Libraries/win64/openssl3/include ^
+   /I C:/TBuild/tdesktop/Telegram/ThirdParty/GSL/include ^
+   /I C:/TBuild/Libraries/win64/Qt-6.11.1/include ^
+   /I C:/TBuild/Libraries/win64/Qt-6.11.1/include/QtCore ^
+   /I C:/TBuild/Libraries/win64/Qt-6.11.1/include/QtNetwork ^
    Telegram/SourceFiles/custom_sync_client.cpp
 ```
+
+Yo'llar ATAYLAB absolyut. `Libraries/` repo ichida emas, uning YONIDA
+(`C:\TBuild\Libraries`), buyruq esa repo ildizidan ishga tushiriladi --
+nisbiy yozilsa `QtCore/QString` topilmay `C1083` beradi va xato Qt
+o'rnatilmagandek ko'rinadi.
+
+`cl` ni topish uchun avval:
+
+```
+call "C:\Program Files\Microsoft Visual Studio8\Community\VC\Auxiliary\Buildcvars64.bat"
+```
+
+(VS 2022 emas, **18**. Aniq yo'lni `vswhere.exe -latest -property installationPath` beradi.)
 
 `/Zs` — faqat sintaksis, obyekt fayl yozilmaydi. Define'lar muhim:
 `QT_NO_CAST_FROM_BYTEARRAY` va `QT_NO_KEYWORDS` haqiqiy build'da
