@@ -1,6 +1,7 @@
 #include "custom_sync_client.h"
 #include "custom_sync_outbox.h"
 #include "custom_sync_crypto.h"
+#include "custom_sync_payload.h"
 #include "custom_settings.h"
 
 #include <QtNetwork/QNetworkAccessManager>
@@ -379,26 +380,6 @@ void Client::mediaDownload(
     });
 }
 
-namespace {
-
-// Yozuvning shifrlanadigan mazmuni. HALI YOZILMAGAN.
-//
-// Har bir kind uchun mazmun lokal jadvallardan o'qiladi: o'chirilgan
-// xabar matni, tahrir tarixi, faollik qiymatlari, media indeks qatori.
-// Bu Task 7 da yoziladi.
-//
-// Ungacha nullopt qaytaradi va yozuv JO'NATILMAYDI. Bo'sh payload bilan
-// jo'natish qaytarib bo'lmas edi: server "created" qaytaradi, MarkSent
-// yozuvni outbox'dan o'chiradi, record_id esa deterministik bo'lgani
-// uchun keyingi urinish "duplicate" oladi -- ya'ni hodisa butunlay
-// yo'qoladi va uni qayta yuborishning iloji qolmaydi.
-[[nodiscard]] std::optional<QByteArray> BuildPayload(const OutboxEntry &entry) {
-    Q_UNUSED(entry);
-    return std::nullopt;
-}
-
-} // namespace
-
 void Client::pushPending(Fn<void(int sentCount, int failedCount)> done) {
     if (!Outbox::KeysAvailable()) {
         if (done) done(0, 0);
@@ -417,9 +398,21 @@ void Client::pushPending(Fn<void(int sentCount, int failedCount)> done) {
     const auto accountKey = Outbox::AccountKey();
     const auto contentKey = Outbox::ContentKey();
 
+    int droppedCount = 0;
     QVector<Record> records;
     records.reserve(entries.size());
     for (const auto &e : entries) {
+        const auto buildRes = CustomSync::Build(e);
+        if (buildRes.status == BuildStatus::SourceGone) {
+            // Manba qator bazadan o'chirilgan (masalan arxiv tozalangan) -- outboxdan drop qilamiz
+            Outbox::Drop(e.recordId, QStringLiteral("source_gone"));
+            droppedCount++;
+            continue;
+        } else if (buildRes.status != BuildStatus::Ok) {
+            // Kind hali qo'llab-quvvatlanmaydi yoki vaqtincha xatolik -- outbox'da qoladi
+            continue;
+        }
+
         Record rec;
         rec.recordId = e.recordId;
         rec.kind = e.kind;
@@ -432,16 +425,11 @@ void Client::pushPending(Fn<void(int sentCount, int failedCount)> done) {
         rec.observedAt = e.observedAt;
         rec.deviceId = deviceId;
         rec.targetRecordId = e.targetRecordId;
-        const auto plain = BuildPayload(e);
-        if (!plain.has_value()) {
-            // Yozuv outbox'da QOLADI -- yo'qolmaydi, payload yozilgach ketadi.
-            continue;
-        }
 
         rec.nonce = Crypto::RandomBytes(12);
         // Seal() QByteArray qaytaradi, optional emas -- bo'sh natija xatolik
         // demakdir. (Bo'sh matn shifrlanganda ham 16 baytlik tag qaytadi.)
-        const auto enc = Crypto::Seal(contentKey, rec.nonce, *plain);
+        const auto enc = Crypto::Seal(contentKey, rec.nonce, buildRes.json);
         if (enc.isEmpty()) {
             continue;
         }
@@ -449,8 +437,12 @@ void Client::pushPending(Fn<void(int sentCount, int failedCount)> done) {
         records.append(rec);
     }
 
+    if (droppedCount > 0) {
+        qWarning().noquote() << QStringLiteral("[Sync] pushPending: %1 ta yetishmayotgan (source gone) yozuv outboxdan olib tashlandi.")
+            .arg(droppedCount);
+    }
+
     if (records.isEmpty()) {
-        // Jo'natadigan hech nima yo'q (payload hali qurilmaydi).
         if (done) done(0, 0);
         return;
     }

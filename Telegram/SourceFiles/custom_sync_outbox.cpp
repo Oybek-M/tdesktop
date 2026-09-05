@@ -6,6 +6,7 @@
 #include "custom_db.h"
 
 #include <QtCore/QDateTime>
+#include <QtCore/QDebug>
 #include <sqlite3.h>
 #include <algorithm>
 
@@ -153,6 +154,22 @@ QVector<OutboxEntry> Pending(int limit) {
 }
 
 void MarkSent(const QString &recordId) {
+    auto *db = CustomDB::RawHandle();
+    if (!db) return;
+
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(db,
+            "DELETE FROM sync_outbox WHERE record_id = ?",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        bindText(stmt, 1, recordId);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+}
+
+void Drop(const QString &recordId, const QString &reason) {
+    qWarning().noquote() << QStringLiteral("[Sync] Outbox yozuvi bekor qilindi (dropped): record_id=%1, sabab=%2")
+        .arg(recordId, reason);
     auto *db = CustomDB::RawHandle();
     if (!db) return;
 

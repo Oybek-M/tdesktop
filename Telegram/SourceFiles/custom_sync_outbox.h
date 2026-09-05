@@ -40,6 +40,9 @@ void Enqueue(
 
 void MarkSent(const QString &recordId);
 
+// Manba qator lokal bazada topilmaganda (SourceGone) yozuvni navbatdan o'chirish.
+void Drop(const QString &recordId, const QString &reason);
+
 // Eksponensial backoff: 1s, 2s, 4s… maksimum 300s (5 daqiqa).
 // next_retry_at diskda saqlanadi — ilova qayta ishga tushsa backoff nolga qaytmaydi.
 void MarkFailed(const QString &recordId, const QString &error);

@@ -1146,6 +1146,8 @@ PRIVATE
     custom_sync_keystore.h
     custom_sync_client.cpp
     custom_sync_client.h
+    custom_sync_payload.cpp
+    custom_sync_payload.h
     custom_settings.cpp
     custom_settings.h
     custom_upstream_checker.cpp
