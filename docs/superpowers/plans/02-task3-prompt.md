@@ -190,4 +190,4 @@ OUT OF SCOPE
   - Do not start Task 4 (outbox layer and enqueue points). This task
     creates the tables only — nothing writes to them yet.
   - Do not modify any other migration block.
-  - Do not touch the user's real `custom_mod.db`.
+  - Do not touch the user's real database at `<ArchiveRoot>/db/actioned_messages.db` (ArchiveRoot is a user setting; resolve it via `dbFilePath()` in custom_db.cpp:113).

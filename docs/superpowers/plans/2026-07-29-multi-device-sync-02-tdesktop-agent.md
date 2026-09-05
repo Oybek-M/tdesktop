@@ -917,8 +917,13 @@ va mavjud v5 blokining uslubiga mos ekaniga ishonch hosil qiling.
 Keyingi to'liq build'dan keyin (Task 6) tekshiriladi:
 
 ```bash
-sqlite3 "%APPDATA%/CustomMod/custom_mod.db" ".schema sync_outbox"
-sqlite3 "%APPDATA%/CustomMod/custom_mod.db" "SELECT version FROM schema_version;"
+# ArchiveRoot Sozlamalar > Xotira'da o'zgartirilgan bo'lishi
+# mumkin -- default quyidagicha, aniq qiymat: dbFilePath()
+# (custom_db.cpp:113).
+DB="$HOME/customizationMainFolder/db/actioned_messages.db"
+
+sqlite3 "$DB" ".schema sync_outbox"
+sqlite3 "$DB" "SELECT version FROM schema_version;"
 ```
 
 Kutilgan: jadval mavjud, versiya `6`.
@@ -1326,7 +1331,12 @@ Kutilgan: `Build succeeded`.
 3. Bazani tekshiring:
 
 ```bash
-sqlite3 "%APPDATA%/CustomMod/custom_mod.db" "SELECT key, substr(value,1,20) FROM sync_state;"
+# ArchiveRoot Sozlamalar > Xotira'da o'zgartirilgan bo'lishi
+# mumkin -- default quyidagicha, aniq qiymat: dbFilePath()
+# (custom_db.cpp:113).
+DB="$HOME/customizationMainFolder/db/actioned_messages.db"
+
+sqlite3 "$DB" "SELECT key, substr(value,1,20) FROM sync_state;"
 ```
 
 Kutilgan: `device_id` va `refresh_token` yozuvlari mavjud.
@@ -1334,7 +1344,12 @@ Kutilgan: `device_id` va `refresh_token` yozuvlari mavjud.
 4. Biror chatda xabar o'chiring va outbox'ni tekshiring:
 
 ```bash
-sqlite3 "%APPDATA%/CustomMod/custom_mod.db" "SELECT count(*) FROM sync_outbox;"
+# ArchiveRoot Sozlamalar > Xotira'da o'zgartirilgan bo'lishi
+# mumkin -- default quyidagicha, aniq qiymat: dbFilePath()
+# (custom_db.cpp:113).
+DB="$HOME/customizationMainFolder/db/actioned_messages.db"
+
+sqlite3 "$DB" "SELECT count(*) FROM sync_outbox;"
 ```
 
 Kutilgan: navbat to'ldi, so'ng bo'shadi (push muvaffaqiyatli).

@@ -145,7 +145,7 @@ void TryRecordBackgroundDelete(long long msgId);
 bool ExportFullBackup(const QString &destDir);
 bool ImportFullBackup(const QString &srcDir);
 ```
-Export v2 tarkibi: `custom_mod.db` + `BombMedia/` + `peer_lists.json` + `branding.json` + registry + `manifest.json`
+Export v2 tarkibi: `actioned_messages.db` + `BombMedia/` + `peer_lists.json` + `branding.json` + registry + `manifest.json`
 
 ---
 
@@ -263,7 +263,7 @@ QPointer<CustomModWindow> gInstance;
 ```
 
 ### fillAboutTab — 7 ta backup element:
-1. SQLite DB (`custom_mod.db`)
+1. SQLite DB (`actioned_messages.db`)
 2. Barcha media (`BombMedia/`)
 3. White/Black list (`peer_lists.json`)
 4. Branding (`branding.json`)
@@ -326,7 +326,7 @@ static constexpr auto kPremiumMaxAccounts = 100;  // asl: 6
 | Per-peer antidelete | Registry `AntiDeletePerPeer` group |
 | Per-peer antiedit | Registry `AntiEditPerPeer` group |
 | Per-Chat names master | Registry `PerPeerNames` group |
-| SQLite DB | `%AppData%\...\CustomMod\custom_mod.db` |
+| SQLite DB | `<ArchiveRoot>/db/actioned_messages.db` — ArchiveRoot Sozlamalar > Xotira'dan o'zgartiriladi (default `~/customizationMainFolder`); aniq yo'l `dbFilePath()` — custom_db.cpp:113 |
 | Media | `%AppData%\...\CustomMod\BombMedia\` |
 | Branding | `%AppData%\...\CustomMod\branding.json` |
 

@@ -40,7 +40,7 @@ NON-NEGOTIABLE RULES
   Do NOT start a full tdesktop build (~34 minutes). The verification
      below does not need one.
   Do NOT modify anything under `docs/sync-protocol/`.
-  Do NOT touch the user's real `custom_mod.db`.
+  Do NOT touch the user's real database at `<ArchiveRoot>/db/actioned_messages.db` (ArchiveRoot is a user setting; resolve it via `dbFilePath()` in custom_db.cpp:113).
 
 ============================================================
 YOUR TASK — PLAN 02, TASK 7a

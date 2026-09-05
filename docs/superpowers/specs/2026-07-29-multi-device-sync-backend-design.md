@@ -436,7 +436,7 @@ yo'qoladi — Telegram `updateDeleteMessages` faqat msgId yuboradi, kontent
 yubormaydi, shuning uchun keyinroq ulanib "tiklab olish" imkonsiz.
 
 **Muammo B — joy bo'yicha uzilish.** Barcha ma'lumot bitta qurilmadagi
-`custom_mod.db` + media papkasida qamalgan.
+`actioned_messages.db` + media papkasida qamalgan.
 
 ### Yakuniy ko'rinish (5 ta app)
 

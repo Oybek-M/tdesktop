@@ -32,7 +32,7 @@ xabar mavjud edi.
 
 ### 1.2 Empirik o'lchovlar (real DB, read-only)
 
-- DB: `%APPDATA%\TelegramDesktop\CustomMod\actioned_messages.db`, 155 MB
+- DB: `%APPDATA%\TelegramDesktop\CustomMod\actioned_messages.db`, 155 MB — 2026-08-13 dagi yo'l; baza keyin ArchiveRoot ostiga ko'chirilgan, hozirgisi uchun `dbFilePath()` (custom_db.cpp:113)
 - `actioned_messages` 268 286 qator, `text_cache` 16 149, `activity_history` 238 730
 - O'rtacha xabar matni: `text_cache` 318 bayt, `actioned_messages` 176 bayt
 - → 10 000 xabarli chatning to'liq arxivi ≈ **3 MB**
