@@ -102,7 +102,7 @@ o'rnatilmagandek ko'rinadi.
 `cl` ni topish uchun avval:
 
 ```
-call "C:\Program Files\Microsoft Visual Studio8\Community\VC\Auxiliary\Buildcvars64.bat"
+call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"
 ```
 
 (VS 2022 emas, **18**. Aniq yo'lni `vswhere.exe -latest -property installationPath` beradi.)
