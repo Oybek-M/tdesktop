@@ -19,6 +19,7 @@ QByteArray gPeerKey;
 QByteArray gAccountKey;
 QByteArray gMediaKey;
 bool gMasterKeyLoaded = false;
+thread_local int t_mergeDepth = 0;
 
 void bindText(sqlite3_stmt *stmt, int index, const QString &str) {
     if (str.isEmpty()) {
@@ -53,6 +54,18 @@ int CurrentAttempts(sqlite3 *db, const QString &recordId) {
 
 namespace Outbox {
 
+MergeGuard::MergeGuard() {
+    ++t_mergeDepth;
+}
+
+MergeGuard::~MergeGuard() {
+    --t_mergeDepth;
+}
+
+bool MergeInProgress() {
+    return t_mergeDepth > 0;
+}
+
 bool KeysAvailable() {
     return CustomSettings::SyncEnabled()
         && !CustomSettings::SyncServerUrl().trimmed().isEmpty()
@@ -66,6 +79,9 @@ void Enqueue(
         qint64 msgId,
         qint64 occurredAt,
         const QString &targetRecordId) {
+    if (MergeInProgress()) {
+        return;
+    }
     if (!KeysAvailable()) {
         return;
     }

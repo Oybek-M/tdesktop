@@ -25,6 +25,19 @@ namespace Outbox {
 // Hozircha doim false qaytaradi — soxta record_id yozilishining oldini oladi (K5).
 [[nodiscard]] bool KeysAvailable();
 
+// Merge davomida enqueue'ni o'chiradi. THREAD_LOCAL bo'lishi SHART:
+// merge sync oqimida ishlaydi, foydalanuvchi esa ayni paytda UI
+// oqimida xabar o'chirishi mumkin -- global bayroq o'sha haqiqiy
+// hodisani ham yutib yuborardi.
+class MergeGuard {
+public:
+    MergeGuard();
+    ~MergeGuard();
+    MergeGuard(const MergeGuard &) = delete;
+    MergeGuard &operator=(const MergeGuard &) = delete;
+};
+[[nodiscard]] bool MergeInProgress();
+
 // Navbatga qo'shadi. KeysAvailable() false bo'lsa hech narsa qilmaydi (bazaga tegmaydi).
 // Bu funksiya custom_db.cpp dagi capture funksiyalarining OXIRIDA chaqiriladi.
 void Enqueue(

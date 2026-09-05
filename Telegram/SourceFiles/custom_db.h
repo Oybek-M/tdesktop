@@ -12,6 +12,9 @@ struct sqlite3; // oldindan e'lon -- sqlite3.h sarlavhaga kirmasin
 
 namespace CustomDB {
 
+// K1: barcha faollik va arvoh o'qishlarni tozalash hamda qabul filtri uchun yagona muddat.
+constexpr int kActivityRetentionDays = 30;
+
 // FAQAT sync outbox uchun. Boshqa modul bu tutqichni olmasin --
 // baza ulanishining egasi custom_db.cpp bo'lib qoladi.
 [[nodiscard]] sqlite3 *RawHandle();
@@ -95,9 +98,9 @@ void ResetGhostRead(const PeerKey &key);
 // ketadi. Bu funksiya barcha akkauntlar bo'yicha tozalaydi.
 void ResetGhostReadForPeerAllAccounts(const QString &peerId);
 
-// E22: Delete ghost_reads entries older than |days| days (default 30).
+// E22: Delete ghost_reads entries older than |days| days (default kActivityRetentionDays).
 // Called automatically by SaveGhostRead(); safe to call manually.
-void PruneStaleGhostReads(int days = 30);
+void PruneStaleGhostReads(int days = kActivityRetentionDays);
 void MarkDeleted(
     long long msgId,
     const PeerKey &key,
@@ -589,7 +592,7 @@ bool GetLatestActivityHistoryValue(
 // 2026-08-24: muddat 365 -> 30 kun (foydalanuvchi qarori). Last-seen
 // yozuvlari kuniga ~10 600 ta; 365 kunda jadval ~3.9 mln qatorga yetardi.
 // 30 kunda ~320 ming qatorda barqarorlashadi.
-void PruneStaleActivityHistory(int days = 30);
+void PruneStaleActivityHistory(int days = kActivityRetentionDays);
 
 // 2026-08-24: faollik keshi FON oqimida yuklanadi — startup'ni bloklamaydi.
 // Tayyor bo'lmaguncha RecordField() status yozuvini o'tkazib yuborishi

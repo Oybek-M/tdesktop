@@ -51,6 +51,27 @@ struct PullResponse {
     QString error;
 };
 
+enum class MergeStatus {
+    Merged,
+    Rejected,
+    Corrupt,
+    TombstoneSkipped,
+    Unsupported,
+};
+
+struct MergeResult {
+    MergeStatus status = MergeStatus::Unsupported;
+    QString reason;
+};
+
+// Bitta yozuvni deshifrlab, hash'larini tekshirib, retention filtri orqali
+// o'tkazib lokal bazaga (CustomDB) yozadi. MergeGuard ostida ishlaydi.
+[[nodiscard]] MergeResult MergeRecord(
+    const Record &record,
+    const QByteArray &contentKey,
+    const QByteArray &peerKey,
+    const QByteArray &accountKey);
+
 // Tarmoqsiz test qilinishi mumkin bo'lgan erkin parser funksiyalar:
 [[nodiscard]] EnrollResponse ParseEnrollResponse(const QByteArray &jsonBytes, int httpStatus);
 [[nodiscard]] RefreshResponse ParseRefreshResponse(const QByteArray &jsonBytes, int httpStatus);
@@ -99,6 +120,9 @@ public:
 
     // Outbox-dagi navbatda turgan yozuvlarni serverga push qiladi
     void pushPending(Fn<void(int sentCount, int failedCount)> done = nullptr);
+
+    // Serverdan yozuvlarni tortib olib (pull), ularni lokal bazaga kiritadi (merge)
+    void pullAndMerge(Fn<void(int merged, int rejected, QString error)> done);
 
 private:
     void ensureAccessToken(Fn<void(bool success)> done);

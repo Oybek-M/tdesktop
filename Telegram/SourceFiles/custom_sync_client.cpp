@@ -3,6 +3,7 @@
 #include "custom_sync_crypto.h"
 #include "custom_sync_payload.h"
 #include "custom_settings.h"
+#include "custom_db.h"
 
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkRequest>
@@ -11,8 +12,11 @@
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonArray>
 #include <QtCore/QDateTime>
+#include <QtCore/QDebug>
+#include <sqlite3.h>
 
 #include <optional>
+#include <algorithm>
 
 namespace CustomSync {
 
@@ -482,6 +486,237 @@ void Client::pushPending(Fn<void(int sentCount, int failedCount)> done) {
             failed = int(batchIds.size());
         }
         if (done) done(sent, failed);
+    });
+}
+
+namespace {
+
+static void bindText(sqlite3_stmt *stmt, int index, const QString &str) {
+    if (str.isEmpty()) {
+        sqlite3_bind_text(stmt, index, "", 0, SQLITE_STATIC);
+    } else {
+        const auto utf8 = str.toUtf8();
+        sqlite3_bind_text(stmt, index, utf8.constData(), utf8.size(), SQLITE_TRANSIENT);
+    }
+}
+
+static bool HasEditedMessage(sqlite3 *db, const CustomDB::PeerKey &key, qint64 msgId) {
+    if (!db) return false;
+    sqlite3_stmt *stmt = nullptr;
+    bool exists = false;
+    if (sqlite3_prepare_v2(db,
+            "SELECT 1 FROM actioned_messages "
+            "WHERE peer_id = ? AND msg_id = ? AND type = 'edited' AND account_id IN (0, ?) "
+            "LIMIT 1",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        bindText(stmt, 1, key.peerId);
+        sqlite3_bind_int64(stmt, 2, msgId);
+        sqlite3_bind_int64(stmt, 3, key.accountId);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            exists = true;
+        }
+        sqlite3_finalize(stmt);
+    }
+    return exists;
+}
+
+static void RecordCorrupt(const QString &recordId) {
+    qWarning().noquote() << QStringLiteral("[Sync] Buzilgan (corrupt) yozuv aniqlandi va o'tkazib yuborildi: record_id=") << recordId;
+    const auto current = Outbox::GetState(QStringLiteral("corrupt_records"));
+    auto list = current.isEmpty() ? QStringList() : current.split(QLatin1Char(','));
+    list.append(recordId);
+    while (list.size() > 50) {
+        list.removeFirst();
+    }
+    Outbox::SetState(QStringLiteral("corrupt_records"), list.join(QLatin1Char(',')));
+}
+
+} // namespace
+
+MergeResult MergeRecord(
+        const Record &record,
+        const QByteArray &contentKey,
+        const QByteArray &peerKey,
+        const QByteArray &accountKey) {
+    // 0. Tombstone tekshiruvi (Task 7c gacha kechiktirilgan)
+    if (record.kind == QLatin1String(Kind::Tombstone)) {
+        qWarning().noquote() << QStringLiteral("[Sync] Tombstone yozuvi qabul qilindi lekin hozircha o'tkazib yuborildi (Task 7c da bajariladi): record_id=%1, target=%2")
+            .arg(record.recordId, record.targetRecordId);
+        return { MergeStatus::TombstoneSkipped, QStringLiteral("tombstone_deferred_to_7c") };
+    }
+
+    // 1. Retention filter (faqat activity va ghost_read uchun!)
+    // deleted, edited, media_index hech qachon prune qilinmaydi va cheksiz saqlanadi.
+    const qint64 retentionCutoff = QDateTime::currentDateTime()
+        .addDays(-CustomDB::kActivityRetentionDays)
+        .toSecsSinceEpoch();
+
+    if (record.kind == QLatin1String(Kind::Activity)
+            || record.kind == QLatin1String(Kind::GhostRead)) {
+        if (record.occurredAt < retentionCutoff) {
+            return { MergeStatus::Rejected, QStringLiteral("outside_retention_window") };
+        }
+    }
+
+    // 2. Deshifrlash (AES-256-GCM)
+    const auto plain = Crypto::Open(contentKey, record.nonce, record.payload);
+    if (!plain.has_value()) {
+        return { MergeStatus::Corrupt, QStringLiteral("decrypt_failed") };
+    }
+
+    // 3. JSON parse va pre-image'larni o'qish (§0.14)
+    const auto doc = QJsonDocument::fromJson(*plain);
+    if (!doc.isObject()) {
+        return { MergeStatus::Corrupt, QStringLiteral("json_not_object") };
+    }
+    const auto obj = doc.object();
+    const auto accountIdStr = obj.value(QStringLiteral("account_id")).toString();
+    const auto peerId = obj.value(QStringLiteral("peer_id")).toString();
+    if (accountIdStr.isEmpty() || peerId.isEmpty()) {
+        return { MergeStatus::Corrupt, QStringLiteral("missing_account_or_peer_id") };
+    }
+
+    // 4. Hash'larni pre-image bilan solishtirish (yaxlitlik va to'g'ri kalit tekshiruvi)
+    const auto expectedPeerHash = Crypto::ComputePeerHash(peerKey, peerId);
+    if (expectedPeerHash != record.peerHash) {
+        return { MergeStatus::Rejected, QStringLiteral("peer_hash_mismatch") };
+    }
+    if (record.kind != QLatin1String(Kind::Activity)) {
+        const auto expectedAccountHash = Crypto::ComputeAccountHash(accountKey, accountIdStr);
+        if (expectedAccountHash != record.accountHash) {
+            return { MergeStatus::Rejected, QStringLiteral("account_hash_mismatch") };
+        }
+    }
+
+    bool accountIdOk = false;
+    const qint64 accountId = accountIdStr.toLongLong(&accountIdOk);
+    if (!accountIdOk) {
+        return { MergeStatus::Corrupt, QStringLiteral("invalid_account_id") };
+    }
+    const CustomDB::PeerKey key{ .accountId = accountId, .peerId = peerId };
+
+    // 5. Lokal bazaga yozish -- MergeGuard ostida!
+    Outbox::MergeGuard guard;
+
+    if (record.kind == QLatin1String(Kind::Deleted)) {
+        const auto text = obj.value(QStringLiteral("text")).toString();
+        const auto senderId = obj.value(QStringLiteral("sender_id")).toString();
+        const bool isOut = obj.value(QStringLiteral("is_out")).toBool();
+        const bool isMedia = obj.value(QStringLiteral("is_media")).toBool();
+        const auto msgDate = static_cast<unsigned int>(std::max<qint64>(0, record.occurredAt));
+        CustomDB::MarkDeleted(record.msgId, key, QString(), text, msgDate, isOut, senderId, isMedia);
+        return { MergeStatus::Merged, QString() };
+    }
+
+    if (record.kind == QLatin1String(Kind::Edited)) {
+        auto *db = CustomDB::RawHandle();
+        if (HasEditedMessage(db, key, record.msgId)) {
+            // Allaqachon mavjud -- qayta insert qilmaymiz (K4 idempotency)
+            return { MergeStatus::Merged, QStringLiteral("already_exists") };
+        }
+        const auto oldText = obj.value(QStringLiteral("old_text")).toString();
+        const auto newText = obj.value(QStringLiteral("new_text")).toString();
+        const bool isOut = obj.value(QStringLiteral("is_out")).toBool();
+        CustomDB::ActionedMessage msg;
+        msg.accountId = key.accountId;
+        msg.peerId = key.peerId;
+        msg.msgId = record.msgId;
+        msg.type = QStringLiteral("edited");
+        msg.originalText = oldText;
+        msg.newText = newText;
+        msg.isOut = isOut;
+        msg.msgDate = static_cast<unsigned int>(std::max<qint64>(0, record.occurredAt));
+        msg.timestamp = (record.observedAt > 0)
+            ? QDateTime::fromSecsSinceEpoch(record.observedAt)
+            : QDateTime::currentDateTime();
+        CustomDB::SaveActionedMessage(msg);
+        return { MergeStatus::Merged, QString() };
+    }
+
+    if (record.kind == QLatin1String(Kind::Activity)) {
+        const auto field = obj.value(QStringLiteral("field")).toString();
+        const bool hasOldValue = obj.value(QStringLiteral("has_old_value")).toBool();
+        const auto oldValue = hasOldValue ? obj.value(QStringLiteral("old_value")).toString() : QString();
+        const auto newValue = obj.value(QStringLiteral("new_value")).toString();
+        if (CustomDB::HasActivityEntryAt(key.peerId, field, record.occurredAt)) {
+            // Allaqachon mavjud -- qayta insert qilmaymiz (K4 idempotency)
+            return { MergeStatus::Merged, QStringLiteral("already_exists") };
+        }
+        CustomDB::SaveActivityHistoryEntry(key, field, hasOldValue, oldValue, newValue, record.occurredAt, u"observed"_q);
+        return { MergeStatus::Merged, QString() };
+    }
+
+    if (record.kind == QLatin1String(Kind::GhostRead)) {
+        CustomDB::SaveGhostRead(key, record.msgId);
+        return { MergeStatus::Merged, QString() };
+    }
+
+    if (record.kind == QLatin1String(Kind::MediaIndex)) {
+        CustomDB::MediaIndexEntry entry;
+        entry.peerId = key.peerId;
+        entry.msgId = record.msgId;
+        entry.kind = obj.value(QStringLiteral("kind")).toString();
+        entry.fileName = obj.value(QStringLiteral("file_name")).toString();
+        entry.relPath = obj.value(QStringLiteral("rel_path")).toString();
+        entry.size = obj.value(QStringLiteral("size")).toVariant().toLongLong();
+        entry.sha256 = obj.value(QStringLiteral("sha256")).toString();
+        entry.status = obj.value(QStringLiteral("status")).toString();
+        entry.reason = obj.value(QStringLiteral("reason")).toString();
+        entry.layer = obj.value(QStringLiteral("layer")).toString();
+        entry.msgDate = static_cast<unsigned int>(obj.value(QStringLiteral("msg_date")).toVariant().toLongLong());
+        entry.archivedAt = static_cast<unsigned int>(QDateTime::currentSecsSinceEpoch());
+        CustomDB::UpsertMediaIndex(key, entry);
+        return { MergeStatus::Merged, QString() };
+    }
+
+    return { MergeStatus::Unsupported, QStringLiteral("unsupported_kind") };
+}
+
+void Client::pullAndMerge(Fn<void(int merged, int rejected, QString error)> done) {
+    if (!Outbox::KeysAvailable()) {
+        if (done) done(0, 0, QString());
+        return;
+    }
+
+    const auto cursorStr = Outbox::GetState(QStringLiteral("pull_cursor"), QStringLiteral("0"));
+    const qint64 since = cursorStr.toLongLong();
+    const int limit = CustomSettings::SyncPushChunkSize();
+
+    pull(since, limit, [done](bool success, QVector<Record> records, qint64 nextSince, bool hasMore, QString error) {
+        Q_UNUSED(hasMore);
+        if (!success) {
+            if (done) done(0, 0, error);
+            return;
+        }
+
+        const auto peerKey = Outbox::PeerKey();
+        const auto accountKey = Outbox::AccountKey();
+        const auto contentKey = Outbox::ContentKey();
+
+        int mergedCount = 0;
+        int rejectedCount = 0;
+
+        for (const auto &rec : records) {
+            const auto res = MergeRecord(rec, contentKey, peerKey, accountKey);
+            switch (res.status) {
+            case MergeStatus::Merged:
+                mergedCount++;
+                break;
+            case MergeStatus::Corrupt:
+                RecordCorrupt(rec.recordId);
+                rejectedCount++;
+                break;
+            case MergeStatus::Rejected:
+            case MergeStatus::TombstoneSkipped:
+            case MergeStatus::Unsupported:
+                rejectedCount++;
+                break;
+            }
+        }
+
+        Outbox::SetState(QStringLiteral("pull_cursor"), QString::number(nextSince));
+
+        if (done) done(mergedCount, rejectedCount, QString());
     });
 }
 

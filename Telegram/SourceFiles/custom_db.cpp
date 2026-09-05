@@ -861,7 +861,7 @@ void SaveGhostRead(const PeerKey &key, long long msgId) {
     // E22: Prune stale entries once every 50 saves to keep the table lean.
     static int sSaveCount = 0;
     if (++sSaveCount % 50 == 0) {
-        PruneStaleGhostReads(30);
+        PruneStaleGhostReads(kActivityRetentionDays);
     }
     if (!gDb) return;
 
