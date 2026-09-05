@@ -9,6 +9,28 @@ Format: `## YYYY-MM-DD — sarlavha`
 
 ---
 
+## 2026-09-05 — payload ochiq `account_id` va `peer_id` ni olib yuradi
+
+**Nima:** har kind'ning shifrlanadigan payload'iga ikkita majburiy
+maydon qo'shildi: `account_id` va `peer_id`, ikkalasi ham o'nlik satr —
+`account_hash` / `peer_hash` uchun ishlatilgan aynan pre-image. Spec §0.14.
+
+**Nima uchun:** `peer_hash` — HMAC, teskarilab bo'lmaydi. Usiz qabul
+qiluvchi yozuvni qaysi lokal chatga yozishni aniqlay olmaydi. Mahalliy
+peer'lar ustidan teskari jadval qurish esa aynan kerakli holatni —
+boshqa qurilma biladigan, bu qurilma bilmaydigan peer'ni — qamramaydi.
+
+Qo'shimcha: pre-image mavjud bo'lgani uchun qabul qiluvchi
+`HMAC(peer_key, peer_id) == peer_hash` ni tekshira oladi (kalit
+nomuvofiqligini arzon ushlaydi).
+
+**Ta'sirlanadi:** faqat klientlar. Payload E2E shifrlangan, server uni
+ochmaydi va `byte[]` sifatida saqlaydi — server tomonida o'zgarish yo'q.
+`test-vectors.json` o'zgarmaydi (vektorlar payload tarkibini
+belgilamaydi).
+
+---
+
 ## 2026-08-27 — `tombstone` nishoni ochiq maydonda
 
 **Nima:** `tombstone` yozuvi `target_record_id` ni ochiq maydonda ham

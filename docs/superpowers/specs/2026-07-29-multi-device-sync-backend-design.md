@@ -387,6 +387,41 @@ takrorlanadi — mijozlar uchun).
 **Ta'sirlanadi:** hammasi. tdesktop sync agenti (plan 02) tombstone
 push qilganda shu maydonni to'ldirishi shart.
 
+### 0.14 Payload ochiq `account_id` va `peer_id` ni olib yuradi (2026-09-05)
+
+`pull` javobida yozuvning egasi faqat `account_hash` va `peer_hash`
+sifatida keladi. Bu HMAC'lar — **teskarilab bo'lmaydi**. Mijoz esa
+yozuvni lokal bazaga yozish uchun haqiqiy `PeerKey{account_id, peer_id}`
+ni bilishi shart.
+
+Hash'dan lokal peer'ni topishning yagona yo'li — mahalliy tanish
+peer'lar ustidan teskari jadval qurish. Bu aynan kerakli holatni
+qamramaydi: **boshqa qurilma bilgan, bu qurilma bilmagan peer**. Ya'ni
+ko'p qurilmali sync'ning asosiy foydasi yo'qoladi.
+
+**Qaror:** har bir kind'ning payload'i (shifrlanadigan JSON obyekti)
+ikkita majburiy maydon bilan boshlanadi:
+
+```
+account_id   o'nlik satr -- account_hash uchun ishlatilgan aynan pre-image
+peer_id      o'nlik satr -- peer_hash uchun ishlatilgan aynan pre-image
+```
+
+🔴 **Maxfiylik buzilmaydi.** Payload E2E shifrlangan; server uni hech
+qachon ocha olmaydi va uni faqat `byte[]` sifatida saqlaydi. Server
+tomonida hech qanday o'zgarish talab qilinmaydi.
+
+**Qo'shimcha foyda — arzon yaxlitlik tekshiruvi.** Bu qiymatlar
+hash'larning pre-image'i bo'lgani uchun qabul qiluvchi
+`HMAC(peer_key, peer_id) == peer_hash` ni tekshira oladi. Mos
+kelmasa — kalit noto'g'ri yoki ma'lumot buzilgan; yozuv rad etiladi.
+
+`kind == "activity"` uchun `account_hash` bo'sh satr (§0.12), lekin
+payload'dagi `account_id` baribir to'ldiriladi — u yozish uchun kerak.
+Bu holda faqat `peer_hash` tekshiriladi.
+
+**Ta'sirlanadi:** faqat klientlar. Server payload'ni ochmaydi.
+
 ---
 
 ## 1. Maqsad va kontekst
@@ -532,6 +567,10 @@ Payload — shifrlanishdan oldingi JSON obyekti.
 | `peer_directory` | 0 | `{entries: [{peer_hash, name, username, type}]}` |
 | `media_index` | xabar id (manfiy bo'lishi mumkin) | 0.4 ga qarang |
 | `tombstone` | `SHA256(target_record_id)[0:8]` | `{target_record_id}` |
+
+Bu jadvalga qo'shimcha: **§0.14** bo'yicha HAR payload yana ikkita
+majburiy maydon oladi — `account_id` va `peer_id` (o'nlik satrlar).
+Ularsiz qabul qiluvchi yozuvni qaysi lokal chatga yozishni bilolmaydi.
 
 ### 3.3 Ikki xil semantika — aralashtirmaslik kerak
 

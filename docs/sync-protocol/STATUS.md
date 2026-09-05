@@ -1,6 +1,6 @@
 # Loyihalar holati — HAR SESSIYA SHU YERDAN BOSHLANADI
 
-Oxirgi yangilanish: **2026-09-02**
+Oxirgi yangilanish: **2026-09-05**
 
 > ✅ **2026-08-26 dagi ko'p akkauntli aralashuv xatosi HAL QILINDI.**
 > Protokol tomoni: spec §0.12 (`record_id` ga `account_hash`),
@@ -17,7 +17,7 @@ Oxirgi yangilanish: **2026-09-02**
 
 | Loyiha | Holat | Keyingi qadam |
 |---|---|---|
-| **tdesktop** (CustomMod) | 🟢 v7.1.1 chiqarildi, ishlab turibdi | 🔴 To'liq build, keyin Task 7 (pull va merge) |
+| **tdesktop** (CustomMod) | 🟢 v7.1.1; sync kodi bilan to'liq build ✅ (2026-09-05) | Task 7a (payload qurish), keyin 7b (pull va merge) |
 | **customsync-server** | ✅ 01a va 01b TUGADI | — |
 | **server-controller** | ⚪ boshlanmagan | 01a/01b tugagach |
 | **tmobile-android** | ⚪ muhokama qilinmagan | — |
@@ -68,12 +68,12 @@ yo'qotish — tiklab bo'lmaydi.
    o'chiradi, `record_id` deterministik bo'lgani uchun qayta yuborib
    ham bo'lmaydi — hodisa butunlay yo'qoladi.
 
-3. 🔴 **`custom_sync_client.cpp` (443 qator) HALI BIR MARTA HAM
-   KOMPILYATSIYA QILINMAGAN.** U selftest'ga kirmaydi va to'liq build
-   qilinmagan. Tekshiruvda bitta aniq kompilyatsiya xatosi topilib
-   tuzatildi (`Crypto::Seal` `QByteArray` qaytaradi, `optional` emas),
-   lekin boshqasi ham bo'lishi mumkin. **Task 7 dan oldin to'liq build
-   qilinsin** (~34 daqiqa).
+3. ✅ **`custom_sync_client.cpp` KOMPILYATSIYA QILINDI** (2026-09-05).
+   To'liq build o'tdi: beshala `custom_sync_*.obj` va `custom_db.obj`
+   qurildi, `moc_custom_sync_client.cpp` generatsiya qilindi,
+   `Telegram.exe` linklandi. Ungacha bitta kompilyatsiya xatosi topilib
+   tuzatilgan edi (`Crypto::Seal` `QByteArray` qaytaradi, `optional`
+   emas) -- u selftest'ga kirmagani uchun sezilmay qolgandi.
 
 4. **`Outbox::Enqueue` hozircha inert.** `KeysAvailable()` doim `false`
    qaytaradi, chunki master kalit Task 6 (enrollment) da paydo bo'ladi. Task 6 da uni
@@ -82,6 +82,17 @@ yo'qotish — tiklab bo'lmaydi.
    hamma yozuvni bitta `''` kalitiga uradi. Kodda ikkinchi qulf bor
    (bo'sh `recordId` da darhol qaytadi), lekin u xatoni yashiradi emas,
    to'xtatadi xolos.
+
+5. 🔴 **`edited` uchun `occurred_at` ikki tahrirni ajratmaydi.**
+   Enqueue nuqtasi `msg.msgDate` ni beradi -- xabarning ASL sanasi, u
+   tahrirda o'zgarmaydi. Ya'ni bir xabar ikki marta tahrirlansa ikkala
+   hodisa bir xil `record_id` oladi va ikkinchisi dedup'da yo'qoladi.
+   Lokal tahrir vaqtiga o'tish YECHIM EMAS: `occurred_at` aynan shu
+   sabab deterministik -- ikki qurilma bir hodisani ko'rganda bir xil
+   `record_id` chiqarishi kerak, lokal soat esa har qurilmada boshqa.
+   To'g'ri yechim Telegram'ning tahrir sanasini talab qiladi,
+   `ActionedMessage` da esa bunday maydon yo'q. Alohida ish sifatida
+   qoldirildi (2026-09-05 da Task 7a tayyorlanayotganda topildi).
 
 ### tdesktop'da Track C uchun QOLGAN ishlar
 
@@ -159,6 +170,8 @@ To'liq matn: spec §0.
 | 0.9 | Kvota: mijozda ham, serverda ham |
 | 0.10 | `peer_directory` va `PeerNameCache` birlashtirildi |
 | 0.11 | Plan 06 — reliz boshqaruvi API orqali |
+| 0.13 | `tombstone` nishoni OCHIQ maydonda (server payload'ni ocholmaydi) |
+| 0.14 | Payload ochiq `account_id` + `peer_id` olib yuradi — `peer_hash` teskarilanmaydi (2026-09-05) |
 
 ---
 
