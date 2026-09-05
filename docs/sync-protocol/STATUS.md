@@ -103,6 +103,17 @@ yo'qotish — tiklab bo'lmaydi.
    mumkin, aks holda 7b davrida kelgan tombstone'lar qo'llanmay
    qoladi.
 
+7. 🔴 **Task 8 uchun: merge QAYSI OQIMDA ishlaydi?** Hozir
+   `pullAndMerge` QNetworkAccessManager callback'ida, ya'ni GUI
+   oqimida bajariladi -- capture bilan bir xil oqim, poyga yo'q.
+   Ammo `MergeGuard` izohida "merge sync oqimida ishlaydi" deyilgan.
+   Agar orkestrator merge'ni boshqa oqimga ko'chirsa,
+   `custom_db.cpp` dagi `gPendingWrites` (87-qator) **hech qanday
+   mutex bilan himoyalanmagan** -- `gCacheMutex` faqat keshlarni
+   qoplaydi. `MergeGuard` ning o'zi thread_local, ya'ni to'g'ri;
+   muammo faqat gPendingWrites da. (2026-09-05, Task 7c tekshiruvida
+   topildi.)
+
 ### tdesktop'da Track C uchun QOLGAN ishlar
 
 1. ✅ **Sxema v10 — `account_id`** (5 ta jadval) + media tuzatishlari — kod tayyor, build o'tdi.
