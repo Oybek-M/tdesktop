@@ -25,6 +25,55 @@ Oxirgi yangilanish: **2026-09-07**
 
 ---
 
+## Ikki mashina o'rtasida ishlash (office laptop ↔ uy PC)
+
+2026-09-07 da kerak bo'ldi va yana kerak bo'ladi. Ikkala repo endi
+GitHub'da, ya'ni odatiy yo'l — `push` / `pull`:
+
+| Repo | Remote | Branch |
+|---|---|---|
+| tdesktop (CustomMod) | `Oybek-M/tdesktop` (`origin`) | `Oybek` |
+| customsync-server | `Oybek-M/customsync-server` (`origin`) | `Oybek` |
+
+🔴 **`upstream` ga (`telegramdesktop/tdesktop`) hech qachon push
+qilinmaydi.** `saidjon` remote'iga ham.
+
+### Push bilan KETMAYDIGAN narsalar
+
+1. **`cmake` submodule'idagi `/MP6` o'zgarishi.** U commit qilinmagan
+   va submodule detached HEAD'da turadi. Patch:
+   `Projects programming/Telegram/cmake-MP6.patch`. Yangi mashinada
+   build'dan OLDIN:
+
+       cd C:/TBuild/tdesktop/cmake && git apply ../../cmake-MP6.patch
+
+   Nima uchun kerak: raqamsiz `/MP` barcha yadroni oladi, har
+   `cl.exe` `/O2` bilan 1-2 GB yeydi. 15 GB RAM to'lib OS muzlaydi.
+   Yadro/RAM boshqacha bo'lsa raqamni moslang.
+
+2. **`out/` build daraxti** — repo'da yo'q, yangi mashinada CMake
+   qaytadan konfiguratsiya qilinadi va birinchi build to'liq bo'ladi
+   (~34 daqiqa; inkremental build ~8 daqiqa).
+
+3. **Foydalanuvchi bazasi** (`<ArchiveRoot>/db/actioned_messages.db`)
+   — mashinaga bog'liq va ko'chirilmaydi. Ikki mashinada ikki alohida
+   arxiv bo'ladi; ularni birlashtirish aynan shu loyihaning (sync)
+   maqsadi.
+
+4. **Master kalit** — DPAPI bilan himoyalangan, mashinadan chiqmaydi.
+   Yangi mashina Task 12 oqimi orqali umumiy arxivga QO'SHILADI
+   (parol so'raladi), yangi kalit YARATMAYDI.
+
+### Remote'siz zaxira (agar internet bo'lmasa)
+
+    git bundle create ../repo-YYYY-MM-DD.bundle --all
+    # boshqa mashinada:
+    git clone repo-YYYY-MM-DD.bundle repo
+
+Bitta fayl, to'liq tarix bilan. `git bundle verify` tekshiradi.
+
+---
+
 ## tdesktop — protokolga tegishli holat
 
 | Nima | Holat |
@@ -159,19 +208,23 @@ yashovchi `_client` a'zosi (`219e6cd52b`).
 
 ---
 
-## 🔴 KEYINGI QADAM — to'liq build (uyda bajariladi)
+## ✅ TO'LIQ BUILD O'TDI — 2026-09-07, 18:54
 
-    cmake --build C:/TBuild/tdesktop/out --config Release
+    13 succeeded, 0 failed, 43 up-to-date, 1 skipped
+    07:48 daqiqa
 
-Bitta build to'rtta ishni qoplaydi: Task 11 watchdog, Task 12a, Task
-12b va tdesktop-customization tomonida kutayotgan o'zgarishlar.
+Bitta build to'rtta ishni qopladi: Task 11 watchdog, Task 12a, Task
+12b va tdesktop-customization tomonidagi o'zgarishlar.
 
-⚠️ **Hozir ishlaydigan `Telegram.exe` YO'Q.** 2026-09-07 da qo'lda
-to'xtatilgan build 2 097 152 baytlik kesilgan fayl qoldirdi (avval
-235 348 992). Manba va obyekt fayllari butun — keyingi muvaffaqiyatli
-build uni qayta yaratadi.
+`Telegram.exe` **qayta linklandi**: 235 447 808 bayt, 18:54 —
+build tugagan vaqt bilan mos. (Ungacha qo'lda to'xtatilgan build
+2 097 152 baytlik kesilgan fayl qoldirgan edi.)
 
-### Build'dan keyin, shu tartibda
+🔴 **Endi kod kompilyatsiya bo'ldi, lekin HALI ISHLATILMADI.**
+Sinxronizatsiya tab'i, watchdog va kalit ulashish oqimi ekranda hech
+kim tomonidan ko'rilmagan.
+
+### Build'dan keyin, shu tartibda (BAJARILMAGAN)
 
 1. `../superpowers/plans/02-task11-manual-checklist.md` — 4 bo'lim.
    4-bo'lim Sinxronizatsiya tab'ini **birinchi marta ko'z bilan
@@ -297,6 +350,7 @@ global sozlamami yoki har chat uchun alohidami?
 
 ## customsync-server — implement holati
 
+**Repo:** https://github.com/Oybek-M/customsync-server (public, MIT)
 **Papka:** `Projects programming\Telegram\customsync-server`
 **Branch:** `Oybek` — `dotnet test`: **105 test, hammasi o'tadi**
 
