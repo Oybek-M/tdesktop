@@ -123,9 +123,24 @@ yo'qotish — tiklab bo'lmaydi.
      `hasMore=false` bo'lmaguncha tiklanmaydi, ya'ni har intervalda
      bitta paket.
 
-## Plan 02 qolgan tartib (2026-09-07 da kelishildi)
+## Qolgan tartib (2026-09-07 da kelishildi)
 
-**10 (UI) -> 11 (regressiya) -> 9 (WebSocket).**
+**12 (kalit ulashish) -> 11 (regressiya) -> ghost-read -> 9 (WebSocket)
+-> plan 05 (capture xizmati) -> Android.**
+
+🔴 **Task 12 -- BLOCKER, 1-o'rin.** Har qurilma hozir TASODIFIY master
+kalit yaratadi, ya'ni ikki qurilma bir-birining yozuvini ocha olmaydi
+va dedup ishlamaydi. Loyihaning asosiy maqsadi (bitta akkaunt, 4 ta
+sessiya: tdesktop + Android + iOS + capture xizmati) usiz ishlamaydi.
+
+Server tomoni **TAYYOR** -- `KeyEndpoints.cs` da `/api/v1/keys/wraps`
+GET/POST/DELETE ishlaydi. Ish faqat klientda. POST `admin` rolini
+talab qiladi: 1-qurilma `--admin` kodi bilan enroll bo'lib o'ramni
+yaratadi, qolganlari oddiy kod bilan faqat o'qiydi.
+
+- **12a** -- kripto + transport + selftest (UI yo'q)
+- **12b** -- UI oqimi: parol so'rash, o'ram bor/yo'qligiga qarab
+  tarmoqlanish, barmoq izini ko'rsatish. PBKDF2 `crl::async` da.
 
 Sabab: 30 soniyalik polling allaqachon ishlaydi, WebSocket faqat
 kechikishni kamaytiradi. UI esa blokerdek: foydalanuvchi hozir sync'ni
