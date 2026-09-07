@@ -243,6 +243,21 @@ struct MediaPeerSummary {
 // archiveRoot — ~/customizationMainFolder. Nechta yozuv o'zgargani qaytadi.
 int ReconcileMediaIndex(const QString &archiveRoot);
 
+// A21-C: legacy (account_id = 0) yozuvlari bir necha akkauntda uchraydigan
+// peer'lar. Egasini qoida bilan aniqlab bo'lmaydi -- foydalanuvchi tanlaydi.
+struct AmbiguousLegacyPeer {
+    QString peerId;
+    int legacyCount = 0;            // shu peer'dagi account_id = 0 qatorlar
+    QVector<qint64> candidates;     // noldan farqli account_id'lar
+    QVector<int> candidateCounts;   // har nomzodning qatorlari (candidates bilan bir tartibda)
+};
+
+[[nodiscard]] QVector<AmbiguousLegacyPeer> GetAmbiguousLegacyPeers();
+
+// Tanlangan peer'ning BARCHA account_id = 0 qatorlarini accountId ga
+// biriktiradi. Nechta qator o'zgargani qaytadi.
+int AssignLegacyRows(const QString &peerId, qint64 accountId);
+
 // Bir martalik BACKFILL skaneri: media_index v7 da paydo bo'lgan, ya'ni
 // undan OLDIN arxivlangan fayllar indeksda yo'q va shuning uchun
 // eksportga tushmaydi. Bu funksiya medias/ daraxtini aylanib chiqib,

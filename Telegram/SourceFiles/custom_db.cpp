@@ -1750,6 +1750,129 @@ int ReconcileMediaIndex(const QString &archiveRoot) {
     return changed;
 }
 
+// ---------------------------------------------------------------------------
+// A21-C: Ambiguous Legacy Peers Manual Assignment
+// ---------------------------------------------------------------------------
+
+QVector<AmbiguousLegacyPeer> GetAmbiguousLegacyPeers() {
+	Init();
+	QVector<AmbiguousLegacyPeer> result;
+	if (!gDb) return result;
+
+	// 1. Kamida 2 ta noldan farqli akkauntda uchraydigan VA kamida 1 ta
+	// account_id = 0 qatori bor bo'lgan peer'larni aniqlaymiz.
+	// legacy_count bo'yicha kamayish tartibida saralanadi (eng ko'p
+	// muammoli peer'lar birinchi chiqadi).
+	sqlite3_stmt *peerStmt = nullptr;
+	const char *const peerSql =
+		"SELECT peer_id, "
+		"       SUM(CASE WHEN account_id = 0 THEN 1 ELSE 0 END) AS legacy_count "
+		"FROM actioned_messages "
+		"GROUP BY peer_id "
+		"HAVING COUNT(DISTINCT CASE WHEN account_id <> 0 THEN account_id END) >= 2 "
+		"   AND SUM(CASE WHEN account_id = 0 THEN 1 ELSE 0 END) > 0 "
+		"ORDER BY legacy_count DESC";
+
+	if (sqlite3_prepare_v2(gDb, peerSql, -1, &peerStmt, nullptr) == SQLITE_OK) {
+		while (sqlite3_step(peerStmt) == SQLITE_ROW) {
+			AmbiguousLegacyPeer entry;
+			entry.peerId = colText(peerStmt, 0);
+			entry.legacyCount = sqlite3_column_int(peerStmt, 1);
+			if (!entry.peerId.isEmpty()) {
+				result.append(entry);
+			}
+		}
+		sqlite3_finalize(peerStmt);
+	}
+
+	// 2. Har bir peer uchun nomzod akkauntlarni va ularning yozuvlar sonini
+	// o'qiymiz. SELECT ochiq turgan holda boshqa operatsiya qilmaslik uchun
+	// avval barcha peer'lar o'qib olingan.
+	sqlite3_stmt *candStmt = nullptr;
+	const char *const candSql =
+		"SELECT account_id, COUNT(*) "
+		"FROM actioned_messages "
+		"WHERE peer_id = ? AND account_id <> 0 "
+		"GROUP BY account_id "
+		"ORDER BY COUNT(*) DESC, account_id ASC";
+
+	if (sqlite3_prepare_v2(gDb, candSql, -1, &candStmt, nullptr) == SQLITE_OK) {
+		for (auto &peer : result) {
+			bindText(candStmt, 1, peer.peerId);
+			while (sqlite3_step(candStmt) == SQLITE_ROW) {
+				const auto accId = sqlite3_column_int64(candStmt, 0);
+				const auto cnt = sqlite3_column_int(candStmt, 1);
+				peer.candidates.append(accId);
+				peer.candidateCounts.append(cnt);
+			}
+			sqlite3_reset(candStmt);
+			sqlite3_clear_bindings(candStmt);
+		}
+		sqlite3_finalize(candStmt);
+	}
+
+	return result;
+}
+
+int AssignLegacyRows(const QString &peerId, qint64 accountId) {
+	if (peerId.isEmpty() || accountId <= 0) {
+		return 0;
+	}
+	Init();
+	if (!gDb) return 0;
+
+	// UPDATE operatsiyasini alohida tranzaksiya ichida bajaramiz.
+	if (!execSql("BEGIN")) {
+		return 0;
+	}
+
+	int changed = 0;
+	sqlite3_stmt *stmt = nullptr;
+	// Qat'iy talablar:
+	// 1. Faqat shu peer_id: WHERE peer_id = ?
+	// 2. Faqat legacy qatorlar: AND account_id = 0 (noldan farqli qatorlarga aslo tegmaydi)
+	const char *const updateSql =
+		"UPDATE actioned_messages "
+		"SET account_id = ? "
+		"WHERE peer_id = ? AND account_id = 0";
+
+	if (sqlite3_prepare_v2(gDb, updateSql, -1, &stmt, nullptr) == SQLITE_OK) {
+		sqlite3_bind_int64(stmt, 1, accountId);
+		bindText(stmt, 2, peerId);
+		if (sqlite3_step(stmt) == SQLITE_DONE) {
+			changed = sqlite3_changes(gDb);
+		}
+		sqlite3_finalize(stmt);
+	}
+
+	execSql("COMMIT");
+
+	if (changed > 0) {
+		// Qatorlar yangi accountId ga o'tgach, in-memory keshlar (gDeletedCache,
+		// gEditedCache, gLoadedPeers, gPeersWithDeleted) eski holatni saqlamasligi
+		// uchun shu peer'ga tegishli barcha kesh yozuvlarini tozalaymiz.
+		QMutexLocker locker(&gCacheMutex);
+		for (auto it = gLoadedPeers.begin(); it != gLoadedPeers.end();) {
+			if (it->peerId == peerId) {
+				gDeletedCache.remove(*it);
+				gEditedCache.remove(*it);
+				gPeersWithDeleted.remove(*it);
+				it = gLoadedPeers.erase(it);
+			} else {
+				++it;
+			}
+		}
+		// accountId=0 bo'lgan sintetik yozuvlar ham tozalansin
+		const PeerKey zeroKey{ .accountId = 0, .peerId = peerId };
+		gDeletedCache.remove(zeroKey);
+		gEditedCache.remove(zeroKey);
+		gPeersWithDeleted.remove(zeroKey);
+		gLoadedPeers.remove(zeroKey);
+	}
+
+	return changed;
+}
+
 Sha256Report BackfillMediaSha256(const QString &archiveRoot) {
 	Init();
 	auto report = Sha256Report();

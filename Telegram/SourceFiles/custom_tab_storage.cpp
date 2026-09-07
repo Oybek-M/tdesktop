@@ -263,6 +263,109 @@ void fillStorageTab(
 		});
 	}
 
+	// 3b-bo'lim: Egasi noma'lum yozuvlar (Standart yopiq)
+	const auto s3b = AddCollapsibleSection(
+		content,
+		u"👤 Egasi noma'lum yozuvlar"_q,
+		false);
+	{
+		s3b->add(
+			object_ptr<Ui::FlatLabel>(
+				s3b,
+				rpl::single(u"Bu yozuvlar ko'p akkauntli tizimdan oldin saqlangan bo'lib, bir nechta akkauntingizda uchraydi. Birini tanlasangiz, yozuvlar boshqa akkauntlaringizdan yashiriladi."_q),
+				st::customModHintLabel),
+			st::boxRowPadding);
+
+		const auto ambiguousPeers = CustomDB::GetAmbiguousLegacyPeers();
+		if (ambiguousPeers.isEmpty()) {
+			s3b->add(
+				object_ptr<Ui::FlatLabel>(
+					s3b,
+					rpl::single(u"Egasi noma'lum noaniq yozuvlar mavjud emas."_q),
+					st::customModHintLabel),
+				st::boxRowPadding);
+		} else {
+			for (const auto &peer : ambiguousPeers) {
+				Ui::AddSkip(s3b, 8);
+				auto name = CustomSettings::GetPeerDisplayName(peer.peerId);
+				if (name.isEmpty()) {
+					auto ok = false;
+					const auto rawId = peer.peerId.toULongLong(&ok);
+					if (ok && rawId) {
+						if (const auto window = Core::App().activeWindow()) {
+							if (const auto c = window->sessionController()) {
+								const auto p = c->session().data().peerLoaded(PeerId(rawId));
+								if (p) {
+									name = p->name();
+									CustomSettings::RememberPeerName(peer.peerId, name);
+								}
+							}
+						}
+					}
+				}
+				if (name.isEmpty()) {
+					name = peer.peerId;
+				}
+
+				const auto title = QString(u"%1 (%2 ta yozuv)"_q)
+					.arg(name)
+					.arg(peer.legacyCount);
+
+				s3b->add(
+					object_ptr<Ui::FlatLabel>(
+						s3b,
+						rpl::single(title),
+						st::defaultSubsectionTitle),
+					st::defaultSubsectionTitlePadding);
+
+				for (int i = 0; i < peer.candidates.size(); ++i) {
+					const auto accId = peer.candidates[i];
+					const auto cnt = peer.candidateCounts[i];
+					const auto btnText = QString(u"→ %1 (%2 ta yozuv shu akkauntda)"_q)
+						.arg(accId)
+						.arg(cnt);
+
+					const auto btn = s3b->add(
+						object_ptr<Ui::SettingsButton>(
+							s3b,
+							rpl::single(btnText),
+							st::settingsButtonNoIcon));
+
+					const auto legacyCount = peer.legacyCount;
+					const auto peerId = peer.peerId;
+
+					btn->setClickedCallback([=] {
+						const auto window = Core::App().activeWindow();
+						if (!window) return;
+
+						const auto confirmText = QString(
+							u"\"%1\" chatidagi %2 ta eski yozuvni %3 akkauntiga biriktirmoqchimisiz?\n\n"
+							"Ogohlantirish: bu yozuvlar boshqa akkauntlaringizda ko'rinmay qoladi."_q)
+							.arg(name)
+							.arg(legacyCount)
+							.arg(accId);
+
+						window->show(Ui::MakeConfirmBox({
+							.text = confirmText,
+							.confirmed = [=](Fn<void()> close) {
+								close();
+								const auto moved = CustomDB::AssignLegacyRows(peerId, accId);
+								Ui::Toast::Show(QString(
+									u"%1 ta yozuv %2 akkauntiga biriktirildi."_q)
+									.arg(moved)
+									.arg(accId));
+								if (onArchiveChanged) {
+									onArchiveChanged();
+								}
+							},
+							.confirmText = u"Biriktirish"_q,
+						}));
+					});
+				}
+			}
+		}
+	}
+
 	// 4-bo'lim: Eksport va tiklash (Standart yopiq)
 	const auto s4 = AddCollapsibleSection(content, u"📤 Eksport va tiklash"_q, false);
 	{
