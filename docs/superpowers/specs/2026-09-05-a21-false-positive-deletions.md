@@ -1,6 +1,6 @@
 # A21 — Soxta "o'chirilgan" yozuvlari (partiyali false-positive)
 
-**Holat:** 🟡 ILDIZ SABAB TOPILDI — tuzatish yo'nalishi bo'yicha qaror kutilmoqda
+**Holat:** 🟡 A va B bajarildi (sxema v16, commit 9fa32cc7c3) — C qoldi, build kutilmoqda
 **Aniqlangan:** 2026-09-05, foydalanuvchi hisoboti + baza tahlili
 **Xavf darajasi:** yuqori — AntiDelete'ning ishonchliligini yo'q qiladi
 
@@ -166,3 +166,24 @@ Tozalash yoki migratsiya OLDIDAN backup shart. Bugungi nusxa mavjud:
 Soxta deb ko'ringan yozuvlarni ko'r-ko'rona o'chirish **mumkin emas** —
 ular orasida chinakam o'chirilgan xabarlar bor (§3.2), va ular ayni
 shu jadvalda saqlanadi.
+
+## 6. Bajarilgani (2026-09-05)
+
+**A — avtomatik egalik (sxema v16).** Peer'ning noldan farqli yozuvlari
+bitta akkauntga tegishli bo'lsa, legacy qatorlar o'sha akkauntga
+biriktiriladi. Jonli bazaning nusxasida sinaldi: legacy **26 753 -> 14 970**
+(11 783 biriktirildi), NULL yo'q, .
+
+v15 boshqa sessiyaning  i tomonidan band edi -- shuning
+uchun **v16**.
+
+**B — UI belgisi.** Qolgan  yozuvlari chatda boshqacha
+belgi bilan chiziladi (, ):
+. Yashirmaymiz --
+ ataylab qat'iy va ma'lumot yo'qotmaslikni afzal biladi.
+
+**C — qo'lda biriktirish.** 29 ta noaniq peer (11 148 yozuv) uchun Ombor
+tabida ro'yxat. Prompt tayyor: .
+
+**Keyingi qadam:** build + sinov. Akam chatida (peer 1334067829) 445 ta
+yozuv hamon legacy -- u noaniqlar ichida, unga faqat C yordam beradi.
