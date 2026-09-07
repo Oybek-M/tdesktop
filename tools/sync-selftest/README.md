@@ -111,6 +111,33 @@ call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\v
 `QT_NO_CAST_FROM_BYTEARRAY` va `QT_NO_KEYWORDS` haqiqiy build'da
 yoqilgan va ularsiz tekshiruv haqiqatdan yumshoqroq bo'ladi.
 
+## Bitta faylni to'liq build'siz kompilyatsiya qilish
+
+`/Zs` shim usuli tdesktop'ning butun sarlavha daraxtini tortadigan
+fayllarda ishlamaydi (`custom_db.cpp`, `custom_tab_*.cpp`). Ular uchun
+34 daqiqalik to'liq build SHART emas -- MSBuild bitta faylni
+kompilyatsiya qila oladi:
+
+```
+call "C:\Program Files\Microsoft Visual Studio8\Community\VC\Auxiliary\Buildcvars64.bat"
+msbuild C:\TBuild	desktop\out\Telegram\Telegram.vcxproj /nologo /v:m ^
+  /p:Configuration=Release /p:Platform=x64 ^
+  /p:SelectedFiles=C:\TBuild	desktop\Telegram\SourceFiles\custom_tab_sync.cpp ^
+  /t:ClCompile
+```
+
+PCH allaqachon qurilgani uchun bu ~1 daqiqa oladi. Link bosqichi
+bajarilmaydi, ya'ni `Telegram.exe` ga tegilmaydi.
+
+2026-09-07 da `custom_tab_sync.cpp` (800+ qator UI kodi) uchta ketma-ket
+to'liq build'ni yeb qo'ydi, chunki har safar faqat bitta kompilyatsiya
+xatosi topilardi. Shu buyruq bilan uchalasi ham bir necha daqiqada
+topilishi mumkin edi.
+
+MSB8028 ogohlantirishlari (`intermediate directory ... shared`) normal --
+ular tdesktop'ning tashqi kutubxonalariga tegishli, sizning kodingizga
+emas.
+
 `custom_db.cpp` bu usul bilan tekshirilmaydi — u tdesktop'ning butun
 sarlavha daraxtini tortadi. Undagi chaqiruvlarni alohida kichik probe
 faylida takrorlab tekshirish mumkin.
