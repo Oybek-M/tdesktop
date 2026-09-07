@@ -142,6 +142,30 @@ yaratadi, qolganlari oddiy kod bilan faqat o'qiydi.
 - **12b** -- UI oqimi: parol so'rash, o'ram bor/yo'qligiga qarab
   tarmoqlanish, barmoq izini ko'rsatish. PBKDF2 `crl::async` da.
 
+## Ghost-read tuzatishi uchun aniq boshlang'ich nuqta (2026-09-07)
+
+Task 11 migratsiya tekshiruvi jonli bazadan raqamlarni berdi:
+`actioned_messages` 42 490, `activity_history` 160 611,
+`media_index` 3 087 -- va **`ghost_reads` = 0 ta qator**.
+
+Bu tasodif emas, izlanishni juda toraytiradi. Yozish yo'li faqat
+**bitta** shartga bog'liq:
+
+    data_histories.cpp:776 va 786
+    if (CustomSettings::ShouldGhost(QString::number(peer->id.value))) {
+        CustomDB::SaveGhostRead(...);
+
+O'qish tomoni esa keng ulangan (`history.cpp` da 4 ta joy,
+`api_updates.cpp` da 1 ta). Ya'ni mexanizm bor, lekin **hech qachon
+yozilmayapti**.
+
+Ikki ehtimol, tuzatishdan oldin shuni aniqlash kerak:
+1. Ghost rejimi yoqilgan, lekin `ShouldGhost()` false qaytaryapti
+   (peer id formati mos kelmayapti?) -- unda tuzatish shu yerda.
+2. Ghost rejimi o'chiq -- unda o'qilgan holat serverga ketadi va
+   muammoning sababi butunlay boshqa joyda; avval shuni tekshirish
+   kerak, aks holda noto'g'ri joyni tuzatamiz.
+
 Sabab: 30 soniyalik polling allaqachon ishlaydi, WebSocket faqat
 kechikishni kamaytiradi. UI esa blokerdek: foydalanuvchi hozir sync'ni
 yoqa ham olmaydi. 🔴 **Task 9 tashlab yuborilmaydi** -- u tartibda
