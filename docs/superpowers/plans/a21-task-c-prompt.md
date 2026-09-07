@@ -42,6 +42,27 @@ Measured on the live database (2026-09-05):
 `1334067829` is the chat the user actually reported. 29 items is small
 enough to resolve by hand — that is the whole point of this task.
 
+### 1.1. What success looks like — read this before you verify anything
+
+**Do not judge this task by what changes in the chat window.** Measured
+on 2026-09-07, of the 217 legacy `deleted` rows in peer `1334067829`:
+
+| | rows |
+|---|---|
+| has text — can be injected into the chat | 23 |
+| has a media file that still exists on disk | 0 |
+| **no content at all — never injected** | **194** |
+
+A separate rule (`history.cpp`, added 2026-08-27) refuses to inject a
+record with no text and no surviving media file, and `looksForeign()`
+filters more of what is left. So roughly 89% of these rows are already
+invisible, and assigning them an owner will not visibly change the chat.
+
+That is expected. **This task is about data correctness, not about the
+chat rendering.** Verify it with SQL against a copy of the database and
+through the Ombor tab's own list, never by looking for messages to
+disappear from a conversation.
+
 **Do NOT invent a heuristic.** Attribution by timestamp was already
 measured and rejected: the accounts' activity windows nearly all run from
 2026-08-27/28 to today, so timestamps separate nothing. Attribution by
@@ -183,6 +204,9 @@ history. Treat it accordingly:
   candidate accounts.
 - A confirmed assign moves exactly the stated rows, the toast reports the
   same number, and reopening the tab no longer lists that peer.
+- `SELECT COUNT(*) FROM actioned_messages WHERE account_id = 0` drops by
+  exactly the assigned amount, and no row's `account_id` changed from a
+  non-zero value. Check this on a copy, not the live database.
 - The code compiles as part of the existing `custom_db` / `custom_tab_*`
   targets with no new CMake entries.
 
