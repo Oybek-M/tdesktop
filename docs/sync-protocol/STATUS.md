@@ -132,6 +132,14 @@ kechikishni kamaytiradi. UI esa blokerdek: foydalanuvchi hozir sync'ni
 yoqa ham olmaydi. 🔴 **Task 9 tashlab yuborilmaydi** -- u tartibda
 oxirgi, lekin plan 02 usiz TUGAMAGAN hisoblanadi.
 
+✅ **Task 10 (UI) bajarildi** (2026-09-07). `custom_tab_sync.cpp`,
+tab indeksi 7. To'liq build o'tdi, `Telegram.exe` qayta linklandi.
+
+🔴 **Tab HALI KO'Z BILAN KO'RILMAGAN.** Kod kompilyatsiya bo'ldi,
+lekin hech kim uni ekranda ochmagan. Task 11 ning birinchi ishi --
+ilovani ishga tushirib tabni ochish: joylashuv, matnlar, toggle va
+holat yozuvlari haqiqatan ishlaydimi.
+
 ### tdesktop'da Track C uchun QOLGAN ishlar
 
 1. ✅ **Sxema v10 — `account_id`** (5 ta jadval) + media tuzatishlari — kod tayyor, build o'tdi.
