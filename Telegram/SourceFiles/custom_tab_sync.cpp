@@ -52,7 +52,7 @@ void ShowJoinArchiveBox(
 				st::defaultSubsectionTitle),
 			st::defaultSubsectionTitlePadding);
 
-		const auto passInput = Settings::AddPasswordField(
+		const auto passInput = Settings::CloudPassword::AddPasswordField(
 			box->verticalLayout(),
 			rpl::single(u"Parolni kiriting"_q),
 			QString()).get();
@@ -198,7 +198,7 @@ void ShowCreateArchiveBox(
 				st::defaultSubsectionTitle),
 			st::defaultSubsectionTitlePadding);
 
-		const auto pass1Input = Settings::AddPasswordField(
+		const auto pass1Input = Settings::CloudPassword::AddPasswordField(
 			box->verticalLayout(),
 			rpl::single(u"Yangi parol"_q),
 			QString()).get();
@@ -212,7 +212,7 @@ void ShowCreateArchiveBox(
 				st::defaultSubsectionTitle),
 			st::defaultSubsectionTitlePadding);
 
-		const auto pass2Input = Settings::AddPasswordField(
+		const auto pass2Input = Settings::CloudPassword::AddPasswordField(
 			box->verticalLayout(),
 			rpl::single(u"Parolni qayta kiriting"_q),
 			QString()).get();
