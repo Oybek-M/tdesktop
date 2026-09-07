@@ -140,43 +140,100 @@ void CustomTabBar::setActiveTab(int index) {
 	update();
 }
 
-void CustomTabBar::paintEvent(QPaintEvent *) {
-		Painter p(this);
-		const auto h = height();
-		p.fillRect(rect(), st::windowBg);
-		p.fillRect(0, h - 1, width(), 1, st::shadowFg->c);
-		if (_names.empty()) return;
-		const auto tabW = width() / int(_names.size());
-		for (auto i = 0; i < int(_names.size()); ++i) {
-			const auto active = (i == _active);
-			p.setPen(active
-				? st::windowActiveTextFg->c
-				: st::windowSubTextFg->c);
-			p.setFont(active ? st::semiboldFont : st::normalFont);
-			p.drawText(
-				QRect(i * tabW, 0, tabW, h - 3),
-				_names[i],
-				QTextOption(Qt::AlignCenter));
-			if (active) {
-				p.fillRect(
-					i * tabW + 4, h - 3,
-					tabW - 8, 2,
-					st::windowActiveTextFg->c);
-			}
-		}
+// Tab kengliklari matn uzunligiga yarasha taqsimlanadi.
+//
+// Ilgari `width() / _names.size()` -- teng bo'lish -- ishlatilardi va 8-tab
+// ("Sinxronizatsiya") qo'shilgach u kesilib qolardi: "Arxiv" ga kerakdan
+// ~45px ortiq joy tegar, uzun nomga esa yetmasdi. Joy yetarli edi, faqat
+// noto'g'ri taqsimlangandi.
+//
+// O'lchov HAR DOIM semibold bilan olinadi, garchi nofaol tablar normal
+// shriftda chizilsa ham: aks holda tab tanlanganda uning kengligi o'zgarib,
+// yonidagilar joyidan siljib turardi.
+void CustomTabBar::recomputeWidths() {
+	_widths.assign(_names.size(), 0);
+	const auto count = int(_names.size());
+	if (!count || width() <= 0) {
+		return;
+	}
+	const auto padding = 2 * st::customModTabBarHPadding;
+
+	auto natural = std::vector<int>(count, 0);
+	auto total = 0;
+	for (auto i = 0; i != count; ++i) {
+		natural[i] = st::semiboldFont->width(_names[i]) + padding;
+		total += natural[i];
 	}
 
+	// Oxirgi tab chetgacha yetsin: bo'lishdagi qoldiq unga qo'shiladi,
+	// aks holda o'ng chekkada bir-ikki piksel bo'sh qolardi.
+	auto used = 0;
+	for (auto i = 0; i != count; ++i) {
+		_widths[i] = (i == count - 1)
+			? (width() - used)
+			: int(qint64(natural[i]) * width() / total);
+		used += _widths[i];
+	}
+}
+
+void CustomTabBar::resizeEvent(QResizeEvent *) {
+	recomputeWidths();
+}
+
+void CustomTabBar::paintEvent(QPaintEvent *) {
+	Painter p(this);
+	const auto h = height();
+	p.fillRect(rect(), st::windowBg);
+	p.fillRect(0, h - 1, width(), 1, st::shadowFg->c);
+	if (_names.empty()) return;
+	if (_widths.size() != _names.size()) {
+		recomputeWidths();
+	}
+	auto x = 0;
+	for (auto i = 0; i < int(_names.size()); ++i) {
+		const auto tabW = _widths[i];
+		const auto active = (i == _active);
+		p.setPen(active
+			? st::windowActiveTextFg->c
+			: st::windowSubTextFg->c);
+		// Deraza juda torayganda proportsional ulush ham yetmay qoladi --
+		// o'shanda matn kesilib "..." qo'yiladi, chala harf qolmasin.
+		const auto inner = tabW - 2 * st::customModTabBarHPadding;
+		const auto font = active ? st::semiboldFont : st::normalFont;
+		const auto text = font->elided(_names[i], std::max(inner, 0));
+		p.setFont(font);
+		p.drawText(
+			QRect(x, 0, tabW, h - 3),
+			text,
+			QTextOption(Qt::AlignCenter));
+		if (active) {
+			p.fillRect(
+				x + 4, h - 3,
+				std::max(tabW - 8, 0), 2,
+				st::windowActiveTextFg->c);
+		}
+		x += tabW;
+	}
+}
 
 void CustomTabBar::mousePressEvent(QMouseEvent *e) {
-		if (_names.empty()) return;
-		const auto tabW = width() / int(_names.size());
-		const auto idx = e->pos().x() / tabW;
-		if (idx >= 0 && idx < int(_names.size())) {
-			_active = idx;
-			_tabSelected.fire_copy(idx);
+	if (_names.empty()) return;
+	if (_widths.size() != _names.size()) {
+		recomputeWidths();
+	}
+	// Chizishdagi kengliklardan foydalanamiz -- ular boshqacha hisoblansa
+	// bosish qo'shni tabga tushib ketardi.
+	auto x = 0;
+	for (auto i = 0; i < int(_names.size()); ++i) {
+		x += _widths[i];
+		if (e->pos().x() < x) {
+			_active = i;
+			_tabSelected.fire_copy(i);
 			update();
+			return;
 		}
 	}
+}
 
 
 void AddAvatarPeerRow(

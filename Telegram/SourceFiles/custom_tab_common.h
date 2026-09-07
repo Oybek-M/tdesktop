@@ -106,9 +106,15 @@ public:
 protected:
 	void paintEvent(QPaintEvent *) override;
 	void mousePressEvent(QMouseEvent *e) override;
+	void resizeEvent(QResizeEvent *) override;
 
 private:
+	// Tablar teng emas, matn uzunligiga yarasha joy oladi -- sabab
+	// .cpp dagi recomputeWidths() izohida.
+	void recomputeWidths();
+
 	std::vector<QString> _names;
+	std::vector<int> _widths; // _names bilan bir tartibda, pikselda
 	int _active = 0;
 	rpl::event_stream<int> _tabSelected;
 };
