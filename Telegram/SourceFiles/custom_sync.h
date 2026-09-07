@@ -89,6 +89,7 @@ private:
     int _consecutiveFailures = 0;
     qint64 _lastSuccessAt = 0;
     QString _lastError;
+    quint64 _currentCycleId = 0;
 };
 
 [[nodiscard]] Orchestrator *GetOrchestrator();

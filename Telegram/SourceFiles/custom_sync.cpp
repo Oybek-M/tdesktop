@@ -135,16 +135,35 @@ void Orchestrator::runCycle() {
     }
 
     _inFlight = true;
+    const auto cycleId = ++_currentCycleId;
     Q_EMIT statusChanged(status());
+
+    // Watchdog: agar tarmoq callback'i hech qachon kelmasa, _inFlight abadiy
+    // qotib qolmasligi uchun himoya taymeri (timeout intervaldan hisoblanadi).
+    const int interval = CustomSettings::SyncIntervalSeconds();
+    const int watchdogTimeoutMs = std::max(60, interval * 3) * 1000;
+    QTimer::singleShot(watchdogTimeoutMs, this, [this, cycleId] {
+        if (_inFlight && _currentCycleId == cycleId) {
+            qWarning() << "CustomSync: cycle" << cycleId
+                       << "watchdog fired; clearing inFlight flag and applying backoff";
+            onCycleFinished(0, 0, 0, 0, false, QStringLiteral("cycle_timeout"));
+        }
+    });
 
     // Avval push, keyin pull (spec §3.4: observed_at iloji boricha yaqin bo'lishi uchun)
     if (!_client) {
         _client = new Client(this);
     }
-    _client->pushPending([this](int sent, int failed) {
+    _client->pushPending([this, cycleId](int sent, int failed) {
+        if (_currentCycleId != cycleId) {
+            return;
+        }
         // Push xato bo'lsa ham pull baribir urinib ko'riladi
-        _client->pullAndMerge([this, sent, failed](
+        _client->pullAndMerge([this, cycleId, sent, failed](
                 int merged, int rejected, bool hasMore, QString error) {
+            if (_currentCycleId != cycleId) {
+                return;
+            }
             onCycleFinished(sent, failed, merged, rejected, hasMore, error);
         });
     });
