@@ -2310,6 +2310,21 @@ void History::loadDeletedMessages() {
 	const QString marker = QString::fromUtf8(
 		"\xe2\x80\x94\xe2\x80\x94 O'CHIRILDI \xe2\x80\x94\xe2\x80\x94");
 
+	// A21: egasi noma'lum yozuv uchun alohida belgi.
+	//
+	// v16 migratsiyasi nomzodi YAGONA bo'lganlarni biriktirdi. Qolgani --
+	// peer bir necha akkauntda uchragani uchun -- 0 bo'lib qoladi va
+	// `account_id IN (0, ?)` filtri sababli HAR akkauntda ko'rinadi.
+	// Yuqoridagi looksForeign() ataylab qat'iy, ya'ni shubhali yozuvni
+	// ko'rsatishni afzal biladi -- ma'lumot yo'qotmaslik uchun.
+	//
+	// Shuning uchun ularni yashirmaymiz, BELGILAYMIZ: foydalanuvchi
+	// "bu yozuv boshqa akkauntdan kelgan bo'lishi mumkin" ekanini
+	// ko'rib tursin, jim qolgan noto'g'ri belgi o'rniga.
+	const QString legacyMarker = QString::fromUtf8(
+		"\xe2\x80\x94\xe2\x80\x94 O'CHIRILDI \xe2\x80\x94\xe2\x80\x94"
+		"  \xe2\x9a\xa0 eski yozuv, akkaunt noma'lum");
+
 	int injectedCount = 0;
 	int skippedEmpty = 0;   // mazmuni yo'qligi uchun chizilmagan
 	int skippedForeign = 0; // boshqa akkauntniki deb topilgan
@@ -2420,7 +2435,8 @@ void History::loadDeletedMessages() {
 		}
 
 		TextWithEntities displayText;
-		displayText.append(marker + "\n\n");
+		displayText.append(
+			((msg.accountId == 0) ? legacyMarker : marker) + "\n\n");
 		if (!msg.text.isEmpty()) {
 			displayText.append(TextWithEntities{ msg.text });
 		} else {

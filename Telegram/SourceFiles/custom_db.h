@@ -65,7 +65,7 @@ struct ActionedMessage {
 // v13 (A17): actioned_messages ga read_at ustuni
 // v14 (sync): sync_outbox + sync_state jadvallari
 // v15 (sync): sync_record_map jadvali va indeksi
-constexpr int kCurrentSchemaVersion = 15;
+constexpr int kCurrentSchemaVersion = 16;
 
 void Init();
 

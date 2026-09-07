@@ -726,6 +726,36 @@ void RunMigrations() {
                 "ON sync_record_map(kind, account_id, peer_id, occurred_at)");
     }
 
+    // v15 -> v16 (A21): egasi ANIQ bo'lgan legacy yozuvlarga account_id.
+    //
+    // v10 gacha account_id yozilmagan -- 26 753 qator 0 bilan qoldi.
+    // O'qish filtri `account_id IN (0, ?)` bo'lgani uchun nol "HAMMA
+    // akkaunt" degani: boshqa akkauntda qayd etilgan o'chirish begona
+    // chatga kirib boradi. Foydalanuvchi uni "men o'chirmaganman"
+    // deb ko'radi va AntiDelete'ga ishonchi yo'qoladi.
+    //
+    // Taxmin QILMAYMIZ. Faqat peer'ning noldan farqli yozuvlari
+    // BITTA akkauntga tegishli bo'lsa biriktiramiz -- o'shanda nomzod
+    // yagona. Ikki va undan ortiq akkauntda uchraydigan peer (o'lchov:
+    // 29 ta, yozuvlarning 42%) va umuman dalili yo'qlari (1044 peer)
+    // 0 bo'lib qoladi va UI'da "eski yozuv" deb belgilanadi.
+    //
+    // Vaqt bo'yicha biriktirish ko'rib chiqilib RAD ETILDI: akkauntlarning
+    // faollik oynalari deyarli to'liq ustma-ust (hammasi 2026-08-27/28
+    // dan bugungacha), ya'ni timestamp hech narsani ajratmaydi.
+    if (version < 16) {
+        execSql("CREATE TEMP TABLE IF NOT EXISTS a21_owner AS "
+                "SELECT peer_id, MIN(account_id) AS owner "
+                "FROM actioned_messages WHERE account_id <> 0 "
+                "GROUP BY peer_id HAVING COUNT(DISTINCT account_id) = 1");
+        execSql("UPDATE actioned_messages SET account_id = ("
+                "  SELECT owner FROM a21_owner "
+                "  WHERE a21_owner.peer_id = actioned_messages.peer_id) "
+                "WHERE account_id = 0 "
+                "  AND peer_id IN (SELECT peer_id FROM a21_owner)");
+        execSql("DROP TABLE IF EXISTS a21_owner");
+    }
+
     // Update version stamp.
     {
         sqlite3_stmt *stmt = nullptr;
