@@ -48,7 +48,8 @@ Split it the way it actually divides:
 
   - **You** do everything that can be checked without launching the
     app: the migration against a copy of the real database, a static
-    K5 audit, the build, the selftest, and one small defensive fix.
+    K5 audit, the selftest, and one small defensive fix. NOT the full
+    build -- that is the user's to run.
   - **You write the manual checklist** that the user runs afterwards.
 
 Do not claim any manual result. If a row can only be confirmed by
