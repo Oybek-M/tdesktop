@@ -233,14 +233,6 @@ void Client::enroll(
                 ? dt.toSecsSinceEpoch()
                 : (QDateTime::currentSecsSinceEpoch() + 3600);
 
-            // Master key: faqat birinchi marta (mavjud bo'lmasa) yaratiladi!
-            // Mavjud bo'lsa hech qachon almashtirilmaydi (tarix undecryptable bo'lib qolmasligi uchun).
-            // OGOHLANTIRISH / XAVF: Ikkinchi qurilma bugun boshqa master key yaratadi (gap)!
-            if (!Outbox::EnsureMasterKeyCreated()) {
-                if (done) done(false, QStringLiteral("master_key_creation_failed"));
-                return;
-            }
-
             if (done) done(true, QString());
         } else {
             if (done) done(false, resp.error.isEmpty() ? QStringLiteral("enroll_failed") : resp.error);
