@@ -114,6 +114,24 @@ yo'qotish — tiklab bo'lmaydi.
    muammo faqat gPendingWrites da. (2026-09-05, Task 7c tekshiruvida
    topildi.)
 
+8. **Task 8 dan qolgan ikkita quyruq (Task 11 uchun):**
+   - `_inFlight` uchun **watchdog yo'q**. `pushPending` yoki
+     `pullAndMerge` callback'i otilmasa bayroq abadiy qoladi va sync
+     jimgina o'ladi. `QNetworkReply` odatda `finished` ni chiqaradi,
+     ya'ni ehtimollik past -- lekin timeout arzon.
+   - **Katta backlog sekin oqadi.** Cap'ga yetgach `_catchUpCycles`
+     `hasMore=false` bo'lmaguncha tiklanmaydi, ya'ni har intervalda
+     bitta paket.
+
+## Plan 02 qolgan tartib (2026-09-07 da kelishildi)
+
+**10 (UI) -> 11 (regressiya) -> 9 (WebSocket).**
+
+Sabab: 30 soniyalik polling allaqachon ishlaydi, WebSocket faqat
+kechikishni kamaytiradi. UI esa blokerdek: foydalanuvchi hozir sync'ni
+yoqa ham olmaydi. 🔴 **Task 9 tashlab yuborilmaydi** -- u tartibda
+oxirgi, lekin plan 02 usiz TUGAMAGAN hisoblanadi.
+
 ### tdesktop'da Track C uchun QOLGAN ishlar
 
 1. ✅ **Sxema v10 — `account_id`** (5 ta jadval) + media tuzatishlari — kod tayyor, build o'tdi.
