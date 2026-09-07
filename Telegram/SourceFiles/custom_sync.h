@@ -49,6 +49,8 @@ struct SyncStatus {
 [[nodiscard]] SyncStatus CurrentSyncStatus();
 
 #ifndef SYNC_SELFTEST
+class Client;
+
 // Orkestrator sinfi — faqat asosiy (GUI) oqimda ishlaydi (QTimer).
 // Hech qanday ikkinchi oqim yoki mutex yo'q.
 class Orchestrator : public QObject {
@@ -74,6 +76,13 @@ private:
                          bool hasMore, const QString &error);
 
     QTimer *_timer = nullptr;
+    // BITTA uzoq yashovchi klient. Har siklda yangisini yaratish xato edi:
+    // access token Client ichida yashaydi, ya'ni yangi nusxa har safar
+    // /devices/refresh ga borardi. Refresh token esa BIR MARTALIK -- server
+    // eskisini o'ldiradi -- shuning uchun bu har 30 soniyada bitta ortiqcha
+    // so'rov va bitta token rotatsiyasi demak edi. TLS ulanishi ham qayta
+    // ishlatilmasdi.
+    Client *_client = nullptr;
     bool _inFlight = false;
     bool _hasMore = false;
     int _catchUpCycles = 0;

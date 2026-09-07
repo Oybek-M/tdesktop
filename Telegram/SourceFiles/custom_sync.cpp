@@ -138,12 +138,13 @@ void Orchestrator::runCycle() {
     Q_EMIT statusChanged(status());
 
     // Avval push, keyin pull (spec §3.4: observed_at iloji boricha yaqin bo'lishi uchun)
-    auto *client = new Client(this);
-    client->pushPending([this, client](int sent, int failed) {
+    if (!_client) {
+        _client = new Client(this);
+    }
+    _client->pushPending([this](int sent, int failed) {
         // Push xato bo'lsa ham pull baribir urinib ko'riladi
-        client->pullAndMerge([this, client, sent, failed](
+        _client->pullAndMerge([this, sent, failed](
                 int merged, int rejected, bool hasMore, QString error) {
-            client->deleteLater();
             onCycleFinished(sent, failed, merged, rejected, hasMore, error);
         });
     });
