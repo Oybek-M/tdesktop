@@ -15,10 +15,13 @@ add_executable(sync_selftest
     ../../Telegram/SourceFiles/custom_sync_record.cpp
     ../../Telegram/SourceFiles/custom_sync_crypto.cpp
     ../../Telegram/SourceFiles/custom_sync_keystore.cpp
+    ../../Telegram/SourceFiles/custom_sync.cpp
 )
 
 target_include_directories(sync_selftest PRIVATE
     ../../Telegram/SourceFiles)
+
+target_compile_definitions(sync_selftest PRIVATE SYNC_SELFTEST)
 
 target_link_libraries(sync_selftest PRIVATE
     Qt6::Core OpenSSL::Crypto crypt32 ws2_32)

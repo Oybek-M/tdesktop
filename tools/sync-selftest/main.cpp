@@ -14,6 +14,7 @@
 #include "custom_sync_record.h"
 #include "custom_sync_crypto.h"
 #include "custom_sync_keystore.h"
+#include "custom_sync.h"
 
 namespace {
 
@@ -487,6 +488,149 @@ int main(int argc, char *argv[]) {
     qInfo().noquote() << QStringLiteral("record_id_from_master natijasi: %1/%2 holat muvaffaqiyatli o'tdi.")
         .arg(masterRecordIdPassed)
         .arg(masterRecordIdChecked);
+
+    qInfo().noquote() << "\nScheduler NextAction mantiqi tekshirilmoqda:";
+    int schedulerChecked = 0;
+    const int schedulerFailuresBefore = gFailures;
+
+    // 1. disabled -> never runs
+    {
+        schedulerChecked++;
+        CustomSync::SchedulerState s;
+        s.enabled = false;
+        s.inFlight = false;
+        s.consecutiveFailures = 0;
+        s.hasMore = false;
+        s.catchUpCycles = 0;
+        s.intervalSeconds = 30;
+        const auto d = CustomSync::NextAction(s);
+        check("scheduler/disabled/runNow", d.runNow ? "true" : "false", "false");
+        check("scheduler/disabled/delay", QString::number(d.delaySeconds), "0");
+    }
+
+    // 2. inFlight -> never runs, whatever else is true
+    {
+        schedulerChecked++;
+        CustomSync::SchedulerState s;
+        s.enabled = true;
+        s.inFlight = true;
+        s.consecutiveFailures = 0;
+        s.hasMore = true;
+        s.catchUpCycles = 1;
+        s.intervalSeconds = 30;
+        const auto d = CustomSync::NextAction(s);
+        check("scheduler/inFlight/runNow", d.runNow ? "true" : "false", "false");
+        check("scheduler/inFlight/delay", QString::number(d.delaySeconds), "0");
+    }
+
+    // 3. clean state -> runs after intervalSeconds
+    {
+        schedulerChecked++;
+        CustomSync::SchedulerState s;
+        s.enabled = true;
+        s.inFlight = false;
+        s.consecutiveFailures = 0;
+        s.hasMore = false;
+        s.catchUpCycles = 0;
+        s.intervalSeconds = 30;
+        const auto d = CustomSync::NextAction(s);
+        check("scheduler/clean/runNow", d.runNow ? "true" : "false", "false");
+        check("scheduler/clean/delay", QString::number(d.delaySeconds), "30");
+    }
+
+    // 4. hasMore and under the cap -> runs immediately
+    {
+        schedulerChecked++;
+        CustomSync::SchedulerState s;
+        s.enabled = true;
+        s.inFlight = false;
+        s.consecutiveFailures = 0;
+        s.hasMore = true;
+        s.catchUpCycles = 2;
+        s.intervalSeconds = 30;
+        const auto d = CustomSync::NextAction(s);
+        check("scheduler/hasMore_under_cap/runNow", d.runNow ? "true" : "false", "true");
+        check("scheduler/hasMore_under_cap/delay", QString::number(d.delaySeconds), "0");
+    }
+
+    // 5. hasMore and at the cap -> falls back to intervalSeconds
+    {
+        schedulerChecked++;
+        CustomSync::SchedulerState s;
+        s.enabled = true;
+        s.inFlight = false;
+        s.consecutiveFailures = 0;
+        s.hasMore = true;
+        s.catchUpCycles = 5;
+        s.intervalSeconds = 30;
+        const auto d = CustomSync::NextAction(s);
+        check("scheduler/hasMore_at_cap/runNow", d.runNow ? "true" : "false", "false");
+        check("scheduler/hasMore_at_cap/delay", QString::number(d.delaySeconds), "30");
+    }
+
+    // 6. failures 1,2,3 -> the delay doubles
+    {
+        schedulerChecked++;
+        CustomSync::SchedulerState s;
+        s.enabled = true;
+        s.inFlight = false;
+        s.hasMore = false;
+        s.catchUpCycles = 0;
+        s.intervalSeconds = 30;
+
+        s.consecutiveFailures = 1;
+        const auto d1 = CustomSync::NextAction(s);
+        s.consecutiveFailures = 2;
+        const auto d2 = CustomSync::NextAction(s);
+        s.consecutiveFailures = 3;
+        const auto d3 = CustomSync::NextAction(s);
+
+        check("scheduler/failures_1_2_3/d1", QString::number(d1.delaySeconds), "30");
+        check("scheduler/failures_1_2_3/d2", QString::number(d2.delaySeconds), "60");
+        check("scheduler/failures_1_2_3/d3", QString::number(d3.delaySeconds), "120");
+    }
+
+    // 7. failures large -> capped at 300 seconds
+    {
+        schedulerChecked++;
+        CustomSync::SchedulerState s;
+        s.enabled = true;
+        s.inFlight = false;
+        s.hasMore = false;
+        s.catchUpCycles = 0;
+        s.intervalSeconds = 30;
+        s.consecutiveFailures = 20;
+        const auto d = CustomSync::NextAction(s);
+        check("scheduler/failures_large/runNow", d.runNow ? "true" : "false", "false");
+        check("scheduler/failures_large/delay", QString::number(d.delaySeconds), "300");
+    }
+
+    // 8. failure count reset -> back to intervalSeconds
+    {
+        schedulerChecked++;
+        CustomSync::SchedulerState s;
+        s.enabled = true;
+        s.inFlight = false;
+        s.hasMore = false;
+        s.catchUpCycles = 0;
+        s.intervalSeconds = 30;
+        s.consecutiveFailures = 0;
+        const auto d = CustomSync::NextAction(s);
+        check("scheduler/failure_reset/runNow", d.runNow ? "true" : "false", "false");
+        check("scheduler/failure_reset/delay", QString::number(d.delaySeconds), "30");
+    }
+
+    constexpr int kExpectedSchedulerCases = 8;
+    if (schedulerChecked != kExpectedSchedulerCases) {
+        qWarning().noquote() << QStringLiteral("XATO: %1 ta scheduler holati kutilgan edi, lekin %2 ta tekshirildi!")
+            .arg(kExpectedSchedulerCases)
+            .arg(schedulerChecked);
+        return 1;
+    }
+    const int schedulerPassed = schedulerChecked - (gFailures - schedulerFailuresBefore);
+    qInfo().noquote() << QStringLiteral("scheduler natijasi: %1/%2 holat muvaffaqiyatli o'tdi.")
+        .arg(schedulerPassed)
+        .arg(schedulerChecked);
 
     if (gFailures == 0) {
         qInfo().noquote() << "\nBarcha vektorlar va tekshiruvlar mos keldi.";

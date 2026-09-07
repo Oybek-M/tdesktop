@@ -61,6 +61,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "custom_db.h"
 #include "custom_media_quota.h"
 #include "custom_settings.h"
+#include "custom_sync.h"
 #include "lang/lang_keys.h"
 #include "core/application.h"
 #include "ui/text/text_utilities.h"
@@ -188,6 +189,10 @@ Session::Session(
 	// Media kvotasi: boshlang'ich qiymatni indeksdan darhol oladi, papka
 	// skaneri esa fonda ketadi (custom_media_quota.cpp izohiga qarang).
 	CustomMediaQuota::Init();
+	// Sync orkestrator: Start() idempotent — statik gOrchestrator tekshiruvi
+	// tufayli nechta Session yaratilishidan qat'i nazar faqat BITTA nusxa
+	// ishlaydi. SyncEnabled() false bo'lsa timer qurilmaydi (K5).
+	CustomSync::Start();
 	// A13/K1b: arxivdan tiklanadigan chatlarni chat ro'yxatiga qaytarish.
 	// Konstruktorda EMAS, balki chat ro'yxati serverdan yuklangach —
 	// aks holda History'larning folderKnown() false bo'lib, keraksiz

@@ -782,9 +782,9 @@ MergeResult MergeRecord(
     return { MergeStatus::Unsupported, QStringLiteral("unsupported_kind") };
 }
 
-void Client::pullAndMerge(Fn<void(int merged, int rejected, QString error)> done) {
+void Client::pullAndMerge(Fn<void(int merged, int rejected, bool hasMore, QString error)> done) {
     if (!Outbox::KeysAvailable()) {
-        if (done) done(0, 0, QString());
+        if (done) done(0, 0, false, QString());
         return;
     }
 
@@ -798,9 +798,8 @@ void Client::pullAndMerge(Fn<void(int merged, int rejected, QString error)> done
     const int limit = CustomSettings::SyncPushChunkSize();
 
     pull(since, limit, [done](bool success, QVector<Record> records, qint64 nextSince, bool hasMore, QString error) {
-        Q_UNUSED(hasMore);
         if (!success) {
-            if (done) done(0, 0, error);
+            if (done) done(0, 0, false, error);
             return;
         }
 
@@ -831,7 +830,7 @@ void Client::pullAndMerge(Fn<void(int merged, int rejected, QString error)> done
 
         Outbox::SetState(QStringLiteral("pull_cursor"), QString::number(nextSince));
 
-        if (done) done(mergedCount, rejectedCount, QString());
+        if (done) done(mergedCount, rejectedCount, hasMore, QString());
     });
 }
 

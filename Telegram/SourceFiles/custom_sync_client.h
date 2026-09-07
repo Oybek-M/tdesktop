@@ -122,7 +122,7 @@ public:
     void pushPending(Fn<void(int sentCount, int failedCount)> done = nullptr);
 
     // Serverdan yozuvlarni tortib olib (pull), ularni lokal bazaga kiritadi (merge)
-    void pullAndMerge(Fn<void(int merged, int rejected, QString error)> done);
+    void pullAndMerge(Fn<void(int merged, int rejected, bool hasMore, QString error)> done);
 
 private:
     void ensureAccessToken(Fn<void(bool success)> done);
