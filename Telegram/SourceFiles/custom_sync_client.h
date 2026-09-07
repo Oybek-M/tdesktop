@@ -1,6 +1,7 @@
 #pragma once
 
 #include "custom_sync_record.h"
+#include "custom_sync_keyshare.h"
 
 #include <QtCore/QObject>
 #include <QtCore/QString>
@@ -123,6 +124,11 @@ public:
 
     // Serverdan yozuvlarni tortib olib (pull), ularni lokal bazaga kiritadi (merge)
     void pullAndMerge(Fn<void(int merged, int rejected, bool hasMore, QString error)> done);
+
+    // Key sharing (Task 12a)
+    void listKeyWraps(Fn<void(bool ok, QVector<KeyShare::Wrap> wraps, QString error)> done);
+    void getKeyWrap(const QString &wrapId, Fn<void(bool ok, KeyShare::Wrap wrap, QString error)> done);
+    void createKeyWrap(const KeyShare::Wrap &wrap, Fn<void(bool ok, QString wrapId, QString error)> done);
 
 private:
     void ensureAccessToken(Fn<void(bool success)> done);

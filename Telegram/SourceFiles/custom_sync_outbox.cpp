@@ -407,7 +407,34 @@ void SetState(const QString &key, const QString &value) {
 // passphrase-wrap oqimi (/api/v1/keys/wraps) va parolni kiritish oynasi talab
 // qilinadi (keyingi vazifa). Ungacha ikkinchi qurilmani enroll qilish bir-birining
 // yozuvlarini ocholmaydigan va record_id'lari hech qachon mos kelmaydigan
-// ikkita mustaqil qurilma hosil qiladi — va bu haqda hech narsa ogohlantirmaydi.
+bool AdoptMasterKey(const QByteArray &masterKey) {
+    if (masterKey.size() != 32) {
+        return false;
+    }
+
+    // Agar master key allaqachon mavjud bo'lsa, uni HECH QACHON almashtirmaymiz!
+    // Avval yuborilgan barcha yozuvlar shu kalitga bog'liq; uni almashtirish
+    // butun tarixni ochib bo'lmas holga keltirib qo'yadi.
+    const auto existingProtected = GetState(QStringLiteral("master_key_protected"));
+    if (!existingProtected.isEmpty()) {
+        return false;
+    }
+
+    if (!Keystore::Available()) {
+        return false;
+    }
+
+    const auto protectedBlob = Keystore::ProtectBytes(masterKey);
+    if (!protectedBlob.has_value() || protectedBlob->isEmpty()) {
+        return false;
+    }
+
+    SetState(QStringLiteral("master_key_protected"),
+             QString::fromLatin1(protectedBlob->toBase64()));
+
+    return LoadMasterKey();
+}
+
 bool EnsureMasterKeyCreated() {
     // Agar master key allaqachon mavjud bo'lsa, uni HECH QACHON almashtirmaymiz!
     // Chunki avval yuborilgan barcha yozuvlar shu kalitdan hosil qilingan;
@@ -475,6 +502,14 @@ QByteArray MasterKey() {
         return QByteArray();
     }
     return gMasterKey;
+}
+
+QString KeyFingerprint() {
+    const auto key = MasterKey();
+    if (key.isEmpty()) {
+        return QString();
+    }
+    return Crypto::KeyFingerprint(key);
 }
 
 QByteArray ContentKey() {

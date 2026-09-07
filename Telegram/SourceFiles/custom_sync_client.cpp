@@ -834,4 +834,90 @@ void Client::pullAndMerge(Fn<void(int merged, int rejected, bool hasMore, QStrin
     });
 }
 
+void Client::listKeyWraps(Fn<void(bool ok, QVector<KeyShare::Wrap> wraps, QString error)> done) {
+    ensureAccessToken([this, done](bool authOk) {
+        if (!authOk) {
+            if (done) done(false, {}, QStringLiteral("auth_failed"));
+            return;
+        }
+        QNetworkRequest req(makeUrl(QStringLiteral("/api/v1/keys/wraps")));
+        req.setRawHeader("Authorization", "Bearer " + _accessToken.toLatin1());
+
+        auto *reply = _network->get(req);
+        connect(reply, &QNetworkReply::finished, this, [reply, done] {
+            reply->deleteLater();
+            const int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            const auto data = reply->readAll();
+            const auto resp = KeyShare::ParseKeyWrapListResponse(data, httpStatus);
+            if (httpStatus == 200 && resp.error.isEmpty()) {
+                if (done) done(true, resp.wraps, QString());
+            } else {
+                if (done) done(false, {}, resp.error.isEmpty() ? QStringLiteral("list_wraps_failed") : resp.error);
+            }
+        });
+    });
+}
+
+void Client::getKeyWrap(const QString &wrapId, Fn<void(bool ok, KeyShare::Wrap wrap, QString error)> done) {
+    if (wrapId.isEmpty()) {
+        if (done) done(false, {}, QStringLiteral("empty_wrap_id"));
+        return;
+    }
+    ensureAccessToken([this, wrapId, done](bool authOk) {
+        if (!authOk) {
+            if (done) done(false, {}, QStringLiteral("auth_failed"));
+            return;
+        }
+        QNetworkRequest req(makeUrl(QStringLiteral("/api/v1/keys/wraps/") + wrapId));
+        req.setRawHeader("Authorization", "Bearer " + _accessToken.toLatin1());
+
+        auto *reply = _network->get(req);
+        connect(reply, &QNetworkReply::finished, this, [reply, done] {
+            reply->deleteLater();
+            const int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            const auto data = reply->readAll();
+            const auto resp = KeyShare::ParseKeyWrapResponse(data, httpStatus);
+            if (httpStatus == 200 && resp.error.isEmpty()) {
+                if (done) done(true, resp.wrap, QString());
+            } else {
+                if (done) done(false, {}, resp.error.isEmpty() ? QStringLiteral("get_wrap_failed") : resp.error);
+            }
+        });
+    });
+}
+
+void Client::createKeyWrap(const KeyShare::Wrap &wrap, Fn<void(bool ok, QString wrapId, QString error)> done) {
+    ensureAccessToken([this, wrap, done](bool authOk) {
+        if (!authOk) {
+            if (done) done(false, QString(), QStringLiteral("auth_failed"));
+            return;
+        }
+        QNetworkRequest req(makeUrl(QStringLiteral("/api/v1/keys/wraps")));
+        req.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+        req.setRawHeader("Authorization", "Bearer " + _accessToken.toLatin1());
+
+        QJsonObject body{
+            { QStringLiteral("wrap_type"), wrap.wrapType },
+            { QStringLiteral("label"), wrap.label },
+            { QStringLiteral("salt"), QString::fromLatin1(wrap.salt.toBase64()) },
+            { QStringLiteral("nonce"), QString::fromLatin1(wrap.nonce.toBase64()) },
+            { QStringLiteral("wrapped_key"), QString::fromLatin1(wrap.wrappedKey.toBase64()) },
+            { QStringLiteral("iterations"), wrap.iterations },
+        };
+
+        auto *reply = _network->post(req, QJsonDocument(body).toJson(QJsonDocument::Compact));
+        connect(reply, &QNetworkReply::finished, this, [reply, done] {
+            reply->deleteLater();
+            const int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            const auto data = reply->readAll();
+            const auto resp = KeyShare::ParseCreateKeyWrapResponse(data, httpStatus);
+            if ((httpStatus == 200 || httpStatus == 201) && resp.error.isEmpty()) {
+                if (done) done(true, resp.wrapId, QString());
+            } else {
+                if (done) done(false, QString(), resp.error.isEmpty() ? QStringLiteral("create_wrap_failed") : resp.error);
+            }
+        });
+    });
+}
+
 } // namespace CustomSync

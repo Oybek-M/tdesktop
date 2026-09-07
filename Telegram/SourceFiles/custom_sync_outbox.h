@@ -98,10 +98,14 @@ void MarkFailed(const QString &recordId, const QString &error);
 void SetState(const QString &key, const QString &value);
 
 // Master kalit boshqaruvi:
+// Serverdan ochilgan master kalitni O'RNATADI. Lokal kalit allaqachon
+// bo'lsa -- FALSE qaytaradi va hech narsani o'zgartirmaydi.
+[[nodiscard]] bool AdoptMasterKey(const QByteArray &masterKey);
 // Faqat birinchi marta (enroll paytida) yaratiladi, mavjud bo'lsa hech qachon almashtirilmaydi.
 [[nodiscard]] bool EnsureMasterKeyCreated();
 [[nodiscard]] bool LoadMasterKey();
 [[nodiscard]] QByteArray MasterKey();
+[[nodiscard]] QString KeyFingerprint();
 [[nodiscard]] QByteArray ContentKey();
 [[nodiscard]] QByteArray PeerKey();
 [[nodiscard]] QByteArray AccountKey();

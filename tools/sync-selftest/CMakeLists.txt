@@ -16,6 +16,7 @@ add_executable(sync_selftest
     ../../Telegram/SourceFiles/custom_sync_crypto.cpp
     ../../Telegram/SourceFiles/custom_sync_keystore.cpp
     ../../Telegram/SourceFiles/custom_sync.cpp
+    ../../Telegram/SourceFiles/custom_sync_keyshare.cpp
 )
 
 target_include_directories(sync_selftest PRIVATE

@@ -15,6 +15,7 @@
 #include "custom_sync_crypto.h"
 #include "custom_sync_keystore.h"
 #include "custom_sync.h"
+#include "custom_sync_keyshare.h"
 
 namespace {
 
@@ -631,6 +632,154 @@ int main(int argc, char *argv[]) {
     qInfo().noquote() << QStringLiteral("scheduler natijasi: %1/%2 holat muvaffaqiyatli o'tdi.")
         .arg(schedulerPassed)
         .arg(schedulerChecked);
+
+    qInfo() << "\nKeyShare (Wrap/Unwrap/Parser) tekshirilmoqda:";
+    int keyshareChecked = 0;
+    const int keyshareFailuresBefore = gFailures;
+
+    // 1. Round trip
+    {
+        keyshareChecked++;
+        const auto masterKey = QByteArray("01234567890123456789012345678901", 32);
+        const QString passphrase = QStringLiteral("secret_pass_123");
+        const QString label = QStringLiteral("laptop-wrap");
+        const auto wrap = CustomSync::KeyShare::WrapMasterKey(masterKey, passphrase, label);
+        check("keyshare/roundtrip/wrapType", wrap.wrapType, QStringLiteral("passphrase"));
+        check("keyshare/roundtrip/label", wrap.label, label);
+        check("keyshare/roundtrip/iterations", QString::number(wrap.iterations), QString::number(CustomSync::KeyShare::kPassphraseIterations));
+        const auto unwrapped = CustomSync::KeyShare::UnwrapMasterKey(wrap, passphrase);
+        check("keyshare/roundtrip/has_value", unwrapped.has_value() ? "true" : "false", "true");
+        if (unwrapped.has_value()) {
+            check("keyshare/roundtrip/key_match", QString::fromLatin1(unwrapped->toHex()), QString::fromLatin1(masterKey.toHex()));
+        }
+    }
+
+    // 2. Wrong passphrase -> empty optional
+    {
+        keyshareChecked++;
+        const auto masterKey = QByteArray("01234567890123456789012345678901", 32);
+        const auto wrap = CustomSync::KeyShare::WrapMasterKey(masterKey, QStringLiteral("correct_pass"), QStringLiteral("dev"));
+        const auto unwrapped = CustomSync::KeyShare::UnwrapMasterKey(wrap, QStringLiteral("wrong_pass"));
+        check("keyshare/wrong_passphrase/empty", unwrapped.has_value() ? "false" : "true", "true");
+    }
+
+    // 3. Tampered wrappedKey (flip one byte) -> empty optional
+    {
+        keyshareChecked++;
+        const auto masterKey = QByteArray("01234567890123456789012345678901", 32);
+        const QString pass = QStringLiteral("tamper_test_pass");
+        auto wrap = CustomSync::KeyShare::WrapMasterKey(masterKey, pass, QStringLiteral("dev"));
+        if (!wrap.wrappedKey.isEmpty()) {
+            wrap.wrappedKey[0] = static_cast<char>(wrap.wrappedKey[0] ^ 0xFF);
+        }
+        const auto unwrapped = CustomSync::KeyShare::UnwrapMasterKey(wrap, pass);
+        check("keyshare/tampered_wrappedKey/empty", unwrapped.has_value() ? "false" : "true", "true");
+    }
+
+    // 4. Tampered salt -> empty optional
+    {
+        keyshareChecked++;
+        const auto masterKey = QByteArray("01234567890123456789012345678901", 32);
+        const QString pass = QStringLiteral("tamper_salt_pass");
+        auto wrap = CustomSync::KeyShare::WrapMasterKey(masterKey, pass, QStringLiteral("dev"));
+        if (!wrap.salt.isEmpty()) {
+            wrap.salt[0] = static_cast<char>(wrap.salt[0] ^ 0xAA);
+        }
+        const auto unwrapped = CustomSync::KeyShare::UnwrapMasterKey(wrap, pass);
+        check("keyshare/tampered_salt/empty", unwrapped.has_value() ? "false" : "true", "true");
+    }
+
+    // 5. Two wraps of same key with same pass have different salt and nonce, and both unwrap
+    {
+        keyshareChecked++;
+        const auto masterKey = QByteArray("01234567890123456789012345678901", 32);
+        const QString pass = QStringLiteral("fresh_salt_nonce_pass");
+        const auto wrap1 = CustomSync::KeyShare::WrapMasterKey(masterKey, pass, QStringLiteral("dev1"));
+        const auto wrap2 = CustomSync::KeyShare::WrapMasterKey(masterKey, pass, QStringLiteral("dev2"));
+
+        const bool saltsDifferent = (wrap1.salt != wrap2.salt);
+        const bool noncesDifferent = (wrap1.nonce != wrap2.nonce);
+        check("keyshare/fresh_salt_different", saltsDifferent ? "true" : "false", "true");
+        check("keyshare/fresh_nonce_different", noncesDifferent ? "true" : "false", "true");
+
+        const auto unwrap1 = CustomSync::KeyShare::UnwrapMasterKey(wrap1, pass);
+        const auto unwrap2 = CustomSync::KeyShare::UnwrapMasterKey(wrap2, pass);
+        check("keyshare/fresh_unwrap1_match", unwrap1.has_value() && *unwrap1 == masterKey ? "true" : "false", "true");
+        check("keyshare/fresh_unwrap2_match", unwrap2.has_value() && *unwrap2 == masterKey ? "true" : "false", "true");
+    }
+
+    // 6. iterations read from wrap, not assumed: custom iteration count honours it
+    {
+        keyshareChecked++;
+        const auto masterKey = QByteArray("fedcba9876543210fedcba9876543210", 32);
+        const QString pass = QStringLiteral("custom_iter_pass");
+        const int customIterations = 10000;
+        const auto salt = CustomSync::Crypto::RandomBytes(16);
+        const auto nonce = CustomSync::Crypto::RandomBytes(12);
+        const auto kek = CustomSync::Crypto::Pbkdf2(pass.toUtf8(), salt, customIterations, 32);
+        const auto wrappedKey = CustomSync::Crypto::Seal(kek, nonce, masterKey);
+
+        CustomSync::KeyShare::Wrap wrap;
+        wrap.wrapType = QStringLiteral("passphrase");
+        wrap.label = QStringLiteral("custom-iter");
+        wrap.salt = salt;
+        wrap.nonce = nonce;
+        wrap.wrappedKey = wrappedKey;
+        wrap.iterations = customIterations;
+
+        const auto unwrapped = CustomSync::KeyShare::UnwrapMasterKey(wrap, pass);
+        check("keyshare/custom_iterations/has_value", unwrapped.has_value() ? "true" : "false", "true");
+        if (unwrapped.has_value()) {
+            check("keyshare/custom_iterations/key_match", QString::fromLatin1(unwrapped->toHex()), QString::fromLatin1(masterKey.toHex()));
+        }
+    }
+
+    // 7. Parsing: literal snake_case JSON body with base64 fields, assert every field and base64 decoding
+    {
+        keyshareChecked++;
+        const QByteArray expectedSalt = QByteArray::fromHex("000102030405060708090a0b0c0d0e0f");
+        const QByteArray expectedNonce = QByteArray::fromHex("101112131415161718191a1b");
+        const QByteArray expectedWrappedKey = QByteArray::fromHex("202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f");
+
+        const QString saltB64 = QString::fromLatin1(expectedSalt.toBase64());
+        const QString nonceB64 = QString::fromLatin1(expectedNonce.toBase64());
+        const QString wrappedKeyB64 = QString::fromLatin1(expectedWrappedKey.toBase64());
+
+        const QByteArray json = QString(
+            "{\n"
+            "  \"wrap_id\": \"wrap_test_777\",\n"
+            "  \"wrap_type\": \"passphrase\",\n"
+            "  \"label\": \"Device Alfa\",\n"
+            "  \"salt\": \"%1\",\n"
+            "  \"nonce\": \"%2\",\n"
+            "  \"wrapped_key\": \"%3\",\n"
+            "  \"iterations\": 600000\n"
+            "}"
+        ).arg(saltB64, nonceB64, wrappedKeyB64).toUtf8();
+
+        const auto res = CustomSync::KeyShare::ParseKeyWrapResponse(json, 200);
+        check("keyshare/parsing/error_empty", res.error.isEmpty() ? "true" : "false", "true");
+        check("keyshare/parsing/wrap_id", res.wrap.wrapId, QStringLiteral("wrap_test_777"));
+        check("keyshare/parsing/wrap_type", res.wrap.wrapType, QStringLiteral("passphrase"));
+        check("keyshare/parsing/label", res.wrap.label, QStringLiteral("Device Alfa"));
+        check("keyshare/parsing/iterations", QString::number(res.wrap.iterations), QStringLiteral("600000"));
+        check("keyshare/parsing/salt_bytes", QString::fromLatin1(res.wrap.salt.toHex()), QString::fromLatin1(expectedSalt.toHex()));
+        check("keyshare/parsing/nonce_bytes", QString::fromLatin1(res.wrap.nonce.toHex()), QString::fromLatin1(expectedNonce.toHex()));
+        check("keyshare/parsing/wrapped_key_bytes", QString::fromLatin1(res.wrap.wrappedKey.toHex()), QString::fromLatin1(expectedWrappedKey.toHex()));
+        check("keyshare/parsing/base64_not_hex", (res.wrap.salt == expectedSalt && res.wrap.salt != QByteArray::fromHex(saltB64.toLatin1())) ? "true" : "false", "true");
+    }
+
+    constexpr int kExpectedKeyShareCases = 7;
+    if (keyshareChecked != kExpectedKeyShareCases) {
+        qWarning().noquote() << QStringLiteral("XATO: %1 ta keyshare holati kutilgan edi, lekin %2 ta tekshirildi!")
+            .arg(kExpectedKeyShareCases)
+            .arg(keyshareChecked);
+        return 1;
+    }
+    const int keysharePassed = keyshareChecked - (gFailures - keyshareFailuresBefore);
+    qInfo().noquote() << QStringLiteral("keyshare natijasi: %1/%2 holat muvaffaqiyatli o'tdi.")
+        .arg(keysharePassed)
+        .arg(keyshareChecked);
 
     if (gFailures == 0) {
         qInfo().noquote() << "\nBarcha vektorlar va tekshiruvlar mos keldi.";
