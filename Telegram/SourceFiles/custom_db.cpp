@@ -1868,6 +1868,11 @@ int AssignLegacyRows(const QString &peerId, qint64 accountId) {
 		gEditedCache.remove(zeroKey);
 		gPeersWithDeleted.remove(zeroKey);
 		gLoadedPeers.remove(zeroKey);
+		// gPeersWithDeleted dan yozuv olib tashlandi, lekin peer'da
+		// o'chirilgan xabarlar QOLDI -- ular endi boshqa account_id
+		// ostida. Bayroq tushirilmasa ro'yxat faqat restart'dan keyin
+		// qayta yig'iladi va peer oradagi vaqtda yo'qolib turadi.
+		gPeersWithDeletedLoaded = false;
 	}
 
 	return changed;
