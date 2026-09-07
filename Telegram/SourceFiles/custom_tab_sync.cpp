@@ -6,6 +6,7 @@
 #include "custom_sync_keyshare.h"
 
 #include "ui/widgets/fields/password_input.h"
+#include "settings/cloud_password/settings_cloud_password_common.h"
 #include "ui/layers/generic_box.h"
 #include "crl/crl_async.h"
 #include "crl/crl_on_main.h"
@@ -51,13 +52,10 @@ void ShowJoinArchiveBox(
 				st::defaultSubsectionTitle),
 			st::defaultSubsectionTitlePadding);
 
-		const auto passInput = box->verticalLayout()->add(
-			object_ptr<Ui::PasswordInput>(
-				box->verticalLayout(),
-				st::defaultInputField,
-				rpl::single(u"Parolni kiriting"_q),
-				QString()),
-			st::boxRowPadding);
+		const auto passInput = Settings::AddPasswordField(
+			box->verticalLayout(),
+			rpl::single(u"Parolni kiriting"_q),
+			QString()).get();
 
 		Ui::AddSkip(box->verticalLayout(), 4);
 
@@ -200,13 +198,10 @@ void ShowCreateArchiveBox(
 				st::defaultSubsectionTitle),
 			st::defaultSubsectionTitlePadding);
 
-		const auto pass1Input = box->verticalLayout()->add(
-			object_ptr<Ui::PasswordInput>(
-				box->verticalLayout(),
-				st::defaultInputField,
-				rpl::single(u"Yangi parol"_q),
-				QString()),
-			st::boxRowPadding);
+		const auto pass1Input = Settings::AddPasswordField(
+			box->verticalLayout(),
+			rpl::single(u"Yangi parol"_q),
+			QString()).get();
 
 		Ui::AddSkip(box->verticalLayout(), 4);
 
@@ -217,13 +212,10 @@ void ShowCreateArchiveBox(
 				st::defaultSubsectionTitle),
 			st::defaultSubsectionTitlePadding);
 
-		const auto pass2Input = box->verticalLayout()->add(
-			object_ptr<Ui::PasswordInput>(
-				box->verticalLayout(),
-				st::defaultInputField,
-				rpl::single(u"Parolni qayta kiriting"_q),
-				QString()),
-			st::boxRowPadding);
+		const auto pass2Input = Settings::AddPasswordField(
+			box->verticalLayout(),
+			rpl::single(u"Parolni qayta kiriting"_q),
+			QString()).get();
 
 		Ui::AddSkip(box->verticalLayout(), 4);
 
