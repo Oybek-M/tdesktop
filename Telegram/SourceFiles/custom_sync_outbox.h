@@ -102,6 +102,16 @@ void SetState(const QString &key, const QString &value);
 // bo'lsa -- FALSE qaytaradi va hech narsani o'zgartirmaydi.
 [[nodiscard]] bool AdoptMasterKey(const QByteArray &masterKey);
 // Faqat birinchi marta (enroll paytida) yaratiladi, mavjud bo'lsa hech qachon almashtirilmaydi.
+// DIQQAT: 2026-09-07 dan beri CHAQIRUVCHISI YO'Q, va bu ataylab.
+//
+// Ilgari `Client::enroll` uni chaqirardi. Muammo: u kalitni DARHOL
+// saqlaydi, POST esa keyin yiqilishi mumkin (admin roli bo'lmasa 403).
+// O'shanda qurilma serverga hech qachon yuklanmagan kalit bilan qolardi,
+// `AdoptMasterKey` esa uni almashtirishdan bosh tortadi -- ya'ni o'sha
+// qurilma umumiy arxivga boshqa qo'shila olmasdi.
+//
+// To'g'ri tartib (custom_tab_sync.cpp): RandomBytes(32) -> WrapMasterKey
+// -> createKeyWrap(POST) -> AdoptMasterKey. Buni enroll'ga qaytarmang.
 [[nodiscard]] bool EnsureMasterKeyCreated();
 [[nodiscard]] bool LoadMasterKey();
 [[nodiscard]] QByteArray MasterKey();
