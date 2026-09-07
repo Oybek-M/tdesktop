@@ -70,7 +70,11 @@ void ShowJoinArchiveBox(
 
 		const auto weakBox = base::make_weak(box);
 
-		const auto submitBtn = box->addButton(rpl::single(u"Qulfni ochish va ulanish"_q), [=] {
+		// Tugmani AVVAL yaratamiz, ishlovchini keyin ulaymiz: lambda
+		// o'zining initsializatorida submitBtn ni ushlab qololmaydi
+		// (C3536). Bu naqsh repoda allaqachon ishlatiladi.
+		const auto submitBtn = box->addButton(rpl::single(u"Qulfni ochish va ulanish"_q), [] {});
+		submitBtn->setClickedCallback([=] {
 			const auto pass = passInput->getLastText();
 			if (pass.isEmpty()) {
 				statusLabel->setText(u"Iltimos, arxiv parolini kiriting."_q);
@@ -232,7 +236,11 @@ void ShowCreateArchiveBox(
 
 		const auto weakBox = base::make_weak(box);
 
-		const auto submitBtn = box->addButton(rpl::single(u"Arxiv yaratish"_q), [=] {
+		// Tugmani AVVAL yaratamiz, ishlovchini keyin ulaymiz: lambda
+		// o'zining initsializatorida submitBtn ni ushlab qololmaydi
+		// (C3536). Bu naqsh repoda allaqachon ishlatiladi.
+		const auto submitBtn = box->addButton(rpl::single(u"Arxiv yaratish"_q), [] {});
+		submitBtn->setClickedCallback([=] {
 			const auto pass1 = pass1Input->getLastText();
 			const auto pass2 = pass2Input->getLastText();
 
