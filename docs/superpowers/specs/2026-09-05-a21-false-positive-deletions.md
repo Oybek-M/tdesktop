@@ -1,6 +1,6 @@
 # A21 — Soxta "o'chirilgan" yozuvlari (partiyali false-positive)
 
-**Holat:** 🟡 A va B bajarildi (sxema v16, commit 9fa32cc7c3) — C qoldi, build kutilmoqda
+**Holat:** 🟡 A, B, C kodi tayyor — BUILD va qo'lda sinov qoldi
 **Aniqlangan:** 2026-09-05, foydalanuvchi hisoboti + baza tahlili
 **Xavf darajasi:** yuqori — AntiDelete'ning ishonchliligini yo'q qiladi
 
@@ -138,7 +138,7 @@ bir oylik oraliq — aynan shunga mos.
 | G2 | `account_id` peer id bilan chalkashgan | `custom_peer_key.cpp:19` — `accountId = session.userId().bare`. To'g'ri. `1334067829` ham akkaunt, ham peer sifatida uchraydi, chunki u foydalanuvchining akkauntlaridan biri VA boshqa akkauntdagi suhbatdosh. Chalkashish yo'q. |
 | — | Begona `msg_id` oralig'i | `msg_id` uzluksiz `5380..397135` — uzun tarix, xato emas. |
 
-## 4. Tuzatish yo'nalishi (hali kelishilmagan)
+## 4. Tuzatish yo'nalishi (§6 da hal qilindi — quyiga qarang)
 
 **Muammo:** `account_id = 0` ni "hamma akkaunt" deb talqin qilish
 26 753 ta legacy yozuvni akkauntlar orasida oqizadi. Lekin uni
@@ -167,26 +167,75 @@ Soxta deb ko'ringan yozuvlarni ko'r-ko'rona o'chirish **mumkin emas** —
 ular orasida chinakam o'chirilgan xabarlar bor (§3.2), va ular ayni
 shu jadvalda saqlanadi.
 
-## 6. Bajarilgani (2026-09-05)
+## 6. Bajarilgani (2026-09-05 .. 09-07)
 
-**A — avtomatik egalik (sxema v16).** Peer'ning noldan farqli yozuvlari
-bitta akkauntga tegishli bo'lsa, legacy qatorlar o'sha akkauntga
-biriktiriladi. Jonli bazaning nusxasida sinaldi: legacy
-**26 753 -> 14 970** (11 783 biriktirildi), NULL yo'q, `integrity ok`.
+Uch variant birlashtirildi: aniq bo'lganda avtomatik, noaniq bo'lganda
+qo'lda, qolganda belgilash.
+
+### A — avtomatik egalik (sxema v16, commit `9fa32cc7c3`)
+
+Peer'ning noldan farqli yozuvlari bitta akkauntga tegishli bo'lsa —
+nomzod yagona — legacy qatorlar o'shanga biriktiriladi.
+
+Jonli bazada bajarildi (2026-09-07): legacy **26 753 -> 14 970**
+(11 783 biriktirildi), `schema_version` = 16, NULL yo'q, `integrity ok`.
+Avtomatik zaxira: `premigrate-v14-20260907-145414.bak`.
 
 v15 boshqa sessiyaning `sync_record_map` jadvali tomonidan band edi —
 shuning uchun **v16**.
 
-**B — UI belgisi.** Qolgan `account_id = 0` yozuvlari chatda boshqacha
-belgi bilan chiziladi (`history.cpp:2324`, `legacyMarker`):
+### B — UI belgisi (commit `9fa32cc7c3`)
+
+Qolgan `account_id = 0` yozuvlari chatda boshqacha belgi bilan chiziladi
+(`history.cpp`, `legacyMarker`):
 `—— O'CHIRILDI ——  ⚠ eski yozuv, akkaunt noma'lum`.
+
 Yashirmaymiz: `looksForeign()` ataylab qat'iy va ma'lumot yo'qotmaslikni
 afzal biladi, shuning uchun to'g'ri yo'l — belgilash.
 
-**C — qo'lda biriktirish.** 29 ta noaniq peer (11 148 yozuv) uchun Ombor
-tabida ro'yxat. Prompt tayyor: `plans/a21-task-c-prompt.md`.
+**Kutilgandan kam ko'rinadi.** Peer `1334067829` dagi 217 ta legacy
+`deleted` yozuvidan faqat **23** tasida matn bor; 194 tasida mazmun
+umuman yo'q va ular 2026-08-27 dagi qoida bilan allaqachon chizilmaydi.
+Ya'ni bu yozuvlarning 89% i ekranda hech qachon ko'rinmagan.
 
-**Keyingi qadam:** build + sinov. Akam chatida (peer `1334067829`) 445 ta
-yozuv hamon legacy — u noaniqlar ichida, unga faqat C yordam beradi.
-Build'dan keyin o'sha chatda yozuvlar `⚠ eski yozuv` belgisi bilan
-chiqishi kerak.
+### C — qo'lda biriktirish (Gemini, commit `7896c40ccf` + `1c6202bf5b`)
+
+Ombor tabida "👤 Egasi noma'lum yozuvlar" bo'limi: har noaniq peer uchun
+nomzod akkauntlar tugmasi, tasdiq oynasi, `AssignLegacyRows()`.
+
+Mustaqil tekshirildi: SQL da `WHERE peer_id = ? AND account_id = 0`
+ikkala sharti ham bor, `sqlite3_reset` + `clear_bindings` to'g'ri,
+migratsiyaga tegilmagan (241 qo'shilish, 0 o'chirish), jonli bazada
+so'rov **29 peer / 11 148 qator** qaytardi.
+
+Bitta nuqson topildi va tuzatildi (`1c6202bf5b`): kesh tozalanganda
+`gPeersWithDeletedLoaded` bayrog'i tushirilmasdi, shuning uchun peer
+restart'gacha "o'chirilgan xabari bor" ro'yxatiga qaytmasdi.
+
+### Noaniq qatorlarning haqiqiy taqsimoti
+
+Ushbu hujjatning oldingi jadvali akkaunt SONI bo'yicha saralangan edi va
+shuning uchun eng kattasini yashirgan. Qator soni bo'yicha:
+
+| peer_id | legacy qator | ulush |
+|---|---|---|
+| **562952328991389** | **6 253** | **56%** |
+| 562951958195494 | 1 120 | 10% |
+| 562952357785131 | 759 | 7% |
+| 1334067829 | 445 | 4% |
+| qolgan 25 ta | 2 571 | 23% |
+
+Bitta peer noaniq qatorlarning yarmidan ko'pini ushlab turadi. U
+`5629...` ko'rinishidagi katta ID — guruh yoki kanal, foydalanuvchi unda
+bir necha akkaunt bilan bo'lgan. Unga "Tegmang" ham to'g'ri javob
+bo'lishi mumkin; qaror foydalanuvchiniki.
+
+## 7. Qolgan ish
+
+1. **Build** va qo'lda sinov. Avval KICHIK peer'da sinang (masalan
+   `281479796986935`, 8 qator): tasdiq oynasidagi son, toast'dagi son va
+   ro'yxatdan yo'qolishi mos kelsinmi.
+2. Katta peerlarga, ayniqsa `562952328991389` ga, o'ylab qaror qiling.
+3. `text_cache` (67% legacy) va `media_index` (58% legacy) da ham shu
+   muammo bor, lekin ular chatga xabar chizmaydi — alohida, past
+   ustuvorlikdagi ish.

@@ -25,7 +25,11 @@ Two of three fixes are already merged (commit `9fa32cc7c3`):
 across 29 peers** are ambiguous: the peer appears under two or more
 accounts, so no rule can pick the owner. Only the user knows.
 
-Measured on the live database (2026-09-05):
+Measured on the live database (2026-09-05). **Note:** this table is
+sorted by account count, not by row count, so it hides the largest
+peer — `562952328991389` holds 6 253 legacy rows on its own, 56% of
+the total. See the spec's section 6 for the row-count ordering.
+
 
 | peer_id | accounts | legacy rows |
 |---|---|---|
