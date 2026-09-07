@@ -1171,6 +1171,7 @@ PRIVATE
     custom_tab_privacy.cpp
     custom_tab_storage.cpp
     custom_tab_system.cpp
+    custom_tab_sync.cpp
     history/view/history_view_welcome_messages_section.cpp
     history/view/history_view_welcome_messages_section.h
     history/history.cpp

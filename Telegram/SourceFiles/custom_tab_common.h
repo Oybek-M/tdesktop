@@ -141,3 +141,6 @@ void fillSystemTab(
 	not_null<Ui::VerticalLayout*> content,
 	QWidget *dialogParent,
 	Fn<void()> onArchiveChanged);
+void fillSyncTab(
+	not_null<Ui::VerticalLayout*> content,
+	QWidget *dialogParent);

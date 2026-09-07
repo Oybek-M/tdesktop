@@ -19,8 +19,8 @@ private:
 	void setupContent(not_null<Window::SessionController*> controller);
 
 	CustomTabBar *_tabBar = nullptr;
-	std::array<Ui::ScrollArea*, 7> _panels = {};
-	std::array<QPointer<Ui::VerticalLayout>, 7> _inners = {};
+	std::array<Ui::ScrollArea*, 8> _panels = {};
+	std::array<QPointer<Ui::VerticalLayout>, 8> _inners = {};
 	std::unique_ptr<Ui::LayerManager> _layerManager;
 };
 
@@ -59,9 +59,10 @@ CustomModWindow::CustomModWindow(
 			u"Arxiv"_q,
 			u"Ombor"_q,
 			u"Tizim"_q,
+			u"Sinxronizatsiya"_q,
 		});
 
-	for (auto i = 0; i < 7; ++i) {
+	for (auto i = 0; i < 8; ++i) {
 		_panels[i] = new Ui::ScrollArea(this);
 	}
 
@@ -148,6 +149,9 @@ void CustomModWindow::setupContent(
 
 	// 7. Tizim
 	fillSystemTab(makeInner(6), this, *rebuildArchive);
+
+	// 8. Sinxronizatsiya
+	fillSyncTab(makeInner(7), this);
 }
 
 void CustomModWindow::resizeEvent(QResizeEvent *) {
@@ -155,7 +159,7 @@ void CustomModWindow::resizeEvent(QResizeEvent *) {
 	_tabBar->setGeometry(0, 0, width(), tabH);
 	const auto panelW = width();
 	const auto panelH = height() - tabH;
-	for (auto i = 0; i < 7; ++i) {
+	for (auto i = 0; i < 8; ++i) {
 		_panels[i]->setGeometry(0, tabH, panelW, panelH);
 		if (const auto inner = _inners[i].data(); inner && panelW > 0) {
 			inner->resizeToWidth(panelW);
@@ -182,7 +186,7 @@ void CustomModWindow::showEvent(QShowEvent *e) {
 		const auto panelW = width();
 		const auto panelH = height() - _tabBar->height();
 		if (panelW > 0 && panelH > 0) {
-			for (auto i = 0; i < 7; ++i) {
+			for (auto i = 0; i < 8; ++i) {
 				if (const auto inner = _inners[i].data()) {
 					inner->resizeToWidth(panelW);
 					inner->update();
@@ -197,7 +201,7 @@ void CustomModWindow::showEvent(QShowEvent *e) {
 
 void CustomModWindow::switchTab(int index) {
 	_tabBar->setActiveTab(index);
-	for (auto i = 0; i < 7; ++i) {
+	for (auto i = 0; i < 8; ++i) {
 		_panels[i]->setVisible(i == index);
 	}
 	if (const auto inner = _inners[index].data()) {
