@@ -185,10 +185,17 @@ HOW TO VERIFY YOUR OWN WORK
 ------------------------------------------------------------
 
   1. Selftest green before your change (exit 0) and after.
-  2. Full build: `cmake --build C:/TBuild/tdesktop/out --config Release`
-     — the watchdog touches `custom_sync.cpp`, and `/Zs` alone is not
-     proof it links. ~34 minutes. Confirm `Telegram.exe` was relinked
-     by comparing its timestamp to the objects.
+  2. 🔴 **Do NOT run the full build.** `cmake --build` on the Telegram
+     target is forbidden without the user asking for it. It takes ~34
+     minutes and ~15 GB of RAM, and the machine is running other heavy
+     applications; starting one in the background stalls the user's
+     work. Building and running `sync_selftest` is fine — that takes
+     seconds.
+
+     The watchdog touches `custom_sync.cpp`, so a full build IS needed
+     to prove it links — but the **user runs it**. Finish everything
+     else, verify what you can with `/Zs`, and stop with a clear line
+     saying the build is pending. Do not report the task as verified.
   3. `/Zs` at `/W4 /WX` on `custom_sync.cpp`.
   4. Do not commit the database copy or the harness script.
 
@@ -208,7 +215,8 @@ DEFINITION OF DONE
   - Five K5 claims each backed by a quoted line
   - `02-task11-manual-checklist.md` written, four sections, each row
     saying how to check it
-  - Full build clean, `Telegram.exe` relinked, selftest exit 0
+  - `/Zs` clean at `/W4 /WX`; selftest exit 0
+  - Full build NOT run; handed to the user instead
   - No manual result claimed as done
   - One commit, K7 style; no harness or database copy committed
 
@@ -222,7 +230,7 @@ FINAL REPORT — seven short points
      database work.
   3. `git show --stat HEAD` (stat block only) and the commit subject.
   4. How the watchdog distinguishes its own cycle from a later one.
-  5. Full build result and the `Telegram.exe` timestamp versus objects.
+  5. `/Zs` result, and confirmation that you did not start a full build.
   6. Anything in the K5 audit that did NOT check out.
   7. Anything ambiguous you had to guess at.
 
