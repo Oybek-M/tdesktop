@@ -171,19 +171,22 @@ shu jadvalda saqlanadi.
 
 **A — avtomatik egalik (sxema v16).** Peer'ning noldan farqli yozuvlari
 bitta akkauntga tegishli bo'lsa, legacy qatorlar o'sha akkauntga
-biriktiriladi. Jonli bazaning nusxasida sinaldi: legacy **26 753 -> 14 970**
-(11 783 biriktirildi), NULL yo'q, .
+biriktiriladi. Jonli bazaning nusxasida sinaldi: legacy
+**26 753 -> 14 970** (11 783 biriktirildi), NULL yo'q, `integrity ok`.
 
-v15 boshqa sessiyaning  i tomonidan band edi -- shuning
-uchun **v16**.
+v15 boshqa sessiyaning `sync_record_map` jadvali tomonidan band edi —
+shuning uchun **v16**.
 
-**B — UI belgisi.** Qolgan  yozuvlari chatda boshqacha
-belgi bilan chiziladi (, ):
-. Yashirmaymiz --
- ataylab qat'iy va ma'lumot yo'qotmaslikni afzal biladi.
+**B — UI belgisi.** Qolgan `account_id = 0` yozuvlari chatda boshqacha
+belgi bilan chiziladi (`history.cpp:2324`, `legacyMarker`):
+`—— O'CHIRILDI ——  ⚠ eski yozuv, akkaunt noma'lum`.
+Yashirmaymiz: `looksForeign()` ataylab qat'iy va ma'lumot yo'qotmaslikni
+afzal biladi, shuning uchun to'g'ri yo'l — belgilash.
 
 **C — qo'lda biriktirish.** 29 ta noaniq peer (11 148 yozuv) uchun Ombor
-tabida ro'yxat. Prompt tayyor: .
+tabida ro'yxat. Prompt tayyor: `plans/a21-task-c-prompt.md`.
 
-**Keyingi qadam:** build + sinov. Akam chatida (peer 1334067829) 445 ta
-yozuv hamon legacy -- u noaniqlar ichida, unga faqat C yordam beradi.
+**Keyingi qadam:** build + sinov. Akam chatida (peer `1334067829`) 445 ta
+yozuv hamon legacy — u noaniqlar ichida, unga faqat C yordam beradi.
+Build'dan keyin o'sha chatda yozuvlar `⚠ eski yozuv` belgisi bilan
+chiqishi kerak.
