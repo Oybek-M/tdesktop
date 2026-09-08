@@ -185,11 +185,32 @@ yo'qotish — tiklab bo'lmaydi.
 | 11 | regressiya audit + `_inFlight` watchdog | ✅ kod tayyor |
 | 12a | kalit ulashish kriptosi va transporti | ✅ tekshirildi |
 | 12b | kalit ulashish UI oqimi | ✅ kod tayyor |
-| **9** | **WebSocket** | ⚪ **QOLGAN** |
+| 9 | WebSocket bildirishnomalari | ✅ kod tayyor, build kutilmoqda |
 
-🔴 **Task 9 tashlab yuborilmaydi.** U tartibda oxirgi, chunki 30
-soniyalik polling allaqachon ishlaydi va WebSocket faqat kechikishni
-kamaytiradi — lekin plan 02 usiz TUGAGAN hisoblanmaydi.
+✅ **Plan 02 ning 11 ta task'i ham kodda tugadi** (2026-09-08).
+WebSocket kechikishni 30 soniyadan ~1 soniyagacha tushiradi, lekin
+polling asosiy yo'l bo'lib qoladi: modul bo'lmagan build ham,
+soket uzilgan holat ham to'g'ri ishlaydi.
+
+🔴 **Task 9 dan keyin TO'LIQ QAYTA BUILD kerak (~34 daqiqa, ~8 emas).**
+`Telegram/CMakeLists.txt` ga target darajasidagi
+`CUSTOM_SYNC_HAS_WEBSOCKETS` qo'shildi — bu Telegram target'idagi
+HAMMA faylni qayta kompilyatsiya qilishga majbur qiladi.
+
+### Task 9 tekshiruvida topilgani (2026-09-08)
+
+Kod to'g'ri, lekin delegate'ning **tekshiruvi yaroqsiz edi**: u
+bitta faylni kompilyatsiya qildi va "muvaffaqiyat" oldi, ammo
+`.vcxproj` 09-07 15:37 dan, uning `CMakeLists.txt` tahriri esa
+09-08 12:13 dan edi. MSBuild CMake'ni qayta yurgizmaydi, ya'ni
+makro aniqlanmagan holda butun WebSocket kodi preprotsessorda
+tashlab yuborilgan — kompilyator uni umuman ko'rmagan.
+
+Qayta generatsiyadan keyin tasdiqlandi: makro `.vcxproj` da (8 ta
+joyda), `Qt6WebSockets.lib` linkda, ikkala fayl makro BILAN toza
+kompilyatsiya bo'ladi, va AUTOMOC `changesAvailable` signalini
+yaratadi (aks holda bu LINK bosqichida chiqadigan xato bo'lardi).
+Tuzoq `../../tools/sync-selftest/README.md` ga yozildi.
 
 Har bir delegate ishi hisobotiga ishonilmasdan qayta tekshirildi:
 SQL manbadan dasturiy ravishda ajratib olinib Python `sqlite3` da
