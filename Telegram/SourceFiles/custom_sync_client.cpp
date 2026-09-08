@@ -1035,18 +1035,24 @@ bool isAuthFailure(QWebSocketProtocol::CloseCode code, const QString &reason, co
     if (codeInt == 4401 || codeInt == 4403 || codeInt == 4001 || codeInt == 4003) {
         return true;
     }
+    // DIQQAT: bu yerda "auth" kabi qisqa bo'lakni qidirmang -- u "author",
+    // "authority" kabi begunoh so'zlarga ham tushadi, va close reason
+    // matnini server yozadi. Noto'g'ri "auth xatosi" degan xulosa qayta
+    // ulanishni butunlay to'xtatadi: soket keyingi sikl tokenni
+    // yangilagunicha o'lik qoladi.
     const auto lowerReason = reason.toLower();
     const auto lowerErr = errorStr.toLower();
     if (lowerReason.contains(QStringLiteral("401"))
         || lowerReason.contains(QStringLiteral("403"))
         || lowerReason.contains(QStringLiteral("unauthorized"))
-        || lowerReason.contains(QStringLiteral("forbidden"))
-        || lowerReason.contains(QStringLiteral("auth"))) {
+        || lowerReason.contains(QStringLiteral("unauthorised"))
+        || lowerReason.contains(QStringLiteral("forbidden"))) {
         return true;
     }
     if (lowerErr.contains(QStringLiteral("401"))
         || lowerErr.contains(QStringLiteral("403"))
         || lowerErr.contains(QStringLiteral("unauthorized"))
+        || lowerErr.contains(QStringLiteral("unauthorised"))
         || lowerErr.contains(QStringLiteral("forbidden"))) {
         return true;
     }

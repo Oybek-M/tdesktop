@@ -76,6 +76,10 @@ void Orchestrator::start() {
         return;
     }
 #ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+    // Birinchi start() da _client hali yo'q (u runCycle() da yaratiladi) --
+    // o'shanda soketni klientning o'zi token olgach ochadi. Bu shart esa
+    // "o'chirish -> yoqish" yo'li uchun: klient allaqachon mavjud va
+    // tokeni bor, stop() esa soketni yopib qo'ygan edi.
     if (_client) {
         _client->startWebSocket();
     }
@@ -258,12 +262,17 @@ Orchestrator *GetOrchestrator() {
 // ─── Tashqi API ──────────────────────────────────────────────────────────────
 
 void Start() {
-    // Idempotent: ikkinchi chaqiruvda hech narsa qilmaydi.
-    // Ilova miqyosida bitta nusxa.
-    if (gOrchestrator) {
-        return;
+    // Ilova miqyosida BITTA orkestrator: ikkinchi chaqiruvda yangisi
+    // yaratilmaydi. Ammo darhol qaytib ketish MUMKIN EMAS -- Stop() faqat
+    // taymerni to'xtatadi, orkestratorni o'chirmaydi, ya'ni UI'dagi
+    // "o'chirish -> yoqish" ketma-ketligidan keyin start() qayta
+    // chaqirilmasa taymer hech qachon qurollanmaydi va sync ilova qayta
+    // ishga tushirilguncha jimgina o'lik qoladi.
+    // start() ning o'zi idempotent: sync o'chiq bo'lsa darhol qaytadi,
+    // arm() esa taymerni qayta boshlaydi.
+    if (!gOrchestrator) {
+        gOrchestrator = new Orchestrator(nullptr);
     }
-    gOrchestrator = new Orchestrator(nullptr);
     gOrchestrator->start();
 }
 
