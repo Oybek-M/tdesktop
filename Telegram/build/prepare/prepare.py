@@ -475,11 +475,11 @@ if customRunCommand:
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout f169e01a79a03178c53a852f833441d78ab445bf
+    git checkout c2cc44fca4a8d0e20d1ef0f40884d717c750f0a4
 mac:
     git clone https://github.com/desktop-app/qt6_highsierra_patches.git qt6_highsierra
     cd qt6_highsierra
-    git checkout 4aae812a405f47553e001faf566de572d3eccd16
+    git checkout 7387476bb3b7200d3b044015696cb3c28f78593c
 """)
 
 stage('msys64', """
@@ -1322,6 +1322,7 @@ mac:
         --enable-encoder=aac \
         --enable-encoder=libopus \
         --enable-encoder=libopenh264 \
+        --enable-encoder=libvpx_vp9 \
         --enable-encoder=pcm_s16le \
         --enable-filter=atempo \
         --enable-parser=aac \
@@ -1348,7 +1349,8 @@ mac:
         --enable-muxer=mp4 \
         --enable-muxer=ogg \
         --enable-muxer=opus \
-        --enable-muxer=wav
+        --enable-muxer=wav \
+        --enable-muxer=webm
     }
 
     configureFFmpeg arm64
@@ -1545,7 +1547,7 @@ if qt < '6':
 win:
     git clone https://github.com/desktop-app/tg_angle.git
     cd tg_angle
-    git checkout d4c3606e47
+    git checkout 48bc60bdb1
     cmake -B out ^
         -DTG_ANGLE_SPECIAL_TARGET=%SPECIAL_TARGET% ^
         -DTG_ANGLE_ZLIB_INCLUDE_PATH=%LIBS_DIR%/zlib

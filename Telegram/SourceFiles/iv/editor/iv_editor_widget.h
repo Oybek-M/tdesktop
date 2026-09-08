@@ -11,10 +11,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/flat_map.h"
 #include "iv/editor/iv_editor_button_box.h"
 #include "iv/editor/iv_editor_clipboard_import.h"
+#include "iv/editor/iv_editor_insert_suggestions.h"
 #include "iv/editor/iv_editor_state.h"
 #include "iv/markdown/iv_markdown_article.h"
 #include "ui/style/style_core_types.h"
 #include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/tooltip.h"
 #include "ui/dragging_scroll_manager.h"
 #include "ui/rp_widget.h"
 #include "rpl/lifetime.h"
@@ -96,6 +98,7 @@ struct WidgetServices {
 		QPointer<QWidget>,
 		std::optional<State::ReplaceTarget>,
 		RequestMediaType)> requestMedia;
+	Fn<void(not_null<Widget*>, QPointer<QWidget>, rpl::producer<>)> requestMap;
 	Fn<void(not_null<Widget*>, Ui::PreparedList, PreparedMediaPasteTarget)>
 		applyPreparedMedia;
 	Fn<void(
@@ -115,6 +118,7 @@ struct WidgetServices {
 
 class Widget final
 	: public Ui::RpWidget
+	, public Ui::AbstractTooltipShower
 	, public Markdown::MediaBlockHost {
 public:
 	Widget(
@@ -143,6 +147,7 @@ public:
 	void insertPreparedBlock(RichPage::Block block);
 	void replacePreparedBlock(State::ReplaceTarget target, RichPage::Block block);
 	void insertPreparedBlocks(std::vector<RichPage::Block> blocks);
+	void pasteStructuredClipboardData(const ClipboardData &data);
 	[[nodiscard]] bool hasActiveSelection() const;
 	[[nodiscard]] rpl::producer<bool> hasSelectionValue() const;
 	[[nodiscard]] std::shared_ptr<const RichPage>
@@ -256,6 +261,10 @@ public:
 
 	int resizeGetHeight(int newWidth) override;
 
+	QString tooltipText() const override;
+	QPoint tooltipPos() const override;
+	bool tooltipWindowActive() const override;
+
 protected:
 	bool eventFilter(QObject *object, QEvent *event) override;
 	bool eventHook(QEvent *e) override;
@@ -269,6 +278,7 @@ protected:
 	void keyPressEvent(QKeyEvent *e) override;
 	void inputMethodEvent(QInputMethodEvent *e) override;
 	QVariant inputMethodQuery(Qt::InputMethodQuery query) const override;
+	void leaveEventHook(QEvent *e) override;
 	void mouseMoveEvent(QMouseEvent *e) override;
 	void mousePressEvent(QMouseEvent *e) override;
 	void mouseReleaseEvent(QMouseEvent *e) override;
@@ -556,6 +566,10 @@ private:
 		int ordinal,
 		int offset,
 		const Markdown::InlineTextObjectButtonData &button);
+	void rememberInlineFieldTrim(const QString &full, int left, int length);
+	[[nodiscard]] QString inlineFieldTrimmedLeft() const;
+	[[nodiscard]] QString inlineFieldTrimmedRight() const;
+	[[nodiscard]] int richOffsetForFieldPosition(int position) const;
 	[[nodiscard]] int fieldTextOffsetForCursorPosition(int position) const;
 	[[nodiscard]] int cursorPositionForFieldTextOffset(int offset) const;
 	[[nodiscard]] int richOffsetForFieldOffset(
@@ -615,6 +629,10 @@ private:
 
 	[[nodiscard]] bool handleFieldInputRule(QKeyEvent *e);
 	[[nodiscard]] bool undoLastInputRule();
+
+	[[nodiscard]] bool handleInsertSuggestionsKey(QKeyEvent *e);
+	void applyInsertSuggestion(InsertSuggestionCommand command);
+	void requestMapInsert();
 	struct VerticalNavigationTarget {
 		int ordinal = -1;
 		int offset = 0;
@@ -656,7 +674,6 @@ private:
 	[[nodiscard]] bool moveVerticalDownBoundary();
 	void copyCurrentSelectionToClipboard();
 	[[nodiscard]] TextForMimeData currentSelectionTextForClipboard() const;
-	void pasteStructuredClipboardData(const ClipboardData &data);
 	[[nodiscard]] std::optional<TableImportResult> importTableFromMimeData(
 		not_null<const QMimeData*> data) const;
 	void pasteImportedTable(TableImportResult &&imported);
@@ -846,6 +863,7 @@ private:
 	void handleFieldContextMenuRequest(
 		Ui::InputField::ContextMenuRequest request);
 	[[nodiscard]] bool handleFieldMouseEvent(QEvent *event);
+	void updateHoverTooltip(const QString &text);
 	[[nodiscard]] bool handleHorizontalScrollWheel(
 		QWheelEvent *e,
 		QPoint articlePoint);
@@ -981,6 +999,8 @@ private:
 		QPointer<QWidget>,
 		std::optional<State::ReplaceTarget>,
 		RequestMediaType)> _requestMedia;
+	const Fn<void(not_null<Widget*>, QPointer<QWidget>, rpl::producer<>)>
+		_requestMap;
 	const Fn<void(not_null<Widget*>, Ui::PreparedList, PreparedMediaPasteTarget)>
 		_applyPreparedMedia;
 	const Fn<void(
@@ -1012,6 +1032,9 @@ private:
 	std::optional<style::owned_color> _inlineFieldPlaceholderColorOverride;
 	std::optional<InlineFieldStyleKey> _activeFieldStyleKey;
 	std::optional<State::LeafPath> _fieldLeaf;
+	std::optional<State::LeafPath> _fieldTrimmedLeaf;
+	QString _fieldTrimmedLeft;
+	QString _fieldTrimmedRight;
 	State::FieldMode _fieldMode = State::FieldMode::Rich;
 	QPointer<Ui::Emoji::SuggestionsController> _fieldSuggestions;
 	int _articleHeight = 0;
@@ -1030,6 +1053,7 @@ private:
 		QString text;
 	};
 	std::optional<InputRuleUndo> _inputRuleUndo;
+	std::unique_ptr<InsertSuggestionsController> _insertSuggestions;
 	std::vector<HistoryEntry> _history;
 	int _historyIndex = -1;
 	std::vector<RetainedLeafField> _retainedLeafFields;
@@ -1065,6 +1089,7 @@ private:
 	std::optional<QPoint> _pressedMediaControlPoint;
 	std::optional<ButtonEditRequest> _pressedInlineButton;
 	std::optional<QPoint> _pressedInlineButtonPoint;
+	QString _hoverTooltip;
 	HorizontalScrollDrag _horizontalScrollDrag = HorizontalScrollDrag::None;
 	std::optional<QPoint> _pendingTouchHorizontalScrollPoint;
 	bool _syncingInlineFieldGeometry = false;

@@ -204,6 +204,9 @@ void EditLinkBox(
 			fieldSt,
 			tr::lng_formatting_link_url(),
 			link));
+	url->setInputMethodHints(Qt::ImhUrlCharactersOnly
+		| Qt::ImhNoAutoUppercase
+		| Qt::ImhNoPredictiveText);
 	url->heightValue(
 	) | rpl::on_next([placeholder](int height) {
 		placeholder->resize(placeholder->width(), height);
@@ -315,6 +318,9 @@ void EditCodeLanguageBox(
 		st::settingsAddReplyField,
 		tr::lng_formatting_code_auto(),
 		now.trimmed()));
+	field->setInputMethodHints(Qt::ImhLatinOnly
+		| Qt::ImhNoAutoUppercase
+		| Qt::ImhNoPredictiveText);
 	box->setFocusCallback([=] {
 		field->setFocusFast();
 	});
@@ -1647,4 +1653,10 @@ Ui::InputField::MimeDataHook WrappedMessageFieldMimeHook(
 		}
 		return originalHook ? originalHook(data, action) : false;
 	};
+}
+
+bool PasteAsPlainTextRequested() {
+	const auto modifiers = QGuiApplication::keyboardModifiers();
+	return (modifiers & Qt::ControlModifier)
+		&& (modifiers & Qt::ShiftModifier);
 }
