@@ -134,6 +134,26 @@ to'liq build'ni yeb qo'ydi, chunki har safar faqat bitta kompilyatsiya
 xatosi topilardi. Shu buyruq bilan uchalasi ham bir necha daqiqada
 topilishi mumkin edi.
 
+🔴 **`CMakeLists.txt` ga tegdingizmi — avval qayta generatsiya
+qiling.** MSBuild `/t:ClCompile` CMake'ni qayta yurgizmaydi, ya'ni
+ESKI `.vcxproj` bilan, ESKI bayroqlar bilan kompilyatsiya qilasiz.
+Yangi `target_compile_definitions` bo'lsa, kodingiz `#ifdef` ostida
+butunlay tashlab yuboriladi va kompilyator "muvaffaqiyat" deydi —
+aslida u sizning kodingizni umuman ko'rmagan:
+
+```
+cmake -S C:/TBuild/tdesktop -B C:/TBuild/tdesktop/out
+grep -c YOUR_MACRO out/Telegram/Telegram.vcxproj    # 0 bo'lmasligi kerak
+```
+
+2026-09-08 da Task 9 aynan shunday "tekshirilgan" edi: `.vcxproj`
+09-07 15:37 dan, `CMakeLists.txt` esa 09-08 12:13 dan edi.
+
+⚠️ Yangi Qt signali/sloti qo'shsangiz, kompilyatsiya yetarli emas —
+u AUTOMOC'da yaratiladi va xato faqat LINK bosqichida chiqadi.
+Tekshirish: `msbuild out/Telegram/Telegram_autogen.vcxproj`, keyin
+`grep <signal> out/Telegram/Telegram_autogen/include_Release/*/moc_*.cpp`.
+
 MSB8028 ogohlantirishlari (`intermediate directory ... shared`) normal --
 ular tdesktop'ning tashqi kutubxonalariga tegishli, sizning kodingizga
 emas.
