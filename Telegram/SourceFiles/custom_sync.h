@@ -17,6 +17,7 @@ struct SchedulerState {
     bool inFlight = false;       // hozir sikl ishlayapti
     int consecutiveFailures = 0;
     bool hasMore = false;        // server yana yozuvlar borligini bildirdi
+    bool pendingNotify = false;  // sikl davomida WebSocket xabarnomasi kelgan
     int catchUpCycles = 0;       // ketma-ket tez sikllar soni
     int intervalSeconds = 0;     // CustomSettings::SyncIntervalSeconds()
 };
@@ -74,6 +75,9 @@ private:
     void onCycleFinished(int pushed, int pushFailed,
                          int merged, int rejected,
                          bool hasMore, const QString &error);
+#ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+    void onChangesAvailable(qint64 seq);
+#endif
 
     QTimer *_timer = nullptr;
     // BITTA uzoq yashovchi klient. Har siklda yangisini yaratish xato edi:
@@ -85,6 +89,7 @@ private:
     Client *_client = nullptr;
     bool _inFlight = false;
     bool _hasMore = false;
+    bool _pendingNotify = false;
     int _catchUpCycles = 0;
     int _consecutiveFailures = 0;
     qint64 _lastSuccessAt = 0;

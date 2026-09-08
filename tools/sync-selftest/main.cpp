@@ -621,7 +621,71 @@ int main(int argc, char *argv[]) {
         check("scheduler/failure_reset/delay", QString::number(d.delaySeconds), "30");
     }
 
-    constexpr int kExpectedSchedulerCases = 8;
+    // 9. pendingNotify, not in flight, under the cap -> runs immediately
+    {
+        schedulerChecked++;
+        CustomSync::SchedulerState s;
+        s.enabled = true;
+        s.inFlight = false;
+        s.consecutiveFailures = 0;
+        s.hasMore = false;
+        s.pendingNotify = true;
+        s.catchUpCycles = 1;
+        s.intervalSeconds = 30;
+        const auto d = CustomSync::NextAction(s);
+        check("scheduler/pendingNotify_under_cap/runNow", d.runNow ? "true" : "false", "true");
+        check("scheduler/pendingNotify_under_cap/delay", QString::number(d.delaySeconds), "0");
+    }
+
+    // 10. pendingNotify while disabled -> never runs
+    {
+        schedulerChecked++;
+        CustomSync::SchedulerState s;
+        s.enabled = false;
+        s.inFlight = false;
+        s.consecutiveFailures = 0;
+        s.hasMore = false;
+        s.pendingNotify = true;
+        s.catchUpCycles = 0;
+        s.intervalSeconds = 30;
+        const auto d = CustomSync::NextAction(s);
+        check("scheduler/pendingNotify_disabled/runNow", d.runNow ? "true" : "false", "false");
+        check("scheduler/pendingNotify_disabled/delay", QString::number(d.delaySeconds), "0");
+    }
+
+    // 11. pendingNotify while inFlight -> does not run
+    {
+        schedulerChecked++;
+        CustomSync::SchedulerState s;
+        s.enabled = true;
+        s.inFlight = true;
+        s.consecutiveFailures = 0;
+        s.hasMore = false;
+        s.pendingNotify = true;
+        s.catchUpCycles = 0;
+        s.intervalSeconds = 30;
+        const auto d = CustomSync::NextAction(s);
+        check("scheduler/pendingNotify_inFlight/runNow", d.runNow ? "true" : "false", "false");
+        check("scheduler/pendingNotify_inFlight/delay", QString::number(d.delaySeconds), "0");
+    }
+
+    // 12. pendingNotify at the catch-up cap -> falls back to intervalSeconds
+    {
+        schedulerChecked++;
+        CustomSync::SchedulerState s;
+        s.enabled = true;
+        s.inFlight = false;
+        s.consecutiveFailures = 0;
+        s.hasMore = false;
+        s.pendingNotify = true;
+        s.catchUpCycles = CustomSync::kMaxCatchUpCycles;
+        s.intervalSeconds = 30;
+        const auto d = CustomSync::NextAction(s);
+        check("scheduler/pendingNotify_at_cap/runNow", d.runNow ? "true" : "false", "false");
+        check("scheduler/pendingNotify_at_cap/delay", QString::number(d.delaySeconds), "30");
+    }
+
+    constexpr int kExpectedSchedulerCases = 12;
     if (schedulerChecked != kExpectedSchedulerCases) {
         qWarning().noquote() << QStringLiteral("XATO: %1 ta scheduler holati kutilgan edi, lekin %2 ta tekshirildi!")
             .arg(kExpectedSchedulerCases)

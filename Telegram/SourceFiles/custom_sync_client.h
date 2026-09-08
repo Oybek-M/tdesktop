@@ -13,6 +13,12 @@
 class QNetworkAccessManager;
 class QNetworkReply;
 
+#ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+#include <QtNetwork/QAbstractSocket>
+class QWebSocket;
+class QTimer;
+#endif
+
 namespace CustomSync {
 
 template <typename T>
@@ -130,9 +136,32 @@ public:
     void getKeyWrap(const QString &wrapId, Fn<void(bool ok, KeyShare::Wrap wrap, QString error)> done);
     void createKeyWrap(const KeyShare::Wrap &wrap, Fn<void(bool ok, QString wrapId, QString error)> done);
 
+#ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+    // WebSocket boshqaruvi (K5: faqat sync yoqilgan va autentifikatsiya qilingan bo'lsa)
+    void startWebSocket();
+    void stopWebSocket();
+#endif
+
+Q_SIGNALS:
+#ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+    void changesAvailable(qint64 seq);
+#endif
+
 private:
     void ensureAccessToken(Fn<void(bool success)> done);
     [[nodiscard]] QUrl makeUrl(const QString &path) const;
+
+#ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+    [[nodiscard]] QUrl makeWebSocketUrl() const;
+    void handleWebSocketMessage(const QString &message);
+    void handleWebSocketClosed();
+    void handleWebSocketError(QAbstractSocket::SocketError error);
+    void scheduleWebSocketReconnect();
+
+    QWebSocket *_socket = nullptr;
+    QTimer *_wsReconnectTimer = nullptr;
+    int _wsBackoffSeconds = 1;
+#endif
 
     QNetworkAccessManager *_network = nullptr;
     QString _accessToken;

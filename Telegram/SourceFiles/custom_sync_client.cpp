@@ -15,10 +15,23 @@
 #include <QtCore/QDebug>
 #include <sqlite3.h>
 
+#ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+#include <QtWebSockets/QWebSocket>
+#include <QtWebSockets/QWebSocketProtocol>
+#include <QtCore/QUrlQuery>
+#include <QtCore/QTimer>
+#endif
+
 #include <optional>
 #include <algorithm>
 
 namespace CustomSync {
+
+#ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+// WebSocket qayta ulanish chegaralari (eksponensial backoff: 1s -> 60s)
+constexpr int kMinWsReconnectSeconds = 1;
+constexpr int kMaxWsReconnectSeconds = 60;
+#endif
 
 EnrollResponse ParseEnrollResponse(const QByteArray &jsonBytes, int httpStatus) {
     EnrollResponse res;
@@ -129,7 +142,11 @@ Client::Client(QObject *parent)
     , _network(new QNetworkAccessManager(this)) {
 }
 
-Client::~Client() = default;
+Client::~Client() {
+#ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+    stopWebSocket();
+#endif
+}
 
 QUrl Client::makeUrl(const QString &path) const {
     auto base = CustomSettings::SyncServerUrl().trimmed();
@@ -143,6 +160,9 @@ void Client::ensureAccessToken(Fn<void(bool success)> done) {
     const auto now = QDateTime::currentSecsSinceEpoch();
     constexpr qint64 kExpirationMarginSeconds = 60;
     if (!_accessToken.isEmpty() && now + kExpirationMarginSeconds < _tokenExpiresAt) {
+#ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+        startWebSocket();
+#endif
         if (done) done(true);
         return;
     }
@@ -187,6 +207,9 @@ void Client::ensureAccessToken(Fn<void(bool success)> done) {
                 ? dt.toSecsSinceEpoch()
                 : (QDateTime::currentSecsSinceEpoch() + 3600);
             success = true;
+#ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+            startWebSocket();
+#endif
         }
 
         _refreshing = false;
@@ -233,6 +256,9 @@ void Client::enroll(
                 ? dt.toSecsSinceEpoch()
                 : (QDateTime::currentSecsSinceEpoch() + 3600);
 
+#ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+            startWebSocket();
+#endif
             if (done) done(true, QString());
         } else {
             if (done) done(false, resp.error.isEmpty() ? QStringLiteral("enroll_failed") : resp.error);
@@ -911,5 +937,191 @@ void Client::createKeyWrap(const KeyShare::Wrap &wrap, Fn<void(bool ok, QString 
         });
     });
 }
+
+#ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+QUrl Client::makeWebSocketUrl() const {
+    auto base = CustomSettings::SyncServerUrl().trimmed();
+    while (base.endsWith('/')) {
+        base.chop(1);
+    }
+    QUrl url(base + QStringLiteral("/ws/notify"));
+    if (url.scheme() == QStringLiteral("https")) {
+        url.setScheme(QStringLiteral("wss"));
+    } else if (url.scheme() == QStringLiteral("http")) {
+        url.setScheme(QStringLiteral("ws"));
+    }
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("access_token"), _accessToken);
+    url.setQuery(query);
+    return url;
+}
+
+void Client::startWebSocket() {
+    // 🔴 K5: Faqat quyidagi shartlarning barchasi bajarilgandagina soket ochiladi:
+    // SyncEnabled() && device_id mavjud && yaroqli access_token mavjud
+    const auto now = QDateTime::currentSecsSinceEpoch();
+    const auto deviceId = Outbox::GetState(QStringLiteral("device_id"));
+    if (!CustomSettings::SyncEnabled()
+        || deviceId.isEmpty()
+        || _accessToken.isEmpty()
+        || now >= _tokenExpiresAt) {
+        stopWebSocket();
+        return;
+    }
+
+    if (_socket) {
+        if (_socket->state() == QAbstractSocket::ConnectedState
+            || _socket->state() == QAbstractSocket::ConnectingState) {
+            return;
+        }
+    } else {
+        _socket = new QWebSocket(QString(), QWebSocketProtocol::VersionLatest, this);
+        connect(_socket, &QWebSocket::connected, this, [this] {
+            _wsBackoffSeconds = kMinWsReconnectSeconds;
+            if (_wsReconnectTimer) {
+                _wsReconnectTimer->stop();
+            }
+        });
+        connect(_socket, &QWebSocket::disconnected, this, &Client::handleWebSocketClosed);
+        connect(_socket, &QWebSocket::textMessageReceived, this, &Client::handleWebSocketMessage);
+        connect(_socket, &QWebSocket::errorOccurred, this, &Client::handleWebSocketError);
+    }
+
+    if (_wsReconnectTimer) {
+        _wsReconnectTimer->stop();
+    }
+    _socket->open(makeWebSocketUrl());
+}
+
+void Client::stopWebSocket() {
+    if (_wsReconnectTimer) {
+        _wsReconnectTimer->stop();
+    }
+    if (_socket) {
+        // Ixtiyoriy yopish paytida takroriy ulanish chaqirilmasligi uchun signallarni uzish
+        _socket->disconnect(this);
+        _socket->abort();
+        _socket->deleteLater();
+        _socket = nullptr;
+    }
+    _wsBackoffSeconds = kMinWsReconnectSeconds;
+}
+
+void Client::handleWebSocketMessage(const QString &message) {
+    const auto doc = QJsonDocument::fromJson(message.toUtf8());
+    if (!doc.isObject()) {
+        qWarning() << "CustomSync: WebSocket invalid JSON received";
+        return;
+    }
+    const auto obj = doc.object();
+    const auto type = obj.value(QStringLiteral("type")).toString();
+    if (type == QStringLiteral("changes")) {
+        const auto seq = obj.value(QStringLiteral("seq")).toInteger();
+        qInfo() << "CustomSync: WebSocket changes notification received, seq:" << seq;
+        Q_EMIT changesAvailable(seq);
+    } else {
+        // Noma'lum freym turi — bir marta log qilinadi va e'tiborsiz qoldiriladi
+        qInfo() << "CustomSync: unknown WebSocket frame type ignored:" << type;
+    }
+}
+
+namespace {
+
+bool isAuthFailure(QWebSocketProtocol::CloseCode code, const QString &reason, const QString &errorStr) {
+    if (code == QWebSocketProtocol::CloseCodePolicyViolated) { // 1008 (RFC 6455 policy violation)
+        return true;
+    }
+    const int codeInt = static_cast<int>(code);
+    if (codeInt == 4401 || codeInt == 4403 || codeInt == 4001 || codeInt == 4003) {
+        return true;
+    }
+    const auto lowerReason = reason.toLower();
+    const auto lowerErr = errorStr.toLower();
+    if (lowerReason.contains(QStringLiteral("401"))
+        || lowerReason.contains(QStringLiteral("403"))
+        || lowerReason.contains(QStringLiteral("unauthorized"))
+        || lowerReason.contains(QStringLiteral("forbidden"))
+        || lowerReason.contains(QStringLiteral("auth"))) {
+        return true;
+    }
+    if (lowerErr.contains(QStringLiteral("401"))
+        || lowerErr.contains(QStringLiteral("403"))
+        || lowerErr.contains(QStringLiteral("unauthorized"))
+        || lowerErr.contains(QStringLiteral("forbidden"))) {
+        return true;
+    }
+    return false;
+}
+
+} // namespace
+
+void Client::handleWebSocketClosed() {
+    // K5: Agar sync o'chirilgan bo'lsa, qayta ulanish bo'lmaydi
+    if (!CustomSettings::SyncEnabled()) {
+        stopWebSocket();
+        return;
+    }
+
+    const auto code = _socket ? _socket->closeCode() : QWebSocketProtocol::CloseCodeNormal;
+    const auto reason = _socket ? _socket->closeReason() : QString();
+    const auto errStr = _socket ? _socket->errorString() : QString();
+
+    if (isAuthFailure(code, reason, errStr)) {
+        // Autentifikatsiya xatosi (401/403): eski token bilan serverni qayta urmaslik
+        // uchun bevosita qayta ulanmaymiz. Navbatdagi sikl tokenni yangilaganda
+        // startWebSocket chaqiriladi.
+        qWarning() << "CustomSync: WebSocket auth failure, close code:" << code
+                   << "reason:" << reason << "error:" << errStr;
+        if (_wsReconnectTimer) {
+            _wsReconnectTimer->stop();
+        }
+        return;
+    }
+
+    // Tarmoq uzilishi bo'lsa — eksponensial backoff bilan qayta ulanish
+    scheduleWebSocketReconnect();
+}
+
+void Client::handleWebSocketError(QAbstractSocket::SocketError error) {
+    Q_UNUSED(error);
+    if (!CustomSettings::SyncEnabled()) {
+        stopWebSocket();
+        return;
+    }
+    const auto code = _socket ? _socket->closeCode() : QWebSocketProtocol::CloseCodeNormal;
+    const auto reason = _socket ? _socket->closeReason() : QString();
+    const auto errStr = _socket ? _socket->errorString() : QString();
+
+    if (isAuthFailure(code, reason, errStr)) {
+        qWarning() << "CustomSync: WebSocket auth error:" << errStr;
+        if (_wsReconnectTimer) {
+            _wsReconnectTimer->stop();
+        }
+        return;
+    }
+
+    scheduleWebSocketReconnect();
+}
+
+void Client::scheduleWebSocketReconnect() {
+    if (!CustomSettings::SyncEnabled()) {
+        stopWebSocket();
+        return;
+    }
+    if (!_wsReconnectTimer) {
+        _wsReconnectTimer = new QTimer(this);
+        _wsReconnectTimer->setSingleShot(true);
+        connect(_wsReconnectTimer, &QTimer::timeout, this, [this] {
+            startWebSocket();
+        });
+    }
+    if (_wsReconnectTimer->isActive()) {
+        return;
+    }
+    const int delay = _wsBackoffSeconds;
+    _wsBackoffSeconds = std::min(_wsBackoffSeconds * 2, kMaxWsReconnectSeconds);
+    _wsReconnectTimer->start(delay * 1000);
+}
+#endif
 
 } // namespace CustomSync

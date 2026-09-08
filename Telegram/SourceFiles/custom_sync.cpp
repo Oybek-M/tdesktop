@@ -39,9 +39,9 @@ SchedulerDecision NextAction(const SchedulerState &s) {
         return { false, int(delay) };
     }
 
-    // 4. Server yana ma'lumot borligini bildirdi va tez sikllar chegarasiga
-    // yetilmagan — darhol ishga tushirish (runNow = true)
-    if (s.hasMore && s.catchUpCycles < kMaxCatchUpCycles) {
+    // 4. Server yana ma'lumot borligini bildirdi yoki sikl davomida WebSocket
+    // orqali xabarnoma keldi va tez sikllar chegarasiga yetilmagan — darhol ishga tushirish (runNow = true)
+    if ((s.hasMore || s.pendingNotify) && s.catchUpCycles < kMaxCatchUpCycles) {
         return { true, 0 };
     }
 
@@ -75,12 +75,18 @@ void Orchestrator::start() {
     if (!CustomSettings::SyncEnabled()) {
         return;
     }
+#ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+    if (_client) {
+        _client->startWebSocket();
+    }
+#endif
     // Interval CustomSettings::SyncIntervalSeconds() dan har safar o'qiladi
     SchedulerState state;
     state.enabled = true;
     state.inFlight = _inFlight;
     state.consecutiveFailures = _consecutiveFailures;
     state.hasMore = false;
+    state.pendingNotify = _pendingNotify;
     state.catchUpCycles = 0;
     state.intervalSeconds = CustomSettings::SyncIntervalSeconds();
     arm(NextAction(state));
@@ -88,6 +94,11 @@ void Orchestrator::start() {
 
 void Orchestrator::stop() {
     _timer->stop();
+#ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+    if (_client) {
+        _client->stopWebSocket();
+    }
+#endif
 }
 
 void Orchestrator::syncNow() {
@@ -153,6 +164,9 @@ void Orchestrator::runCycle() {
     // Avval push, keyin pull (spec §3.4: observed_at iloji boricha yaqin bo'lishi uchun)
     if (!_client) {
         _client = new Client(this);
+#ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+        connect(_client, &Client::changesAvailable, this, &Orchestrator::onChangesAvailable);
+#endif
     }
     _client->pushPending([this, cycleId](int sent, int failed) {
         if (_currentCycleId != cycleId) {
@@ -169,6 +183,22 @@ void Orchestrator::runCycle() {
     });
 }
 
+#ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+void Orchestrator::onChangesAvailable(qint64 seq) {
+    Q_UNUSED(seq);
+    if (!CustomSettings::SyncEnabled()) {
+        return;
+    }
+    if (_inFlight) {
+        // Sikl davomida kelgan xabarnoma — sikl tugagach NextAction orqali darhol tortiladi
+        _pendingNotify = true;
+        return;
+    }
+    // Bo'sh turgan paytda xabarnoma kelsa — darhol siklni boshlash
+    syncNow();
+}
+#endif
+
 void Orchestrator::onCycleFinished(
         int pushed, int pushFailed,
         int merged, int rejected,
@@ -182,13 +212,15 @@ void Orchestrator::onCycleFinished(
     Q_UNUSED(rejected);
 
     const bool success = error.isEmpty() && (merged >= 0);
+    const bool pendingNotify = _pendingNotify;
+    _pendingNotify = false;
 
     if (success) {
         _consecutiveFailures = 0;
         _lastError.clear();
         _lastSuccessAt = QDateTime::currentSecsSinceEpoch();
         _hasMore = hasMore;
-        if (hasMore) {
+        if (hasMore || pendingNotify) {
             _catchUpCycles++;
         } else {
             _catchUpCycles = 0;
@@ -213,6 +245,7 @@ void Orchestrator::onCycleFinished(
     state.inFlight = false;
     state.consecutiveFailures = _consecutiveFailures;
     state.hasMore = _hasMore;
+    state.pendingNotify = pendingNotify;
     state.catchUpCycles = _catchUpCycles;
     state.intervalSeconds = CustomSettings::SyncIntervalSeconds();
     arm(NextAction(state));

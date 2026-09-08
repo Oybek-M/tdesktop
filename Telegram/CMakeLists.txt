@@ -94,6 +94,12 @@ PRIVATE
     desktop-app::external_xxhash
 )
 
+find_package(Qt6 COMPONENTS WebSockets QUIET)
+if (TARGET Qt6::WebSockets)
+    target_link_libraries(Telegram PRIVATE Qt6::WebSockets)
+    target_compile_definitions(Telegram PRIVATE CUSTOM_SYNC_HAS_WEBSOCKETS)
+endif()
+
 if (NOT DESKTOP_APP_DISABLE_SWIFT6)
     telegram_add_apple_swift_runtime(Telegram)
 endif()
