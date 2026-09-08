@@ -1350,8 +1350,8 @@ auto MtpChecker::parseText(const QByteArray &text) const
 				).arg(version));
 			return false;
 		}
-		// Format: "{version}:{postId}" - no username/channel needed,
-		// the feed channel is a fixed constant (kFeedChannelId).
+		// Format: "{version}:{postId}" -- kanal qat'iy konstanta,
+		// shuning uchun yozuvda faqat post raqami keladi.
 		const auto full = (*entry).toString();
 		const auto start = full.indexOf(':');
 		if (start <= 0) {
@@ -1360,6 +1360,8 @@ auto MtpChecker::parseText(const QByteArray &text) const
 				).arg(version));
 			return false;
 		}
+		bestLocation.channelId = MTP::kFeedChannelIdValue;
+		bestLocation.accessHash = MTP::kFeedAccessHash;
 		bestLocation.postId = base::StringViewMid(full, start + 1).toInt();
 		if (!bestLocation.postId) {
 			LOG(("Update Error: MTP entry '%1' is bad for version %2."

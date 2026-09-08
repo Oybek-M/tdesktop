@@ -456,7 +456,7 @@ void ResolveChannel(
 // requires per-account access_hash to resolve it, and only members
 // have that loaded locally. See docs/self-update/updater-contract.md
 // section 5.2/6.6 for the full reasoning.
-constexpr auto kFeedChannelId = ChannelId(3924690533ULL);
+constexpr auto kFeedChannelId = ChannelId(kFeedChannelIdValue);
 
 void ResolveOwnChannel(
 		not_null<MTP::WeakInstance*> mtp,
@@ -476,6 +476,11 @@ void ResolveOwnChannel(
 		fail();
 		return;
 	}
+	// kFeedAccessHash ni to'ldirish uchun kerak: shu qiymatni log'dan
+	// ko'chirib sarlavhadagi konstantaga qo'yiladi, shundan keyin bu
+	// funksiya umuman chaqirilmaydi va o'chirilishi mumkin.
+	LOG(("Update Info: feed channel access_hash = %1"
+		).arg(channel->accessHash()));
 	done(channel->inputChannel());
 }
 
@@ -528,18 +533,15 @@ void StartDedicatedLoader(
 			doneHandler,
 			failHandler);
 	};
-	if (location.channelId) {
+	if (location.channelId && location.accessHash) {
 		request(MTP_inputChannel(
 			MTP_long(location.channelId),
 			MTP_long(location.accessHash)));
 	} else if (location.username.isEmpty()) {
-		// CustomMod: o'z reliz kanalimiz maxfiy, username'i yo'q --
-		// uni qat'iy kanal id'si orqali hal qilamiz.
-		//
-		// 7.2.6 dan boshlab upstream'da channelId + accessHash yo'li
-		// paydo bo'ldi va u shu hiyladan yaxshiroq. Ko'chirish ATAYLAB
-		// qilinmadi: self-update sinovdan o'tgan va uni merge ichida
-		// qayta yozish xavfli. Alohida ish sifatida ko'rib chiqiladi.
+		// accessHash hali ma'lum emas -- eski zaxira yo'li. U sessiya
+		// keshiga tayanadi, ya'ni faqat kanal a'zosida va faqat dialoglar
+		// yuklangandan keyin ishlaydi. kFeedAccessHash to'ldirilgach bu
+		// tarmoq o'lik qoladi.
 		ResolveOwnChannel(mtp, request, [=] {
 			ready(nullptr);
 		});
