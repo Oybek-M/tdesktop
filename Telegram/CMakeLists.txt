@@ -2694,7 +2694,14 @@ if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_wins
         PRIVATE
             _other/packer.cpp
             _other/packer.h
+            core/update_verify.cpp
+            core/update_verify.h
         )
+
+        # 7.2.6 dan boshlab packer.cpp core/update_verify.h ni chaqiradi,
+        # shuning uchun SourceFiles include yo'liga qo'shiladi -- yuqoridagi
+        # DESKTOP_APP_SPECIAL_TARGET tarmog'idagi kabi.
+        target_include_directories(Packer PRIVATE ${src_loc})
 
         target_link_libraries(Packer
         PRIVATE
