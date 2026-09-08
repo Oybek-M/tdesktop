@@ -1,5 +1,9 @@
 #include "custom_tab_common.h"
 
+// ApplyTitleBar() uchun kerak. Ilgari lib_ui sarlavhalari orqali
+// tranzitiv kelardi; 7.2.6 dagi lib_ui o'sha zanjirni uzdi.
+#include <QtCore/QOperatingSystemVersion>
+
 // Eslatma: `gInstance` va `ShowCustomBox()` ATAYLAB shu yerda emas,
 // `custom_mod_window.cpp` da ta'riflangan. Sabab: `CustomModWindow`
 // klassi faqat o'sha faylda to'liq ko'rinadi (sarlavhada faqat
