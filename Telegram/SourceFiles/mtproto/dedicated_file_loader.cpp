@@ -38,8 +38,9 @@ std::optional<MTPInputChannel> ExtractChannel(
 }
 
 std::optional<DedicatedLoader::File> ParseFile(
-		const MTPmessages_Messages &result) {
-	const auto message = GetMessagesElement(result);
+		const MTPmessages_Messages &result,
+		int postId) {
+	const auto message = GetMessagesElement(result, postId);
 	if (!message || message->type() != mtpc_message) {
 		LOG(("Update Error: MTP file message not found."));
 		return std::nullopt;
@@ -71,8 +72,8 @@ std::optional<DedicatedLoader::File> ParseFile(
 		return std::nullopt;
 	}
 	const auto size = int64(fields.vsize().v);
-	if (size <= 0) {
-		LOG(("Update Error: MTP file size is invalid."));
+	if (size <= 0 || size > AbstractDedicatedLoader::kMaxFileSize) {
+		LOG(("Update Error: MTP file size is invalid: %1.").arg(size));
 		return std::nullopt;
 	}
 	const auto location = MTP_inputDocumentFileLocation(
@@ -269,8 +270,15 @@ void AbstractDedicatedLoader::threadSafeFailed() {
 	});
 }
 
-void AbstractDedicatedLoader::writeChunk(bytes::const_span data, int totalSize) {
-	const auto size = data.size();
+void AbstractDedicatedLoader::writeChunk(bytes::const_span data, int64 totalSize) {
+	const auto size = int64(data.size());
+	if (totalSize > kMaxFileSize || alreadySize() + size > kMaxFileSize) {
+		LOG(("Update Error: Download exceeds the size limit: %1 / %2."
+			).arg(alreadySize() + size
+			).arg(totalSize));
+		threadSafeFailed();
+		return;
+	}
 	if (size > 0) {
 		const auto written = _output.write(QByteArray::fromRawData(
 			reinterpret_cast<const char*>(data.data()),
@@ -448,7 +456,7 @@ void ResolveChannel(
 // requires per-account access_hash to resolve it, and only members
 // have that loaded locally. See docs/self-update/updater-contract.md
 // section 5.2/6.6 for the full reasoning.
-constexpr auto kFeedChannelId = ChannelId(3924690533ULL);
+constexpr auto kFeedChannelId = ChannelId(kFeedChannelIdValue);
 
 void ResolveOwnChannel(
 		not_null<MTP::WeakInstance*> mtp,
@@ -468,17 +476,29 @@ void ResolveOwnChannel(
 		fail();
 		return;
 	}
+	// kFeedAccessHash ni to'ldirish uchun kerak: shu qiymatni log'dan
+	// ko'chirib sarlavhadagi konstantaga qo'yiladi, shundan keyin bu
+	// funksiya umuman chaqirilmaydi va o'chirilishi mumkin.
+	LOG(("Update Info: feed channel access_hash = %1"
+		).arg(channel->accessHash()));
 	done(channel->inputChannel());
 }
 
 std::optional<MTPMessage> GetMessagesElement(
-		const MTPmessages_Messages &list) {
+		const MTPmessages_Messages &list,
+		int messageId) {
 	return list.match([&](const MTPDmessages_messagesNotModified &) {
 		return std::optional<MTPMessage>(std::nullopt);
-	}, [&](const auto &data) {
-		return data.vmessages().v.isEmpty()
-			? std::nullopt
-			: std::make_optional(data.vmessages().v[0]);
+	}, [&](const auto &data) -> std::optional<MTPMessage> {
+		for (const auto &message : data.vmessages().v) {
+			const auto id = message.match([](const auto &data) {
+				return data.vid().v;
+			});
+			if (!messageId || id == messageId) {
+				return message;
+			}
+		}
+		return std::nullopt;
 	});
 }
 
@@ -487,8 +507,9 @@ void StartDedicatedLoader(
 		const DedicatedLoader::Location &location,
 		const QString &folder,
 		Fn<void(std::unique_ptr<DedicatedLoader>)> ready) {
+	const auto postId = location.postId;
 	const auto doneHandler = [=](const MTPmessages_Messages &result) {
-		const auto file = ParseFile(result);
+		const auto file = ParseFile(result, postId);
 		ready(file
 			? std::make_unique<MTP::DedicatedLoader>(
 				mtp->session(),
@@ -502,20 +523,7 @@ void StartDedicatedLoader(
 		ready(nullptr);
 	};
 
-	const auto &[username, postId] = location;
-	const auto resolve = [=](
-			Fn<void(const MTPInputChannel &channel)> done,
-			Fn<void()> fail) {
-		if (username.isEmpty()) {
-			// Private channel (CustomMod's own update feed) - no
-			// username to resolve, use the fixed channel id instead.
-			ResolveOwnChannel(mtp, std::move(done), std::move(fail));
-		} else {
-			ResolveChannel(mtp, username, std::move(done), std::move(fail));
-		}
-	};
-	resolve([=](
-			const MTPInputChannel &channel) {
+	const auto request = [=](const MTPInputChannel &channel) {
 		mtp->send(
 			MTPchannels_GetMessages(
 				channel,
@@ -524,7 +532,24 @@ void StartDedicatedLoader(
 					MTP_inputMessageID(MTP_int(postId)))),
 			doneHandler,
 			failHandler);
-	}, [=] { ready(nullptr); });
+	};
+	if (location.channelId && location.accessHash) {
+		request(MTP_inputChannel(
+			MTP_long(location.channelId),
+			MTP_long(location.accessHash)));
+	} else if (location.username.isEmpty()) {
+		// accessHash hali ma'lum emas -- eski zaxira yo'li. U sessiya
+		// keshiga tayanadi, ya'ni faqat kanal a'zosida va faqat dialoglar
+		// yuklangandan keyin ishlaydi. kFeedAccessHash to'ldirilgach bu
+		// tarmoq o'lik qoladi.
+		ResolveOwnChannel(mtp, request, [=] {
+			ready(nullptr);
+		});
+	} else {
+		ResolveChannel(mtp, location.username, request, [=] {
+			ready(nullptr);
+		});
+	}
 }
 
 } // namespace MTP

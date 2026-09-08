@@ -36,6 +36,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/image/image_prepare.h"
 #include "lang/lang_keys.h"
 #include "storage/file_download.h"
+#include "storage/storage_folder_archive.h"
 #include "storage/storage_media_prepare.h"
 #include "window/themes/window_theme_preview.h"
 #include "mainwidget.h"
@@ -521,7 +522,8 @@ FileLoadTask::FileLoadTask(Args &&args)
 , _spoiler(args.spoiler)
 , _forceFile(args.forceFile)
 , _sendLargePhotos(args.sendLargePhotos)
-, _animationJob(std::move(args.animationJob)) {
+, _animationJob(std::move(args.animationJob))
+, _archive(std::move(args.archive)) {
 	Expects(_to.options.scheduled
 		|| _to.options.shortcutId
 		|| !_to.replaceMediaOf
@@ -825,6 +827,18 @@ void FileLoadTask::process(ProcessArgs &&args) {
 			QString(),
 			true);
 		filemime = "video/mp4";
+	} else if (_archive) {
+		if (auto entries = Storage::GatherArchiveEntries(*_archive)) {
+			filesize = Storage::ArchiveSizeEstimate(*entries);
+			_result->archiveEntries
+				= std::make_shared<Storage::ArchiveEntries>(
+					std::move(*entries));
+		}
+		filename = _displayName.isEmpty()
+			? u"Archive.zip"_q
+			: _displayName;
+		filemime = u"application/zip"_q;
+		_result->archive = _archive;
 	} else if (!_content.isEmpty()) {
 		filesize = _content.size();
 		if (isVoice) {
@@ -968,7 +982,12 @@ void FileLoadTask::process(ProcessArgs &&args) {
 			auto coverWidth = video->thumbnail.width();
 			auto coverHeight = video->thumbnail.height();
 			auto realSeconds = video->duration / 1000.;
-			const auto convert = !Core::IsMimeSentAsVideo(filemime)
+			const auto gif = video->modifications.gif && !_forceFile;
+			const auto convertForGif = gif
+				&& video->isGifv
+				&& (filemime != u"video/mp4"_q);
+			const auto convert = (!Core::IsMimeSentAsVideo(filemime)
+					|| convertForGif)
 				&& !video->isWebmSticker
 				&& (filesize < Media::Encode::MaxTranscodeSourceSize());
 			if (!_forceFile
@@ -1028,10 +1047,8 @@ void FileLoadTask::process(ProcessArgs &&args) {
 					crl::time(0),
 					video->duration);
 			}
-			const auto gif = video->modifications.gif && !_forceFile;
 			if (!_forceFile) {
-				// A video without sound is what the servers read as a GIF.
-				if (gif && !_album) {
+				if (gif && !_album && (filemime == u"video/mp4"_q)) {
 					attributes.push_back(MTP_documentAttributeAnimated());
 				}
 				auto flags = MTPDdocumentAttributeVideo::Flags(0);
@@ -1227,8 +1244,9 @@ void FileLoadTask::finish() {
 	const auto premium = session->user()->isPremium();
 	if (!_result || !_result->filesize || _result->filesize < 0) {
 		Ui::show(
-			Ui::MakeInformBox(
-				tr::lng_send_image_empty(tr::now, lt_name, _filepath)),
+			Ui::MakeInformBox((_result && _result->archive)
+				? tr::lng_folder_archive_failed(tr::now)
+				: tr::lng_send_image_empty(tr::now, lt_name, _filepath)),
 			Ui::LayerOption::KeepOther);
 		removeFromAlbum();
 	} else if (_result->filesize > kFileSizePremiumLimit

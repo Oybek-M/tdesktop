@@ -87,7 +87,7 @@ protected:
 	void threadSafeReady();
 
 	// Single threaded.
-	void writeChunk(bytes::const_span data, int totalSize);
+	void writeChunk(bytes::const_span data, int64 totalSize);
 
 private:
 	virtual void startLoading() = 0;
@@ -114,12 +114,16 @@ class DedicatedLoader : public AbstractDedicatedLoader {
 public:
 	struct Location {
 		// Shared with emoji_sets_manager.cpp and spellchecker_common.cpp,
-		// which always set a real public username. An empty username
-		// (as CustomMod's own private feed channel produces - see
-		// MtpChecker::parseText in update_checker.cpp) tells
-		// StartDedicatedLoader to resolve via the fixed channel id
-		// instead (ResolveOwnChannel), since a private channel has none.
+		// which always set a real public username. CustomMod's own feed
+		// channel is private and has none, so it sets channelId +
+		// accessHash below instead.
 		QString username;
+
+		// When channelId is set the channel is used directly with the
+		// cached accessHash instead of resolving username.
+		uint64 channelId = 0;
+		uint64 accessHash = 0;
+
 		int32 postId = 0;
 	};
 	struct File {
@@ -162,19 +166,32 @@ void ResolveChannel(
 	Fn<void(const MTPInputChannel &channel)> done,
 	Fn<void()> fail);
 
-// CustomMod's private update-feed channel has no username, so it can't
-// go through contacts.resolveUsername like ResolveChannel() above.
-// Instead this resolves the fixed channel id (kFeedChannelId) using
-// whatever the local session already knows about it. Only channel
-// members have that data loaded, so a non-member silently gets `fail()`
-// - that IS the access control, no separate mechanism needed.
+// CustomMod'ning reliz kanali maxfiy: username'i yo'q, shuning uchun
+// ResolveChannel() ni ishlatib bo'lmaydi. MTProto esa kanalga murojaat
+// qilish uchun (channel_id, access_hash) juftligini talab qiladi.
+//
+// 7.2.6 dan boshlab to'g'ri yo'l bor: Location::channelId + accessHash.
+// Ikkisi ham quyidagi konstantalardan olinadi va binarga tushadi -- ya'ni
+// ilovani ishlatayotgan HAR KIM yangilanish ola oladi, kanal a'zosi
+// bo'lishi shart emas.
+//
+// kFeedAccessHash hali 0. To'ldirilgunicha ResolveOwnChannel() zaxira
+// sifatida ishlaydi: u qiymatni sessiya keshidan qarzga oladi, lekin
+// faqat a'zolarda va faqat dialoglar yuklangandan keyin -- shu sababli
+// almashtirilmoqda.
+inline constexpr auto kFeedChannelIdValue = uint64(3924690533ULL);
+inline constexpr auto kFeedAccessHash = uint64(0);
+
 void ResolveOwnChannel(
 	not_null<MTP::WeakInstance*> mtp,
 	Fn<void(const MTPInputChannel &channel)> done,
 	Fn<void()> fail);
 
+// With a non-zero messageId only the message with that exact id counts,
+// the server may answer a getMessages request with a different message.
 std::optional<MTPMessage> GetMessagesElement(
-	const MTPmessages_Messages &list);
+	const MTPmessages_Messages &list,
+	int messageId = 0);
 
 void StartDedicatedLoader(
 	not_null<MTP::WeakInstance*> mtp,

@@ -1074,7 +1074,10 @@ void HistoryInner::enumerateUserpics(Method method) {
 
 		// Call method on a userpic for all messages that have it and for those who are not showing it
 		// because of their attachment to the next message if they are bottom-most visible.
-		if (view->displayFromPhoto() || (view->hasFromPhoto() && itembottom >= _visibleAreaBottom)) {
+		if (view->displayFromPhoto()
+			|| (view->hasFromPhoto()
+				&& view->isAttachedToNext()
+				&& itembottom >= _visibleAreaBottom)) {
 			if (lowestAttachedItemTop < 0) {
 				lowestAttachedItemTop = itemtop + view->marginTop();
 			}
@@ -1410,10 +1413,6 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 	Painter p(this);
 	auto clip = e->rect();
 
-	if (_thanosController) {
-		_thanosController->clearRemovalHeight();
-	}
-
 	auto context = preparePaintContext(clip);
 	context.gestureHorizontal = _gestureHorizontal;
 	context.highlightPathCache = &_highlightPathCache;
@@ -1709,15 +1708,14 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 			const auto hasTranslation = context.gestureHorizontal.translation
 				&& (context.gestureHorizontal.msgBareId
 					== item->fullId().msg.bare);
+			const auto shift = context.gestureHorizontal.visualTranslation();
 			if (hasTranslation) {
-				p.translate(context.gestureHorizontal.translation, 0);
+				p.translate(shift, 0);
 				update(
 					QRect(
-						st::historyPhotoLeft
-							+ context.gestureHorizontal.translation,
+						st::historyPhotoLeft + std::min(shift, 0),
 						userpicTop,
-						st::msgPhotoSize
-							- context.gestureHorizontal.translation,
+						st::msgPhotoSize + std::abs(shift),
 						st::msgPhotoSize));
 			}
 			if (const auto from = item->displayFrom()) {
@@ -1756,7 +1754,7 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 				Unexpected("Corrupt forwarded information in message.");
 			}
 			if (hasTranslation) {
-				p.translate(-_gestureHorizontal.translation, 0);
+				p.translate(-shift, 0);
 			}
 		}
 		return true;
@@ -4447,9 +4445,6 @@ void HistoryInner::checkActivation() {
 }
 
 void HistoryInner::recountHistoryGeometry(bool initial) {
-	if (_thanosController) {
-		_thanosController->clearRemovalHeight();
-	}
 	_contentWidth = _scroll->width();
 
 	if (_history->hasPendingResizedItems()
@@ -4747,16 +4742,14 @@ void HistoryInner::changeItemsRevealHeight(int revealHeight) {
 }
 
 void HistoryInner::updateSize() {
+	if (_thanosController) {
+		_thanosController->flushRemovals(historyHeight() - _revealHeight);
+	}
 	const auto visibleHeight = _scroll->height();
 	auto collapseGapTotal = 0;
 	for (const auto &gap : collapseGaps()) {
 		collapseGapTotal += gap.height;
 	}
-	collapseGapTotal = std::max(
-		collapseGapTotal - (_thanosController
-			? _thanosController->removalHeight()
-			: 0),
-		0);
 	const auto itemsHeight = historyHeight() - _revealHeight + collapseGapTotal;
 	const auto aboutAboveHistory = _aboutView && _aboutView->aboveHistory();
 	const auto aboutBelowHistory = _aboutView && !aboutAboveHistory;
@@ -4862,6 +4855,9 @@ void HistoryInner::setupThanosEffect() {
 			.visibleAreaTop = [=] { return _visibleAreaTop; },
 			.visibleAreaBottom = [=] { return _visibleAreaBottom; },
 			.contentWidth = [=] { return width(); },
+			.contentHeight = [=] {
+				return historyHeight() - _revealHeight;
+			},
 			.preparePaintContext = [=](QRect clip) {
 				return preparePaintContext(clip);
 			},
