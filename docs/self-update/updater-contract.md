@@ -298,7 +298,29 @@ tdesktop esa `config.h`dagi public key bilan tekshiradi. Ikkalasi
 almashtirilganda **ikkalasi ham** yangilanishi kerak, aks holda
 imzo tekshiruvi muvaffaqiyatsiz bo'ladi.
 
-### 6.7 Implement qilindi: `ResolveOwnChannel`
+### 6.7 Implement qilindi: `ResolveOwnChannel` — 🔴 BEKOR QILINDI (2026-09-09)
+
+> **Bu bo'lim tarixiy.** `ResolveOwnChannel()`, `kFeedChannelId` va
+> `kFeedAccessHash` koddan butunlay olib tashlandi, `MtpChecker` esa
+> endi umuman ishga tushirilmaydi (`update_checker.cpp`,
+> `Updater::start()` da `startImplementation(&_mtpImplementation,
+> nullptr)`).
+>
+> **Sabab:** Telegram kanali orqali tarqatish kanal a'zoligini talab
+> qilardi — `channelLoaded()` faqat a'zoda ishlaydi, va bu
+> tekshiruvda ham, yuklab olishda ham shart edi. Kanal `access_hash`i
+> MTProto'da akkauntga bog'langani uchun uni konstantaga yozib
+> chetlab o'tish ham ishonchli emas. Upstream ham xuddi shunday deb
+> hisoblaydi: ularning maxfiy canary kanali izohida "membership is
+> enrollment ... never through a username resolve" deyilgan, ochiq
+> tarqatish uchun esa alohida username'li yo'l bor.
+>
+> **Yangi holat:** yangilanish FAQAT HTTP mirror orqali keladi —
+> `localstorage.cpp`, `readAutoupdatePrefixRaw()` (hozircha VPS:
+> `updates.2007.uz/secure`, `tdata/prefix` fayli bilan almashtirsa
+> bo'ladi). Hech qanday a'zolik yoki Telegram sessiyasi kerak emas.
+> Quyidagi matn faqat qaror tarixi uchun saqlanadi.
+
 
 `dedicated_file_loader.cpp`ga hardcoded `kFeedChannelId` (yopiq kanal
 ID) va `ResolveOwnChannel()` qo'shildi — 5.2-bo'limdagi yechimning aynan

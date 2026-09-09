@@ -451,39 +451,6 @@ void ResolveChannel(
 	), doneHandler, failHandler);
 }
 
-// CustomMod's private update-feed channel. Public and safe to keep in
-// source: knowing this id alone does not grant access, Telegram still
-// requires per-account access_hash to resolve it, and only members
-// have that loaded locally. See docs/self-update/updater-contract.md
-// section 5.2/6.6 for the full reasoning.
-constexpr auto kFeedChannelId = ChannelId(kFeedChannelIdValue);
-
-void ResolveOwnChannel(
-		not_null<MTP::WeakInstance*> mtp,
-		Fn<void(const MTPInputChannel &channel)> done,
-		Fn<void()> fail) {
-	const auto session = mtp->session();
-	const auto strong = session.get();
-	if (!mtp->valid() || !strong) {
-		fail();
-		return;
-	}
-	const auto channel = strong->data().channelLoaded(kFeedChannelId);
-	if (!channel) {
-		// Not a member (or the channel isn't loaded into this session
-		// yet) - fail silently so the caller's HTTP mirror fallback
-		// takes over. This is the intended access control.
-		fail();
-		return;
-	}
-	// kFeedAccessHash ni to'ldirish uchun kerak: shu qiymatni log'dan
-	// ko'chirib sarlavhadagi konstantaga qo'yiladi, shundan keyin bu
-	// funksiya umuman chaqirilmaydi va o'chirilishi mumkin.
-	LOG(("Update Info: feed channel access_hash = %1"
-		).arg(channel->accessHash()));
-	done(channel->inputChannel());
-}
-
 std::optional<MTPMessage> GetMessagesElement(
 		const MTPmessages_Messages &list,
 		int messageId) {
@@ -533,18 +500,10 @@ void StartDedicatedLoader(
 			doneHandler,
 			failHandler);
 	};
-	if (location.channelId && location.accessHash) {
+	if (location.channelId) {
 		request(MTP_inputChannel(
 			MTP_long(location.channelId),
 			MTP_long(location.accessHash)));
-	} else if (location.username.isEmpty()) {
-		// accessHash hali ma'lum emas -- eski zaxira yo'li. U sessiya
-		// keshiga tayanadi, ya'ni faqat kanal a'zosida va faqat dialoglar
-		// yuklangandan keyin ishlaydi. kFeedAccessHash to'ldirilgach bu
-		// tarmoq o'lik qoladi.
-		ResolveOwnChannel(mtp, request, [=] {
-			ready(nullptr);
-		});
 	} else {
 		ResolveChannel(mtp, location.username, request, [=] {
 			ready(nullptr);

@@ -1267,32 +1267,18 @@ MtpChecker::MtpChecker(
 }
 
 void MtpChecker::start() {
-	if (!_mtp.valid()) {
-		LOG(("Update Info: MTP is unavailable."));
-		crl::on_main(this, [=] { fail(); });
-		return;
-	}
-	// CustomMod o'z reliz kanalidan yangilanadi, shuning uchun upstream'ning
-	// "tdhbcfeed" va canary tarmoqlari ATAYLAB olinmadi: ular rasmiy
-	// Telegram binarlarini olib kelardi va bizning imzolarimizga mos
-	// kelmasdi. startCanary() upstream'da qoldi, biz uni chaqirmaymiz.
-	MTP::ResolveOwnChannel(&_mtp, [=](
-			const MTPInputChannel &channel) {
-		_mtp.send(
-			MTPmessages_GetHistory(
-				MTP_inputPeerChannel(
-					channel.c_inputChannel().vchannel_id(),
-					channel.c_inputChannel().vaccess_hash()),
-				MTP_int(0),  // offset_id
-				MTP_int(0),  // offset_date
-				MTP_int(0),  // add_offset
-				MTP_int(1),  // limit
-				MTP_int(0),  // max_id
-				MTP_int(0),  // min_id
-				MTP_long(0)), // hash
-			[=](const MTPmessages_Messages &result) { gotMessage(result); },
-			failHandler());
-	}, [=] { fail(); });
+	// CustomMod yangilanishni FAQAT HTTP mirror orqali tarqatadi
+	// (readAutoupdatePrefixRaw() dagi VPS manzili). Telegram kanali
+	// yo'li 2026-09-09 da olib tashlandi: u kanal a'zoligini talab
+	// qilardi, VPS esa hech qanday cheklovsiz ishlaydi.
+	//
+	// Upstream'ning "tdhbcfeed" va canary tarmoqlari ham ATAYLAB
+	// olinmaydi -- ular rasmiy Telegram binarlarini olib kelardi va
+	// bizning imzolarimizga mos kelmasdi.
+	//
+	// Klass o'zi saqlanadi (upstream bilan konfliktni kamaytiradi),
+	// lekin Updater uni umuman ishga tushirmaydi.
+	crl::on_main(this, [=] { fail(); });
 }
 
 void MtpChecker::gotMessage(const MTPmessages_Messages &result) {
@@ -1360,8 +1346,6 @@ auto MtpChecker::parseText(const QByteArray &text) const
 				).arg(version));
 			return false;
 		}
-		bestLocation.channelId = MTP::kFeedChannelIdValue;
-		bestLocation.accessHash = MTP::kFeedAccessHash;
 		bestLocation.postId = base::StringViewMid(full, start + 1).toInt();
 		if (!bestLocation.postId) {
 			LOG(("Update Error: MTP entry '%1' is bad for version %2."
@@ -1997,11 +1981,10 @@ void Updater::start(bool forceWait) {
 				&_httpImplementation,
 				std::make_unique<HttpChecker>(_testing));
 		}
-		startImplementation(
-			&_mtpImplementation,
-			std::make_unique<MtpChecker>(
-				LookupCanaryPrivateSession(_session),
-				_testing));
+		// CustomMod: MTP tarmog'i ishga tushirilmaydi -- yangilanish
+		// faqat yuqoridagi HTTP mirror'dan keladi. nullptr avvalgi
+		// tekshiruvchini tozalaydi, canary tarmog'idagi kabi.
+		startImplementation(&_mtpImplementation, nullptr);
 
 		_checking.fire({});
 	} else {
