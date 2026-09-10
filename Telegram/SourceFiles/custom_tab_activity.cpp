@@ -1,5 +1,7 @@
 #include "custom_tab_common.h"
 
+#include "custom_activity_history.h"
+
 void fillActivityTab(
 		not_null<Ui::VerticalLayout*> content,
 		not_null<Window::SessionController*> controller,
@@ -96,7 +98,7 @@ void fillActivityTab(
 	->addClickHandler([=] {
 		bool ok = false;
 		const auto parsed = customBufferInput->getLastText().trimmed().toInt(&ok);
-		const auto clamped = std::clamp(ok ? parsed : 10, 1, 120);
+		const auto clamped = std::clamp(ok ? parsed : 60, 1, 120);
 		CustomSettings::SetInt(u"activityBufferMinutes"_q, clamped);
 		*selectedBufferMinutes = clamped;
 		Ui::Toast::Show(
@@ -288,6 +290,12 @@ void fillActivityTab(
 					return true;
 				}
 				CustomSettings::AddToActivityInclude(peerId, name);
+				// Kontekst menyusidagi yo'l bilan bir xil bo'lishi uchun:
+				// buferni ko'chiramiz va joriy holatni yozamiz.
+				CustomActivityHistory::FlushBufferedActivity(
+					&controller->session(), peerId);
+				CustomActivityHistory::RecordCurrentState(
+					&controller->session(), peer->asUser());
 				Ui::Toast::Show(name + u" Include List'ga qo'shildi."_q);
 				if (onRebuild) onRebuild();
 				return true;

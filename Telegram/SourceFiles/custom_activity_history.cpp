@@ -406,23 +406,24 @@ void MaybeBackupUserpic(not_null<Main::Session*> session, not_null<UserData*> us
 	return ok ? (observedAt - ts) : -1;
 }
 
-void RecordField(
+bool RecordField(
 		not_null<Main::Session*> session,
 		const QString &peerId,
 		const QString &field,
 		const QString &newValue,
-		qint64 observedAt) {
+		qint64 observedAt,
+		const QString &source = u"observed"_q) {
 	// Kesh hali yuklanmagan bo'lsa yozmaymiz: "eski qiymat yo'q" degan
 	// noto'g'ri xulosa chiqib, har kontaktga soxta "kuzatish boshlandi"
 	// yozuvi qo'shilardi. Bir necha soniyalik yo'qotish zararsiz.
 	if (!CustomDB::IsActivityCacheReady()) {
-		return;
+		return false;
 	}
 	QString oldValue;
 	const auto hadPrevious = CustomDB::GetLatestActivityHistoryValue(
 		peerId, field, oldValue);
 	if (hadPrevious && oldValue == newValue) {
-		return; // haqiqiy o'zgarish yo'q — qayta yozmaymiz
+		return false; // haqiqiy o'zgarish yo'q — qayta yozmaymiz
 	}
 	// 2026-08-24: last-seen SHOVQIN filtri.
 	//
@@ -443,12 +444,19 @@ void RecordField(
 			const auto oldAge = StatusAge(oldValue, observedAt);
 			if (newAge >= 0 && oldAge >= 0
 					&& std::llabs(newAge - oldAge) < 60) {
-				return;
+				return false;
 			}
 		}
 	}
 	CustomDB::SaveActivityHistoryEntry(
-		CustomDB::PeerKey{qint64(session->userId().bare), peerId}, field, hadPrevious, oldValue, newValue, observedAt);
+		CustomDB::PeerKey{qint64(session->userId().bare), peerId},
+		field,
+		hadPrevious,
+		oldValue,
+		newValue,
+		observedAt,
+		source);
+	return true;
 }
 
 } // namespace
@@ -656,6 +664,65 @@ void Init(not_null<Main::Session*> session) {
 		CheckPendingStoryMedia();
 		CheckPendingUserpics();
 	}, session->lifetime());
+}
+
+int RecordCurrentState(
+		not_null<Main::Session*> session,
+		not_null<UserData*> user) {
+	// Init() dagi obuna faqat O'ZGARISHNI yozadi. Kuzatuv yoqilgan
+	// paytda kontakt holati o'zgarmasa, bazaga hech nima tushmaydi va
+	// panel bo'sh yoki eskirgan ko'rinadi -- profil paneli esa xotiradagi
+	// jonli qiymatni ko'rsatib turaveradi.
+	//
+	// Real holat (2026-09-10): status paketi 11:45:35 da keldi, kuzatuv
+	// 11:57:20 da yoqildi. O'rtadagi 11 daqiqa 45 soniya 10 daqiqalik
+	// buferdan oshib ketgan, shuning uchun FlushBufferedActivity() ham
+	// hech nima tiklamadi va peer 24.08 dagi holatda qolib ketdi.
+	//
+	// Shu sababli bu yerda ilova ALLAQACHON biladigan holat yoziladi.
+	// RecordField() ning o'zi dublikatni va shovqinni filtrlaydi, ya'ni
+	// qiymat bazadagidek bo'lsa hech nima yozilmaydi.
+	const auto peerId = QString::number(user->id.value);
+	const auto now = base::unixtime::now();
+	auto saved = 0;
+
+	if (RecordField(
+			session,
+			peerId,
+			u"status"_q,
+			EncodeStatus(user->lastseen(), now),
+			now,
+			u"snapshot"_q)) {
+		++saved;
+	}
+	// Bo'sh qiymat yozilmaydi: "kuzatish boshlandi: noma'lum" foydasiz
+	// qator bo'lardi, keyinchalik haqiqiy qiymat kelganda baribir
+	// o'zgarish sifatida yoziladi.
+	const auto name = user->name();
+	if (!name.isEmpty()
+		&& RecordField(
+			session, peerId, u"name"_q, name, now, u"snapshot"_q)) {
+		++saved;
+	}
+	const auto username = user->username();
+	if (!username.isEmpty()
+		&& RecordField(
+			session, peerId, u"username"_q, username, now, u"snapshot"_q)) {
+		++saved;
+	}
+	if (!user->userpicPhotoUnknown()) {
+		const auto photoId = user->userpicPhotoId();
+		const auto value = photoId
+			? QString::number(photoId)
+			: u"empty"_q;
+		if (RecordField(
+				session, peerId, u"photo"_q, value, now, u"snapshot"_q)) {
+			++saved;
+		}
+		// Init() dagi kabi: ID yetarli emas, rasmning o'zi ham kerak.
+		MaybeBackupUserpic(session, user);
+	}
+	return saved;
 }
 
 int FlushBufferedActivity(

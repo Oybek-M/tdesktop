@@ -50,7 +50,7 @@ struct Values {
     // ── Upstream (rasmiy) versiya tekshiruvchisi ─────────────────────────
     bool upstreamCheckEnabled = true;
     int upstreamCheckIntervalMinutes = 1440;  // standart: kunlik
-    int activityBufferMinutes = 10;   // 1 – 120 (A16 §3: vaqtinchalik faollik buferi)
+    int activityBufferMinutes = 60;   // 1 – 120 (A16 §3: vaqtinchalik faollik buferi)
 
     // Katta media backup (2026-08-14). Ikkalasi ham Custom Window'da
     // o'zgartiriladi; chegaralar UpdateInt() da qisiladi.

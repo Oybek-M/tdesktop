@@ -297,7 +297,23 @@ void Init() {
     gValues.upstreamCheckIntervalMinutes = settings.value(
         "upstreamCheckIntervalMinutes", 1440).toInt();
     gValues.activityBufferMinutes = std::clamp(settings.value(
-        "activityBufferMinutes", 10).toInt(), 1, 120);
+        "activityBufferMinutes", 60).toInt(), 1, 120);
+    // 2026-09-10: standart 10 -> 60 daqiqa. 10 daqiqa juda qisqa edi --
+    // kuzatuvsiz peer'ning holati kuzatuv yoqilgunicha buferdan o'chib
+    // ketardi (real holat: 11:45:35 da kelgan status 11:57:20 dagi
+    // kuzatuvga yetib bormadi, farq 11 daqiqa 45 soniya).
+    //
+    // Mavjud o'rnatmalarda qiymat allaqachon registrda 10 bo'lib
+    // yozilgan, shuning uchun standartni o'zgartirish yetmaydi -- bir
+    // marta ko'chiramiz. Ataylab 10 tanlagan foydalanuvchi uni Faollik
+    // tab'idan qaytarib qo'yishi mumkin, bayroq buni qayta bosmaydi.
+    if (!settings.value("activityBufferBumpedTo60", false).toBool()) {
+        if (gValues.activityBufferMinutes == 10) {
+            gValues.activityBufferMinutes = 60;
+            settings.setValue("activityBufferMinutes", 60);
+        }
+        settings.setValue("activityBufferBumpedTo60", true);
+    }
     gValues.upstreamLastKnownVersion = settings.value(
         "upstreamLastKnownVersion", QString()).toString();
     gValues.upstreamEtag = settings.value(

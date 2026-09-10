@@ -1902,6 +1902,7 @@ void Filler::addCustomActivityTrack() {
 		return;
 	}
 	const auto peer = _peer;
+	const auto user = peer->asUser(); // yuqoridagi isUser() tekshiruvi kafolatlaydi
 	const auto peerId = QString::number(peer->id.value);
 	const auto isTracked = CustomSettings::IsInActivityInclude(peerId);
 	const auto text = isTracked
@@ -1917,9 +1918,16 @@ void Filler::addCustomActivityTrack() {
 			CustomSettings::AddToActivityInclude(peerId, peer->name());
 			const auto restored = CustomActivityHistory::FlushBufferedActivity(
 				&peer->session(), peerId);
+			// Bufer bo'sh bo'lsa ham panel bo'sh qolmasligi kerak --
+			// hozir ma'lum bo'lgan holatni darhol yozamiz.
+			const auto snapshot = CustomActivityHistory::RecordCurrentState(
+				&peer->session(), user);
 			if (restored > 0) {
 				controller->showToast(
 					u"Kuzatuv yoqildi — %1 ta yozuv tiklandi"_q.arg(restored));
+			} else if (snapshot > 0) {
+				controller->showToast(
+					u"Kuzatuv yoqildi — joriy holat yozildi"_q);
 			} else {
 				controller->showToast(u"Kuzatuv yoqildi"_q);
 			}

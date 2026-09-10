@@ -2,6 +2,8 @@
 
 #include <QtCore/QString>
 
+class UserData;
+
 namespace Main {
 class Session;
 } // namespace Main
@@ -33,6 +35,18 @@ void Init(not_null<Main::Session*> session);
 // EncodeStatus() bilan bir xil rolda — "story" maydoni uchun. `encoded`
 // — story'ning qo'yilgan vaqti (unix timestamp, matn sifatida).
 [[nodiscard]] QString DecodeStoryLabel(const QString &encoded);
+
+// Peer kuzatuvga qo'shilgan LAHZADA chaqiriladi: shu paytda ma'lum
+// bo'lgan status/ism/username/rasm qiymatlarini bazaga yozadi
+// (source = "snapshot"). Yozilgan qatorlar sonini qaytaradi.
+//
+// Nima uchun kerak: Init() dagi obuna faqat o'zgarishga reaksiya
+// qiladi. Kuzatuv yoqilgandan keyin kontakt holati o'zgarmasa, panel
+// bo'sh yoki eskirgan qolardi. FlushBufferedActivity() bu bo'shliqni
+// faqat bufer muddati ichida yopadi, undan eskisi uchun yopmaydi.
+int RecordCurrentState(
+	not_null<Main::Session*> session,
+	not_null<UserData*> user);
 
 // A16 §3: Peer kuzatuvga qo'shilganda chaqiriladi: shu peer'ning buferdagi
 // o'zgarishlarini bazaga ko'chiradi. Ko'chirilgan yozuvlar sonini qaytaradi.

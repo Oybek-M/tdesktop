@@ -71,6 +71,7 @@ bool gShowObservedStatus = false;
 	if (source == u"manual"_q) return u"✍️"_q;
 	if (source == u"buffer"_q) return u"⏱"_q;
 	if (source == u"read"_q) return u"✓✓"_q;
+	if (source == u"snapshot"_q) return u"📌"_q;
 	return QString();
 }
 
@@ -121,6 +122,9 @@ QString FormatInstantLabel(const OnlinePeriod &p) {
 		return when + u" — ⏱ buferdan tiklangan"_q;
 	} else if (p.source == u"read"_q) {
 		return when + u" — ✓✓ xabarni o'qigan"_q;
+	} else if (p.source == u"snapshot"_q) {
+		// Kuzatuv yoqilgan lahzada yozilgan boshlang'ich holat.
+		return when + u" — 📌 kuzatuv boshlangandagi holat"_q;
 	}
 	return when + u" — aniq lahza"_q;
 }
