@@ -239,3 +239,9 @@ bo'lishi mumkin; qaror foydalanuvchiniki.
 3. `text_cache` (67% legacy) va `media_index` (58% legacy) da ham shu
    muammo bor, lekin ular chatga xabar chizmaydi — alohida, past
    ustuvorlikdagi ish.
+4. **2026-09-11 davomi:** v16 biriktirish ifloslangan dalilga tayangan
+   va ish kodining o'zi ham yangi aralashuv yaratib turgan ekan.
+   6279 qator qo'lda tuzatildi, 5 ta ildiz sabab `14f5d0c0a8` da
+   yopildi. Hozir `account_id=0` da 824 deleted (154 user/chat peer) +
+   14 110 backup qoldi — keyingi ish. Batafsil:
+   [`2026-09-11-account-misattribution-incident.md`](2026-09-11-account-misattribution-incident.md)

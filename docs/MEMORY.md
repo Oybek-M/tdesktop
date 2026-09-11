@@ -136,8 +136,9 @@ bool RecordBackgroundEdit(const QString &peerId, long long msgId,
 // 30 kundan eski yozuvlarni tozalash (avtomatik har 1000 ta cache da)
 void PruneStaleCachedText(int days = 30);
 
-// Non-channel background delete (peerId ma'lum emas)
-void TryRecordBackgroundDelete(long long msgId);
+// Non-channel background delete (peerId ma'lum emas).
+// 2026-09-11: accountId majburiy — qidiruv faqat shu akkaunt text_cache'ida.
+void TryRecordBackgroundDelete(qint64 accountId, long long msgId);
 ```
 
 ### Backup/Restore (v2)
@@ -395,6 +396,7 @@ void PaintPeerAvatar(QPainter &p, const QRect &rect,
 | T39 | Archive tab da background media "(empty)" ko'rinardi | `GetAllDeletedMessages` + struct ga `is_media`/`sender_id`; UI "(media xabar)" |
 | T40 | `RecordBackgroundEdit` re-cache da sender/media o'chirardi (T36 regressi) | `GetCachedTextAndDate` bilan o'qib, `CacheMessageText` ga qaytadan uzatish |
 | T41 | O'chirilgan xabarda vaqt (timestamp) matn ustiga tushardi (overlap) | `validateText` guard'idagi `!isDeletedLocally()` har safar `setTextWithLinks` ni qayta chaqirib **skip block** ni o'chirardi. Yangi `Flag::DeletedMarkerApplied` bayrog'i: marker bir marta qo'llanib, keyin `validateText` no-op bo'ladi → skip block saqlanadi |
+| T42 | (2026-09-11) Saqlangan xabarlar boshqa akkauntlarga yozilib ketardi | Placeholder `_nonChannelMessages` dan chiqarildi, qayta o'chirish yozilmaydi, `MarkDeleted` marker'ni tozalaydi, `TryRecordBackgroundDelete` akkaunt bo'yicha, `addOlderSlice` bo'sh slice'da inject. Commit `14f5d0c0a8`; `superpowers/specs/2026-09-11-account-misattribution-incident.md` |
 
 ---
 

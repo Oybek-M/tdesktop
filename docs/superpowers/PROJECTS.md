@@ -4,7 +4,32 @@ Bu fayl qaysi ish **hozir faol**, qaysi biri **to'xtatib qo'yilgan** va
 qaysi biri **hali muhokama bosqichida** ekanini ko'rsatadi. Yangi
 sessiya boshlanganda birinchi shu yerga qarang.
 
-Oxirgi yangilanish: 2026-09-02 (12:30)
+Oxirgi yangilanish: 2026-09-11 (19:05)
+
+---
+
+# 🔴 2026-09-11 — v7.2.7 build, logout va saqlangan xabarlar aralashuvi
+
+To'liq hujjat: [`specs/2026-09-11-account-misattribution-incident.md`](specs/2026-09-11-account-misattribution-incident.md)
+
+**Holat:** ma'lumot tiklandi, ildiz sabablar kodda yopildi,
+**build `14f5d0c0a8` kutilmoqda** (user qo'lda qurmoqda).
+
+| Nima | Natija |
+|---|---|
+| v7.2.7 merge (`9b081b2a43`) | `rlottie` -> `tlottie` (Rust). Build 13:15 da o'tdi — oldin eskirgan `Telegram.sln` va Qt5 daraxtidagi `sqlite3.c` (C1083) to'sib qo'ydi; SQLite repo ichiga ko'chdi (`952c32360b`) |
+| 14:45 qotish | Eski sozlamadagi `disableOpenGL=true` -> `[Raster]`. Toza sozlamada `[QRhi]` D3D11 |
+| 15:08 logout | Men taklif qilgan `Telegram_OLD.exe` A/B testi `key_datas` ni qayta yozdi -> 9 akkaunt chiqib ketdi. CustomMod DB/media `tdata` dan tashqarida — **zarar ko'rmadi** |
+| Saqlangan xabarlar yo'qolgan | DB'da boshqa akkauntlar nomida edi (`sender_id` dalili). **6279 qator** hozirgi akkauntga o'tkazildi, 0 o'chirildi; 7053823996: 0 -> 615, 7815103103: 0 -> 247. Zaxira + undo bor |
+| Ildiz sabablar (`14f5d0c0a8`) | Placeholder `_nonChannelMessages` da; qayta o'chirishda marker yozilishi; INSERT dublikati; `TryRecordBackgroundDelete` akkauntsiz qidiruvi; `addOlderSlice` bo'sh slice (komilov 7779845655) |
+| `tdata` | 608.9 MB yetim qoldiq Recycle Bin'ga, 810 -> 201 MB |
+
+**Keyingi tartib (user bilan kelishilgan):** 1) build + 3 chatni
+tekshirish -> 2) 824 legacy `account_id=0` o'chirilgan xabar (154 peer,
+har akkauntda ko'rinadi) -> 3) S1: media/stories foni
+(`use-qt-rhi=false`, ilova yopiq holda) -> 4) tezlik qayta scan.
+Qo'shimcha ochiq: `readInboxTill` injected elementlarda o'qish belgisini
+qo'ymaydi (log'da 64 xato).
 
 ---
 
@@ -226,7 +251,7 @@ qolgan — kodda sabab topilmadi. Yana takrorlansa alohida tashxis kerak.
 | 1 | **TTL/media ko'rgich screenshot** | A18 spec §2 da "ko'rib chiqilsin". Rasmni to'liq ekranda ochganda screenshot ishlaydimi — **sinovdan keyin** hal qilinadi |
 | 2 | **`chats` (802) va `storage` (594) hajmi** | Spec'dagi "400 qatordan oshmasin" maqsadidan katta. Bo'limlarga ajratilgach o'qish osonlashdi; yana bo'lish kerakmi — keyin |
 | 3 | **Reliz yuklashni API ga o'tkazish** | `customsync-server` tayyor bo'lgach |
-| 4 | **S1 — story fonining miltillashi** | GL/RHI, vaqtinchalik yechim bor (OpenGL o'chirish) |
+| 4 | **S1 — story fonining miltillashi** | GL/RHI, vaqtinchalik yechim bor (OpenGL o'chirish). 2026-09-11: v7.2.7 da `[QRhi]` yoqilgach media ko'rgich foni ham miltillaydi; `use-qt-rhi=false` JSON tayyor — incident hujjati §6 |
 | 5 | **Priority lazy loader** | Shoshilinch emas |
 | 6 | **A10 — bitta tugmali sync+build+publish** | |
 | 7 | **`media_index` uchun sha256 backfill** | Track C ga kerak |
@@ -1498,3 +1523,10 @@ aniqlangan, muhokama boshlanganda esga olinsin):
   boshqa og'ir ilovalar bilan raqobatlashadi
 - Commit + push faqat `origin/Oybek` ga; `upstream` ga **hech qachon**
 - Commit'larda `Co-Authored-By` trailer **ishlatilmaydi**
+- **Eski build'ni yangi `tdata` ustida hech qachon ishga tushirmang** —
+  `key_datas` qayta yoziladi, barcha akkauntlar qaytarilmas logout
+  bo'ladi (2026-09-11). A/B test faqat `tdata` nusxasi + `-workdir` bilan
+- CustomMod DB'ga qo'lda yozish — faqat ilova **yopiq**, zaxira + undo
+  log bilan
+- Build uchun `Telegram.slnx` ochiladi (`.sln` eskirgan)
+- Agent fayllarni butunlay o'chirmaydi — faqat Recycle Bin'ga
