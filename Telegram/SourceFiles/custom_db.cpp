@@ -180,6 +180,26 @@ static QDateTime strToDt(const QString &s) {
     return QDateTime::fromString(s, Qt::ISODate);
 }
 
+// 2026-09-11: ekranda ko'rsatish uchun matn boshiga qo'shiladigan
+// "-- O'CHIRILDI --" belgisini (A21 "eski yozuv" varianti ham shu satr
+// bilan boshlanadi) olib tashlaydi. Format: marker satri + "\n\n" + asl
+// matn. Bir necha qatlam bo'lsa hammasi olinadi; asl matnga tegilmaydi.
+static QString stripDeletedMarker(QString text) {
+    const QString marker = QString::fromUtf8(
+        "\xe2\x80\x94\xe2\x80\x94 O'CHIRILDI \xe2\x80\x94\xe2\x80\x94");
+    while (text.startsWith(marker)) {
+        const int nl = text.indexOf('\n');
+        if (nl < 0) {
+            return QString();
+        }
+        text = text.mid(nl + 1);
+        if (text.startsWith('\n')) {
+            text = text.mid(1);
+        }
+    }
+    return text;
+}
+
 // ---------------------------------------------------------------------------
 // Init / Migrations
 // ---------------------------------------------------------------------------
@@ -1015,6 +1035,13 @@ void MarkDeleted(
     Init();
     if (!gDb) return;
 
+    // 2026-09-11: marker DB'ga tushmasin. Placeholder yoki allaqachon
+    // o'chirilgan xabar qayta o'chirilganda ilgari marker'li matn asl
+    // matn o'rniga yozilardi (DB'da shunday 21 ta qator topildi).
+    // Tozalangach bo'sh qolsa, pastdagi UPDATE mavjud original_text'ni
+    // saqlab qoladi.
+    const QString cleanText = stripDeletedMarker(originalText);
+
     {
         QMutexLocker locker(&gCacheMutex);
         gDeletedCache[key].insert(msgId);
@@ -1045,7 +1072,7 @@ void MarkDeleted(
                 -1, &upd, nullptr) == SQLITE_OK) {
             const QString relPath = toRelativePath(mediaPath);
             bindText(upd, 1, relPath);      bindText(upd, 2, relPath);
-            bindText(upd, 3, originalText); bindText(upd, 4, originalText);
+            bindText(upd, 3, cleanText);    bindText(upd, 4, cleanText);
             sqlite3_bind_int(upd, 5, isOut ? 1 : 0);
             sqlite3_bind_int64(upd, 6, msgDate); sqlite3_bind_int64(upd, 7, msgDate);
             bindText(upd, 8, senderId);     bindText(upd, 9, senderId);
@@ -1067,7 +1094,7 @@ void MarkDeleted(
     msg.msgId = msgId;
     msg.type = "deleted";
     msg.mediaPath = toRelativePath(mediaPath);
-    msg.originalText = originalText;
+    msg.originalText = cleanText;
     msg.msgDate = msgDate;
     msg.isOut = isOut;
     msg.senderId = senderId;
@@ -2461,50 +2488,58 @@ bool RecordBackgroundEdit(
     return true;
 }
 
-void TryRecordBackgroundDelete(long long msgId) {
+void TryRecordBackgroundDelete(qint64 accountId, long long msgId) {
     Init();
-    if (!gDb || msgId == 0) return;
+    if (!gDb || accountId == 0 || msgId == 0) return;
 
     // Bu funksiya FAQAT non-channel delete (updateDeleteMessages) uchun chaqiriladi.
     // Lekin msg_id global emas: kanallar o'z ID ketma-ketligiga ega, shuning uchun
     // bir xil msg_id li kanal yozuvi ham cache da bo'lishi mumkin. Noto'g'ri peer ga
     // "o'chirildi" yozib qo'ymaslik uchun — barcha kandidatlardan FAQAT non-channel
     // (user/chat) peer ni tanlaymiz. Channel peer id: (value >> 48) & 0xFF == 2.
-    qint64 accountId = 0;
+    //
+    // 2026-09-11: user/chat msg_id faqat BITTA AKKAUNT ichida yagona.
+    // Ilgari qidiruv barcha akkauntlar (va egasi noma'lum account_id=0)
+    // bo'yicha borib birinchi topilganini olardi -- bir akkauntning
+    // o'chirish update'i boshqa akkauntdagi butunlay boshqa suhbatga
+    // "o'chirildi" yozardi. DB dalili: 2431 ta msg_id bir necha
+    // akkauntning cache'ida uchraydi, haqiqiy akkaunt ichida esa bitta
+    // ham takror yo'q. Shu sababli faqat update kelgan akkaunt yozuvlari
+    // o'qiladi. account_id=0 qatorlari ataylab o'qilmaydi: 2026-08-26 dan
+    // keyin ular yozilmaydi va kimniki ekanini bilib bo'lmaydi. Ehtiyot
+    // uchun bir nechta peer chiqsa (bo'lmasligi kerak) hech narsa yozilmaydi.
     QString peerId;
     QString text;
     QString senderId;
     bool isOut = false;
     bool isMedia = false;
     unsigned int msgDate = 0;
-    bool found = false;
+    int candidates = 0;
 
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
-            "SELECT account_id, peer_id, text, is_out, msg_date, sender_id, is_media "
-            "FROM text_cache WHERE msg_id=?",
+            "SELECT peer_id, text, is_out, msg_date, sender_id, is_media "
+            "FROM text_cache WHERE account_id=? AND msg_id=?",
             -1, &stmt, nullptr) == SQLITE_OK) {
-        sqlite3_bind_int64(stmt, 1, msgId);
+        sqlite3_bind_int64(stmt, 1, accountId);
+        sqlite3_bind_int64(stmt, 2, msgId);
         while (sqlite3_step(stmt) == SQLITE_ROW) {
-            const qint64 accId = sqlite3_column_int64(stmt, 0);
-            const QString candidate = colText(stmt, 1);
+            const QString candidate = colText(stmt, 0);
             const quint64 value = candidate.toULongLong();
             const bool isChannel = (((value >> 48) & 0xFFULL) == 2ULL);
             if (isChannel) continue; // non-channel delete — kanal yozuvini o'tkazib yuboramiz
+            ++candidates; // PK (account_id, peer_id, msg_id) -- har qator alohida peer
             peerId   = candidate;
-            text     = colText(stmt, 2);
-            isOut    = (sqlite3_column_int(stmt, 3) != 0);
-            msgDate  = static_cast<unsigned int>(sqlite3_column_int64(stmt, 4));
-            senderId = colText(stmt, 5);
-            isMedia  = (sqlite3_column_int(stmt, 6) != 0);
-            accountId = accId;
-            found = true;
-            break; // non-channel msg_id yagona bo'ladi
+            text     = colText(stmt, 1);
+            isOut    = (sqlite3_column_int(stmt, 2) != 0);
+            msgDate  = static_cast<unsigned int>(sqlite3_column_int64(stmt, 3));
+            senderId = colText(stmt, 4);
+            isMedia  = (sqlite3_column_int(stmt, 5) != 0);
         }
         sqlite3_finalize(stmt);
     }
 
-    if (!found || peerId.isEmpty()) return;
+    if (candidates != 1 || peerId.isEmpty()) return;
 
     PeerKey key{accountId, peerId};
     // Foydalanuvchi o'zi o'chirgan bo'lsa, skip.

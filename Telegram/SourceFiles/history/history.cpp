@@ -1856,6 +1856,13 @@ void History::addOlderSlice(const QVector<MTPMessage> &slice) {
 	if (slice.isEmpty()) {
 		_loadedAtTop = true;
 		checkLocalMessages();
+		// CUSTOM 2026-09-11: bo'sh slice -- serverda bu chatda umuman xabar
+		// qolmagan (suhbatdosh butun tarixni o'chirgan) holatning aynan
+		// o'zi. Ilgari shu yerda qaytib ketilardi va loadDeletedMessages()
+		// chaqirilmasdi, shuning uchun DB'da turgan o'chirilgan xabarlar
+		// aynan eng kerakli chatda ko'rinmasdi (7779845655: DB'da 26 ta,
+		// UI bo'sh). addNewerSlice() bo'sh slice'da ham chaqiradi.
+		loadDeletedMessages();
 		return;
 	}
 

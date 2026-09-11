@@ -2160,11 +2160,15 @@ HistoryItem *Session::changeMessageId(PeerId peerId, MsgId wasId, MsgId nowId) {
 
 	if (!peerIsChannel(peerId)) {
 		if (IsServerMsgId(wasId)) {
+			// CUSTOM 2026-09-11: Assert o'rniga tekshiruv -- placeholder
+			// (registerMessage'dagi izohga qarang) xaritada yo'q, u uchun
+			// Assert ilovani yiqitardi.
 			const auto k = _nonChannelMessages.find(wasId);
-			Assert(k != end(_nonChannelMessages));
-			_nonChannelMessages.erase(k);
+			if (k != end(_nonChannelMessages) && k->second == item) {
+				_nonChannelMessages.erase(k);
+			}
 		}
-		if (IsServerMsgId(nowId)) {
+		if (IsServerMsgId(nowId) && !item->isLocal()) {
 			_nonChannelMessages.emplace(nowId, item);
 		}
 	}
@@ -3227,7 +3231,18 @@ void Session::registerMessage(not_null<HistoryItem*> item) {
 	}
 	list->emplace(itemId, item);
 
-	if (!peerIsChannel(peerId) && IsServerMsgId(itemId)) {
+	// CUSTOM 2026-09-11: loadDeletedMessages() yaratgan "O'CHIRILDI"
+	// placeholder'lari (MessageFlag::Local + server ID) bu xaritaga
+	// KIRMAYDI. Upstream'da Local xabarlar doim klient ID oladi, ya'ni bu
+	// shart faqat placeholder'larni ajratadi.
+	//
+	// Sabab: updateDeleteMessages kabi update'lar peer'siz keladi va
+	// xabarni faqat ID bo'yicha shu xaritadan qidiradi. Placeholder ID'si
+	// DB yozuvidan olingan va boshqa akkauntniki bo'lishi mumkin -- u
+	// xaritada turganda haqiqiy xabarni soya qilardi (emplace ustidan
+	// yozmaydi), begona o'chirish update'i esa placeholder'ga tushib DB'ga
+	// noto'g'ri chat nomidan yangi 'deleted' yozuv qo'shardi.
+	if (!peerIsChannel(peerId) && IsServerMsgId(itemId) && !item->isLocal()) {
 		_nonChannelMessages.emplace(itemId, item);
 	}
 }
@@ -3418,6 +3433,17 @@ void Session::processMessagesDeleted(
 		if (userDelete) {
 			CustomDB::PermanentlyDeleteMessage(key, messageId.v);
 		} else if (::CustomSettings::ShouldAntiDelete(peerIdStr)) {
+			// CUSTOM 2026-09-11: allaqachon "O'CHIRILDI" holatidagi xabarning
+			// (DB'dan tiklangan placeholder yoki shu sessiyada avval
+			// o'chirilgan) DB yozuvi BOR. Qayta yozish marker qo'shilgan
+			// matnni asl matn o'rniga qo'yardi va eski (account_id=0)
+			// qatorni shu akkauntga o'zlashtirib olardi.
+			if (list) {
+				const auto i = list->find(messageId.v);
+				if (i != list->end() && i->second->isDeletedLocally()) {
+					continue;
+				}
+			}
 			// T28: matn/date/isOut ni olish — memory dan yoki cache dan (T27).
 			// v5: sender_id (guruhda haqiqiy yuboruvchi) va is_media ni ham olamiz.
 			QString originalText;
@@ -3489,6 +3515,12 @@ void Session::processMessagesDeleted(
 			const bool keepAlive = ::CustomSettings::ShouldAntiDelete(peerIdStr)
 				&& CustomDB::IsDeletedLocally(key, messageId.v);
 			if (keepAlive) {
+				if (i->second->isDeletedLocally()) {
+					// CUSTOM 2026-09-11: takroriy o'chirish -- holat ham, DB
+					// ham allaqachon to'g'ri. setDeletedLocally() mediani
+					// qayta arxivlab, matnni qayta yozgan bo'lardi.
+					continue;
+				}
 				// FORCE PERSISTENCE: Ignore server delete, keep item in memory.
 				i->second->setDeletedLocally();
 				_session->changes().messageUpdated(i->second, Data::MessageUpdate::Flag::Edited);
@@ -3527,19 +3559,26 @@ void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
 			const bool userDelete = CustomDB::IsUserDeletePending(key, messageId.v);
 			CustomDB::ClearUserDeletePending(key, messageId.v);
 			if (::CustomSettings::ShouldAntiDelete(peerIdStr) && !userDelete) {
+				if (item->isDeletedLocally()) {
+					// CUSTOM 2026-09-11: takroriy o'chirish (masalan
+					// getDifference qayta yubordi) -- DB yozuvi bor.
+					continue;
+				}
 				// SAVE TO PERSISTENT DB (v5: sender_id + is_media bilan):
-				CustomDB::ActionedMessage msg;
-				msg.accountId = key.accountId;
-				msg.peerId = key.peerId;
-				msg.msgId = item->id.bare;
-				msg.type = "deleted";
-				msg.originalText = item->originalText().text;
-				msg.isOut = item->out();
-				msg.msgDate = static_cast<unsigned int>(item->date());
-				msg.senderId = QString::number(item->from()->id.value);
-				msg.isMedia = (item->media() != nullptr);
-				msg.timestamp = QDateTime::currentDateTime();
-				CustomDB::SaveActionedMessage(msg);
+				//
+				// CUSTOM 2026-09-11: ilgari SaveActionedMessage() -- oddiy
+				// INSERT edi va shu (peer, msg) uchun qator bo'lsa ikkinchi
+				// nusxa paydo bo'lardi. MarkDeleted() avval UPDATE qiladi,
+				// kanal yo'li (processMessagesDeleted) bilan bir xil.
+				CustomDB::MarkDeleted(
+					item->id.bare,
+					key,
+					QString(),
+					item->originalText().text,
+					static_cast<unsigned int>(item->date()),
+					item->out(),
+					QString::number(item->from()->id.value),
+					(item->media() != nullptr));
 
 				// FORCE PERSISTENCE: Ignore server delete command.
 				item->setDeletedLocally();
@@ -3559,8 +3598,11 @@ void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
 			// T27 cache da matn bo'lsa — DB ga 'deleted' yozamiz.
 			// peerIdStr ni cache dan topish kerak — peer_id orqali iterate qilamiz.
 			// Bu yo'l yo'q chunki nonChannelMessage faqat msgId ni biladi.
-			// Cache jadvalini msg_id bo'yicha qidiramiz.
-			CustomDB::TryRecordBackgroundDelete(messageId.v);
+			// Cache jadvalini msg_id bo'yicha qidiramiz -- FAQAT shu
+			// akkaunt yozuvlari ichida (user/chat ID'lari akkauntga xos).
+			CustomDB::TryRecordBackgroundDelete(
+				qint64(session().userId().bare),
+				messageId.v);
 		}
 	}
 	if (!toDestroy.empty()) {
@@ -3617,7 +3659,14 @@ void Session::unregisterMessage(not_null<HistoryItem*> item) {
 	messagesListForInsert(peerId)->erase(itemId);
 
 	if (!peerIsChannel(peerId) && IsServerMsgId(itemId)) {
-		_nonChannelMessages.erase(itemId);
+		// CUSTOM 2026-09-11: kalit bo'yicha emas, AYNAN shu xabar bo'lsa
+		// olib tashlaymiz. Placeholder xaritada yo'q, lekin ID'si shu
+		// akkauntdagi haqiqiy xabar ID'si bilan bir xil bo'lishi mumkin --
+		// placeholder yo'q qilinganda haqiqiy xabarning yozuvi o'chmasin.
+		const auto j = _nonChannelMessages.find(itemId);
+		if (j != end(_nonChannelMessages) && j->second == item) {
+			_nonChannelMessages.erase(j);
+		}
 	}
 }
 

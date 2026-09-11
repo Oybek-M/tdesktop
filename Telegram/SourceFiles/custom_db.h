@@ -519,7 +519,9 @@ void ExecRaw(const char *sql);
 // text_cache jadvalida msgId bo'yicha qidirib, agar topilsa AntiDelete
 // yoqilgan peer bo'lsa — 'deleted' yozuvi yaratamiz.
 // Faqat non-channel xabarlar uchun (channel/group da peerId allaqachon ma'lum).
-void TryRecordBackgroundDelete(long long msgId);
+// accountId -- update kelgan akkaunt; qidiruv faqat uning yozuvlarida
+// (user/chat msg_id boshqa akkauntda butunlay boshqa suhbatga tegishli).
+void TryRecordBackgroundDelete(qint64 accountId, long long msgId);
 
 // Sprint 4: Return the locally-saved media path for a deleted message (peerId+msgId),
 // or an empty string if no media was saved. Used as a last-resort fallback in
