@@ -1,6 +1,6 @@
 # Loyihalar holati — HAR SESSIYA SHU YERDAN BOSHLANADI
 
-Oxirgi yangilanish: **2026-09-07**
+Oxirgi yangilanish: **2026-09-11**
 
 > ✅ **2026-08-26 dagi ko'p akkauntli aralashuv xatosi HAL QILINDI.**
 > Protokol tomoni: spec §0.12 (`record_id` ga `account_hash`),
@@ -18,7 +18,7 @@ Oxirgi yangilanish: **2026-09-07**
 | Loyiha | Holat | Keyingi qadam |
 |---|---|---|
 | **tdesktop** (CustomMod) | 🟡 Plan 02 dan 10/11 task kodda tayyor; **to'liq build KUTILMOQDA** | Build (uyda) → qo'lda regressiya → Task 9 |
-| **customsync-server** | ✅ 01a va 01b TUGADI | — |
+| **customsync-server** | 🟡 01a, 01b ✅; **plan 04 jarayonda (3/6)** | 04 Task 6 (ikki fazali o'chirish) |
 | **server-controller** | ⚪ boshlanmagan | 01a/01b tugagach |
 | **tmobile-android** | ⚪ muhokama qilinmagan | — |
 | **tmobile-ios** | ⚪ muhokama qilinmagan | — |
@@ -373,7 +373,7 @@ global sozlamami yoki har chat uchun alohidami?
 
 **Repo:** https://github.com/Oybek-M/customsync-server (public, MIT)
 **Papka:** `Projects programming\Telegram\customsync-server`
-**Branch:** `Oybek` — `dotnet test`: **105 test, hammasi o'tadi**
+**Branch:** `Oybek` — `dotnet test`: **135 test, hammasi o'tadi**
 
 🔴 **Aniq holat va keyingi qadam shu loyihaning `PROGRESS.md`
 faylida.** Quyidagisi faqat qisqacha.
@@ -382,9 +382,17 @@ faylida.** Quyidagisi faqat qisqacha.
 |---|---|
 | **01a** — backend poydevori | ✅ 7 task + rejadan tashqari 6b (rol avtorizatsiyasi) |
 | **01b** — sync yadrosi | ✅ 9 task'ning hammasi, deploy fayllari bilan |
-| 02 — tdesktop agenti | 🟡 11 task'dan 10 tasi kodda tayyor (Task 9 qolgan). Build kutilmoqda |
+| 02 — tdesktop agenti | ✅ 11 task'ning hammasi kodda; v7.2.6 merge'idan keyin build o'tdi |
 | 03 — web controller | ⚪ boshlanmagan |
-| 04, 05, 06 | ⚪ boshlanmagan |
+| **04** — storage lifecycle | 🟡 Task 1-3 ✅ (har birida tekshiruvda xato topilib tuzatildi). Keyingisi: 6 → 7. Task 4-5 keyinga, 8 → plan 03 |
+| 05 — capture xizmati | ⚪ 04 dan keyin. `libtdjson` tahlili `PROGRESS.md` da |
+| 06 — reliz boshqaruvi | 🟡 Task 1-4 bajarilgan (2026-09-03) |
+
+**Kelishilgan tartib (2026-09-09):** `04 → 05 → 03 → read_at → TO'LIQ DEPLOY`.
+Deploy oxirida — foydalanuvchining ongli qarori. Xavfi: klient va server
+hali hech qachon gaplashmagan, deploy'gacha plan 02 ning to'rt qismi
+(regressiya 2-3-bo'lim, watchdog, kalit ulashish, WebSocket) sinab bo'lmaydi.
+Batafsil: customsync-server `PROGRESS.md` §2.
 
 ### 01b da nima ishlaydi
 
