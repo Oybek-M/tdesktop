@@ -2484,8 +2484,14 @@ target_include_directories(Telegram PRIVATE ${src_loc})
 
 # CustomMod: SQLite amalgamation — no Qt SQL plugin needed at runtime.
 # sqlite3.c is compiled as C (not C++) to match the upstream amalgamation expectations.
+#
+# Manba repo ichida turadi. Ilgari Libraries/win64/qt_5.15.18 dagi Qt5
+# manba daraxtidan olinardi -- Qt6 ga o'tilgach bu yashirin bog'liqlik
+# bo'lib qoldi va 2026-09-11 da Qt5 o'chirilganda build C1083 bilan
+# yiqildi. SQLite 3.51.3, public domain; TDLib/tde2e dagi nusxa
+# yaramaydi, u tdsqlite3_* prefiksi bilan qayta nomlangan.
 if (WIN32)
-    set(SQLITE3_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../Libraries/win64/qt_5.15.18/qtbase/src/3rdparty/sqlite")
+    set(SQLITE3_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/sqlite")
     target_include_directories(Telegram PRIVATE ${SQLITE3_DIR})
     target_sources(Telegram PRIVATE "${SQLITE3_DIR}/sqlite3.c")
     set_source_files_properties("${SQLITE3_DIR}/sqlite3.c" PROPERTIES LANGUAGE C)
