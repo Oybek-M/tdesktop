@@ -12,8 +12,10 @@ Oxirgi yangilanish: 2026-09-11 (19:05)
 
 To'liq hujjat: [`specs/2026-09-11-account-misattribution-incident.md`](specs/2026-09-11-account-misattribution-incident.md)
 
-**Holat:** ma'lumot tiklandi, ildiz sabablar kodda yopildi,
-**build `14f5d0c0a8` kutilmoqda** (user qo'lda qurmoqda).
+**Holat: qisman stabil.** Ma'lumot tiklandi, ildiz sabablar kodda
+yopildi, build 19:04 da o'tdi va **3 ta chat sinovda tiklandi**
+(7053823996, 7815103103, 7779845655). 🔴 Ochiq: har startda ~1 daqiqa
+qotish (oxirida oq blur), keyin ishlaydi.
 
 | Nima | Natija |
 |---|---|
@@ -24,10 +26,11 @@ To'liq hujjat: [`specs/2026-09-11-account-misattribution-incident.md`](specs/202
 | Ildiz sabablar (`14f5d0c0a8`) | Placeholder `_nonChannelMessages` da; qayta o'chirishda marker yozilishi; INSERT dublikati; `TryRecordBackgroundDelete` akkauntsiz qidiruvi; `addOlderSlice` bo'sh slice (komilov 7779845655) |
 | `tdata` | 608.9 MB yetim qoldiq Recycle Bin'ga, 810 -> 201 MB |
 
-**Keyingi tartib (user bilan kelishilgan):** 1) build + 3 chatni
-tekshirish -> 2) 824 legacy `account_id=0` o'chirilgan xabar (154 peer,
+**Keyingi tartib (user bilan kelishilgan):** 1) ~~build + 3 chatni
+tekshirish~~ ✅ -> 2) 824 legacy `account_id=0` o'chirilgan xabar (154 peer,
 har akkauntda ko'rinadi) -> 3) S1: media/stories foni
-(`use-qt-rhi=false`, ilova yopiq holda) -> 4) tezlik qayta scan.
+(`use-qt-rhi=false`, ilova yopiq holda) -> 4) tezlik qayta scan
+(birinchi nishon — startdagi ~1 daqiqalik qotish).
 Qo'shimcha ochiq: `readInboxTill` injected elementlarda o'qish belgisini
 qo'ymaydi (log'da 64 xato).
 

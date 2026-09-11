@@ -1,7 +1,8 @@
 # 2026-09-11 — v7.2.7 build, akkauntlar logout'i va saqlangan xabarlar aralashuvi
 
 Holat: **ma'lumot tiklandi, ildiz sabablar kodda yopildi (`14f5d0c0a8`),
-build va qo'lda sinov kutilmoqda.** Vaqtlar mahalliy (UTC+5).
+build 19:04 da o'tdi va 3 ta chat sinovda tasdiqlandi.** Ishga tushishdagi
+~1 daqiqalik qotish hali ochiq (§8). Vaqtlar mahalliy (UTC+5).
 
 ---
 
@@ -111,7 +112,8 @@ eski akkaunt papkasi — **608.9 MB, 22 papka, Recycle Bin'ga**
 
 | # | Ish | Izoh |
 |---|---|---|
-| 1 | **Build `14f5d0c0a8` + sinov** | 7053823996, 7815103103, 7779845655 chatlari |
+| 1 | ~~Build `14f5d0c0a8` + sinov~~ | ✅ 19:04 build, 3 chat tiklandi (§8) |
+| 1a | **Ishga tushishdagi qotish** | Har startda ~1 daqiqa javob bermaydi, oxirida oq blur; keyin ishlaydi. Tezlik scan'ining birinchi nishoni |
 | 2 | **Legacy `account_id=0`** | 824 deleted (154 user/chat peer) + 14 110 backup HAR akkauntda "eski yozuv, akkaunt noma'lum" bilan ko'rinadi; `text_cache` da 8449 legacy; `GetCachedTextAndDate` hali `IN (0,?)` |
 | 3 | **S1 — media ko'rgich foni miltillashi, stories foni** | Merge regressiyasi emas: eski S1, GPU yo'li qaytgani uchun ko'rindi. Tayyor: `experimental_options.json` ga `"use-qt-rhi": false` (faqat ilova YOPIQ holda — chiqishda `Write()` qayta yozadi). UI toggle rad etiladi (Win x64 da scope false); ANGLE kompilyatsiya qilinmagan -> native OpenGL |
 | 4 | **`readInboxTill` + injected elementlar** | `isRegular()==false` bo'lgani uchun o'qish belgisi qo'yilmaydi, log'da 64 xato |
@@ -131,3 +133,19 @@ eski akkaunt papkasi — **608.9 MB, 22 papka, Recycle Bin'ga**
    rasmiy Telegram, CustomMod — `Pictures\Release`.
 4. Build uchun `Telegram.slnx` ochiladi, `.sln` emas.
 5. Agent fayllarni butunlay o'chirmaydi — Recycle Bin.
+
+---
+
+## 8. Sinov natijasi — qisman stabil holat (2026-09-11 kechqurun)
+
+Build: **19:04**, `14 succeeded, 0 failed, 42 up-to-date` (11:32).
+Yakuniy link bosqichi chiqishsiz 3-6 daqiqa turadi — bu normal
+(`link.exe` 5.3 GB RAM bilan faol ishlagani o'lchandi).
+
+| Tekshiruv | Natija |
+|---|---|
+| 7053823996 | ✅ tiklandi |
+| 7815103103 | ✅ tiklandi |
+| 7779845655 (komilov, butun tarixi o'chirilgan) | ✅ tiklandi — `addOlderSlice` tuzatishi ishladi |
+| "eski yozuv, akkaunt noma'lum" belgisi | Hali uchratilmadi — bunday xabari bor chat ochilmagan bo'lishi mumkin, tasdiqlanmagan |
+| Ishga tushish | 🔴 ~1 daqiqa qotib turadi, oxirida oq blur, keyin ishchi holatga o'tadi |
