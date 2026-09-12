@@ -147,6 +147,12 @@ public:
     // shunga qarab uzaytiradi). WebSocket'siz qurilmada doim false.
     [[nodiscard]] bool webSocketConnected() const;
 
+    // Har MUVAFFAQIYATLI soket ulanishida bittaga oshadi. Orkestrator
+    // oxirgi pull qaysi ulanish davomida bo'lganini eslab qoladi: raqam
+    // o'zgargan bo'lsa, oradagi uzilishda xabarnoma yo'qolgan bo'lishi
+    // mumkin -- demak siklni o'tkazib yuborish XAVFLI.
+    [[nodiscard]] quint64 webSocketConnectionId() const;
+
 Q_SIGNALS:
 #ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
     void changesAvailable(qint64 seq);
@@ -164,6 +170,7 @@ private:
     void scheduleWebSocketReconnect();
 
     QWebSocket *_socket = nullptr;
+    quint64 _wsConnectionId = 0;
     QTimer *_wsReconnectTimer = nullptr;
     int _wsBackoffSeconds = 1;
 #endif

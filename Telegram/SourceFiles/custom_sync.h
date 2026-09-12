@@ -72,6 +72,9 @@ Q_SIGNALS:
 private:
     void arm(const SchedulerDecision &d);
     void runCycle();
+    void onTimer();
+    [[nodiscard]] bool canSkipIdleCycle() const;
+    void rearmIdle();
     void onCycleFinished(int pushed, int pushFailed,
                          int merged, int rejected,
                          bool hasMore, const QString &error);
@@ -95,6 +98,14 @@ private:
     qint64 _lastSuccessAt = 0;
     QString _lastError;
     quint64 _currentCycleId = 0;
+
+    // 3-bosqich (2026-09-13): bo'sh siklni butunlay o'tkazib yuborish
+    // uchun holat. canSkipIdleCycle() izohiga qarang.
+    qint64 _knownServerSeq = 0;         // WS xabarnomalaridagi eng katta seq
+    quint64 _cycleWsConnectionId = 0;   // joriy sikl boshlangandagi ulanish
+    quint64 _pulledWsConnectionId = 0;  // oxirgi muvaffaqiyatli pull ulanishi
+    qint64 _lastFullCycleAt = 0;        // oxirgi HAQIQIY muvaffaqiyatli sikl
+    quint64 _skippedCycles = 0;         // kuzatuv logi uchun
 };
 
 [[nodiscard]] Orchestrator *GetOrchestrator();

@@ -408,9 +408,20 @@ void Client::pushPending(Fn<void(int sentCount, int failedCount)> done) {
         return;
     }
 
+    // 3-bosqich: navbat ANIQ bo'sh bo'lsa Pending() so'rovi ham shart emas
+    // (hisoblagich hech qachon haqiqiy sondan kam bo'lmaydi).
+    if (Outbox::ProbablyEmpty()) {
+        if (done) done(0, 0);
+        return;
+    }
+
     const int chunkSize = CustomSettings::SyncPushChunkSize();
     const auto entries = Outbox::Pending(chunkSize);
     if (entries.isEmpty()) {
+        // Hisoblagich eskirgan: yozuvlar yuborib bo'lingan yoki backoff'da
+        // kutyapti. Aniq songa qaytaramiz -- shunda keyingi bo'sh sikllar
+        // so'rovsiz o'tadi.
+        Outbox::ResyncRowCount();
         if (done) done(0, 0);
         return;
     }
@@ -938,6 +949,14 @@ void Client::createKeyWrap(const KeyShare::Wrap &wrap, Fn<void(bool ok, QString 
     });
 }
 
+quint64 Client::webSocketConnectionId() const {
+#ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+    return _wsConnectionId;
+#else
+    return 0;
+#endif
+}
+
 bool Client::webSocketConnected() const {
 #ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
     return _socket
@@ -986,6 +1005,7 @@ void Client::startWebSocket() {
     } else {
         _socket = new QWebSocket(QString(), QWebSocketProtocol::VersionLatest, this);
         connect(_socket, &QWebSocket::connected, this, [this] {
+            ++_wsConnectionId;
             _wsBackoffSeconds = kMinWsReconnectSeconds;
             if (_wsReconnectTimer) {
                 _wsReconnectTimer->stop();

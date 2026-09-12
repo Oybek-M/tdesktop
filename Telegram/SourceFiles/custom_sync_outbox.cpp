@@ -7,6 +7,8 @@
 
 #include <QtCore/QDateTime>
 #include <QtCore/QDebug>
+#include <QtCore/QHash>
+#include <QtCore/QMutex>
 #include <sqlite3.h>
 #include <algorithm>
 
@@ -20,6 +22,45 @@ QByteArray gAccountKey;
 QByteArray gMediaKey;
 bool gMasterKeyLoaded = false;
 thread_local int t_mergeDepth = 0;
+
+// 3-bosqich (2026-09-13): sync_state kichik kalit-qiymat jadvali (cursor,
+// device_id, tokenlar) va HAR siklda o'qilardi, pull_cursor esa qiymati
+// o'zgarmagan bo'lsa ham HAR siklda qayta YOZILARDI. Endi jadval bir marta
+// xotiraga olinadi; bir xil qiymatni yozish umuman bazaga bormaydi.
+// Barcha yozuvlar SetState() orqali o'tadi (boshqa SQL yo'q), shuning
+// uchun kesh bazadan ajralib qolmaydi.
+QMutex gStateMutex;
+QHash<QString, QString> gStateCache;
+bool gStateLoaded = false;
+
+// gStateMutex ushlab turilgan holda chaqiriladi.
+void EnsureStateLoadedLocked(sqlite3 *db) {
+    if (gStateLoaded || !db) {
+        return;
+    }
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(db,
+            "SELECT key, value FROM sync_state",
+            -1, &stmt, nullptr) != SQLITE_OK) {
+        return; // keyingi chaqiriqda qayta urinamiz
+    }
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        const auto key = QString::fromUtf8(
+            reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)));
+        const auto *raw = reinterpret_cast<const char*>(
+            sqlite3_column_text(stmt, 1));
+        gStateCache.insert(key, raw ? QString::fromUtf8(raw) : QString());
+    }
+    sqlite3_finalize(stmt);
+    gStateLoaded = true;
+}
+
+// Navbat qatorlari soni uchun YUQORI chegara (-1 = noma'lum).
+// Oddiy mutex (atomik emas): ResyncRowCount() COUNT va saqlashni bitta
+// qulf ostida bajaradi, Enqueue esa oshirishni o'sha qulf ostida qiladi --
+// shunda parallel Enqueue hisobni hech qachon KAMAYTIRIB yubora olmaydi.
+QMutex gRowHintMutex;
+qint64 gRowHint = -1;
 
 void bindText(sqlite3_stmt *stmt, int index, const QString &str) {
     if (str.isEmpty()) {
@@ -125,8 +166,17 @@ void Enqueue(
         } else {
             bindText(stmt, 8, targetRecordId);
         }
-        sqlite3_step(stmt);
+        const auto inserted = (sqlite3_step(stmt) == SQLITE_DONE);
         sqlite3_finalize(stmt);
+        if (inserted) {
+            // REPLACE bo'lsa ham oshiramiz: ortiqcha hisob xavfsiz (faqat
+            // siklni o'tkazib yuborishga to'sqinlik qiladi), kam hisob esa
+            // yuborilmagan yozuvni yashirib qo'yardi.
+            QMutexLocker locker(&gRowHintMutex);
+            if (gRowHint >= 0) {
+                ++gRowHint;
+            }
+        }
     }
 
     // sync_record_map ni to'ldiramiz (Task 7c)
@@ -372,6 +422,16 @@ QString GetState(const QString &key, const QString &fallback) {
     auto *db = CustomDB::RawHandle();
     if (!db) return fallback;
 
+    {
+        QMutexLocker locker(&gStateMutex);
+        EnsureStateLoadedLocked(db);
+        if (gStateLoaded) {
+            const auto it = gStateCache.constFind(key);
+            return (it != gStateCache.constEnd()) ? it.value() : fallback;
+        }
+    }
+    // Kesh yuklanmadi (jadval hali yo'q va h.k.) -- eski yo'l.
+
     sqlite3_stmt *stmt = nullptr;
     QString result = fallback;
     if (sqlite3_prepare_v2(db,
@@ -390,6 +450,15 @@ void SetState(const QString &key, const QString &value) {
     auto *db = CustomDB::RawHandle();
     if (!db) return;
 
+    QMutexLocker locker(&gStateMutex);
+    EnsureStateLoadedLocked(db);
+    if (gStateLoaded) {
+        const auto it = gStateCache.constFind(key);
+        if (it != gStateCache.constEnd() && it.value() == value) {
+            return; // o'zgarmagan -- bazaga yozish shart emas
+        }
+    }
+
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(db,
             "INSERT INTO sync_state (key, value) VALUES (?, ?) "
@@ -397,9 +466,46 @@ void SetState(const QString &key, const QString &value) {
             -1, &stmt, nullptr) == SQLITE_OK) {
         bindText(stmt, 1, key);
         bindText(stmt, 2, value);
-        sqlite3_step(stmt);
+        const auto written = (sqlite3_step(stmt) == SQLITE_DONE);
+        sqlite3_finalize(stmt);
+        // Kesh faqat yozuv MUVAFFAQIYATLI bo'lsa yangilanadi -- aks holda
+        // xotira bazadan oldinga o'tib ketardi.
+        if (written && gStateLoaded) {
+            gStateCache.insert(key, value);
+        }
+    }
+}
+
+void ResyncRowCount() {
+    auto *db = CustomDB::RawHandle();
+    QMutexLocker locker(&gRowHintMutex);
+    if (!db) {
+        gRowHint = -1;
+        return;
+    }
+    sqlite3_stmt *stmt = nullptr;
+    auto count = qint64(-1);
+    if (sqlite3_prepare_v2(db,
+            "SELECT COUNT(*) FROM sync_outbox",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            count = sqlite3_column_int64(stmt, 0);
+        }
         sqlite3_finalize(stmt);
     }
+    gRowHint = count;
+}
+
+bool ProbablyEmpty() {
+    {
+        QMutexLocker locker(&gRowHintMutex);
+        if (gRowHint >= 0) {
+            return (gRowHint == 0);
+        }
+    }
+    ResyncRowCount();
+    QMutexLocker locker(&gRowHintMutex);
+    return (gRowHint == 0);
 }
 
 // OGOHLANTIRISH / XAVF: Ikkinchi qurilma bugun MUTLAQO BOSHQA master key yaratadi!

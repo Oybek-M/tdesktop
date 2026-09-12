@@ -11,6 +11,8 @@
 #include <QtCore/QDateTime>
 #include <QtCore/QElapsedTimer>
 #include <QtCore/QDebug>
+
+#include "base/debug_log.h"
 #endif
 
 namespace CustomSync {
@@ -68,6 +70,11 @@ constexpr auto kStartupQuietSeconds = 90;
 constexpr auto kWsIdleMultiplier = 10;
 constexpr auto kWsIdleMaxSeconds = 600;
 
+// Siklni o'tkazib yuborish ruxsat etiladigan eng uzun oraliq. Xabarnoma
+// tizimida kutilmagan xato bo'lsa ham (masalan server xabarnomani
+// yubormasa) ma'lumot shundan ortiq eskirmaydi.
+constexpr auto kMaxIdleSkipSeconds = qint64(30 * 60);
+
 // Ilova ishga tushgandan beri o'tgan vaqt (birinchi start() da qo'yiladi).
 QElapsedTimer gSinceStart;
 
@@ -91,7 +98,7 @@ Orchestrator::Orchestrator(QObject *parent)
     , _timer(new QTimer(this))
 {
     _timer->setSingleShot(true);
-    connect(_timer, &QTimer::timeout, this, &Orchestrator::runCycle);
+    connect(_timer, &QTimer::timeout, this, &Orchestrator::onTimer);
 }
 
 Orchestrator::~Orchestrator() {
@@ -190,6 +197,74 @@ void Orchestrator::arm(const SchedulerDecision &d) {
     }
 }
 
+void Orchestrator::onTimer() {
+    // Faqat TAYMER yo'li bo'sh siklni o'tkazib yubora oladi. Foydalanuvchi
+    // bosgan "Sync now" va WS xabarnomasi to'g'ridan-to'g'ri runCycle() ga
+    // boradi -- ular hech qachon o'tkazib yuborilmaydi.
+    if (canSkipIdleCycle()) {
+        ++_skippedCycles;
+        if (_skippedCycles == 1 || (_skippedCycles % 20) == 0) {
+            LOG(("CustomMod Sync: bo'sh sikl o'tkazib yuborildi "
+                "(jami %1, tarmoq va DB so'rovisiz)").arg(_skippedCycles));
+        }
+        rearmIdle();
+        return;
+    }
+    runCycle();
+}
+
+// Bo'sh siklni butunlay (tarmoq ham, DB ham yo'q) o'tkazib yuborish mumkinmi.
+//
+// Mantiq: server boshqa qurilma yozuv yuborganda WebSocket orqali seq
+// bilan xabar beradi (o'zimizning yozuvlarimiz uchun bermaydi --
+// NotifyOthersAsync). Demak:
+//   - soket ulangan VA oxirgi muvaffaqiyatli pull'dan beri UZILMAGAN,
+//   - xabarnomalardagi eng katta seq bizning cursor'dan katta emas,
+//   - yuboriladigan navbat aniq bo'sh,
+// bo'lsa -- serverda ham, bizda ham yangi narsa yo'q, sikl behuda.
+// Kafolat buzilishi mumkin bo'lgan har holatda false: soket yo'q/uzilgan,
+// kutilayotgan xabarnoma, qo'shimcha sahifa, xatolar ketma-ketligi, yoki
+// oxirgi haqiqiy sikl kMaxIdleSkipSeconds dan eski.
+bool Orchestrator::canSkipIdleCycle() const {
+    if (!_client || !_client->webSocketConnected()) {
+        return false;
+    }
+    if (_pendingNotify || _hasMore || _consecutiveFailures > 0) {
+        return false;
+    }
+    if (_client->webSocketConnectionId() != _pulledWsConnectionId) {
+        return false;
+    }
+    const auto now = QDateTime::currentSecsSinceEpoch();
+    if (_lastFullCycleAt == 0
+            || (now - _lastFullCycleAt) >= kMaxIdleSkipSeconds) {
+        return false;
+    }
+    // GetState endi xotiradan o'qiydi (Outbox holat keshi).
+    const auto cursor = Outbox::GetState(
+        QStringLiteral("pull_cursor"),
+        QStringLiteral("0")).toLongLong();
+    if (_knownServerSeq > cursor) {
+        return false;
+    }
+    return Outbox::ProbablyEmpty();
+}
+
+void Orchestrator::rearmIdle() {
+    if (!CustomSettings::SyncEnabled()) {
+        return;
+    }
+    SchedulerState state;
+    state.enabled = true;
+    state.inFlight = false;
+    state.consecutiveFailures = _consecutiveFailures;
+    state.hasMore = false;
+    state.pendingNotify = false;
+    state.catchUpCycles = 0;
+    state.intervalSeconds = EffectiveIntervalSeconds(_client);
+    arm(NextAction(state));
+}
+
 void Orchestrator::runCycle() {
     if (!CustomSettings::SyncEnabled()) {
         return;
@@ -221,6 +296,7 @@ void Orchestrator::runCycle() {
         connect(_client, &Client::changesAvailable, this, &Orchestrator::onChangesAvailable);
 #endif
     }
+    _cycleWsConnectionId = _client->webSocketConnectionId();
     _client->pushPending([this, cycleId](int sent, int failed) {
         if (_currentCycleId != cycleId) {
             return;
@@ -238,7 +314,9 @@ void Orchestrator::runCycle() {
 
 #ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
 void Orchestrator::onChangesAvailable(qint64 seq) {
-    Q_UNUSED(seq);
+    // Seq ni ESLAB qolamiz: bo'sh siklni o'tkazib yuborish qarori
+    // (canSkipIdleCycle) shu raqamni cursor bilan solishtiradi.
+    _knownServerSeq = std::max(_knownServerSeq, seq);
     if (!CustomSettings::SyncEnabled()) {
         return;
     }
@@ -282,6 +360,8 @@ void Orchestrator::onCycleFinished(
         _consecutiveFailures = 0;
         _lastError.clear();
         _lastSuccessAt = QDateTime::currentSecsSinceEpoch();
+        _lastFullCycleAt = _lastSuccessAt;
+        _pulledWsConnectionId = _cycleWsConnectionId;
         _hasMore = hasMore;
         if (hasMore || pendingNotify) {
             _catchUpCycles++;

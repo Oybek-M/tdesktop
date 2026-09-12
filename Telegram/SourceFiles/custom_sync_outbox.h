@@ -93,6 +93,14 @@ void MarkFailed(const QString &recordId, const QString &error);
 
 [[nodiscard]] int PendingCount();
 
+// 3-bosqich (2026-09-13): navbat BO'SHLIGINI SQL'siz bilish.
+// Xotiradagi hisoblagich HAR DOIM haqiqiy qatorlar sonidan KATTA YOKI
+// TENG saqlanadi (Enqueue oshiradi, o'chirishlar kamaytirmaydi), ya'ni
+// "0" javobi ishonchli: navbat aniq bo'sh. Eskirgan katta qiymat
+// ResyncRowCount() bilan aniq songa qaytariladi.
+[[nodiscard]] bool ProbablyEmpty();
+void ResyncRowCount();
+
 // sync_state kalit-qiymat qatlami.
 [[nodiscard]] QString GetState(const QString &key, const QString &fallback = {});
 void SetState(const QString &key, const QString &value);
