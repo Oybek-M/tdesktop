@@ -1,7 +1,8 @@
 # 2026-09-12 — Startdagi qotish: tashxis, tuzatish va sync izolyatsiyasi rejasi
 
-**Holat:** asosiy muammo HAL QILINDI va o'lchov bilan tasdiqlandi.
-2–4-bosqichlar (sync izolyatsiyasi) rejalashtirilgan, hali bajarilmagan.
+**Holat:** asosiy muammo HAL QILINDI va o'lchov bilan tasdiqlandi
+(ikki marta: 18:35 va 21:58 startlarida). 2-bosqich bajarildi
+(`7ee739b265`), 3–4-bosqichlar rejalashtirilgan.
 
 ---
 
@@ -197,14 +198,41 @@ uchun.
 | Ma'lumotni bo'lib-bo'lib yuborish | ✅ push: `SyncPushChunkSize`; pull: `limit=` |
 | "O'zgarish bormi?" yengil xabar | ⚠️ WebSocket **push** bor — so'rab turishdan yaxshiroq |
 
-### 2-bosqich — nafas olish va navbat (server kerak emas)
+### 2-bosqich — navbat (BAJARILDI, `7ee739b265`)
 
-- **Bo'laklar orasida hodisa siklita qaytish.** Hozir bo'laklar ketma-ket,
-  to'xtovsiz bajariladi.
-- **Texnik xizmat uchun yagona ketma-ket navbat.** Hozir compaction,
-  reconcile, zaxira, sync — mustaqil `crl::async`. Ular startni bloklamasa
-  ham **bir-birini** bloklashi mumkin.
-- **Vaqt byudjeti:** har qadam ~50 ms ishlaydi, so'ng navbatni bo'shatadi.
+✅ **Texnik xizmat uchun yagona ketma-ket navbat.**
+`CustomDB::Maintenance::Enqueue(name, work)` — keyingi ish faqat
+oldingisi tugagach boshlanadi, har birining vaqti log'ga chiqadi
+(`CustomMod Maintenance: <nom> took <N> ms`). Navbatga o'tkazildi:
+`CompactActivityHistory`, `ActivityCacheLoad`, `MediaQuotaScan`,
+`AutoBackup`. Avto-zaxira navbat ichida **sinxron** `ExportFullBackup`
+chaqiradi — `ExportFullBackupAsync` o'z oqimini ochib darhol qaytardi va
+navbat uni "tugadi" deb o'ylardi.
+
+Navbatga ataylab **olinmadi:** foydalanuvchi o'zi boshlaydigan amallar
+(qo'lda eksport/import, `BackfillMediaSha256Async`, media skanerlari);
+`ReconcileMediaIndex` (asosiy oqimda, 485 ms — fon oqimiga ko'chirish
+oqim taxminlarini o'zgartirardi, ustiga u allaqachon
+`CompactActivityHistoryAsync` dan oldin ketma-ket bajariladi).
+
+❌ **"Bo'laklar orasida nafas" — kerak emas ekan.** Tekshiruvda ma'lum
+bo'ldi: `pushPending()` har siklda **bitta** bo'lak yuboradi va tarmoq
+callback'i orqali qaytadi, ya'ni bo'laklar allaqachon hodisa sikli orqali
+nafas oladi.
+
+➡️ **Tranzaksiyaga yig'ish 4-bosqichga ko'chdi.** Sync yo'llarida umuman
+tranzaksiya yo'q: bir bo'lakda 50 tagacha (`syncPushChunkSize` standarti)
+alohida `DELETE`, har biri o'z tranzaksiyasi va yozuv qulfi bilan. Buni
+HOZIR tuzatish xavfli, chunki SQLite tranzaksiyasi **ulanishga** tegishli,
+bizda esa ulanish barcha oqimlar orasida umumiy — asosiy oqim tranzaksiya
+ochsa, fon oqimining yozuvi ham o'sha tranzaksiyaga tushib qoladi
+(tranzaksiya qaytarilsa — yo'qoladi, tasdiqlansa — muddatidan oldin
+tasdiqlanadi). Xavfsiz yo'l: avval 4-bosqich (alohida ulanish), keyin
+tranzaksiya.
+
+⏳ **Vaqt byudjeti** — hali qilinmadi. Navbat og'ir ishlarning ustma-ust
+tushishini yo'q qildi, byudjet esa bitta uzun ishning o'zini bo'laklarga
+bo'ladi (masalan compaction `DELETE` ni `LIMIT` bilan sikl qilish).
 
 ### 3-bosqich — arzon `seq` tekshiruvi (server tomoni ham kerak)
 
