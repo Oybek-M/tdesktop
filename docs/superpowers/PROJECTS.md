@@ -4,7 +4,39 @@ Bu fayl qaysi ish **hozir faol**, qaysi biri **to'xtatib qo'yilgan** va
 qaysi biri **hali muhokama bosqichida** ekanini ko'rsatadi. Yangi
 sessiya boshlanganda birinchi shu yerga qarang.
 
-Oxirgi yangilanish: 2026-09-12 (18:50)
+Oxirgi yangilanish: 2026-09-13 (00:40)
+
+---
+
+# 🟢 2026-09-13 — STABIL HOLAT BELGISI
+
+**Git tag: `custommod-stable-20260913`** -> `d054d03a7b` (kod jihatidan
+`7ee739b265`). Keyingi o'zgarishlar narsani buzsa — shu tegga qayting.
+
+| | |
+|---|---|
+| Build | **2026-09-12 23:40** tugadi, 53 daq 32 s, 56 muvaffaqiyatli / 0 xato |
+| Sinov | **2026-09-13 00:17:12** ishga tushirildi, 00:30 gacha kuzatildi |
+| Bloklar | **1453 ms** (oyna yaratilishi) + **420 ms** (90-s, ReconcileMediaIndex) + **492 ms** (bizning kod emas — Scope 0 ms) |
+| Taqqoslash | 09-12 18:00 da **~69 soniya** edi |
+| Tarkib | zaxira 24 soat + start+3 daq; texnik xizmat start+90 s; sync birinchi sikli +90 s va WS xabarnoma teshigi yopilgan; checkpoint PASSIVE; **Maintenance navbati** |
+| Navbat | MediaQuotaScan 16 ms -> CompactActivityHistory 427 ms -> ActivityCacheLoad 175 ms — ketma-ket ✅ |
+| Zaxira | 18:01 dan beri yangi zip yo'q — 24 soatlik tekshiruv ishlayapti ✅ |
+
+To'liq build/sinov vaqt jadvali (09-11 19:04 dan boshlab, 8 ta build):
+spec §6a.
+
+**Build qilinmagan, lekin commit qilingan:** `06da91da35` —
+ReconcileMediaIndex fon oqimiga (420 ms blok manbai) + global texnik
+xizmat jarayonda bir marta (ikkinchi akkauntdagi 238 ms ortiqcha
+compaction).
+
+**Keyingi ish rejasi:** [`plans/2026-09-13-peak-performance-and-stability-plan.md`](plans/2026-09-13-peak-performance-and-stability-plan.md)
+— A1 tasdiq -> A2 (3-bosqich: bo'sh sync siklini SQL'siz o'tkazib
+yuborish, **faqat klient**, `/sync/head` endpoint'i bekor qilindi) -> A3
+(sync uchun alohida SQLite ulanishi + tranzaksiyalar) -> A4 (vaqt
+byudjeti) -> A5 (o'lchov kodini tozalash) -> A7 (reliz, avval VPS
+tekshiruvi). customsync-server (B-faza) parallel: keyingisi plan 04 Task 6.
 
 ---
 

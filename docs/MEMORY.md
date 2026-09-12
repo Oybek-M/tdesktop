@@ -1,6 +1,6 @@
 # CustomMod — Session Memory (Agent uchun)
 
-**Oxirgi yangilanish:** 2026-09-12 (T43 — startdagi qotish: avto-zaxira start ustiga tushardi)  
+**Oxirgi yangilanish:** 2026-09-13 (T44 — stabil holat belgisi va peak performance rejasi)  
 **Loyiha:** Telegram Desktop custom mod
 
 ---
@@ -398,6 +398,7 @@ void PaintPeerAvatar(QPainter &p, const QRect &rect,
 | T41 | O'chirilgan xabarda vaqt (timestamp) matn ustiga tushardi (overlap) | `validateText` guard'idagi `!isDeletedLocally()` har safar `setTextWithLinks` ni qayta chaqirib **skip block** ni o'chirardi. Yangi `Flag::DeletedMarkerApplied` bayrog'i: marker bir marta qo'llanib, keyin `validateText` no-op bo'ladi → skip block saqlanadi |
 | T42 | (2026-09-11) Saqlangan xabarlar boshqa akkauntlarga yozilib ketardi | Placeholder `_nonChannelMessages` dan chiqarildi, qayta o'chirish yozilmaydi, `MarkDeleted` marker'ni tozalaydi, `TryRecordBackgroundDelete` akkaunt bo'yicha, `addOlderSlice` bo'sh slice'da inject. Commit `14f5d0c0a8`; `superpowers/specs/2026-09-11-account-misattribution-incident.md` |
 | T43 | (2026-09-12) Startda ~30-37 soniyalik qotish, oyna "not responding" | Sabab so'rovlarda emas, RAQOBATDA: avto-zaxira HAR startda +5 s da ishlab, 62 MB bazani nusxalardi (`RecentBackupExists()` yo'q edi). Bo'sh mashinada 374 ms lik so'rov ilovada 37 927 ms bo'lgan. Zaxira start+3 daq va 24 soatda bir; `ReconcileMediaIndex`/`CompactActivityHistory`/MediaQuota skaneri start+90 s; sync birinchi sikli +90 s; `wal_checkpoint` PASSIVE. Natija ~69 s -> ~1.9 s. Topilishi: `sqlite3_trace_v2` profayler + `CustomDB::PerfScope`. Commitlar `7c8479b441`..`f143015a1d`; `superpowers/specs/2026-09-12-startup-freeze-diagnosis.md` |
+| T44 | (2026-09-13) Stabil holat belgisi + keyingi reja | Tag `custommod-stable-20260913` (`d054d03a7b`): build 09-12 23:40, sinov 09-13 00:17, bloklar 1453/420/492 ms. Maintenance navbati tasdiqlandi. `06da91da35` (reconcile fonga + global texnik xizmat bir marta) build kutmoqda. Reja: `superpowers/plans/2026-09-13-peak-performance-and-stability-plan.md` (A2 3-bosqich klient tomonida, `/sync/head` bekor) |
 
 ---
 

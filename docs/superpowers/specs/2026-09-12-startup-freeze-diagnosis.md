@@ -1,8 +1,11 @@
 # 2026-09-12 — Startdagi qotish: tashxis, tuzatish va sync izolyatsiyasi rejasi
 
-**Holat:** asosiy muammo HAL QILINDI va o'lchov bilan tasdiqlandi
-(ikki marta: 18:35 va 21:58 startlarida). 2-bosqich bajarildi
-(`7ee739b265`), 3–4-bosqichlar rejalashtirilgan.
+**Holat (2026-09-13 00:30):** asosiy muammo HAL QILINDI va o'lchov bilan
+**uch marta** tasdiqlandi (09-12 18:35, 09-12 21:58, 09-13 00:17
+startlarida). 1-bosqich (`f143015a1d`) va 2-bosqich (`7ee739b265`)
+build qilinib sinovdan o'tdi. Stabil nuqta: git tag
+`custommod-stable-20260913` (§6a). Qolgan ish rejasi:
+[`plans/2026-09-13-peak-performance-and-stability-plan.md`](../plans/2026-09-13-peak-performance-and-stability-plan.md).
 
 ---
 
@@ -147,6 +150,48 @@ emas (oyna yaratish).
 
 ---
 
+## 6a. Build va sinov vaqt jadvali (stabil holat belgisi)
+
+| Build tarkibi (HEAD) | Build | Ishga tushirish / sinov | Bloklar (ms) | Natija |
+|---|---|---|---|---|
+| `14f5d0c0a8` (akkaunt aralashuvi tuzatish) | 09-11 19:04 | 09-11 kechqurun | ~1 daqiqa qotish | 3 chat tiklandi, qotish qoldi |
+| `fd1b5acfff` (o'lchov: stall watchdog) | 09-12 ~15:0x | 09-12 15:3x (Ghost ON) | 1312, 36127, 29939, 4222 | qotish o'lchandi |
+| ″ | ″ | 09-12 15:33 / 15:39 (Ghost OFF) | 1538, 23188 / 17442, 16382, 5835, 2844, 30417, 6438 | Ghost sabab emas |
+| `7c8479b441` (kesh tuzatishlari) | 09-12 ~16:0x | 09-12 16:03:57 | 3403, 575, **34984**, **33706** | ❌ qotish qoldi |
+| `27d61ee760` (SQL profayler + registr) | 09-12 ~17:5x | 09-12 18:00:42 | 1823, 964, **33282**, 4598, 434, **21808**, 6766 | ✅ aybdor topildi |
+| `009d3c7a21` (zaxira + start+90 s + sync arm + checkpoint) | 09-12 ~18:3x | 09-12 18:35:13 | **1490, 444** | ✅ HAL QILINDI |
+| ″ (xuddi shu binar, uyda) | — | 09-12 21:58:45 | 1499, 461, 422 | ✅ takrorlandi |
+| `d054d03a7b` (= kod `7ee739b265`: + WS teshigi + navbat) | **09-12 23:40** (53 daq 32 s, 56/56) | **09-13 00:17:12** | **1453, 420, 492** | ✅ **STABIL** |
+
+09-13 00:17 sinovidagi batafsil natija:
+
+```
+00:17:13  blocked 1453 ms                         <- oyna yaratilishi (Scope 0 ms)
+00:17:17  RestoreDeletedChats 403 ms              <- ataylab kechiktirilmagan
+00:18:43  Maintenance: MediaQuotaScan 16 ms
+00:18:47  blocked 420 ms                          <- asosiy oqimdagi ReconcileMediaIndex
+00:18:48  Maintenance: CompactActivityHistory 427 ms
+00:18:48  Maintenance: ActivityCacheLoad 175 ms   <- ROW_NUMBER() (ilgari 37 927 ms)
+00:18:53  Maintenance: CompactActivityHistory 238 ms  <- 2-akkaunt, ORTIQCHA
+00:18:53  Maintenance: ActivityCacheLoad 162 ms
+00:18:56  blocked 492 ms                          <- Scope 0 ms: bizning chaqiriqlar emas
+```
+
+Navbat ishlari **ketma-ket** bajarildi (kesh faqat compaction'dan keyin).
+Avto-zaxira 18:01 dan beri yaratilmagan — 24 soatlik tekshiruv ishlayapti.
+
+Shu sinovdan chiqqan ikki kichik ortiqchalik `06da91da35` da tuzatildi
+(hali build qilinmagan): `ReconcileMediaIndex` navbat orqali fon oqimiga
+o'tkazildi (420 ms blok manbai) va global texnik xizmat (reconcile +
+compaction) har akkaunt uchun emas, **jarayon davomida bir marta**
+bajariladi (238 ms ortiqcha ish).
+
+**Stabil nuqta:** `custommod-stable-20260913` tegi `d054d03a7b` ga
+qo'yilgan — aynan 23:40 da build qilinib 00:17 da sinalgan holat. Keyingi
+o'zgarishlar biror narsani buzsa, shu tegga qaytish mumkin.
+
+---
+
 ## 7. "Nega aynan upstream'dan keyin" — tekshiruv
 
 Uchta gipoteza **rad etildi**:
@@ -234,20 +279,51 @@ tranzaksiya.
 tushishini yo'q qildi, byudjet esa bitta uzun ishning o'zini bo'laklarga
 bo'ladi (masalan compaction `DELETE` ni `LIMIT` bilan sikl qilish).
 
-### 3-bosqich — arzon `seq` tekshiruvi (server tomoni ham kerak)
+### 3-bosqich — bo'sh siklni SQL'siz o'tkazib yuborish (QAYTA LOYIHALANDI, 09-13)
 
-Hozirgi "bo'sh" sikl ham DB'ga tegadi: `GetState(device_id)`,
-`GetState(refresh_token)`, `KeysAvailable()`, `Pending()` — to'rt-besh
-kichik so'rov, har intervalda, abadiy.
+**Dastlabki taklif (`GET /sync/head` endpoint) BEKOR qilindi.** Server
+kodini o'qigach ma'lum bo'ldi (`SyncEndpoints.cs`, `SyncService.PullAsync`):
+`seq` global va monoton, bo'sh `pull?since=X` esa serverda `Seq > since`
+bo'yicha bitta indeks qidiruvi bilan tugaydi — ya'ni u **allaqachon arzon
+"o'zgarish bormi?" so'rovi**. `/head` endpoint'i tarmoq darajasida deyarli
+hech narsa bermasdi, lekin protokol o'zgarishini (CHANGELOG, STATUS,
+parallel sessiyadagi server ishi bilan kelishuv) talab qilardi.
 
-Taklif: server `GET /api/v1/sync/head` → oxirgi `seq`. Klient uni
-**xotiradagi** oxirgi seq bilan solishtiradi; teng bo'lsa va outbox bo'sh
-bo'lsa — sikl umuman boshlanmaydi, DB'ga bitta ham so'rov ketmaydi.
+**Asl narx klientda.** Bo'sh (hech narsa o'zgarmagan) siklning o'lchangan
+DB ishi:
 
-⚠️ `customsync-server` loyihasida ham ish talab qiladi.
+| Chaqiriq | Soni | Turi |
+|---|---|---|
+| `PendingCount()` (status uchun) | 2 | o'qish |
+| `Pending(chunk)` | 1 | o'qish |
+| `GetState(tombstone_backfill_done)`, `GetState(pull_cursor)` | 2 | o'qish |
+| `GetState(device_id)` (`startWebSocket` ichida) | 1 | o'qish |
+| **`SetState(pull_cursor)` — qiymat o'zgarmagan bo'lsa ham** | 1 | **yozuv** |
 
-Ixtiyoriy qo'shimcha: alohida `syncIdleIntervalSeconds` sozlamasi (hozir
-bo'sh interval `syncIntervalSeconds × 10`, ≤600 s deb hisoblanadi).
+Shuning uchun 3-bosqich **faqat klient tomonida**, server protokoliga
+tegmasdan qilinadi:
+
+1. **`sync_state` xotira keshi** — jadval bir marta o'qiladi, `GetState`
+   xotiradan; `SetState` bir xil qiymatni bazaga YOZMAYDI. Barcha yozuvlar
+   `SetState` orqali o'tadi (boshqa SQL yo'q — tekshirilgan), kesh ajralib
+   qolmaydi.
+2. **Navbat hisoblagichi** — `Outbox::ProbablyEmpty()`: xotiradagi son
+   haqiqiy qatorlar sonidan **hech qachon kam emas** (Enqueue oshiradi,
+   o'chirishlar kamaytirmaydi, eskirgan qiymat `ResyncRowCount()` bilan
+   aniq songa qaytadi). "0" javobi ishonchli — `Pending()` so'rovi ham
+   kerak emas.
+3. **Bo'sh siklni butunlay o'tkazib yuborish** (faqat taymer yo'li) —
+   quyidagilarning HAMMASI bajarilsa: WS ulangan **va** oxirgi
+   muvaffaqiyatli pull'dan beri uzilmagan (`webSocketConnectionId`),
+   xabarnomalardagi eng katta `seq` ≤ `pull_cursor`, navbat aniq bo'sh,
+   kutilayotgan xabarnoma/sahifa/xato yo'q, oxirgi haqiqiy sikl 30
+   daqiqadan yangi. Server o'z yozuvlarimiz uchun xabar bermaydi
+   (`NotifyOthersAsync`), shuning uchun bu shartlar "yangi narsa yo'q"
+   ning to'liq kafolati. "Sync now" va WS xabarnomasi hech qachon
+   o'tkazib yuborilmaydi.
+
+Ixtiyoriy qo'shimcha (keyinroq): alohida `syncIdleIntervalSeconds`
+sozlamasi (hozir bo'sh interval `syncIntervalSeconds × 10`, ≤600 s).
 
 ### 4-bosqich — sync uchun alohida DB ulanishi
 
