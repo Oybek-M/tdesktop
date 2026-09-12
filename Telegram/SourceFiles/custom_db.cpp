@@ -50,6 +50,19 @@ sqlite3 *RawHandle() {
 static QMutex gCacheMutex;
 static QHash<PeerKey, QSet<long long>> gDeletedCache;
 static QHash<PeerKey, QHash<long long, QString>> gEditedCache;
+// T43/perf: qaysi msgId da 'backup' (AntiEdit tarixi) qatori BOR ekanini
+// eslab turadigan to'plam. GetEditHistory() HAR BIR xabar qurilganda
+// chaqiriladi, SQLite esa rejaga idx_am_peer_type (peer_id, type) ni tanlab
+// o'sha peer'ning BARCHA backup qatorlarini skanerlaydi -- ya'ni har bir
+// xabar uchun O(backup_qatorlar) -> jami O(n^2). Bu to'plam yordamida
+// backup'i yo'q xabar uchun SQL ga umuman bormaymiz.
+static QHash<PeerKey, QSet<long long>> gEditBackupIds;
+// T43/perf: ghost_reads butun jadvali xotirada. Jadval kichik (peer'ga bitta
+// qator), lekin GetGhostRead() History::inboxReadTillId() ichidan chaqiriladi
+// va u juda issiq yo'l -- jadval BO'SH bo'lganda ham har chaqiriq SQL
+// prepare/step/finalize qilardi.
+static QHash<PeerKey, long long> gGhostReadCache;
+static bool gGhostReadsLoaded = false;
 // Which peers have already had their entries loaded from the DB into the
 // caches above (via EnsurePeerCacheLoaded()). A peer can also be "loaded"
 // implicitly by live writes (SaveMessage()/MarkEdited()) before it's ever
@@ -800,6 +813,9 @@ void LoadRestoreCache() {
     QMutexLocker locker(&gCacheMutex);
     gDeletedCache.clear();
     gEditedCache.clear();
+    gEditBackupIds.clear();
+    gGhostReadCache.clear();
+    gGhostReadsLoaded = false;
     gLoadedPeers.clear();
     gActivityLatestCache.clear();
     gActivityLoadedPeers.clear();
@@ -855,6 +871,7 @@ static void EnsurePeerCacheLoaded(const PeerKey &key) {
 
     QSet<long long> deletedIds;
     QHash<long long, QString> editedTexts;
+    QSet<long long> backupIds;
 
     {
         sqlite3_stmt *stmt = nullptr;
@@ -873,7 +890,7 @@ static void EnsurePeerCacheLoaded(const PeerKey &key) {
     {
         sqlite3_stmt *stmt = nullptr;
         if (sqlite3_prepare_v2(gDb,
-                "SELECT msg_id, original_text FROM actioned_messages "
+                "SELECT msg_id, original_text, type FROM actioned_messages "
                 "WHERE peer_id = ? AND type IN ('backup', 'edited') "
                 "AND account_id IN (0, ?) ORDER BY rowid ASC",
                 -1, &stmt, nullptr) == SQLITE_OK) {
@@ -884,6 +901,9 @@ static void EnsurePeerCacheLoaded(const PeerKey &key) {
                 if (!editedTexts.contains(msgId)) {
                     editedTexts[msgId] = colText(stmt, 1);
                 }
+                if (colText(stmt, 2) == u"backup"_q) {
+                    backupIds.insert(msgId);
+                }
             }
             sqlite3_finalize(stmt);
         }
@@ -892,6 +912,7 @@ static void EnsurePeerCacheLoaded(const PeerKey &key) {
     QMutexLocker locker(&gCacheMutex);
     if (gLoadedPeers.contains(key)) return; // race guard
     gDeletedCache[key].unite(deletedIds);
+    gEditBackupIds[key].unite(backupIds);
     for (auto it = editedTexts.constBegin(); it != editedTexts.constEnd(); ++it) {
         if (!gEditedCache[key].contains(it.key())) {
             gEditedCache[key][it.key()] = it.value();
@@ -923,6 +944,48 @@ QString GetOriginalTextBeforeEdit(const PeerKey &key, long long msgId) {
 // Ghost reads
 // ---------------------------------------------------------------------------
 
+// T43/perf: butun ghost_reads jadvalini bir marta xotiraga oladi. Jadval
+// kichik (peer'ga bitta qator), GetGhostRead() esa juda issiq yo'ldan
+// chaqiriladi -- har safar SQL qilish startda ~13 soniya yeb qo'yardi.
+static void EnsureGhostReadsLoaded() {
+    {
+        QMutexLocker locker(&gCacheMutex);
+        if (gGhostReadsLoaded) return;
+    }
+    Init();
+    QHash<PeerKey, long long> loaded;
+    if (gDb) {
+        sqlite3_stmt *stmt = nullptr;
+        if (sqlite3_prepare_v2(gDb,
+                "SELECT account_id, peer_id, msg_id FROM ghost_reads",
+                -1, &stmt, nullptr) == SQLITE_OK) {
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                loaded.insert(PeerKey{
+                    .accountId = sqlite3_column_int64(stmt, 0),
+                    .peerId = colText(stmt, 1),
+                }, sqlite3_column_int64(stmt, 2));
+            }
+            sqlite3_finalize(stmt);
+        }
+    }
+    QMutexLocker locker(&gCacheMutex);
+    // O'qish davomida yozilgan yangi qiymat eskisiga almashmasin.
+    for (auto it = loaded.constBegin(); it != loaded.constEnd(); ++it) {
+        if (!gGhostReadCache.contains(it.key())) {
+            gGhostReadCache.insert(it.key(), it.value());
+        }
+    }
+    gGhostReadsLoaded = true;
+}
+
+// Kesh bilan DB ni moslashtirib bo'lmaydigan (ommaviy DELETE/import) hollarda
+// keshni butunlay bekor qilamiz -- keyingi murojaatda qayta yuklanadi.
+static void InvalidateGhostReadCache() {
+    QMutexLocker locker(&gCacheMutex);
+    gGhostReadCache.clear();
+    gGhostReadsLoaded = false;
+}
+
 void SaveGhostRead(const PeerKey &key, long long msgId) {
     Init();
     // E22: Prune stale entries once every 50 saves to keep the table lean.
@@ -945,26 +1008,24 @@ void SaveGhostRead(const PeerKey &key, long long msgId) {
         sqlite3_finalize(stmt);
     }
 
+    {
+        QMutexLocker locker(&gCacheMutex);
+        gGhostReadCache[key] = msgId;
+    }
+
     CustomSync::Outbox::Enqueue(CustomSync::Kind::GhostRead, key.accountId, key.peerId, msgId, QDateTime::currentSecsSinceEpoch());
 }
 
 long long GetGhostRead(const PeerKey &key) {
-    Init();
-    if (!gDb) return 0;
-
-    long long result = 0;
-    sqlite3_stmt *stmt = nullptr;
-    if (sqlite3_prepare_v2(gDb,
-            "SELECT msg_id FROM ghost_reads WHERE peer_id = ? AND account_id IN (0, ?)",
-            -1, &stmt, nullptr) == SQLITE_OK) {
-        bindText(stmt, 1, key.peerId);
-        sqlite3_bind_int64(stmt, 2, key.accountId);
-        if (sqlite3_step(stmt) == SQLITE_ROW) {
-            result = sqlite3_column_int64(stmt, 0);
-        }
-        sqlite3_finalize(stmt);
-    }
-    return result;
+    EnsureGhostReadsLoaded();
+    QMutexLocker locker(&gCacheMutex);
+    // Eski SQL "account_id IN (0, ?)" edi va qaysi qator birinchi kelishi
+    // tasodifiy edi; endi avval shu akkauntniki, topilmasa legacy (0) qatori.
+    const auto it = gGhostReadCache.constFind(key);
+    if (it != gGhostReadCache.constEnd()) return it.value();
+    const auto legacy = gGhostReadCache.constFind(
+        PeerKey{ .accountId = 0, .peerId = key.peerId });
+    return (legacy != gGhostReadCache.constEnd()) ? legacy.value() : 0;
 }
 
 // E22: Remove the ghost-read record for a single peer.
@@ -981,6 +1042,11 @@ void ResetGhostRead(const PeerKey &key) {
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }
+
+    // DELETE IN (0, ?) ikkala qatorni ham o'chiradi -- keshda ham shunday.
+    QMutexLocker locker(&gCacheMutex);
+    gGhostReadCache.remove(key);
+    gGhostReadCache.remove(PeerKey{ .accountId = 0, .peerId = key.peerId });
 }
 
 void ResetGhostReadForPeerAllAccounts(const QString &peerId) {
@@ -994,6 +1060,15 @@ void ResetGhostReadForPeerAllAccounts(const QString &peerId) {
         bindText(stmt, 1, peerId);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
+    }
+
+    QMutexLocker locker(&gCacheMutex);
+    for (auto it = gGhostReadCache.begin(); it != gGhostReadCache.end();) {
+        if (it.key().peerId == peerId) {
+            it = gGhostReadCache.erase(it);
+        } else {
+            ++it;
+        }
     }
 }
 
@@ -1012,6 +1087,9 @@ void PruneStaleGhostReads(int days) {
         const int removed = sqlite3_changes(gDb);
         sqlite3_finalize(stmt);
         if (removed > 0) {
+            // Keshda timestamp yo'q -- qaysi qator ketganini bilmaymiz, shuning
+            // uchun butun keshni bekor qilamiz (bu kamdan-kam sodir bo'ladi).
+            InvalidateGhostReadCache();
             qDebug() << "PruneStaleGhostReads: removed" << removed
                      << "entries older than" << days << "days.";
         }
@@ -1319,6 +1397,18 @@ QVector<QString> GetEditHistory(const PeerKey &key, long long msgId) {
     QVector<QString> result;
     if (!gDb) return result;
 
+    // T43/perf: bu funksiya har bir HistoryItem qurilishida chaqiriladi.
+    // Peer keshi 'backup' qatori bor msgId larni bilgani uchun, ro'yxatda
+    // yo'q xabar uchun SQL ga bormaymiz -- startdagi eng katta qotish shu edi.
+    EnsurePeerCacheLoaded(key);
+    {
+        QMutexLocker locker(&gCacheMutex);
+        const auto it = gEditBackupIds.constFind(key);
+        if (it == gEditBackupIds.constEnd() || !it->contains(msgId)) {
+            return result;
+        }
+    }
+
     sqlite3_stmt *stmt = nullptr;
     if (sqlite3_prepare_v2(gDb,
             "SELECT original_text FROM actioned_messages "
@@ -1357,6 +1447,19 @@ void SaveActionedMessage(const ActionedMessage &msg) {
             .accountId = msg.accountId,
             .peerId = msg.peerId,
         });
+    }
+
+    // T43: 'backup' qatori shu yo'l orqali ham kiradi (sync mijozidan kelgan
+    // yozuvlar). gEditBackupIds yangilanmasa GetEditHistory() uni ko'rmay
+    // qolardi, chunki endi u keshga tayanadi.
+    if (msg.type == u"backup"_q && !msg.peerId.isEmpty()) {
+        const PeerKey key{ .accountId = msg.accountId, .peerId = msg.peerId };
+        EnsurePeerCacheLoaded(key);
+        QMutexLocker locker(&gCacheMutex);
+        gEditBackupIds[key].insert(msg.msgId);
+        if (!gEditedCache[key].contains(msg.msgId)) {
+            gEditedCache[key][msg.msgId] = msg.originalText;
+        }
     }
 
     sqlite3_stmt *stmt = nullptr;
@@ -1528,6 +1631,9 @@ void SaveMessage(HistoryItem *item) {
         if (!gEditedCache[key].contains(msg.msgId)) {
             gEditedCache[key][msg.msgId] = cleanText;
         }
+        // T43: GetEditHistory() keshdagi shu to'plamga qarab SQL qilish yoki
+        // qilmaslikni hal qiladi -- yangi backup darrov ko'rinsin.
+        gEditBackupIds[key].insert(msg.msgId);
     }
 
     gPendingWrites.append(msg);
@@ -1883,6 +1989,7 @@ int AssignLegacyRows(const QString &peerId, qint64 accountId) {
 			if (it->peerId == peerId) {
 				gDeletedCache.remove(*it);
 				gEditedCache.remove(*it);
+				gEditBackupIds.remove(*it);
 				gPeersWithDeleted.remove(*it);
 				it = gLoadedPeers.erase(it);
 			} else {
@@ -1893,6 +2000,7 @@ int AssignLegacyRows(const QString &peerId, qint64 accountId) {
 		const PeerKey zeroKey{ .accountId = 0, .peerId = peerId };
 		gDeletedCache.remove(zeroKey);
 		gEditedCache.remove(zeroKey);
+		gEditBackupIds.remove(zeroKey);
 		gPeersWithDeleted.remove(zeroKey);
 		gLoadedPeers.remove(zeroKey);
 		// gPeersWithDeleted dan yozuv olib tashlandi, lekin peer'da
@@ -2585,6 +2693,9 @@ void PermanentlyDeleteMessage(const PeerKey &key, long long msgId) {
         if (gEditedCache.contains(key)) {
             gEditedCache[key].remove(msgId);
         }
+        if (gEditBackupIds.contains(key)) {
+            gEditBackupIds[key].remove(msgId);
+        }
     }
     // Drop any queued (unflushed) writes for this message.
     gPendingWrites.erase(
@@ -3105,6 +3216,7 @@ bool ImportFullBackup(const QString &sourcePath, bool fullReplace) {
     if (fullReplace) {
         ClearAllArchive();
         execSql("DELETE FROM ghost_reads");
+        InvalidateGhostReadCache();
     }
 
     QString sourceDir = sourcePath;
@@ -3482,6 +3594,7 @@ void ClearEditedArchive() {
     {
         QMutexLocker locker(&gCacheMutex);
         gEditedCache.clear();
+        gEditBackupIds.clear();
     }
 }
 
@@ -3492,6 +3605,7 @@ void ClearAllArchive() {
         QMutexLocker locker(&gCacheMutex);
         gDeletedCache.clear();
         gEditedCache.clear();
+        gEditBackupIds.clear();
         gPeersWithDeleted.clear(); // endi hech kimda 'deleted' yo'q
     }
 }
