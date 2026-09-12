@@ -2,6 +2,7 @@
 
 #include "custom_db.h"
 #include "custom_settings.h"
+#include "base/call_delayed.h"
 #include "core/application.h"
 #include "crl/crl.h"
 #include "ui/boxes/confirm_box.h"
@@ -15,6 +16,10 @@
 
 namespace CustomMediaQuota {
 namespace {
+
+// Start tinchligi: main_session.cpp dagi kStartupQuietMs bilan bir xil
+// maqsad -- texnik xizmat startning og'ir qismi tugagach boshlansin.
+constexpr auto kStartupScanDelayMs = crl::time(90 * 1000);
 
 // Fon skaneri UI oqimidan mustaqil yozadi — atomik.
 std::atomic<long long> gUsedBytes{ 0 };
@@ -48,20 +53,29 @@ void Init() {
     //    undan oldin arxivlangan fayllar indeksda yo'q — ular faqat
     //    skanerdan chiqadi. Skaner UI oqimida qilinsa ishga tushish
     //    sekinlashardi (o'n minglab fayl), shuning uchun crl::async.
+    //
+    //    2026-09-12: bundan tashqari skaner endi startdan 90 soniya keyin
+    //    boshlanadi. Fon oqimida bo'lsa ham, o'n minglab faylni yurish
+    //    DISK bo'yicha bazani o'qish bilan raqobatlashadi -- startdagi
+    //    qotishning bir qismi shundan edi. Kvota raqami darhol kerak
+    //    emas: yuqoridagi SQL yig'indisi allaqachon berilgan, skaner
+    //    faqat indeksdan oldingi (v7 gacha) fayllarni qo'shadi.
     const auto mediaDir = CustomSettings::ArchiveMediasDir();
-    crl::async([mediaDir] {
-        if (!QDir(mediaDir).exists()) {
-            return;
-        }
-        const auto scanned = ScanFolderBytes(mediaDir);
-        // Skaner davomida AddBytes() ishlagan bo'lishi mumkin, shuning
-        // uchun kattarog'ini olamiz — kam baholashdan ko'ra ko'p baholash
-        // xavfsizroq (kvota to'lganini o'tkazib yuborishdan ko'ra).
-        auto current = gUsedBytes.load();
-        while (scanned > current
-            && !gUsedBytes.compare_exchange_weak(current, scanned)) {
-            // compare_exchange_weak `current` ni yangilaydi — qayta urinamiz.
-        }
+    base::call_delayed(kStartupScanDelayMs, [mediaDir] {
+        crl::async([mediaDir] {
+            if (!QDir(mediaDir).exists()) {
+                return;
+            }
+            const auto scanned = ScanFolderBytes(mediaDir);
+            // Skaner davomida AddBytes() ishlagan bo'lishi mumkin, shuning
+            // uchun kattarog'ini olamiz — kam baholashdan ko'ra ko'p
+            // baholash xavfsizroq (kvota to'lganini o'tkazib yuborishdan).
+            auto current = gUsedBytes.load();
+            while (scanned > current
+                && !gUsedBytes.compare_exchange_weak(current, scanned)) {
+                // compare_exchange_weak `current` ni yangilaydi — qayta urinamiz.
+            }
+        });
     });
 }
 

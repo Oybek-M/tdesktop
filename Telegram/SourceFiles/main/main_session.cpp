@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "main/main_session.h"
 #include <QtCore/QElapsedTimer>
+#include "base/call_delayed.h"
 
 
 #include "apiwrap.h"
@@ -78,6 +79,11 @@ namespace Main {
 namespace {
 
 constexpr auto kTmpPasswordReserveTime = TimeId(10);
+
+// CUSTOM 2026-09-12: start tinchligi oynasi. Texnik xizmat ishlari shu
+// vaqtdan keyin boshlanadi -- startning eng og'ir qismi (chatlar, xabar
+// ob'ektlari, media) tugab ulgursin.
+constexpr auto kStartupQuietMs = crl::time(90 * 1000);
 
 [[nodiscard]] QString ValidatedInternalLinksDomain(
 		not_null<const Session*> session) {
@@ -224,10 +230,28 @@ Session::Session(
 		timed("RestoreDeletedChats", [&] {
 			CustomArchive::RestoreDeletedChats(this);
 		});
-		// Indeksni fayl tizimi bilan moslashtirish: import'dan keyin
-		// yo'q fayllar 'missing' ga, tugagan yuklashlar 'present' ga.
-		timed("ReconcileMediaIndex", [] {
+		// 2026-09-12: quyidagi ikki ish UI uchun ZARUR EMAS -- ikkalasi
+		// ham texnik xizmat. Ilgari ular aynan shu yerda, chat ro'yxati
+		// yuklangan zahoti ishlardi, ya'ni xabar ob'ektlari hali qurilib
+		// turgan paytda bitta SQLite ulanishi uchun raqobatga kirardi.
+		// O'lchov ko'rsatdi: raqobat ostida 374 ms lik so'rov 37 900 ms
+		// gacha cho'zilgan. Endi start tinchiganidan keyin bajariladi.
+		// RestoreDeletedChats kechiktirilMAYDI -- u foydalanuvchiga
+		// ko'rinadigan ish (saqlangan chatlarni ro'yxatga qaytarish).
+		base::call_delayed(kStartupQuietMs, this, [] {
+			// Indeksni fayl tizimi bilan moslashtirish: import'dan keyin
+			// yo'q fayllar 'missing' ga, tugagan yuklashlar 'present' ga.
+			auto timer = QElapsedTimer();
+			timer.start();
 			CustomDB::ReconcileMediaIndex(CustomSettings::ArchiveRoot());
+			const auto ms = timer.elapsed();
+			if (ms >= 50) {
+				LOG(("CustomMod Perf: ReconcileMediaIndex (kechiktirilgan) "
+					"took %1 ms").arg(ms));
+			}
+			// Faollik tarixini ma'nosiz qatorlardan tozalash (fon oqimida).
+			// Tugagach keshni O'ZI qayta yuklaydi.
+			CustomDB::CompactActivityHistoryAsync();
 		});
 		// Kvota ogohlantirishi shu yerda — konstruktorda hali oyna yo'q.
 		CustomMediaQuota::ShowQuotaAlertIfNeeded();
@@ -238,11 +262,6 @@ Session::Session(
 		timed("PruneStaleActivityHistory", [] {
 			CustomDB::PruneStaleActivityHistory();
 		});
-		// Faollik tarixini ma'nosiz qatorlardan tozalash (fon oqimida,
-		// ~6 soniya). Tugagach keshni O'ZI qayta yuklaydi, shuning uchun
-		// alohida WarmActivityCache() chaqirilmaydi — aks holda kesh ikki
-		// marta yuklanardi.
-		CustomDB::CompactActivityHistoryAsync();
 	}, lifetime());
 
 	// 2026-08-24: rasm arxivi. PhotoData'da finishLoad() hook'i yo'q,
