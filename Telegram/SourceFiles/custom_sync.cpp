@@ -9,6 +9,7 @@
 
 #include <QtCore/QTimer>
 #include <QtCore/QDateTime>
+#include <QtCore/QElapsedTimer>
 #include <QtCore/QDebug>
 #endif
 
@@ -59,6 +60,30 @@ static Orchestrator *gOrchestrator = nullptr;
 // maqsad -- og'ir start tugagach ishlasin.
 constexpr auto kStartupQuietSeconds = 90;
 
+// WebSocket ulangan bo'lsa taymer intervali shuncha barobar uzayadi
+// (yuqori chegara bilan). Sabab: soket ulangan ekan, server o'zgarishni
+// O'ZI itaradi -- qisqa intervalli so'rab turish shunchaki ortiqcha
+// DB + tarmoq ishi. Taymer bu holatda faqat ZAXIRA yo'l: soket jimgina
+// uzilib qolsa yoki xabarnoma yo'qolsa.
+constexpr auto kWsIdleMultiplier = 10;
+constexpr auto kWsIdleMaxSeconds = 600;
+
+// Ilova ishga tushgandan beri o'tgan vaqt (birinchi start() da qo'yiladi).
+QElapsedTimer gSinceStart;
+
+[[nodiscard]] bool InStartupQuietWindow() {
+    return gSinceStart.isValid()
+        && (gSinceStart.elapsed() < qint64(kStartupQuietSeconds) * 1000);
+}
+
+[[nodiscard]] int EffectiveIntervalSeconds(Client *client) {
+    const auto base = CustomSettings::SyncIntervalSeconds();
+    if (!client || !client->webSocketConnected()) {
+        return base;
+    }
+    return std::min(base * kWsIdleMultiplier, kWsIdleMaxSeconds);
+}
+
 } // namespace
 
 Orchestrator::Orchestrator(QObject *parent)
@@ -76,6 +101,9 @@ Orchestrator::~Orchestrator() {
 }
 
 void Orchestrator::start() {
+    if (!gSinceStart.isValid()) {
+        gSinceStart.start();
+    }
     if (!CustomSettings::SyncEnabled()) {
         return;
     }
@@ -96,7 +124,7 @@ void Orchestrator::start() {
     state.hasMore = false;
     state.pendingNotify = _pendingNotify;
     state.catchUpCycles = 0;
-    state.intervalSeconds = CustomSettings::SyncIntervalSeconds();
+    state.intervalSeconds = EffectiveIntervalSeconds(_client);
 
     // 2026-09-12: ilova ishga tushgandan keyingi BIRINCHI sikl kamida 90
     // soniya kechiktiriladi. Standart interval 30 soniya, ya'ni ilgari
@@ -214,8 +242,18 @@ void Orchestrator::onChangesAvailable(qint64 seq) {
     if (!CustomSettings::SyncEnabled()) {
         return;
     }
-    if (_inFlight) {
-        // Sikl davomida kelgan xabarnoma — sikl tugagach NextAction orqali darhol tortiladi
+    if (_inFlight || InStartupQuietWindow()) {
+        // Sikl davomida kelgan xabarnoma — sikl tugagach NextAction orqali
+        // darhol tortiladi.
+        //
+        // 2026-09-12: start tinchligi oynasida ham shu yo'ldan boramiz.
+        // Ilgari bu yerdan to'g'ridan-to'g'ri syncNow() chaqirilardi va u
+        // taymerni butunlay chetlab o'tardi -- ya'ni startda server bitta
+        // xabarnoma yuborsa, sikl chatlar yuklanayotgan paytda ishga
+        // tushib, bitta SQLite ulanishi uchun raqobatga kirardi. Endi
+        // bayroq qo'yiladi, armlangan taymer esa oyna tugashi bilan uni
+        // NextAction orqali darhol tortadi -- ya'ni xabarnoma YO'QOLMAYDI,
+        // faqat kechikadi.
         _pendingNotify = true;
         return;
     }
@@ -272,7 +310,7 @@ void Orchestrator::onCycleFinished(
     state.hasMore = _hasMore;
     state.pendingNotify = pendingNotify;
     state.catchUpCycles = _catchUpCycles;
-    state.intervalSeconds = CustomSettings::SyncIntervalSeconds();
+    state.intervalSeconds = EffectiveIntervalSeconds(_client);
     arm(NextAction(state));
 }
 

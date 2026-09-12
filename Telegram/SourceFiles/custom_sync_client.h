@@ -142,6 +142,11 @@ public:
     void stopWebSocket();
 #endif
 
+    // Soket ulangan bo'lsa server o'zgarishlarni ITARADI, ya'ni qisqa
+    // intervalli so'rab turishning keragi yo'q (orkestrator intervalni
+    // shunga qarab uzaytiradi). WebSocket'siz qurilmada doim false.
+    [[nodiscard]] bool webSocketConnected() const;
+
 Q_SIGNALS:
 #ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
     void changesAvailable(qint64 seq);

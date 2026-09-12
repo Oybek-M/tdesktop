@@ -938,6 +938,15 @@ void Client::createKeyWrap(const KeyShare::Wrap &wrap, Fn<void(bool ok, QString 
     });
 }
 
+bool Client::webSocketConnected() const {
+#ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
+    return _socket
+        && (_socket->state() == QAbstractSocket::ConnectedState);
+#else
+    return false;
+#endif
+}
+
 #ifdef CUSTOM_SYNC_HAS_WEBSOCKETS
 QUrl Client::makeWebSocketUrl() const {
     auto base = CustomSettings::SyncServerUrl().trimmed();
