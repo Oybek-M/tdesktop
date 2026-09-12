@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "custom_db.h"
 #include "custom_peer_key.h"
 #include "custom_settings.h"
+#include <QtCore/QElapsedTimer>
 #include <QtCore/QFile>
 #include <QtCore/QTextStream>
 #include <QtCore/QDateTime>
@@ -2225,6 +2226,26 @@ void History::loadDeletedMessages() {
 	// bo'sh tarixni o'zi to'g'ri hal qiladi (addNewToBack).
 	if (!_deletedInjectionReady) return;
 
+	// CUSTOM 2026-09-12: bu funksiya scroll, o'qish va start hodisalarida
+	// juda ko'p chaqiriladi. Har chaqiruv arzon bo'lsa ham yig'indisi
+	// startdagi qotishni tushuntirishi mumkin, shuning uchun umumiy
+	// hisobni yuritamiz (log faqat sekin chaqiruvda yoki har 200 da).
+	struct PerfScope {
+		QElapsedTimer timer;
+		PerfScope() { timer.start(); }
+		~PerfScope() {
+			static auto totalMs = qint64(0);
+			static auto calls = 0;
+			const auto ms = timer.elapsed();
+			totalMs += ms;
+			++calls;
+			if (ms >= 100 || (calls % 200) == 0) {
+				LOG(("CustomMod Perf: loadDeletedMessages call %1 took "
+					"%2 ms, total %3 ms").arg(calls).arg(ms).arg(totalMs));
+			}
+		}
+	} perfScope;
+
 	const auto key = CustomDB::Key(session(), peer->id);
 	if (!CustomSettings::ShouldAntiDelete(key.peerId)) return;
 	auto deleted = CustomDB::GetDeletedMessages(key);
@@ -2488,10 +2509,11 @@ void History::loadDeletedMessages() {
 		injectedCount++;
 	}
 	if (injectedCount > 0) {
-		qDebug() << "[CustomMod] Injected" << injectedCount
-		         << "deleted messages for peer" << peer->id.value
-		         << "| skipped: mazmunsiz" << skippedEmpty
-		         << ", begona" << skippedForeign;
+		// LOG(), qDebug() EMAS -- qDebug log.txt ga tushmaydi.
+		LOG(("CustomMod: injected %1 deleted messages for peer %2 "
+			"| skipped: empty %3, foreign %4"
+			).arg(injectedCount).arg(peer->id.value
+			).arg(skippedEmpty).arg(skippedForeign));
 	}
 }
 

@@ -6,6 +6,8 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "main/main_session.h"
+#include <QtCore/QElapsedTimer>
+
 
 #include "apiwrap.h"
 #include "api/api_peer_colors.h"
@@ -207,17 +209,35 @@ Session::Session(
 	) | rpl::filter([](Data::Folder *folder) {
 		return !folder; // faqat asosiy ro'yxat (arxiv papkasi emas)
 	}) | rpl::take(1) | rpl::on_next([=] {
-		CustomArchive::RestoreDeletedChats(this);
+		// CUSTOM 2026-09-12: shu blok chat ro'yxati yuklangach ishlaydi,
+		// ya'ni startdagi qotish oynasiga aynan to'g'ri keladi. Har bir
+		// bosqich alohida o'lchanadi (50 ms dan sekin bo'lsa log'ga).
+		const auto timed = [](const char *name, auto &&work) {
+			auto timer = QElapsedTimer();
+			timer.start();
+			work();
+			const auto ms = timer.elapsed();
+			if (ms >= 50) {
+				LOG(("CustomMod Perf: %1 took %2 ms").arg(name).arg(ms));
+			}
+		};
+		timed("RestoreDeletedChats", [&] {
+			CustomArchive::RestoreDeletedChats(this);
+		});
 		// Indeksni fayl tizimi bilan moslashtirish: import'dan keyin
 		// yo'q fayllar 'missing' ga, tugagan yuklashlar 'present' ga.
-		CustomDB::ReconcileMediaIndex(CustomSettings::ArchiveRoot());
+		timed("ReconcileMediaIndex", [] {
+			CustomDB::ReconcileMediaIndex(CustomSettings::ArchiveRoot());
+		});
 		// Kvota ogohlantirishi shu yerda — konstruktorda hali oyna yo'q.
 		CustomMediaQuota::ShowQuotaAlertIfNeeded();
 		// 2026-08-24: faollik tarixini ishga tushishda bir marta tozalash.
 		// Ilgari tozalash FAQAT yangi yozuv kelganda ishlardi — ya'ni
 		// kuzatiladigan kontakt bo'lmasa eski yozuvlar abadiy qolardi.
 		// v8 indeksi bilan bu amal ~0.3 ms.
-		CustomDB::PruneStaleActivityHistory();
+		timed("PruneStaleActivityHistory", [] {
+			CustomDB::PruneStaleActivityHistory();
+		});
 		// Faollik tarixini ma'nosiz qatorlardan tozalash (fon oqimida,
 		// ~6 soniya). Tugagach keshni O'ZI qayta yuklaydi, shuning uchun
 		// alohida WarmActivityCache() chaqirilmaydi — aks holda kesh ikki

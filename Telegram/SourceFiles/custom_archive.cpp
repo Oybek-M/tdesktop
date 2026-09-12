@@ -1,4 +1,5 @@
 #include "custom_archive.h"
+#include "base/debug_log.h"
 
 #include "custom_db.h"
 #include "custom_peer_key.h"
@@ -16,6 +17,7 @@
 #include "history/history_item.h"
 #include "main/main_session.h"
 #include "storage/file_download.h" // Storage::kMaxFileInMemory
+#include <QtCore/QElapsedTimer>
 #include <QtCore/QDateTime>
 #include <QtCore/QDir>
 #include <QtCore/QFile>
@@ -613,6 +615,12 @@ void RestoreDeletedChats(not_null<Main::Session*> session) {
 	if (peers.isEmpty()) {
 		return;
 	}
+	// CUSTOM 2026-09-12: ro'yxatda 200 ga yaqin peer bor. Qaysi qism
+	// qimmat ekanini bilish uchun ko'rilgan va haqiqatan tiklangan
+	// chatlar sonini ham yozamiz (faqat sekin bo'lsa).
+	auto perfTimer = QElapsedTimer();
+	perfTimer.start();
+	auto restored = 0;
 	auto &owner = session->data();
 	for (const auto &peerIdStr : peers) {
 		auto ok = false;
@@ -646,6 +654,7 @@ void RestoreDeletedChats(not_null<Main::Session*> session) {
 		if (history->isEmpty()) {
 			continue; // inject qilinmadi (masalan hammasi allaqachon bor)
 		}
+		++restored;
 		if (history->folderKnown()) {
 			// Papkasi ma'lum — to'g'ridan-to'g'ri ro'yxatga qo'shamiz.
 			// refreshChatListEntry o'zi "ro'yxatda yo'q" holatini ham
@@ -657,6 +666,11 @@ void RestoreDeletedChats(not_null<Main::Session*> session) {
 			// javob kelgach tdesktop uni ro'yxatga o'zi qo'shadi.
 			owner.histories().requestDialogEntry(history);
 		}
+	}
+	const auto ms = perfTimer.elapsed();
+	if (ms >= 50) {
+		LOG(("CustomMod Perf: RestoreDeletedChats %1 peers, %2 restored, "
+			"%3 ms").arg(peers.size()).arg(restored).arg(ms));
 	}
 }
 

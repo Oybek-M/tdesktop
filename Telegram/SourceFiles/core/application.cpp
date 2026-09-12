@@ -106,6 +106,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/cached_webview_availability.h"
 #include "test/test_agent.h"
 
+#include <QtCore/QElapsedTimer>
 #include <QtCore/QStandardPaths>
 #include <QtCore/QMimeDatabase>
 #include <QtGui/QGuiApplication>
@@ -312,11 +313,59 @@ Application::~Application() {
 	Instance = nullptr;
 }
 
+namespace {
+
+// CUSTOM 2026-09-12: startdagi ~1 daqiqalik qotishni TAXMIN qilmasdan
+// o'lchash uchun. Ikki narsa yoziladi: har bir bosqich qancha turgani va
+// asosiy oqim (UI) qancha muddat umuman javob bermagani. Log faqat sekin
+// bo'lganda yoziladi -- normal ishda shovqin bermaydi.
+//
+// LOG() ishlatiladi, qDebug() EMAS: qDebug log.txt ga tushmaydi, shuning
+// uchun ilgari yozilgan "[CustomMod] Injected ..." satrlari hech qachon
+// ko'rinmagan va tashxis uchun foydasiz bo'lib qolgan.
+void TimedStep(const char *name, Fn<void()> work) {
+	auto timer = QElapsedTimer();
+	timer.start();
+	work();
+	const auto ms = timer.elapsed();
+	if (ms >= 50) {
+		LOG(("CustomMod Perf: %1 took %2 ms").arg(name).arg(ms));
+	}
+}
+
+// Asosiy oqim bloklanish kuzatuvchisi: taymer har kTickMs da otilishi
+// kerak; kechikish = UI o'sha muddat davomida qotgani. Bu qotish qaysi
+// kodda ekanini aytmaydi, lekin uning HAQIQATAN borligini va qancha
+// davom etganini log'ga yozadi (log'dagi jim 90 soniya shu edi).
+void StartMainThreadStallWatch() {
+	static constexpr auto kTickMs = crl::time(250);
+	static constexpr auto kReportMs = crl::time(400);
+	// Ataylab o'chirilmaydi: statik obyekt main() dan KEYIN, Qt allaqachon
+	// yo'q bo'lgan paytda yo'q qilinardi va taymerni bekor qilish o'sha
+	// yerda xavfli. Bitta obyekt -- ilova umri davomida.
+	static auto watch = (base::Timer*)nullptr;
+	static auto since = QElapsedTimer();
+	if (watch) {
+		return;
+	}
+	since.start();
+	watch = new base::Timer([] {
+		const auto late = since.restart() - kTickMs;
+		if (late >= kReportMs) {
+			LOG(("CustomMod Perf: main thread blocked %1 ms").arg(late));
+		}
+	});
+	watch->callEach(kTickMs);
+}
+
+} // namespace
+
 void Application::run() {
-	CustomDB::Init();
-	CustomSettings::Init();
-	CustomUpstream::Init();
-	CustomBranding::Load();
+	StartMainThreadStallWatch();
+	TimedStep("CustomDB::Init", [] { CustomDB::Init(); });
+	TimedStep("CustomSettings::Init", [] { CustomSettings::Init(); });
+	TimedStep("CustomUpstream::Init", [] { CustomUpstream::Init(); });
+	TimedStep("CustomBranding::Load", [] { CustomBranding::Load(); });
 	// Branding icon (agar JSON da iconPath ko'rsatilgan bo'lsa) — startup vaqtida.
 	{
 		const auto &path = CustomBranding::Get().iconPath;
