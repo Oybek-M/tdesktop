@@ -35,20 +35,20 @@ keyin — `customsync-server` ishini davom ettirish.
 - [ ] **Tasdiqlash:** 90-soniyadagi ~420 ms blok yo'qolishi;
       `CustomMod Maintenance: CompactActivityHistory` log'da **bir** marta.
 
-### A2. 3-bosqich — bo'sh siklni SQL'siz o'tkazib yuborish (klient tomoni)
+### A2. 3-bosqich — bo'sh siklni SQL'siz o'tkazib yuborish (klient tomoni) — ✅ KOD TAYYOR (`46daed5fa3`), build kutmoqda
 
 Loyiha: spec §8 "3-bosqich". Server protokoliga TEGILMAYDI (`/sync/head`
 bekor qilindi — bo'sh `pull` allaqachon arzon, narx klientda).
 
-- [ ] **A2.1 `sync_state` xotira keshi** (`custom_sync_outbox.cpp`):
+- [x] **A2.1 `sync_state` xotira keshi** (`custom_sync_outbox.cpp`):
       `GetState` xotiradan, `SetState` bir xil qiymatni yozmaydi, kesh
       faqat muvaffaqiyatli yozuvdan keyin yangilanadi.
-- [ ] **A2.2 Navbat hisoblagichi** (`Outbox::ProbablyEmpty`,
+- [x] **A2.2 Navbat hisoblagichi** (`Outbox::ProbablyEmpty`,
       `ResyncRowCount`): yuqori chegara invarianti — Enqueue oshiradi
       (mutex ostida), o'chirish kamaytirmaydi; `pushPending()` hisoblagich
       0 bo'lsa `Pending()` so'rovini o'tkazib yuboradi, `Pending()` bo'sh
       qaytsa aniq songa qaytaradi.
-- [ ] **A2.3 Bo'sh siklni o'tkazib yuborish** (`custom_sync.cpp/.h`,
+- [x] **A2.3 Bo'sh siklni o'tkazib yuborish** (`custom_sync.cpp/.h`,
       `custom_sync_client.cpp/.h`): taymer `onTimer()` orqali;
       `canSkipIdleCycle()` shartlari — WS ulangan va
       `webSocketConnectionId` oxirgi muvaffaqiyatli pull'dagi bilan bir
@@ -56,12 +56,14 @@ bekor qilindi — bo'sh `pull` allaqachon arzon, narx klientda).
       `_pendingNotify/_hasMore/_consecutiveFailures` yo'q, oxirgi haqiqiy
       sikl < 30 daqiqa. "Sync now" va WS xabarnomasi o'tkazib
       yuborilmaydi.
-- [ ] **A2.4 Kuzatuv logi:** o'tkazib yuborilgan sikllar uchun siyrak
+- [x] **A2.4 Kuzatuv logi:** o'tkazib yuborilgan sikllar uchun siyrak
       `LOG` (birinchisi va har 20-si) — tasdiqlash uchun.
 - [ ] **Tasdiqlash:** WS ulangan holatda bir necha interval davomida
       `CustomMod SQL` jadvallarida `sync_state`/`sync_outbox` so'rovlari
       deyarli yo'q; boshqa qurilmadan o'zgarish yuborilganda u baribir
-      darhol tortiladi (xabarnoma yo'li).
+      darhol tortiladi (xabarnoma yo'li). Log'da
+      `CustomMod Sync: bo'sh sikl o'tkazib yuborildi (jami N, ...)` qatori
+      ko'rinishi kerak (birinchisi va har 20-si).
 
 ### A3. 4-bosqich — sync uchun alohida SQLite ulanishi
 
