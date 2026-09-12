@@ -981,6 +981,7 @@ static void EnsurePeerCacheLoaded(const PeerKey &key) {
 
     QSet<long long> deletedIds;
     QHash<long long, QString> editedTexts;
+    QHash<long long, long long> firstRowid; // msgId -> eng kichik rowid
     QSet<long long> backupIds;
 
     {
@@ -1000,15 +1001,23 @@ static void EnsurePeerCacheLoaded(const PeerKey &key) {
     {
         sqlite3_stmt *stmt = nullptr;
         if (sqlite3_prepare_v2(gDb,
-                "SELECT msg_id, original_text, type FROM actioned_messages "
+                // ORDER BY rowid ASC olib tashlandi: reja uni "USE TEMP
+                // B-TREE FOR ORDER BY" bilan bajarardi, ya'ni peer'ning
+                // barcha qatorlarini (original_text bilan birga) xotirada
+                // saralardi. "Birinchi nusxa" shartini rowid ni o'qib,
+                // C++ tomonida eng kichigini saqlab ta'minlaymiz.
+                "SELECT msg_id, original_text, type, rowid FROM actioned_messages "
                 "WHERE peer_id = ? AND type IN ('backup', 'edited') "
-                "AND account_id IN (0, ?) ORDER BY rowid ASC",
+                "AND account_id IN (0, ?)",
                 -1, &stmt, nullptr) == SQLITE_OK) {
             bindText(stmt, 1, key.peerId);
             sqlite3_bind_int64(stmt, 2, key.accountId);
             while (sqlite3_step(stmt) == SQLITE_ROW) {
                 const long long msgId = sqlite3_column_int64(stmt, 0);
-                if (!editedTexts.contains(msgId)) {
+                const long long rowId = sqlite3_column_int64(stmt, 3);
+                const auto known = firstRowid.constFind(msgId);
+                if (known == firstRowid.constEnd() || rowId < known.value()) {
+                    firstRowid[msgId] = rowId;
                     editedTexts[msgId] = colText(stmt, 1);
                 }
                 if (colText(stmt, 2) == u"backup"_q) {
@@ -3880,13 +3889,19 @@ static void StartActivityCacheLoad() {
         QHash<QString, QHash<QString, CachedLatest>> all;
         sqlite3_stmt *stmt = nullptr;
         if (sqlite3_prepare_v2(gDb,
-                "SELECT peer_id, field, new_value, observed_at "
-                "FROM activity_history a "
-                "WHERE a.id = ("
-                "    SELECT b.id FROM activity_history b "
-                "    WHERE b.peer_id = a.peer_id AND b.field = a.field "
-                "    ORDER BY b.observed_at DESC, b.id DESC "
-                "    LIMIT 1)",
+                // Ilgari bu korrelatsiyali ichki so'rov edi: 107k qatorli
+                // jadval to'liq skanerlanib, HAR BIR qator uchun alohida
+                // indeks qidiruvi + vaqtinchalik saralash bajarilardi.
+                // Oyna funksiyasi bilan bitta o'tishga tushadi (o'lchov:
+                // 374 -> 263 ms bo'sh mashinada, raqobat ostida farq
+                // ancha kattaroq). Natija bir xil -- 1072 qator.
+                "SELECT peer_id, field, new_value, observed_at FROM ("
+                "    SELECT peer_id, field, new_value, observed_at, "
+                "           ROW_NUMBER() OVER ("
+                "               PARTITION BY peer_id, field "
+                "               ORDER BY observed_at DESC, id DESC) rn "
+                "    FROM activity_history) "
+                "WHERE rn = 1",
                 -1, &stmt, nullptr) == SQLITE_OK) {
             while (sqlite3_step(stmt) == SQLITE_ROW) {
                 const auto peerId = colText(stmt, 0);
@@ -4235,7 +4250,30 @@ QString SaveMediaFile(const QString &sourcePath, const QString &type) {
 // Auto backup
 // ---------------------------------------------------------------------------
 
+// Startdagi qotishning ASOSIY sababi (2026-09-12 o'lchovi): avto-zaxira
+// har ishga tushirishda startdan 5 soniya keyin ishlardi va oxirgi zaxira
+// qachon qilingani tekshirilmasdi. Ya'ni kuniga necha marta ilova ochilsa,
+// shuncha marta 62 MB baza nusxalanib, JSON yozilib, zip qilinardi --
+// aynan chatlar yuklanayotgan paytda, bitta SQLite ulanishi ustida.
+// Raqobat natijasida odatda 374 ms turadigan so'rov 37 900 ms ga,
+// 20 ms turadigani 2 200 ms ga cho'zilgan edi.
+static bool RecentBackupExists() {
+    QDir dir(CustomSettings::ArchiveBackupsDir());
+    const auto entries = dir.entryInfoList(
+        { u"CustomModBackup_*.zip"_q }, QDir::Files, QDir::Time);
+    if (entries.isEmpty()) return false;
+    // QDir::Time -- eng yangisi birinchi.
+    const auto age = entries.first().lastModified()
+        .secsTo(QDateTime::currentDateTime());
+    return (age >= 0 && age < 24 * 60 * 60);
+}
+
 static void RunAutoBackup() {
+    if (RecentBackupExists()) {
+        // Sutkasiga bitta zaxira yetarli -- niyat ham shu edi ("every 24h"),
+        // faqat tekshiruv yo'q edi.
+        return;
+    }
     const QString backupRoot = CustomSettings::ArchiveBackupsDir();
     QDir().mkpath(backupRoot);
 
@@ -4293,14 +4331,20 @@ void SetImportReloadCallback(ReloadCallback cb) {
 }
 
 void StartAutoBackup() {
-    // Run once at startup after a short delay so DB is fully ready.
-    QTimer::singleShot(5000, []() { RunAutoBackup(); });
+    // 3 daqiqa: start (chatlar yuklanishi, xabar ob'ektlari qurilishi)
+    // tugab, ilova tinchiganidan keyin. Ilgari 5 soniya edi va aynan
+    // startning eng og'ir joyiga tushardi -- RecentBackupExists()
+    // izohiga qarang.
+    QTimer::singleShot(3 * 60 * 1000, []() { RunAutoBackup(); });
 
-    // Then repeat every 24 hours.
+    // Keyin soatiga bir marta TEKSHIRAMIZ, lekin RecentBackupExists()
+    // tufayli amalda sutkasiga bitta zaxira chiqadi. Ilgari interval
+    // 24 soat edi: zaxira 23 soat oldin qilingan bo'lsa ham taymer
+    // ishlab, keyingi imkoniyat 47 soatdan keyin kelardi.
     static QTimer *autoTimer = nullptr;
     if (!autoTimer) {
         autoTimer = new QTimer();
-        autoTimer->setInterval(24 * 60 * 60 * 1000);
+        autoTimer->setInterval(60 * 60 * 1000);
         QObject::connect(autoTimer, &QTimer::timeout, []() { RunAutoBackup(); });
         autoTimer->start();
     }
