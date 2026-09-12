@@ -3352,6 +3352,11 @@ bool HistoryItem::hasNoForwardsFlag() const {
 }
 
 void HistoryItem::restoreFromCustomDB() {
+	// T43/diag: bu funksiya HAR BIR xabar qurilishida chaqiriladi, ya'ni
+	// chaqiriqlar soni startda nechta HistoryItem yaratilganini ham
+	// ko'rsatadi -- upstream merge'idan keyin qotish kuchayganini shu
+	// raqam tasdiqlaydi yoki rad etadi.
+	CustomDB::PerfScope perf("item:restoreFromCustomDB");
 	const auto key = CustomDB::Key(this);
 	const auto peerId = key.peerId;
 	const long long msgId = id.bare;

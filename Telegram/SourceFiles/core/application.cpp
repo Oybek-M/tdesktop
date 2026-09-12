@@ -353,6 +353,9 @@ void StartMainThreadStallWatch() {
 		const auto late = since.restart() - kTickMs;
 		if (late >= kReportMs) {
 			LOG(("CustomMod Perf: main thread blocked %1 ms").arg(late));
+			// T43/diag: qotish tugadi -- shu davrda qaysi SQL so'rovlar
+			// qancha vaqt yegani darrov log'ga tushsin.
+			CustomDB::DumpSqlProfile(u"blok %1 ms"_q.arg(late));
 		}
 	});
 	watch->callEach(kTickMs);

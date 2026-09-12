@@ -5,6 +5,7 @@
 #include <QtCore/QJsonArray>
 #include <QtCore/QVector>
 #include <QtCore/QHashFunctions>
+#include <QtCore/QElapsedTimer>
 #include <functional>
 
 class HistoryItem;
@@ -18,6 +19,32 @@ constexpr int kActivityRetentionDays = 30;
 // FAQAT sync outbox uchun. Boshqa modul bu tutqichni olmasin --
 // baza ulanishining egasi custom_db.cpp bo'lib qoladi.
 [[nodiscard]] sqlite3 *RawHandle();
+
+// T43/diag: oxirgi chaqiruvdan beri bajarilgan SQL so'rovlari va o'lchangan
+// kod nuqtalarining narxini log'ga chiqaradi. Startdagi qotish BITTA sabab
+// emas, ketma-ket bir nechta sabab yig'indisi bo'lishi mumkin -- shuning
+// uchun bitta gipotezani emas, barcha nuqtalarni birdan o'lchaymiz.
+void DumpSqlProfile(const QString &reason);
+
+// Bitta o'lchov nuqtasining narxini qo'shadi (nomlar bo'yicha yig'iladi).
+void PerfNote(const char *name, qint64 ns);
+
+// RAII: blok tugaganda o'z narxini registrga yozadi. Nom STATIK matn
+// bo'lishi shart (literal) -- registr uni nusxalamaydi.
+struct PerfScope {
+	explicit PerfScope(const char *name) : _name(name) {
+		_timer.start();
+	}
+	~PerfScope() {
+		PerfNote(_name, _timer.nsecsElapsed());
+	}
+	PerfScope(const PerfScope &) = delete;
+	PerfScope &operator=(const PerfScope &) = delete;
+
+private:
+	const char *_name = nullptr;
+	QElapsedTimer _timer;
+};
 
 // Akkaunt + peer juftligi. Nima uchun alohida tur: 12 ta akkaunt
 // bitta bazaga yozadi, fon akkauntlari ham. Bitta QString peerId

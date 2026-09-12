@@ -28,6 +28,7 @@
 #include "history/history.h"
 #include "data/data_peer.h"
 #include "crl/crl.h"
+#include "base/debug_log.h"
 
 namespace CustomDB {
 
@@ -47,6 +48,17 @@ sqlite3 *RawHandle() {
 // startup — with 200k+ rows a full-table load blocked the UI for seconds.
 // gCacheMutex guards both caches against concurrent reads/writes from
 // background threads (e.g. MTProto callbacks vs. UI thread).
+// T43/diag: SQL profayler hisoblagichlari. gCacheMutex dan ALOHIDA qulf --
+// profayler kesh qulfi ushlab turilgan paytda ham chaqirilishi mumkin.
+struct ProfileEntry {
+    qint64 calls = 0;
+    qint64 totalNs = 0;
+};
+static QMutex gProfMutex;
+static QHash<QString, ProfileEntry> gProfile;
+// Kod nuqtalari (PerfScope) uchun alohida registr: nom -> chaqiriq + vaqt.
+static QHash<QString, ProfileEntry> gScopes;
+
 static QMutex gCacheMutex;
 static QHash<PeerKey, QSet<long long>> gDeletedCache;
 static QHash<PeerKey, QHash<long long, QString>> gEditedCache;
@@ -297,6 +309,27 @@ void Init() {
     }
 
     gInitialized = true;
+
+    // T43/diag: SQL profayler. Har bir bajarilgan so'rovning sarflagan vaqti
+    // so'rov matni bo'yicha yig'iladi; qotish tugashi bilan (stall watchdog)
+    // eng qimmat so'rovlar log'ga chiqadi. Taxmin qilmaslik uchun kerak --
+    // kesh tuzatishlari qotishni olib tashlamagach, aybdorni SHU ko'rsatadi.
+    sqlite3_trace_v2(gDb, SQLITE_TRACE_PROFILE, [](
+            unsigned type,
+            void *ctx,
+            void *stmt,
+            void *elapsed) -> int {
+        Q_UNUSED(ctx);
+        if (type != SQLITE_TRACE_PROFILE || !stmt || !elapsed) return 0;
+        const auto ns = *static_cast<sqlite3_int64*>(elapsed);
+        const char *sql = sqlite3_sql(static_cast<sqlite3_stmt*>(stmt));
+        if (!sql) return 0;
+        QMutexLocker locker(&gProfMutex);
+        auto &entry = gProfile[QString::fromUtf8(sql)];
+        entry.calls += 1;
+        entry.totalNs += ns;
+        return 0;
+    }, nullptr);
 
     // Performance pragmas:
     // WAL mode: readers don't block writers and vice versa.
@@ -808,6 +841,82 @@ void RunMigrations() {
 // Cache loading
 // ---------------------------------------------------------------------------
 
+// T43/diag: oxirgi dump'dan beri to'plangan SQL narxini log'ga chiqaradi va
+// hisoblagichlarni nollaydi, shunda har bir qotish o'z narxini ko'rsatadi.
+void PerfNote(const char *name, qint64 ns) {
+    if (!name) return;
+    QMutexLocker locker(&gProfMutex);
+    auto &entry = gScopes[QString::fromLatin1(name)];
+    entry.calls += 1;
+    entry.totalNs += ns;
+}
+
+// Registrni "nom -> narx" jadvali sifatida log'ga chiqaradi (kamayish
+// tartibida) va nollaydi.
+static void DumpRegistry(
+        QHash<QString, ProfileEntry> snapshot,
+        const QString &title,
+        const QString &reason,
+        int limit,
+        bool trimText) {
+    if (snapshot.isEmpty()) return;
+
+    QVector<QPair<QString, ProfileEntry>> rows;
+    rows.reserve(snapshot.size());
+    qint64 grandTotalNs = 0;
+    qint64 grandCalls = 0;
+    for (auto it = snapshot.constBegin(); it != snapshot.constEnd(); ++it) {
+        rows.push_back({ it.key(), it.value() });
+        grandTotalNs += it.value().totalNs;
+        grandCalls += it.value().calls;
+    }
+    std::sort(rows.begin(), rows.end(), [](const auto &a, const auto &b) {
+        return a.second.totalNs > b.second.totalNs;
+    });
+
+    LOG(("CustomMod %1 [%2]: jami %3 ms, %4 chaqiriq, %5 xil")
+        .arg(title)
+        .arg(reason)
+        .arg(grandTotalNs / 1000000)
+        .arg(grandCalls)
+        .arg(rows.size()));
+    const auto shown = std::min(int(rows.size()), limit);
+    for (auto i = 0; i != shown; ++i) {
+        auto name = rows[i].first;
+        if (trimText) {
+            name.replace(QChar(QChar::LineFeed), QChar(QChar::Space));
+            if (name.size() > 160) {
+                name = name.left(160) + u"..."_q;
+            }
+        }
+        LOG(("CustomMod %1   %2 ms / %3 chaqiriq : %4")
+            .arg(title)
+            .arg(rows[i].second.totalNs / 1000000)
+            .arg(rows[i].second.calls)
+            .arg(name));
+    }
+}
+
+void DumpSqlProfile(const QString &reason) {
+    QHash<QString, ProfileEntry> scopes;
+    {
+        QMutexLocker locker(&gProfMutex);
+        scopes = gScopes;
+        gScopes.clear();
+    }
+    DumpRegistry(std::move(scopes), u"Scope"_q, reason, 20, false);
+
+    QHash<QString, ProfileEntry> snapshot;
+    {
+        QMutexLocker locker(&gProfMutex);
+        if (gProfile.isEmpty()) return;
+        snapshot = gProfile;
+        gProfile.clear();
+    }
+
+    DumpRegistry(std::move(snapshot), u"SQL"_q, reason, 12, true);
+}
+
 void LoadRestoreCache() {
     Init();
     QMutexLocker locker(&gCacheMutex);
@@ -862,6 +971,7 @@ static void EnsurePeersWithDeletedLoaded() {
 // already loaded. Called lazily from the read/write sites below instead of
 // eagerly for the whole archive at startup (see LoadRestoreCache()).
 static void EnsurePeerCacheLoaded(const PeerKey &key) {
+    PerfScope perf("db:EnsurePeerCacheLoaded");
     {
         QMutexLocker locker(&gCacheMutex);
         if (gLoadedPeers.contains(key)) return;
@@ -926,6 +1036,7 @@ static void EnsurePeerCacheLoaded(const PeerKey &key) {
 // ---------------------------------------------------------------------------
 
 bool IsDeletedLocally(const PeerKey &key, long long msgId) {
+    PerfScope perf("db:IsDeletedLocally");
     EnsurePeerCacheLoaded(key);
     QMutexLocker locker(&gCacheMutex);
     const auto it = gDeletedCache.constFind(key);
@@ -933,6 +1044,7 @@ bool IsDeletedLocally(const PeerKey &key, long long msgId) {
 }
 
 QString GetOriginalTextBeforeEdit(const PeerKey &key, long long msgId) {
+    PerfScope perf("db:GetOriginalTextBeforeEdit");
     EnsurePeerCacheLoaded(key);
     QMutexLocker locker(&gCacheMutex);
     const auto it = gEditedCache.constFind(key);
@@ -1017,6 +1129,7 @@ void SaveGhostRead(const PeerKey &key, long long msgId) {
 }
 
 long long GetGhostRead(const PeerKey &key) {
+    PerfScope perf("db:GetGhostRead");
     EnsureGhostReadsLoaded();
     QMutexLocker locker(&gCacheMutex);
     // Eski SQL "account_id IN (0, ?)" edi va qaysi qator birinchi kelishi
@@ -1393,6 +1506,7 @@ QString GetMessageHistory(long long msgId, const PeerKey &key) {
 }
 
 QVector<QString> GetEditHistory(const PeerKey &key, long long msgId) {
+    PerfScope perf("db:GetEditHistory");
     Init();
     QVector<QString> result;
     if (!gDb) return result;
