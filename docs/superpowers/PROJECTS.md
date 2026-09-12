@@ -4,7 +4,59 @@ Bu fayl qaysi ish **hozir faol**, qaysi biri **to'xtatib qo'yilgan** va
 qaysi biri **hali muhokama bosqichida** ekanini ko'rsatadi. Yangi
 sessiya boshlanganda birinchi shu yerga qarang.
 
-Oxirgi yangilanish: 2026-09-11 (19:05)
+Oxirgi yangilanish: 2026-09-12 (18:50)
+
+---
+
+# ✅ 2026-09-12 — Startdagi qotish HAL QILINDI (~69 s -> ~1.9 s)
+
+To'liq hujjat: [`specs/2026-09-12-startup-freeze-diagnosis.md`](specs/2026-09-12-startup-freeze-diagnosis.md)
+
+**Asosiy sabab:** avto-zaxira HAR ishga tushirishda, startdan 5 soniya
+keyin ishlardi va oxirgi zaxira qachon qilingani tekshirilmasdi (niyat
+"24 soatda bir" bo'lsa ham). 62 MB baza nusxasi + JSON + zip aynan
+chatlar yuklanayotgan paytda, bitta `FULLMUTEX` SQLite ulanishi ustida.
+
+**Eng muhim raqam:** bo'sh mashinada 374 ms turadigan so'rov ilovada
+**37 927 ms** bo'lgan (≈100×). So'rovlar sekin emas edi — ular navbatda
+turgan edi. Uch marta "sekin so'rovni optimallashtirish" gipotezasi shu
+sababdan ishlamadi.
+
+**Qanday topildi:** taxmin o'rniga o'lchov asbobi (`27d61ee760`) —
+`sqlite3_trace_v2` SQL profayleri + `CustomDB::PerfScope` nuqta registri,
+stall watchdog blokni sezgach ikkalasini log'ga chiqaradi va nollaydi.
+User'ning "balki bir nechta muammo ketma-ket" farazi shu dizaynga sabab
+bo'ldi va to'g'ri chiqdi.
+
+| Commit | Nima |
+|---|---|
+| `7c8479b441` | `gEditBackupIds` + `gGhostReadCache` keshlari (haqiqiy yaxshilanish, lekin asosiy sabab emas) |
+| `27d61ee760` | O'lchov asbobi (profayler + registr) |
+| `f8e26268f5` | **Asosiy:** `RecentBackupExists()` 24 soat; zaxira start+5s -> start+3 daqiqa; taymer 24s -> 1s; TEMP B-TREE sort olib tashlandi; faollik so'rovi `ROW_NUMBER()` ga |
+| `d689e15b8d` | `ReconcileMediaIndex` / `CompactActivityHistoryAsync` / MediaQuota skaneri -> start+90 s |
+| `009d3c7a21` | Sync birinchi arm'i >=90 s; `wal_checkpoint` `TRUNCATE` -> `PASSIVE` (TRUNCATE soatiga bir) |
+| `f143015a1d` | WS xabarnomasi start oynasida `syncNow()` ni chetlab o'tmaydi; WS ulangan bo'lsa interval x10 (<=600 s) |
+
+**Startda ishlaydigan 7 qism tekshirildi:** 6 tasi tuzatildi, 7-chisi
+(`BackfillMediaSha256Async`) startda umuman chaqirilmasligi aniqlandi.
+Ataylab kechiktirilmadi: `RestoreDeletedChats` (ko'rinadigan ish, 376 ms),
+`PruneStaleActivityHistory`, kvota ogohlantirishi, qo'lda "Sync now".
+
+**"Nega upstream'dan keyin" javobi:** merge'ning o'zi emas. Bizning
+startdagi ishlar 24-avgustgacha qo'shilgan, ma'lumot sentyabrda
+sakramagan, upstream'ning start kodidagi diffi esa logout xavfsizligi
+tuzatishlari. Qolgan tushuntirish — merge bilan BIR KUNLARDA tushgan
+sync kengayishi (`148cc7b719`, 08-sen, WebSocket xabarnomalari): startda
+soket ulanib, server xabarnomasi darhol sikl boshlar edi.
+
+**🔴 Ochiq (2-4-bosqichlar, spec §8):** bo'laklar orasida nafas olish +
+texnik xizmat uchun yagona navbat + vaqt byudjeti (server kerak emas);
+arzon `GET /sync/head` seq tekshiruvi (server tomoni ham kerak); sync
+uchun alohida DB ulanishi + `busy_timeout`/retry.
+
+**🟡 Tozalash:** o'lchov kodi (profayler + `PerfScope`) hali kodda va har
+chaqiriqda mutex qulfi oladi — bir-ikki start tasdiqlangach olib tashlash
+kerak (spec §9 da fayllar ro'yxati).
 
 ---
 
@@ -14,8 +66,8 @@ To'liq hujjat: [`specs/2026-09-11-account-misattribution-incident.md`](specs/202
 
 **Holat: qisman stabil.** Ma'lumot tiklandi, ildiz sabablar kodda
 yopildi, build 19:04 da o'tdi va **3 ta chat sinovda tiklandi**
-(7053823996, 7815103103, 7779845655). 🔴 Ochiq: har startda ~1 daqiqa
-qotish (oxirida oq blur), keyin ishlaydi.
+(7053823996, 7815103103, 7779845655). ~~🔴 Ochiq: har startda ~1 daqiqa
+qotish~~ ✅ **2026-09-12 da hal qilindi** — yuqoridagi bo'limga qarang.
 
 | Nima | Natija |
 |---|---|
@@ -29,8 +81,8 @@ qotish (oxirida oq blur), keyin ishlaydi.
 **Keyingi tartib (user bilan kelishilgan):** 1) ~~build + 3 chatni
 tekshirish~~ ✅ -> 2) 824 legacy `account_id=0` o'chirilgan xabar (154 peer,
 har akkauntda ko'rinadi) -> 3) S1: media/stories foni
-(`use-qt-rhi=false`, ilova yopiq holda) -> 4) tezlik qayta scan
-(birinchi nishon — startdagi ~1 daqiqalik qotish).
+(`use-qt-rhi=false`, ilova yopiq holda) -> ~~4) tezlik qayta scan
+(birinchi nishon — startdagi ~1 daqiqalik qotish)~~ ✅ 2026-09-12.
 Qo'shimcha ochiq: `readInboxTill` injected elementlarda o'qish belgisini
 qo'ymaydi (log'da 64 xato).
 

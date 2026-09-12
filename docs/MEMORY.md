@@ -1,6 +1,6 @@
 # CustomMod — Session Memory (Agent uchun)
 
-**Oxirgi yangilanish:** 2026-06-15 (T41 — timestamp overlap fix, `Flag::DeletedMarkerApplied`)  
+**Oxirgi yangilanish:** 2026-09-12 (T43 — startdagi qotish: avto-zaxira start ustiga tushardi)  
 **Loyiha:** Telegram Desktop custom mod
 
 ---
@@ -397,6 +397,7 @@ void PaintPeerAvatar(QPainter &p, const QRect &rect,
 | T40 | `RecordBackgroundEdit` re-cache da sender/media o'chirardi (T36 regressi) | `GetCachedTextAndDate` bilan o'qib, `CacheMessageText` ga qaytadan uzatish |
 | T41 | O'chirilgan xabarda vaqt (timestamp) matn ustiga tushardi (overlap) | `validateText` guard'idagi `!isDeletedLocally()` har safar `setTextWithLinks` ni qayta chaqirib **skip block** ni o'chirardi. Yangi `Flag::DeletedMarkerApplied` bayrog'i: marker bir marta qo'llanib, keyin `validateText` no-op bo'ladi → skip block saqlanadi |
 | T42 | (2026-09-11) Saqlangan xabarlar boshqa akkauntlarga yozilib ketardi | Placeholder `_nonChannelMessages` dan chiqarildi, qayta o'chirish yozilmaydi, `MarkDeleted` marker'ni tozalaydi, `TryRecordBackgroundDelete` akkaunt bo'yicha, `addOlderSlice` bo'sh slice'da inject. Commit `14f5d0c0a8`; `superpowers/specs/2026-09-11-account-misattribution-incident.md` |
+| T43 | (2026-09-12) Startda ~30-37 soniyalik qotish, oyna "not responding" | Sabab so'rovlarda emas, RAQOBATDA: avto-zaxira HAR startda +5 s da ishlab, 62 MB bazani nusxalardi (`RecentBackupExists()` yo'q edi). Bo'sh mashinada 374 ms lik so'rov ilovada 37 927 ms bo'lgan. Zaxira start+3 daq va 24 soatda bir; `ReconcileMediaIndex`/`CompactActivityHistory`/MediaQuota skaneri start+90 s; sync birinchi sikli +90 s; `wal_checkpoint` PASSIVE. Natija ~69 s -> ~1.9 s. Topilishi: `sqlite3_trace_v2` profayler + `CustomDB::PerfScope`. Commitlar `7c8479b441`..`f143015a1d`; `superpowers/specs/2026-09-12-startup-freeze-diagnosis.md` |
 
 ---
 
