@@ -2534,7 +2534,19 @@ void Checkpoint() {
     // keyingi tranzaksiyalar yo'qolishi mumkin — muntazam chaqirish shu
     // oynani daqiqalargacha qisqartiradi, yozuv tezligini esa saqlaydi
     // (synchronous=FULL ga o'tish hamma yozuvni sekinlashtirardi).
-    execSql("PRAGMA wal_checkpoint(TRUNCATE)");
+    //
+    // 2026-09-12: rejim TRUNCATE dan PASSIVE ga o'zgartirildi. TRUNCATE
+    // BARCHA o'quvchilar tugaguncha kutadi va shu davomida bazani ushlab
+    // turadi -- ya'ni fon ishi bilan ustma-ust tushsa, o'zi qotish manbai
+    // bo'la olardi. PASSIVE hech qachon kutmaydi: imkoni boricha ko'chiradi,
+    // qolganini keyingi safarga qoldiradi -- durabilik maqsadi saqlanadi.
+    // WAL fayl hajmini qisqartirish uchun TRUNCATE soatiga bir marta
+    // qilinadi (12 ta 5 daqiqalik tick).
+    static auto sTick = 0;
+    const auto truncate = ((++sTick % 12) == 0);
+    execSql(truncate
+        ? "PRAGMA wal_checkpoint(TRUNCATE)"
+        : "PRAGMA wal_checkpoint(PASSIVE)");
 }
 
 void ExecRaw(const char *sql) {

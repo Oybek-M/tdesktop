@@ -55,6 +55,10 @@ namespace {
 
 static Orchestrator *gOrchestrator = nullptr;
 
+// Start tinchligi: main_session.cpp dagi kStartupQuietMs bilan bir xil
+// maqsad -- og'ir start tugagach ishlasin.
+constexpr auto kStartupQuietSeconds = 90;
+
 } // namespace
 
 Orchestrator::Orchestrator(QObject *parent)
@@ -93,7 +97,24 @@ void Orchestrator::start() {
     state.pendingNotify = _pendingNotify;
     state.catchUpCycles = 0;
     state.intervalSeconds = CustomSettings::SyncIntervalSeconds();
-    arm(NextAction(state));
+
+    // 2026-09-12: ilova ishga tushgandan keyingi BIRINCHI sikl kamida 90
+    // soniya kechiktiriladi. Standart interval 30 soniya, ya'ni ilgari
+    // birinchi sinxronizatsiya aynan startning og'ir qismiga tushardi
+    // (outbox o'qish + tarmoq + DB yozuv) va bitta SQLite ulanishi uchun
+    // chat yuklash bilan raqobatlashardi. Sinxronizatsiya baribir davriy --
+    // bir daqiqalik kechikish xatti-harakatni o'zgartirmaydi. Bayroq faqat
+    // birinchi marta ishlaydi: "o'chirish -> yoqish" yo'li darhol armlansin.
+    static auto sFirstArmAfterLaunch = true;
+    auto decision = NextAction(state);
+    if (sFirstArmAfterLaunch) {
+        sFirstArmAfterLaunch = false;
+        decision.runNow = false;
+        decision.delaySeconds = std::max(
+            decision.delaySeconds,
+            kStartupQuietSeconds);
+    }
+    arm(decision);
 }
 
 void Orchestrator::stop() {
