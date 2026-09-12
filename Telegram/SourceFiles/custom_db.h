@@ -29,6 +29,23 @@ void DumpSqlProfile(const QString &reason);
 // Bitta o'lchov nuqtasining narxini qo'shadi (nomlar bo'yicha yig'iladi).
 void PerfNote(const char *name, qint64 ns);
 
+// Fon texnik xizmat ishlari uchun YAGONA ketma-ket navbat.
+//
+// Nima uchun: 2026-09-12 gacha compaction, media skaneri va avto-zaxira
+// bir-biridan mustaqil `crl::async` bilan ishga tushardi. Ular endi
+// startni bloklamaydi (hammasi start+90 s dan keyin), lekin BIR-BIRINI
+// bloklashi mumkin edi: hammasi bitta FULLMUTEX SQLite ulanishi va bitta
+// diskka tegadi. Navbat orqali bir vaqtda faqat BITTA og'ir ish ketadi.
+//
+// |name| STATIK matn bo'lishi shart (log uchun saqlanadi). |work| fon
+// oqimida bajariladi -- UI ga tegadigan ish `crl::on_main` orqali
+// qaytarilsin.
+namespace Maintenance {
+
+void Enqueue(const char *name, std::function<void()> work);
+
+} // namespace Maintenance
+
 // RAII: blok tugaganda o'z narxini registrga yozadi. Nom STATIK matn
 // bo'lishi shart (literal) -- registr uni nusxalamaydi.
 struct PerfScope {

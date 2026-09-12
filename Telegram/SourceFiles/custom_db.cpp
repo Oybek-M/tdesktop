@@ -20,6 +20,7 @@
 #include <QtCore/QProcess>
 #include <QtCore/QMutex>
 #include <QtCore/QDateTime>
+#include <QtCore/QElapsedTimer>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonArray>
@@ -29,6 +30,7 @@
 #include "data/data_peer.h"
 #include "crl/crl.h"
 #include "base/debug_log.h"
+#include <deque>
 
 namespace CustomDB {
 
@@ -916,6 +918,60 @@ void DumpSqlProfile(const QString &reason) {
 
     DumpRegistry(std::move(snapshot), u"SQL"_q, reason, 12, true);
 }
+
+namespace Maintenance {
+namespace {
+
+struct Task {
+    const char *name = nullptr;
+    std::function<void()> work;
+};
+
+QMutex gQueueMutex;
+std::deque<Task> gQueue;
+bool gRunning = false; // navbat zanjiri faolmi
+
+void StartNext() {
+    Task task;
+    {
+        QMutexLocker locker(&gQueueMutex);
+        if (gQueue.empty()) {
+            gRunning = false;
+            return;
+        }
+        task = std::move(gQueue.front());
+        gQueue.pop_front();
+    }
+    crl::async([task = std::move(task)]() mutable {
+        QElapsedTimer timer;
+        timer.start();
+        if (task.work) {
+            task.work();
+        }
+        LOG(("CustomMod Maintenance: %1 took %2 ms")
+            .arg(task.name)
+            .arg(timer.elapsed()));
+        // Zanjirni davom ettiramiz: keyingi ish faqat SHU ish tugagach
+        // boshlanadi -- navbatning butun ma'nosi shu.
+        StartNext();
+    });
+}
+
+} // namespace
+
+void Enqueue(const char *name, std::function<void()> work) {
+    {
+        QMutexLocker locker(&gQueueMutex);
+        gQueue.push_back(Task{ name, std::move(work) });
+        if (gRunning) {
+            return; // ishlab turgan zanjir uni o'zi oladi
+        }
+        gRunning = true;
+    }
+    StartNext();
+}
+
+} // namespace Maintenance
 
 void LoadRestoreCache() {
     Init();
@@ -3891,7 +3947,7 @@ static void StartActivityCacheLoad() {
         if (gActivityCacheLoadedAll || gActivityCacheLoading) return;
         gActivityCacheLoading = true;
     }
-    crl::async([] {
+    Maintenance::Enqueue("ActivityCacheLoad", [] {
         Init();
         if (!gDb) {
             QMutexLocker locker(&gCacheMutex);
@@ -4041,7 +4097,7 @@ int CompactActivityHistory() {
 }
 
 void CompactActivityHistoryAsync() {
-    crl::async([] {
+    Maintenance::Enqueue("CompactActivityHistory", [] {
         CompactActivityHistory();
         // Siqishdan keyin kesh eskirdi — qayta yuklansin.
         {
@@ -4303,10 +4359,8 @@ static void RunAutoBackup() {
     // Ya'ni "qanday media bor edi" ma'lumoti saqlanadi, fayllarning
     // o'zi esa asl joyida — ular allaqachon doimiy arxivda turibdi,
     // takror nusxa saqlashning ma'nosi yo'q.
-    ExportFullBackupAsync(
-        backupRoot,
-        ExportOptions(),
-        [backupRoot](const ExportResult &result) {
+    Maintenance::Enqueue("AutoBackup", [backupRoot] {
+        const auto result = ExportFullBackup(backupRoot, ExportOptions());
         if (result.mainZipPath.isEmpty()) {
             qDebug() << "AutoBackup: export failed";
             return;

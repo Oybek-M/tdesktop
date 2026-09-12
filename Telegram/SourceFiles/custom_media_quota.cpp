@@ -62,7 +62,9 @@ void Init() {
     //    faqat indeksdan oldingi (v7 gacha) fayllarni qo'shadi.
     const auto mediaDir = CustomSettings::ArchiveMediasDir();
     base::call_delayed(kStartupScanDelayMs, [mediaDir] {
-        crl::async([mediaDir] {
+        // Navbat orqali: skaner compaction yoki avto-zaxira bilan bir
+        // vaqtda ishlamasin (hammasi bitta diskka tegadi).
+        CustomDB::Maintenance::Enqueue("MediaQuotaScan", [mediaDir] {
             if (!QDir(mediaDir).exists()) {
                 return;
             }
