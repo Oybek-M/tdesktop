@@ -239,17 +239,29 @@ Session::Session(
 		// RestoreDeletedChats kechiktirilMAYDI -- u foydalanuvchiga
 		// ko'rinadigan ish (saqlangan chatlarni ro'yxatga qaytarish).
 		base::call_delayed(kStartupQuietMs, this, [] {
+			// 2026-09-13: bu ishlar GLOBAL -- media_index ham,
+			// activity_history ham akkaunt bo'yicha ajratilmagan. Ilgari har
+			// Session (ya'ni har akkaunt) ularni qaytadan bajarardi: 2
+			// akkauntda compaction 427 + 238 ms, ikkinchisi butunlay ortiqcha.
+			// Endi jarayon davomida BIR marta. Birinchi Session 90 soniya
+			// ichida yopilsa (logout), bayroq qo'yilmaydi va ishni keyingisi
+			// bajaradi.
+			static auto sGlobalMaintenanceDone = false;
+			if (sGlobalMaintenanceDone) {
+				return;
+			}
+			sGlobalMaintenanceDone = true;
+
 			// Indeksni fayl tizimi bilan moslashtirish: import'dan keyin
 			// yo'q fayllar 'missing' ga, tugagan yuklashlar 'present' ga.
-			auto timer = QElapsedTimer();
-			timer.start();
-			CustomDB::ReconcileMediaIndex(CustomSettings::ArchiveRoot());
-			const auto ms = timer.elapsed();
-			if (ms >= 50) {
-				LOG(("CustomMod Perf: ReconcileMediaIndex (kechiktirilgan) "
-					"took %1 ms").arg(ms));
-			}
-			// Faollik tarixini ma'nosiz qatorlardan tozalash (fon oqimida).
+			// Navbat orqali fon oqimida: asosiy oqimda 90-soniyada ~420 ms
+			// blok berardi. Import yo'llari (ImportFullBackup,
+			// ImportMediaArchive) uni allaqachon fon oqimida chaqiradi --
+			// oqim xavfsizligi amalda tasdiqlangan.
+			CustomDB::Maintenance::Enqueue("ReconcileMediaIndex", [] {
+				CustomDB::ReconcileMediaIndex(CustomSettings::ArchiveRoot());
+			});
+			// Faollik tarixini siqish -- navbatda Reconcile'dan KEYIN.
 			// Tugagach keshni O'ZI qayta yuklaydi.
 			CustomDB::CompactActivityHistoryAsync();
 		});
