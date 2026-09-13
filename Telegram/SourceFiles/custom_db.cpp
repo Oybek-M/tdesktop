@@ -919,6 +919,12 @@ void DumpSqlProfile(const QString &reason) {
     DumpRegistry(std::move(snapshot), u"SQL"_q, reason, 12, true);
 }
 
+void ResetSqlProfile() {
+    QMutexLocker locker(&gProfMutex);
+    gScopes.clear();
+    gProfile.clear();
+}
+
 namespace Maintenance {
 namespace {
 

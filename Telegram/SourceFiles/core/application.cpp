@@ -340,6 +340,13 @@ void TimedStep(const char *name, Fn<void()> work) {
 void StartMainThreadStallWatch() {
 	static constexpr auto kTickMs = crl::time(250);
 	static constexpr auto kReportMs = crl::time(400);
+	// Noutbuk uxlasa taymer ham to'xtaydi, uyg'onganda esa butun uyqu
+	// davri "blok" bo'lib ko'rinardi (09-13 log: 57 455 410 ms = ~16
+	// soat). Eng uzun haqiqiy qotish ~38 s edi, shuning uchun 5 daqiqadan
+	// uzun kechikish alohida belgilanadi va SQL jadvali chiqarilmaydi --
+	// u uyqudan oldingi soatlardagi oddiy ishni "blok aybdori" qilib
+	// ko'rsatardi.
+	static constexpr auto kSuspendGapMs = crl::time(5 * 60 * 1000);
 	// Ataylab o'chirilmaydi: statik obyekt main() dan KEYIN, Qt allaqachon
 	// yo'q bo'lgan paytda yo'q qilinardi va taymerni bekor qilish o'sha
 	// yerda xavfli. Bitta obyekt -- ilova umri davomida.
@@ -351,7 +358,12 @@ void StartMainThreadStallWatch() {
 	since.start();
 	watch = new base::Timer([] {
 		const auto late = since.restart() - kTickMs;
-		if (late >= kReportMs) {
+		if (late >= kSuspendGapMs) {
+			LOG(("CustomMod Perf: taymer %1 ms kechikdi "
+				"(tizim uyqusi bo'lishi mumkin, qotish deb hisoblanmadi)"
+				).arg(late));
+			CustomDB::ResetSqlProfile();
+		} else if (late >= kReportMs) {
 			LOG(("CustomMod Perf: main thread blocked %1 ms").arg(late));
 			// T43/diag: qotish tugadi -- shu davrda qaysi SQL so'rovlar
 			// qancha vaqt yegani darrov log'ga tushsin.

@@ -25,6 +25,8 @@ constexpr int kActivityRetentionDays = 30;
 // emas, ketma-ket bir nechta sabab yig'indisi bo'lishi mumkin -- shuning
 // uchun bitta gipotezani emas, barcha nuqtalarni birdan o'lchaymiz.
 void DumpSqlProfile(const QString &reason);
+// Jadvallarni log'ga chiqarmasdan nollaydi (masalan tizim uyqusidan keyin).
+void ResetSqlProfile();
 
 // Bitta o'lchov nuqtasining narxini qo'shadi (nomlar bo'yicha yig'iladi).
 void PerfNote(const char *name, qint64 ns);
