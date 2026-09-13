@@ -4,7 +4,34 @@ Bu fayl qaysi ish **hozir faol**, qaysi biri **to'xtatib qo'yilgan** va
 qaysi biri **hali muhokama bosqichida** ekanini ko'rsatadi. Yangi
 sessiya boshlanganda birinchi shu yerga qarang.
 
-Oxirgi yangilanish: 2026-09-13 (00:40)
+Oxirgi yangilanish: 2026-09-14 (01:10)
+
+---
+
+# 🟢 2026-09-14 — tdesktop: A1 tasdiqlandi, reja qayta tartiblandi
+
+> Bu bo'lim faqat **tdesktop (CustomMod)** haqida. customsync-server holati
+> o'z faylida: `customsync-server/PROGRESS.md` va `sync-protocol/STATUS.md`.
+> 09-15 dan boshlab har loyiha **o'z sessiyasida** davom etadi.
+
+| | |
+|---|---|
+| Build | **2026-09-14 00:26** (binar `out/Release/Telegram.exe`) |
+| Sinov | **2026-09-14 00:47:26** ishga tushirildi (`Pictures/Release`), 00:51 gacha kuzatildi |
+| Tarkib | `06da91da35` A1 · `46daed5fa3` A2 · `52f6e0a143` story/rasm signali · `77d6162653` + `2a7596df04` uyqu qotish deb yozilmaydi (>10 daq) |
+| 90-soniya | **blok YO'Q** (09-13 da 420 ms edi) ✅ |
+| Navbat | MediaQuotaScan 22 ms -> ReconcileMediaIndex 567 ms (fonda) -> CompactActivityHistory 481 ms (**bir marta**) -> ActivityCacheLoad 176 ms ✅ |
+| Start bloki | **3451 ms** (09-13 da 1453) — Scope 0 ms, SQL 30 ms: bizning kod emas, til yuklangandan OpenAL'gacha 2 s (Qt/audio init). Build'dan keyingi sovuq start bo'lishi mumkin — **keyingi startda qayta o'lchash** |
+| A2 | build'da, lekin **sinab bo'lmaydi**: sync yoqilmagan va server deploy qilinmagan |
+
+**Keyingi qadam (tdesktop sessiyasi):** A5 — o'lchov kodini
+(`PerfScope`, SQL profayler) issiq yo'llardan olish -> build -> start
+qayta o'lchovi -> A7 reliz (avval VPS mirror tekshiruvi). A2 tasdig'i va
+A3 (sync uchun alohida ulanish) server deploy bosqichiga ko'chdi. Batafsil:
+[`plans/2026-09-13-peak-performance-and-stability-plan.md`](plans/2026-09-13-peak-performance-and-stability-plan.md) §Tartib.
+
+Stabil qaytish nuqtasi o'zgarmadi: `custommod-stable-20260913`. Yangi build
+bir necha kun muammosiz ishlasa, yangi teg qo'yiladi.
 
 ---
 
@@ -26,7 +53,7 @@ Oxirgi yangilanish: 2026-09-13 (00:40)
 To'liq build/sinov vaqt jadvali (09-11 19:04 dan boshlab, 8 ta build):
 spec §6a.
 
-**Build qilinmagan, lekin commit qilingan:** `06da91da35` —
+**Build qilinmagan, lekin commit qilingan:** (09-14 00:26 build'ga kirdi) `06da91da35` —
 ReconcileMediaIndex fon oqimiga (420 ms blok manbai) + global texnik
 xizmat jarayonda bir marta (ikkinchi akkauntdagi 238 ms ortiqcha
 compaction).

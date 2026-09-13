@@ -1,6 +1,6 @@
 # Loyihalar holati — HAR SESSIYA SHU YERDAN BOSHLANADI
 
-Oxirgi yangilanish: **2026-09-11**
+Oxirgi yangilanish: **2026-09-14**
 
 > ✅ **2026-08-26 dagi ko'p akkauntli aralashuv xatosi HAL QILINDI.**
 > Protokol tomoni: spec §0.12 (`record_id` ga `account_hash`),
@@ -18,7 +18,7 @@ Oxirgi yangilanish: **2026-09-11**
 | Loyiha | Holat | Keyingi qadam |
 |---|---|---|
 | **tdesktop** (CustomMod) | 🟡 Plan 02 dan 10/11 task kodda tayyor; **to'liq build KUTILMOQDA** | Build (uyda) → qo'lda regressiya → Task 9 |
-| **customsync-server** | 🟡 01a, 01b ✅; **plan 04 jarayonda (3/6)** | 04 Task 6 (ikki fazali o'chirish) |
+| **customsync-server** | 🟡 01a, 01b ✅; **plan 04 jarayonda** (Task 1-3, 6 ✅) | 04 Task 7 (rejalashtirilgan purge + sweep) |
 | **server-controller** | ⚪ boshlanmagan | 01a/01b tugagach |
 | **tmobile-android** | ⚪ muhokama qilinmagan | — |
 | **tmobile-ios** | ⚪ muhokama qilinmagan | — |
@@ -373,7 +373,7 @@ global sozlamami yoki har chat uchun alohidami?
 
 **Repo:** https://github.com/Oybek-M/customsync-server (public, MIT)
 **Papka:** `Projects programming\Telegram\customsync-server`
-**Branch:** `Oybek` — `dotnet test`: **135 test, hammasi o'tadi**
+**Branch:** `Oybek` — `dotnet test`: **152 test, hammasi o'tadi** (2026-09-14)
 
 🔴 **Aniq holat va keyingi qadam shu loyihaning `PROGRESS.md`
 faylida.** Quyidagisi faqat qisqacha.
@@ -384,7 +384,7 @@ faylida.** Quyidagisi faqat qisqacha.
 | **01b** — sync yadrosi | ✅ 9 task'ning hammasi, deploy fayllari bilan |
 | 02 — tdesktop agenti | ✅ 11 task'ning hammasi kodda; v7.2.6 merge'idan keyin build o'tdi |
 | 03 — web controller | ⚪ boshlanmagan |
-| **04** — storage lifecycle | 🟡 Task 1-3 ✅ (har birida tekshiruvda xato topilib tuzatildi). Keyingisi: 6 → 7. Task 4-5 keyinga, 8 → plan 03 |
+| **04** — storage lifecycle | 🟡 Task 1-3, 6 ✅ (har birida tekshiruvda xato topilib tuzatildi). Keyingisi: 7. Task 4-5 keyinga, 8 → plan 03 |
 | 05 — capture xizmati | ⚪ 04 dan keyin. `libtdjson` tahlili `PROGRESS.md` da |
 | 06 — reliz boshqaruvi | 🟡 Task 1-4 bajarilgan (2026-09-03) |
 

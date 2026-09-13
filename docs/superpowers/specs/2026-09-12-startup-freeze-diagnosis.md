@@ -162,6 +162,7 @@ emas (oyna yaratish).
 | `009d3c7a21` (zaxira + start+90 s + sync arm + checkpoint) | 09-12 ~18:3x | 09-12 18:35:13 | **1490, 444** | ✅ HAL QILINDI |
 | ″ (xuddi shu binar, uyda) | — | 09-12 21:58:45 | 1499, 461, 422 | ✅ takrorlandi |
 | `d054d03a7b` (= kod `7ee739b265`: + WS teshigi + navbat) | **09-12 23:40** (53 daq 32 s, 56/56) | **09-13 00:17:12** | **1453, 420, 492** | ✅ **STABIL** |
+| `2a7596df04` (+ A1 reconcile fonga, A2 bo'sh sync sikli, uyqu filtri) | **09-14 00:26** | **09-14 00:47:26** | **3451** (Scope 0, SQL 30 ms) | ✅ 90-s blok yo'q; start bloki qayta o'lchanadi |
 
 09-13 00:17 sinovidagi batafsil natija:
 
