@@ -5,6 +5,9 @@
 #include "custom_media_quota.h" // kvota tekshiruvi
 #include "custom_settings.h"
 #include "base/unixtime.h"
+#include "base/call_delayed.h"
+#include "api/api_peer_photo.h"
+#include "apiwrap.h"
 #include "data/data_changes.h"
 #include "data/data_lastseen_status.h"
 #include "data/data_peer.h"
@@ -459,6 +462,60 @@ bool RecordField(
 	return true;
 }
 
+// Profil rasmi QO'YILGAN lahza -- story kabi aniq onlayn lahza.
+//
+// Last-seen yashirilgan ("yaqinda") kontaktda status hech narsa bermaydi.
+// Rasmni almashtirish esa faqat onlayn holatda bo'ladi va Telegram
+// rasmning yuklangan vaqtini (`photo.date`) saqlaydi. Aniqlangan vaqt
+// (`now`) EMAS, aynan shu sana yoziladi: startda qolib ketgan
+// o'zgarishlar ham to'g'ri vaqtga tushadi.
+//
+// `userProfilePhoto` yangilanishida faqat rasm ID'si bor, sana yo'q.
+// Sana to'liq `Photo` obyektida -- u yo'q bo'lsa `photos.getUserPhotos`
+// bir marta so'raladi (faqat kuzatilayotgan kontakt rasmi o'zgarganda,
+// ya'ni kuniga bir necha marta) va javob kelgach qayta tekshiriladi.
+void RecordPhotoOnlineMoment(
+		not_null<Main::Session*> session,
+		not_null<UserData*> user,
+		PhotoId photoId,
+		bool allowRequest) {
+	if (!photoId || user->userpicPhotoId() != photoId) {
+		return; // rasm o'chirilgan yoki oradan yana almashgan
+	}
+	const auto photo = session->data().photo(photoId);
+	const auto date = qint64(photo->isNull() ? 0 : photo->date());
+	if (date <= 0) {
+		if (allowRequest) {
+			session->api().peerPhoto().requestUserPhotos(
+				user,
+				Api::PeerPhoto::UserPhotoId());
+			base::call_delayed(crl::time(15 * 1000), session, [=] {
+				RecordPhotoOnlineMoment(session, user, photoId, false);
+			});
+		}
+		return;
+	}
+	const auto now = qint64(base::unixtime::now());
+	// Juda eski rasm (masalan kuzatuv yoqilganda birinchi ko'rilgan)
+	// "onlayn davrlar" ro'yxatini ma'nosiz sanalar bilan to'ldirardi.
+	constexpr auto kMaxPhotoAge = qint64(30 * 24 * 3600);
+	if (date > now + 60 || (now - date) > kMaxPhotoAge) {
+		return;
+	}
+	const auto peerId = QString::number(user->id.value);
+	if (CustomDB::HasActivityEntryAt(peerId, u"status"_q, date)) {
+		return; // boshqa akkauntdan allaqachon yozilgan
+	}
+	CustomDB::SaveActivityHistoryEntry(
+		CustomDB::PeerKey{ qint64(session->userId().bare), peerId },
+		u"status"_q,
+		false,
+		QString(),
+		u"online:"_q + QString::number(date),
+		date,
+		u"photo"_q);
+}
+
 } // namespace
 
 QString EncodeStatus(const Data::LastseenStatus &status, int32 now) {
@@ -574,7 +631,9 @@ void Init(not_null<Main::Session*> session) {
 					? QString::number(photoId)
 					: u"empty"_q;
 				if (isTracking) {
-					RecordField(session, peerId, u"photo"_q, value, now);
+					if (RecordField(session, peerId, u"photo"_q, value, now)) {
+						RecordPhotoOnlineMoment(session, user, photoId, true);
+					}
 					// Rasm ID'sining o'zi yetarli emas — eski rasm
 					// almashtirilsa yo'qoladi. Rasmning O'ZINI ham saqlaymiz.
 					MaybeBackupUserpic(session, user);
@@ -602,8 +661,26 @@ void Init(not_null<Main::Session*> session) {
 	// Story HECH QACHON ochilmaydi — faqat mavjud sinxronizatsiya orqali
 	// kelgan metadata (sana) o'qiladi. Stories::markAsRead() bu yerda
 	// HECH QACHON chaqirilmaydi (xavfsizlik invarianti).
-	session->data().stories().itemsChanged(
-	) | rpl::on_next([=](PeerId peerId) {
+	//
+	// 2026-09-13 TUZATISH: ilgari faqat `itemsChanged()` ga obuna edik.
+	// Upstream'da u FAQAT `stories.getStoriesByID` javobidan keyin
+	// otiladi (Stories::resolve) -- ya'ni story ma'lumoti ID bo'yicha
+	// alohida so'ralgandagina. Yangi story esa `updateStory` yoki
+	// `getPeerStories`/`getAllStories` orqali keladi va ular
+	// `sourceChanged()` ni otadi, `itemsChanged()` ni EMAS. Story to'liq
+	// ko'rinishda kelsa, uni ochganda ham resolve kerak bo'lmaydi va
+	// signal umuman kelmaydi.
+	//
+	// Dalil (haqiqiy DB): barcha kontaktlar bo'yicha oxirgi `story` yozuvi
+	// 11.09 12:28 da, `status`/`photo` esa 13.09 gacha yozilgan. 13.09 da
+	// ko'rilgan story (peer 7719677791, "2 hours ago") bazaga tushmagan.
+	// Signal ilgari tasodifan -- story ID bo'yicha yuklangan paytlarda --
+	// ishlab kelgan.
+	//
+	// Endi ikkala signalga obunamiz. Sana `StoryIdDates` dan olinadi, u
+	// story'ning o'zi yuklanmagan ("skipped") bo'lsa ham bor, shuning uchun
+	// lookup() faqat media zaxirasi uchun kerak.
+	const auto onStoriesChanged = [=](PeerId peerId) {
 		const auto user = session->data().peer(peerId)->asUser();
 		if (!user) {
 			return; // faqat User (shaxsiy chat) kuzatiladi
@@ -622,42 +699,87 @@ void Init(not_null<Main::Session*> session) {
 			source->ids,
 			ranges::less{},
 			&Data::StoryIdDates::date);
-		const auto found = stories.lookup({ peerId, latest.id });
-		if (!found) {
-			return;
-		}
-		const auto story = *found;
 		const auto now = base::unixtime::now();
 
-		RecordField(
-			session,
-			peerId2,
-			u"story"_q,
-			QString::number(story->date()),
-			now);
+		// sourceChanged() tez-tez otiladi (o'qilgan belgisi, strip
+		// yangilanishi). Bazaga faqat yangi sanalar uchun boriladi --
+		// asosiy oqimdagi har ortiqcha SQL umumiy ulanishda navbat
+		// hosil qiladi (startdagi qotish saboqi, 2026-09-12).
+		static auto sRecordedStoryDates
+			= base::flat_set<std::pair<PeerId, TimeId>>();
 
-		// A16 §1: Story qo'yilgan vaqt — foydalanuvchi aniq onlayn bo'lgan lahza.
-		// Buni status shkalasiga kiritamiz. observed_at ga story ko'rilgan vaqt (now)
-		// emas, aynan story QO'YILGAN vaqt (storyDate) yoziladi.
-		// Akkauntlar aro takror yozmaslik uchun bazadan tekshiramiz.
-		const auto storyDate = qint64(story->date());
-		if (storyDate > 0 && !CustomDB::HasActivityEntryAt(peerId2, u"status"_q, storyDate)) {
-			CustomDB::SaveActivityHistoryEntry(
-				CustomDB::PeerKey{ qint64(session->userId().bare), peerId2 },
-				u"status"_q,
-				false,                                     // hasOldValue - oldingi qiymat YO'Q
-				QString(),                                 // oldValue
-				u"online:"_q + QString::number(storyDate), // newValue
-				storyDate,                                 // observed_at = story QO'YILGAN vaqt
-				u"story"_q);                               // source
+		// A16 §1: Story qo'yilgan vaqt -- foydalanuvchi aniq onlayn
+		// bo'lgan lahza. observed_at ga story ko'rilgan vaqt (now) emas,
+		// aynan QO'YILGAN vaqt yoziladi. Faqat eng oxirgisi emas, HAR BIR
+		// aktiv story: biz oflayn paytda bir nechta story qo'yilgan
+		// bo'lsa, har biri alohida onlayn lahza.
+		for (const auto &idDates : source->ids) {
+			const auto storyDate = idDates.date;
+			if (storyDate <= 0
+				|| sRecordedStoryDates.contains({ peerId, storyDate })) {
+				continue;
+			}
+			// Akkauntlar aro takror yozmaslik uchun bazadan tekshiramiz.
+			if (!CustomDB::HasActivityEntryAt(
+					peerId2,
+					u"status"_q,
+					storyDate)) {
+				CustomDB::SaveActivityHistoryEntry(
+					CustomDB::PeerKey{
+						qint64(session->userId().bare),
+						peerId2 },
+					u"status"_q,
+					false,     // hasOldValue - oldingi qiymat YO'Q
+					QString(), // oldValue
+					u"online:"_q + QString::number(storyDate),
+					storyDate, // observed_at = story QO'YILGAN vaqt
+					u"story"_q);
+			}
+			sRecordedStoryDates.emplace(peerId, storyDate);
+		}
+
+		// Kesh tayyor bo'lmasa RecordField jimgina qaytadi (start+90 s
+		// oynasi). Story signali bu oynada ko'p keladi (getAllStories),
+		// shuning uchun keyinroq bir marta qayta urinamiz.
+		if (!CustomDB::IsActivityCacheReady()) {
+			static auto sRetryScheduled = base::flat_set<PeerId>();
+			if (!sRetryScheduled.contains(peerId)) {
+				sRetryScheduled.emplace(peerId);
+				base::call_delayed(crl::time(120 * 1000), session, [=] {
+					sRetryScheduled.remove(peerId);
+					if (CustomDB::IsActivityCacheReady()) {
+						RecordField(
+							session,
+							peerId2,
+							u"story"_q,
+							QString::number(latest.date),
+							base::unixtime::now());
+					}
+				});
+			}
+		} else {
+			RecordField(
+				session,
+				peerId2,
+				u"story"_q,
+				QString::number(latest.date),
+				now);
 		}
 
 		const auto fullId = FullStoryId{ peerId, latest.id };
 		if (!gProcessedStoryMedia.contains(fullId)) {
-			gProcessedStoryMedia.emplace(fullId);
-			MaybeBackupStoryMedia(session, story, fullId);
+			// Story hali yuklanmagan bo'lsa belgilamaymiz: ma'lumoti
+			// keyinroq kelganda (itemsChanged) zaxira qilinadi.
+			if (const auto found = stories.lookup(fullId)) {
+				gProcessedStoryMedia.emplace(fullId);
+				MaybeBackupStoryMedia(session, *found, fullId);
+			}
 		}
-	}, session->lifetime());
+	};
+	session->data().stories().sourceChanged(
+	) | rpl::on_next(onStoriesChanged, session->lifetime());
+	session->data().stories().itemsChanged(
+	) | rpl::on_next(onStoriesChanged, session->lifetime());
 
 	session->downloaderTaskFinished(
 	) | rpl::on_next([=] {

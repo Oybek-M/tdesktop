@@ -72,6 +72,7 @@ bool gShowObservedStatus = false;
 	if (source == u"buffer"_q) return u"⏱"_q;
 	if (source == u"read"_q) return u"✓✓"_q;
 	if (source == u"snapshot"_q) return u"📌"_q;
+	if (source == u"photo"_q) return u"🖼"_q;
 	return QString();
 }
 
@@ -122,6 +123,9 @@ QString FormatInstantLabel(const OnlinePeriod &p) {
 		return when + u" — ⏱ buferdan tiklangan"_q;
 	} else if (p.source == u"read"_q) {
 		return when + u" — ✓✓ xabarni o'qigan"_q;
+	} else if (p.source == u"photo"_q) {
+		// Rasm yuklangan vaqt (photo.date), aniqlangan vaqt emas.
+		return when + u" — 🖼 profil rasmini qo'ygan"_q;
 	} else if (p.source == u"snapshot"_q) {
 		// Kuzatuv yoqilgan lahzada yozilgan boshlang'ich holat.
 		return when + u" — 📌 kuzatuv boshlangandagi holat"_q;
