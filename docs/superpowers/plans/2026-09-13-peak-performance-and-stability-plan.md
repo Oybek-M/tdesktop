@@ -25,17 +25,24 @@ keyin — `customsync-server` ishini davom ettirish.
 
 ## A-faza — tdesktop (CustomMod)
 
-### A1. Kichik ortiqchaliklar — ✅ KOD TAYYOR (`06da91da35`), build kutmoqda
+### A1. Kichik ortiqchaliklar — ✅ TASDIQLANDI (build 09-14 00:26, sinov 00:47)
 
 - [x] `ReconcileMediaIndex` -> `Maintenance` navbati (fon oqimi). Oqim
       xavfsizligi: import yo'llari uni allaqachon `crl::async` ichidan
       chaqiradi.
 - [x] Global texnik xizmat (reconcile + compaction) jarayon davomida bir
       marta (ilgari har akkaunt uchun).
-- [ ] **Tasdiqlash:** 90-soniyadagi ~420 ms blok yo'qolishi;
+- [x] **Tasdiqlash:** 90-soniyadagi ~420 ms blok yo'qolishi;
       `CustomMod Maintenance: CompactActivityHistory` log'da **bir** marta.
+      09-14 00:47 sinovi: 90-soniyada blok YO'Q; navbat ketma-ket —
+      MediaQuotaScan 22 ms -> ReconcileMediaIndex 567 ms (endi fonda) ->
+      CompactActivityHistory 481 ms (bir marta) -> ActivityCacheLoad 176 ms.
+- [ ] **Kuzatish:** start bloki 3451 ms bo'ldi (09-13 da 1453 ms). Scope
+      0 ms, SQL 30 ms — bizning kod emas; log'da til yuklangandan OpenAL'gacha
+      2 s bo'shliq (Qt/audio init). Build'dan keyingi birinchi (sovuq)
+      ishga tushirish bo'lishi mumkin — keyingi startda qayta o'lchansin.
 
-### A2. 3-bosqich — bo'sh siklni SQL'siz o'tkazib yuborish (klient tomoni) — ✅ KOD TAYYOR (`46daed5fa3`), build kutmoqda
+### A2. 3-bosqich — bo'sh siklni SQL'siz o'tkazib yuborish (klient tomoni) — ✅ KOD build'da, tasdiq DEPLOY'GACHA KUTADI
 
 Loyiha: spec §8 "3-bosqich". Server protokoliga TEGILMAYDI (`/sync/head`
 bekor qilindi — bo'sh `pull` allaqachon arzon, narx klientda).
@@ -58,7 +65,11 @@ bekor qilindi — bo'sh `pull` allaqachon arzon, narx klientda).
       yuborilmaydi.
 - [x] **A2.4 Kuzatuv logi:** o'tkazib yuborilgan sikllar uchun siyrak
       `LOG` (birinchisi va har 20-si) — tasdiqlash uchun.
-- [ ] **Tasdiqlash:** WS ulangan holatda bir necha interval davomida
+- [ ] **Tasdiqlash (deploy'dan keyin):** bu kompyuterda sync yoqilmagan
+      (`syncEnabled` va server manzili yo'q), server ham hali deploy
+      qilinmagan — ya'ni sync kodi hozir umuman ishlamaydi va uni real
+      sinab bo'lmaydi. Tasdiqlash server deploy'i va klient ulanganidan
+      keyin. WS ulangan holatda bir necha interval davomida
       `CustomMod SQL` jadvallarida `sync_state`/`sync_outbox` so'rovlari
       deyarli yo'q; boshqa qurilmadan o'zgarish yuborilganda u baribir
       darhol tortiladi (xabarnoma yo'li). Log'da
@@ -151,5 +162,15 @@ Kanonik holat: `customsync-server/PROGRESS.md` (2026-09-11: 135 test,
 
 ## Tartib
 
-`A1 tasdiq` -> `A2` -> build + tasdiq -> `A3` -> build + tasdiq -> `A4` ->
-`A5` -> `A7 reliz` ; `A6` va `B` parallel.
+~~`A1 tasdiq` -> `A2` -> build + tasdiq -> `A3` -> build + tasdiq -> `A4` ->
+`A5` -> `A7 reliz`~~
+
+**Qayta tartiblandi (09-14):** sync hozir hech kimda yoqilmagan va server
+deploy qilinmagan, shuning uchun A2 tasdig'i va A3 (sync uchun alohida
+ulanish) foydalanuvchiga hozir hech narsa bermaydi va sinab ham bo'lmaydi.
+Ular server deploy'i bosqichiga ko'chadi. Hozirgi tartib:
+
+`A5` (o'lchov kodini issiq yo'llardan olish — har bir foydalanuvchiga
+foyda) -> build + start qayta o'lchovi -> `A7 reliz` ; `A4` faqat o'lchov
+blok ko'rsatsa ; `A2 tasdiq` + `A3` — deploy'dan keyin ; `A6` va `B`
+parallel.
