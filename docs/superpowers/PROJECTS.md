@@ -4,6 +4,10 @@ Bu fayl qaysi ish **hozir faol**, qaysi biri **to'xtatib qo'yilgan** va
 qaysi biri **hali muhokama bosqichida** ekanini ko'rsatadi. Yangi
 sessiya boshlanganda birinchi shu yerga qarang.
 
+> 🖥️ **Undan ham oldin:** [`../MACHINES.md`](../MACHINES.md) — qaysi
+> kompyuterdasiz (laptop / PC) va shu kompyuterdagi yo'llar. Bu fayldagi
+> `C:\TBuild\...` kabi yo'llar laptop'niki.
+
 Oxirgi yangilanish: 2026-09-14 (01:10)
 
 ---
