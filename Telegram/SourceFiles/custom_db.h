@@ -48,14 +48,31 @@ void Enqueue(const char *name, std::function<void()> work);
 
 } // namespace Maintenance
 
+// Profiling yoqilganligini tekshiradi (jarayonda bir marta o'qiladi).
+// CUSTOMMOD_PROFILE=1 muhit o'zgaruvchisi (environment variable) bilan yoqiladi:
+//   PowerShell: $env:CUSTOMMOD_PROFILE="1"; .\Telegram.exe
+//   CMD:        set CUSTOMMOD_PROFILE=1 && Telegram.exe
+// Yoqilmagan bo'lsa: sqlite3_trace_v2 o'rnatilmaydi, PerfScope taymer
+// ishlatmaydi va mutex olmaydi, DumpSqlProfile hech narsa chiqarmaydi.
+[[nodiscard]] inline bool ProfilingEnabled() {
+	static const auto enabled = (qEnvironmentVariableIntValue("CUSTOMMOD_PROFILE") == 1);
+	return enabled;
+}
+
 // RAII: blok tugaganda o'z narxini registrga yozadi. Nom STATIK matn
 // bo'lishi shart (literal) -- registr uni nusxalamaydi.
+// Profiling yoqilmagan bo'lsa (standart) bitta bool tekshiruvi bilan
+// darhol qaytadi -- taymer ishlamaydi, mutex olinmaydi.
 struct PerfScope {
 	explicit PerfScope(const char *name) : _name(name) {
-		_timer.start();
+		if (ProfilingEnabled()) {
+			_timer.start();
+		}
 	}
 	~PerfScope() {
-		PerfNote(_name, _timer.nsecsElapsed());
+		if (ProfilingEnabled()) {
+			PerfNote(_name, _timer.nsecsElapsed());
+		}
 	}
 	PerfScope(const PerfScope &) = delete;
 	PerfScope &operator=(const PerfScope &) = delete;

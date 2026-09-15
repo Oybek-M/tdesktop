@@ -11,7 +11,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "custom_db.h"
 #include "custom_peer_key.h"
 #include "custom_settings.h"
-#include <QtCore/QElapsedTimer>
 #include <QtCore/QFile>
 #include <QtCore/QTextStream>
 #include <QtCore/QDateTime>
@@ -2218,7 +2217,6 @@ std::optional<int> History::countStillUnreadLocal(MsgId readTillId) const {
 }
 
 void History::loadDeletedMessages() {
-	CustomDB::PerfScope perf("history:loadDeletedMessages");
 	// CUSTOM A13: ilgari `if (isEmpty()) return;` edi — bu butun chat
 	// o'chirilganda (blocks bo'sh) saqlangan xabarlarni ham ko'rsatmasdi.
 	// Aslida himoya kerak bo'lgan yagona holat — konstruktor paytidagi
@@ -2226,26 +2224,6 @@ void History::loadDeletedMessages() {
 	// yarim qurilgan History ustida ishlaydi). insertMessageToBlocks()
 	// bo'sh tarixni o'zi to'g'ri hal qiladi (addNewToBack).
 	if (!_deletedInjectionReady) return;
-
-	// CUSTOM 2026-09-12: bu funksiya scroll, o'qish va start hodisalarida
-	// juda ko'p chaqiriladi. Har chaqiruv arzon bo'lsa ham yig'indisi
-	// startdagi qotishni tushuntirishi mumkin, shuning uchun umumiy
-	// hisobni yuritamiz (log faqat sekin chaqiruvda yoki har 200 da).
-	struct PerfScope {
-		QElapsedTimer timer;
-		PerfScope() { timer.start(); }
-		~PerfScope() {
-			static auto totalMs = qint64(0);
-			static auto calls = 0;
-			const auto ms = timer.elapsed();
-			totalMs += ms;
-			++calls;
-			if (ms >= 100 || (calls % 200) == 0) {
-				LOG(("CustomMod Perf: loadDeletedMessages call %1 took "
-					"%2 ms, total %3 ms").arg(calls).arg(ms).arg(totalMs));
-			}
-		}
-	} perfScope;
 
 	const auto key = CustomDB::Key(session(), peer->id);
 	if (!CustomSettings::ShouldAntiDelete(key.peerId)) return;
@@ -2660,7 +2638,6 @@ bool History::inboxReadTillKnown() const {
 }
 
 MsgId History::inboxReadTillId() const {
-	CustomDB::PerfScope perf("history:inboxReadTillId");
 	MsgId result = _inboxReadBefore.value_or(1) - 1;
 	if (CustomSettings::GhostMode()) {
 		qint64 ghostRead = CustomDB::GetGhostRead(CustomDB::Key(session(), peer->id));
@@ -2676,13 +2653,11 @@ MsgId History::outboxReadTillId() const {
 }
 
 HistoryItem *History::lastAvailableMessage() const {
-	CustomDB::PerfScope perf("history:lastAvailableMessage");
 	const_cast<History*>(this)->loadDeletedMessages();
 	return isEmpty() ? nullptr : blocks.back()->messages.back()->data().get();
 }
 
 int History::unreadCount() const {
-	CustomDB::PerfScope perf("history:unreadCount");
 	if (CustomSettings::GhostMode()) {
 		if (_ghostReadTillId > 0 && _ghostReadTillId >= _topMessageId.bare) {
 			return 0;

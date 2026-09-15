@@ -938,7 +938,6 @@ void SetBlocklistCategory(PeerType type, bool enabled) {
 // Priority: Blocklist (false) > Whitelist (true) > Global flag
 
 bool ShouldAntiDelete(const QString &peerId) {
-    CustomDB::PerfScope perf("settings:ShouldAntiDelete");
     if (!gInitialized) Init();
     if (!peerId.isEmpty() && IsInBlocklist(peerId)) return false;
     if (!peerId.isEmpty() && IsInWhitelist(peerId)) return true;
@@ -946,7 +945,6 @@ bool ShouldAntiDelete(const QString &peerId) {
 }
 
 bool ShouldAntiEdit(const QString &peerId) {
-    CustomDB::PerfScope perf("settings:ShouldAntiEdit");
     if (!gInitialized) Init();
     if (!peerId.isEmpty() && IsInBlocklist(peerId)) return false;
     if (!peerId.isEmpty() && IsInWhitelist(peerId)) return true;
@@ -954,7 +952,6 @@ bool ShouldAntiEdit(const QString &peerId) {
 }
 
 bool ShouldGhost(const QString &peerId) {
-    CustomDB::PerfScope perf("settings:ShouldGhost");
     if (!gInitialized) Init();
     if (!peerId.isEmpty() && IsInBlocklist(peerId)) return false;
     if (!peerId.isEmpty() && IsInWhitelist(peerId)) return true;

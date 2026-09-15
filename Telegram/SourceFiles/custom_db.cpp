@@ -312,26 +312,27 @@ void Init() {
 
     gInitialized = true;
 
-    // T43/diag: SQL profayler. Har bir bajarilgan so'rovning sarflagan vaqti
-    // so'rov matni bo'yicha yig'iladi; qotish tugashi bilan (stall watchdog)
-    // eng qimmat so'rovlar log'ga chiqadi. Taxmin qilmaslik uchun kerak --
-    // kesh tuzatishlari qotishni olib tashlamagach, aybdorni SHU ko'rsatadi.
-    sqlite3_trace_v2(gDb, SQLITE_TRACE_PROFILE, [](
-            unsigned type,
-            void *ctx,
-            void *stmt,
-            void *elapsed) -> int {
-        Q_UNUSED(ctx);
-        if (type != SQLITE_TRACE_PROFILE || !stmt || !elapsed) return 0;
-        const auto ns = *static_cast<sqlite3_int64*>(elapsed);
-        const char *sql = sqlite3_sql(static_cast<sqlite3_stmt*>(stmt));
-        if (!sql) return 0;
-        QMutexLocker locker(&gProfMutex);
-        auto &entry = gProfile[QString::fromUtf8(sql)];
-        entry.calls += 1;
-        entry.totalNs += ns;
-        return 0;
-    }, nullptr);
+    // T43/diag: SQL profayler faqat CUSTOMMOD_PROFILE=1 bo'lganda o'rnatiladi.
+    // Har bir bajarilgan so'rovning sarflagan vaqti so'rov matni bo'yicha yig'iladi;
+    // qotish tugashi bilan (stall watchdog) eng qimmat so'rovlar log'ga chiqadi.
+    if (ProfilingEnabled()) {
+        sqlite3_trace_v2(gDb, SQLITE_TRACE_PROFILE, [](
+                unsigned type,
+                void *ctx,
+                void *stmt,
+                void *elapsed) -> int {
+            Q_UNUSED(ctx);
+            if (type != SQLITE_TRACE_PROFILE || !stmt || !elapsed) return 0;
+            const auto ns = *static_cast<sqlite3_int64*>(elapsed);
+            const char *sql = sqlite3_sql(static_cast<sqlite3_stmt*>(stmt));
+            if (!sql) return 0;
+            QMutexLocker locker(&gProfMutex);
+            auto &entry = gProfile[QString::fromUtf8(sql)];
+            entry.calls += 1;
+            entry.totalNs += ns;
+            return 0;
+        }, nullptr);
+    }
 
     // Performance pragmas:
     // WAL mode: readers don't block writers and vice versa.
@@ -862,8 +863,9 @@ void RunMigrations() {
 
 // T43/diag: oxirgi dump'dan beri to'plangan SQL narxini log'ga chiqaradi va
 // hisoblagichlarni nollaydi, shunda har bir qotish o'z narxini ko'rsatadi.
+// Profiling o'chiq bo'lsa (standart) hech narsa qilmaydi.
 void PerfNote(const char *name, qint64 ns) {
-    if (!name) return;
+    if (!name || !ProfilingEnabled()) return;
     QMutexLocker locker(&gProfMutex);
     auto &entry = gScopes[QString::fromLatin1(name)];
     entry.calls += 1;
@@ -917,6 +919,8 @@ static void DumpRegistry(
 }
 
 void DumpSqlProfile(const QString &reason) {
+    if (!ProfilingEnabled()) return;
+
     QHash<QString, ProfileEntry> scopes;
     {
         QMutexLocker locker(&gProfMutex);
@@ -937,6 +941,8 @@ void DumpSqlProfile(const QString &reason) {
 }
 
 void ResetSqlProfile() {
+    if (!ProfilingEnabled()) return;
+
     QMutexLocker locker(&gProfMutex);
     gScopes.clear();
     gProfile.clear();
@@ -1050,7 +1056,6 @@ static void EnsurePeersWithDeletedLoaded() {
 // already loaded. Called lazily from the read/write sites below instead of
 // eagerly for the whole archive at startup (see LoadRestoreCache()).
 static void EnsurePeerCacheLoaded(const PeerKey &key) {
-    PerfScope perf("db:EnsurePeerCacheLoaded");
     {
         QMutexLocker locker(&gCacheMutex);
         if (gLoadedPeers.contains(key)) return;
@@ -1124,7 +1129,6 @@ static void EnsurePeerCacheLoaded(const PeerKey &key) {
 // ---------------------------------------------------------------------------
 
 bool IsDeletedLocally(const PeerKey &key, long long msgId) {
-    PerfScope perf("db:IsDeletedLocally");
     EnsurePeerCacheLoaded(key);
     QMutexLocker locker(&gCacheMutex);
     const auto it = gDeletedCache.constFind(key);
@@ -1217,7 +1221,6 @@ void SaveGhostRead(const PeerKey &key, long long msgId) {
 }
 
 long long GetGhostRead(const PeerKey &key) {
-    PerfScope perf("db:GetGhostRead");
     EnsureGhostReadsLoaded();
     QMutexLocker locker(&gCacheMutex);
     // Eski SQL "account_id IN (0, ?)" edi va qaysi qator birinchi kelishi
