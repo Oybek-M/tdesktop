@@ -114,15 +114,17 @@ tranzaksiyalarga yo'l ochadi.
 - [ ] `ActivityCacheLoad` (162–175 ms) — kerak bo'lsa bo'laklash;
       hozirgi qiymat qabul qilinadigan.
 
-### A5. O'lchov kodini tozalash
+### A4+. Startdagi 727 ms blokni yo'qotish — KOD TAYYOR (`4a477c8abd`, `c27bdccb60`), build kutmoqda
 
-- [ ] SQL profayler (`sqlite3_trace_v2`) va `PerfScope` registri har
-      chaqiriqda mutex oladi. A1–A3 tasdiqlangach: issiq yo'llardagi
-      `PerfScope` larni olib tashlash (`history.cpp`, `history_item.cpp`,
-      `custom_settings.cpp`, `custom_db.cpp`), profaylerni sozlama/debug
-      bayrog'i ortiga yashirish. Stall watchdog'ning bitta `LOG` qatori
-      qolishi mumkin (arzon, kelajakda qotish qaytsa darhol ko'rinadi).
-      Fayllar ro'yxati: spec §9.
+- [x] **A4+.1 Indeks:** `actioned_messages(type, account_id, peer_id)` qamrovchi indeksi (sxema v17). `EnsurePeersWithDeletedLoaded` so'rovi 110 ms dan 0.47 ms ga (234x) tushdi; SCAN o'rniga SEARCH COVERING INDEX (`4a477c8abd`).
+- [x] **A4+.2 `RestoreDeletedChats` DB so'rovi fonga:** `GetPeersWithDeletedMessages` `crl::async` da olinadi, UI tiklash sikli `crl::on_main(session, ...)` da bajariladi. Asosiy oqim bloklanmaydi (`c27bdccb60`).
+- [x] **A4+.3 `PruneStaleActivityHistory` fonga:** `CustomDB::Maintenance::Enqueue` orqali fon oqimida darhol bajariladi, asosiy oqimdan 126 ms blok olib tashlandi (`c27bdccb60`).
+
+### A5. O'lchov kodini tozalash — KOD TAYYOR (`6eb4b30075`), build kutmoqda
+
+- [x] SQL profayler (`sqlite3_trace_v2`) va `PerfScope` registri `CustomDB::ProfilingEnabled()` (`CUSTOMMOD_PROFILE=1`) bayrog'i ortiga olindi. Standart holatda trace ulanmaydi, mutex va taymerlar ishlamaydi.
+- [x] Eng issiq yo'llardagi `PerfScope` lar butunlay olib tashlandi (`settings:ShouldAntiDelete/Edit/Ghost`, `db:EnsurePeerCacheLoaded`, `db:IsDeletedLocally`, `db:GetGhostRead`, `item:restoreFromCustomDB`, `history:loadDeletedMessages`, `history:inboxReadTillId`, `history:lastAvailableMessage`, `history:unreadCount`, lokal `struct PerfScope`).
+- [x] Doimiy diagnostika qoldi: stall watchdog (`main thread blocked N ms`), `Maintenance took N ms`, `timed()` loglari. Fonga qarang: spec §9.
 
 ### A6. Eskidan qolgan ochiq ishlar
 

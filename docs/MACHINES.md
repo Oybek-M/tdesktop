@@ -77,6 +77,7 @@ bo'lishi mumkin.
 | Build muhiti | Qt 6.11.1 (`QT` env), `Telegram.slnx` | ❓ |
 | Server testlari uchun baza sozlamasi | `<server>\src\CustomSync.Api\appsettings.Development.json` (gitignore — nusxalanadi yoki `scripts\db-bootstrap.ps1`) | ❓ |
 | Agent xotirasini sinxronlash | `C:\Users\Oybek\agent-sync-vault` (`agent-sync push/pull`) | ❓ |
+| CustomMod arxiv ildizi (`ArchiveRoot`) | `C:\Users\Oybek\Pictures\customizationMainFolder` (baza: `.../db/actioned_messages.db`) | ❓ |
 
 Remote'lar (hamma kompyuterda bir xil): tdesktop -> `origin` =
 `Oybek-M/tdesktop` fork, branch `Oybek` (upstream'ga push TAQIQ);

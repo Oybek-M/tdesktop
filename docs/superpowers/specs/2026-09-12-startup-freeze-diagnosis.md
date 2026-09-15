@@ -343,14 +343,34 @@ sozlamasi (hozir bo'sh interval `syncIntervalSeconds × 10`, ≤600 s).
 
 ---
 
-## 9. Tozalash kerak bo'lgan narsa
+## 9. O'lchov kodini tozalash (BAJARILDI, `6eb4b30075`)
 
-O'lchov kodi (**SQL profayler + `PerfScope` registri**) hali kodda va
-har chaqiriqda mutex qulfi oladi. Bir-ikki start tasdiqlangach uni olib
-tashlash yoki bayroq ortiga yashirish kerak. Fayllar: `custom_db.cpp`
-(`gProfile`, `gScopes`, `DumpSqlProfile`, `PerfNote`), `custom_db.h`
-(`PerfScope`), `core/application.cpp` (watchdog dumpi),
-`custom_settings.cpp`, `history/history.cpp`, `history/history_item.cpp`.
+O'lchov kodi o'z vazifasini to'liq bajardi (T43 qotish manbalari aniqlandi va yopildi).
+Issiq yo'llardan mutex va taymer narxi olib tashlandi, profiling esa bayroq ortiga olindi:
+
+1. **Profiling bayrog'i (`CustomDB::ProfilingEnabled()`):**
+   - Faqat `CUSTOMMOD_PROFILE=1` muhit o'zgaruvchisi (environment variable) bilan yoqiladi:
+     - PowerShell: `$env:CUSTOMMOD_PROFILE="1"; .\Telegram.exe`
+     - CMD: `set CUSTOMMOD_PROFILE=1 && Telegram.exe`
+   - Profiling o'chiq bo'lganda (standart holat):
+     - `sqlite3_trace_v2` UMUMAN ulanmaydi;
+     - `PerfScope` konstruktor/destruktori bitta bool tekshiruvi bilan darhol qaytadi (taymer ishlamaydi, mutex olinmaydi);
+     - `DumpSqlProfile` va `ResetSqlProfile` hech narsa qilmaydi (log'ga jadvallar chiqmaydi).
+
+2. **Eng issiq yo'llardan butunlay olib tashlangan `PerfScope` lar:**
+   - `custom_settings.cpp`: `settings:ShouldAntiDelete`, `settings:ShouldAntiEdit`, `settings:ShouldGhost`
+   - `custom_db.cpp`: `db:EnsurePeerCacheLoaded`, `db:IsDeletedLocally`, `db:GetGhostRead`
+   - `history_item.cpp`: `item:restoreFromCustomDB`
+   - `history.cpp`: `history:loadDeletedMessages`, `history:inboxReadTillId`, `history:lastAvailableMessage`, `history:unreadCount`
+   - `history.cpp`: lokal `struct PerfScope` (har 200-chaqiruvda log chiqaruvchi) va ishlatilmay qolgan `#include <QtCore/QElapsedTimer>`
+
+3. **Bayroq ortida qolgan kam chaqiriladigan diagnostika (`CUSTOMMOD_PROFILE=1` da ishlaydi):**
+   - `custom_db.cpp`: `db:GetOriginalTextBeforeEdit`, `db:GetEditHistory`
+
+4. **Doimiy qolgan arzon diagnostika (har doim ishlaydi):**
+   - Stall watchdog: `LOG(("CustomMod Perf: main thread blocked %1 ms").arg(late));` va uyqu kechikishi logi;
+   - `CustomDB::Maintenance::Enqueue`: `LOG(("CustomMod Maintenance: %1 took %2 ms").arg(task.name).arg(timer.elapsed()));`;
+   - Startdagi `TimedStep` va `timed` loglari.
 
 ---
 

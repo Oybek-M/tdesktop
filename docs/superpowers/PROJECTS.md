@@ -28,10 +28,7 @@ Oxirgi yangilanish: 2026-09-14 (01:10)
 | Start bloki | **3451 ms** (09-13 da 1453) — Scope 0 ms, SQL 30 ms: bizning kod emas, til yuklangandan OpenAL'gacha 2 s (Qt/audio init). Build'dan keyingi sovuq start bo'lishi mumkin — **keyingi startda qayta o'lchash** |
 | A2 | build'da, lekin **sinab bo'lmaydi**: sync yoqilmagan va server deploy qilinmagan |
 
-**Keyingi qadam (tdesktop sessiyasi):** A5 — o'lchov kodini
-(`PerfScope`, SQL profayler) issiq yo'llardan olish -> build -> start
-qayta o'lchovi -> A7 reliz (avval VPS mirror tekshiruvi). A2 tasdig'i va
-A3 (sync uchun alohida ulanish) server deploy bosqichiga ko'chdi. Batafsil:
+**Keyingi qadam (tdesktop sessiyasi):** A4+ (startdagi 727 ms blok: v17 qamrovchi indeks `4a477c8abd`, `RestoreDeletedChats` DB so'rovi va `PruneStaleActivityHistory` fonga `c27bdccb60`) hamda A5 (o'lchov kodi `CUSTOMMOD_PROFILE=1` ortiga olindi, issiq yo'llar tozalandi `6eb4b30075`) kodlari tayyor -> **qo'lda build (~55 daq)** -> start logini tekshirish (727 ms blok va profayler jadvallari yo'qligi) -> A7 reliz (avval VPS mirror tekshiruvi). A2 tasdig'i va A3 (sync uchun alohida ulanish) server deploy bosqichiga ko'chdi. Batafsil:
 [`plans/2026-09-13-peak-performance-and-stability-plan.md`](plans/2026-09-13-peak-performance-and-stability-plan.md) §Tartib.
 
 Stabil qaytish nuqtasi o'zgarmadi: `custommod-stable-20260913`. Yangi build
