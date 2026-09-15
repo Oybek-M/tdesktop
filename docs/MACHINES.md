@@ -27,6 +27,43 @@ Hujjatlarda, xotirada yoki promptlarda uchragan har qanday mutlaq yo'l
 Hujjatlarda yangi yo'l yozayotganda iloji bo'lsa **nisbiy** yozing:
 `<tdesktop>/docs/...`, `<server>/PROGRESS.md`.
 
+## Agentlar uchun kirish nuqtalari
+
+| Agent | Qoida qayerdan o'qiladi |
+|---|---|
+| Claude Code | global `~\.claude\CLAUDE.md` ("Kompyuterga bog'liq yo'llar" bo'limi, `agent-sync` bilan ko'chadi) + `docs/superpowers/PROJECTS.md` boshidagi ogohlantirish |
+| Gemini / Antigravity | repo ildizidagi `GEMINI.md` (git bilan ko'chadi) + har prompt faylining §0 bloki |
+| Har qanday prompt | pastdagi standart §0 blokini promptning BOSHIGA qo'ying |
+
+Upstream `CLAUDE.md` / `AGENTS.md` ga ATAYLAB tegilmagan — upstream
+merge'da konflikt bermasligi uchun.
+
+### Prompt'lar uchun standart §0 bloki (nusxalang)
+
+```markdown
+## 0. 🖥️ AVVAL: qaysi kompyuterdasiz (MAJBURIY)
+
+Loyiha laptop va PC'da olib boriladi. Bu promptdagi yo'llar laptop'niki
+bo'lishi mumkin.
+1. `hostname` ni aniqlang.
+2. `<tdesktop>\docs\MACHINES.md` jadvalidan shu kompyuter yo'llarini oling
+   (`<tdesktop>` = `C:\TBuild\tdesktop` yoki `D:\Oybek\Telegram\tdesktop`,
+   qaysi biri mavjud bo'lsa).
+3. Jadvalda yo'q bo'lsa — topib jadvalga yozing va hisobotda ayting.
+4. `git fetch origin && git status -sb`; orqada bo'lsa `git pull --ff-only`.
+   Ish oxirida hammasini push qiling.
+```
+
+## Ish kunining oxirida (kompyuter almashishidan oldin)
+
+1. Ikkala repo: `git status` toza, hammasi `origin/Oybek` ga push qilingan.
+2. `agent-sync push "<izoh>"` — agent xotirasi va chatlar.
+3. Keyingi kompyuterda: ikkala repo'da `git pull --ff-only`, keyin
+   `agent-sync pull`.
+4. `~\.gemini\GEMINI.md` `agent-sync` bilan KO'CHMAYDI (u faqat
+   `.gemini\antigravity` ni oladi) — shuning uchun Gemini qoidalari
+   repo'dagi `GEMINI.md` ga yozilgan.
+
 ## Jadval
 
 | | Laptop | PC |
