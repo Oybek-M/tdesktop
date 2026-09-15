@@ -270,9 +270,15 @@ Session::Session(
 		// 2026-08-24: faollik tarixini ishga tushishda bir marta tozalash.
 		// Ilgari tozalash FAQAT yangi yozuv kelganda ishlardi — ya'ni
 		// kuzatiladigan kontakt bo'lmasa eski yozuvlar abadiy qolardi.
-		// v8 indeksi bilan bu amal ~0.3 ms.
+		// 2026-09-15 (A4+): nazariyada ~0.3 ms deb hisoblangan bo'lsa-da,
+		// start paytida 100k+ qatorli jadvalda DELETE va lock raqobati
+		// asosiy oqimda 126 ms gacha cho'zilishi kuzatildi. UI uchun zarur
+		// bo'lmagani sababli Maintenance::Enqueue orqali fon oqimida,
+		// startda darhol bajariladi.
 		timed("PruneStaleActivityHistory", [] {
-			CustomDB::PruneStaleActivityHistory();
+			CustomDB::Maintenance::Enqueue("PruneStaleActivityHistory", [] {
+				CustomDB::PruneStaleActivityHistory();
+			});
 		});
 	}, lifetime());
 

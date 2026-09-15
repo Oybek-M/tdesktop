@@ -1,5 +1,6 @@
 #include "custom_archive.h"
 #include "base/debug_log.h"
+#include "crl/crl.h"
 
 #include "custom_db.h"
 #include "custom_peer_key.h"
@@ -611,67 +612,78 @@ void EndBatch() {
 }
 
 void RestoreDeletedChats(not_null<Main::Session*> session) {
-	const auto peers = CustomDB::GetPeersWithDeletedMessages(qint64(session->userId().bare));
-	if (peers.isEmpty()) {
-		return;
-	}
-	// CUSTOM 2026-09-12: ro'yxatda 200 ga yaqin peer bor. Qaysi qism
-	// qimmat ekanini bilish uchun ko'rilgan va haqiqatan tiklangan
-	// chatlar sonini ham yozamiz (faqat sekin bo'lsa).
-	auto perfTimer = QElapsedTimer();
-	perfTimer.start();
-	auto restored = 0;
-	auto &owner = session->data();
-	for (const auto &peerIdStr : peers) {
-		auto ok = false;
-		const auto raw = peerIdStr.toULongLong(&ok);
-		if (!ok || !raw) {
-			continue;
+	const auto accountId = qint64(session->userId().bare);
+	// 2026-09-15 (A4+): DB so'rovi (GetPeersWithDeletedMessages) fon oqimida
+	// olinadi, UI ishi esa asosiy oqimda bajariladi.
+	// RestoreDeletedChats kechiktirilMAYDI -- u chatsListLoadedEvents da
+	// darhol ishga tushadi, faqat DB qismi fonga o'tgani uchun asosiy oqimni
+	// 608 ms ga bloklamaydi. Session yopilib qolsa crl::on_main(session, ...)
+	// uni bekor qiladi.
+	crl::async([session, accountId] {
+		const auto peers = CustomDB::GetPeersWithDeletedMessages(accountId);
+		if (peers.isEmpty()) {
+			return;
 		}
-		if (!CustomSettings::ShouldAntiDelete(peerIdStr)) {
-			continue; // bu chat uchun AntiDelete o'chirilgan
-		}
-		const auto peerId = PeerId(raw);
+		crl::on_main(session, [session, peers] {
+			// CUSTOM 2026-09-12: ro'yxatda 200 ga yaqin peer bor. Qaysi qism
+			// qimmat ekanini bilish uchun ko'rilgan va haqiqatan tiklangan
+			// chatlar sonini ham yozamiz (faqat sekin bo'lsa).
+			auto perfTimer = QElapsedTimer();
+			perfTimer.start();
+			auto restored = 0;
+			auto &owner = session->data();
+			for (const auto &peerIdStr : peers) {
+				auto ok = false;
+				const auto raw = peerIdStr.toULongLong(&ok);
+				if (!ok || !raw) {
+					continue;
+				}
+				if (!CustomSettings::ShouldAntiDelete(peerIdStr)) {
+					continue; // bu chat uchun AntiDelete o'chirilgan
+				}
+				const auto peerId = PeerId(raw);
 
-		// MUHIM (performans): bu ro'yxatda 300+ peer bo'lishi mumkin va
-		// ayrimlarida o'n minglab o'chirilgan xabar bor. Shuning uchun
-		// hech narsa YARATMAYDIGAN tekshiruvlardan boshlaymiz — History
-		// yaratish va inject qilish faqat haqiqatan yo'qolgan chat uchun.
-		if (!owner.peerLoaded(peerId)) {
-			continue; // peer hali yuklanmagan — tegmaymiz
-		}
-		if (const auto existing = owner.historyLoaded(peerId)) {
-			if (existing->inChatList()) {
-				continue; // chat allaqachon ro'yxatda — ish yo'q
+				// MUHIM (performans): bu ro'yxatda 300+ peer bo'lishi mumkin va
+				// ayrimlarida o'n minglab o'chirilgan xabar bor. Shuning uchun
+				// hech narsa YARATMAYDIGAN tekshiruvlardan boshlaymiz — History
+				// yaratish va inject qilish faqat haqiqatan yo'qolgan chat uchun.
+				if (!owner.peerLoaded(peerId)) {
+					continue; // peer hali yuklanmagan — tegmaymiz
+				}
+				if (const auto existing = owner.historyLoaded(peerId)) {
+					if (existing->inChatList()) {
+						continue; // chat allaqachon ro'yxatda — ish yo'q
+					}
+				}
+
+				const auto history = owner.history(peerId);
+				if (history->inChatList()) {
+					continue;
+				}
+				history->loadDeletedMessages();
+				if (history->isEmpty()) {
+					continue; // inject qilinmadi (masalan hammasi allaqachon bor)
+				}
+				++restored;
+				if (history->folderKnown()) {
+					// Papkasi ma'lum — to'g'ridan-to'g'ri ro'yxatga qo'shamiz.
+					// refreshChatListEntry o'zi "ro'yxatda yo'q" holatini ham
+					// qayta ishlaydi (existenceChanged).
+					owner.refreshChatListEntry(history);
+				} else {
+					// Papka noma'lum: refreshChatListEntry Expects(folderKnown())
+					// bilan yiqilardi. Serverdan dialog yozuvini so'raymiz —
+					// javob kelgach tdesktop uni ro'yxatga o'zi qo'shadi.
+					owner.histories().requestDialogEntry(history);
+				}
 			}
-		}
-
-		const auto history = owner.history(peerId);
-		if (history->inChatList()) {
-			continue;
-		}
-		history->loadDeletedMessages();
-		if (history->isEmpty()) {
-			continue; // inject qilinmadi (masalan hammasi allaqachon bor)
-		}
-		++restored;
-		if (history->folderKnown()) {
-			// Papkasi ma'lum — to'g'ridan-to'g'ri ro'yxatga qo'shamiz.
-			// refreshChatListEntry o'zi "ro'yxatda yo'q" holatini ham
-			// qayta ishlaydi (existenceChanged).
-			owner.refreshChatListEntry(history);
-		} else {
-			// Papka noma'lum: refreshChatListEntry Expects(folderKnown())
-			// bilan yiqilardi. Serverdan dialog yozuvini so'raymiz —
-			// javob kelgach tdesktop uni ro'yxatga o'zi qo'shadi.
-			owner.histories().requestDialogEntry(history);
-		}
-	}
-	const auto ms = perfTimer.elapsed();
-	if (ms >= 50) {
-		LOG(("CustomMod Perf: RestoreDeletedChats %1 peers, %2 restored, "
-			"%3 ms").arg(peers.size()).arg(restored).arg(ms));
-	}
+			const auto ms = perfTimer.elapsed();
+			if (ms >= 50) {
+				LOG(("CustomMod Perf: RestoreDeletedChats %1 peers, %2 restored, "
+					"%3 ms").arg(peers.size()).arg(restored).arg(ms));
+			}
+		});
+	});
 }
 
 void TryRescueMedia(not_null<HistoryItem*> item) {
