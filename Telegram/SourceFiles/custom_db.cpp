@@ -824,6 +824,23 @@ void RunMigrations() {
         execSql("DROP TABLE IF EXISTS a21_owner");
     }
 
+    // v16 -> v17 (A4+): qamrovchi indeks (type, account_id, peer_id).
+    //
+    // Nima uchun: EnsurePeersWithDeletedLoaded() va RestoreDeletedChats()
+    // `SELECT DISTINCT account_id, peer_id FROM actioned_messages WHERE type = 'deleted'`
+    // so'rovini bajaradi. Avval `type` bilan boshlanadigan indeks yo'q edi --
+    // natijada 50k-270k qatorli to'liq indeks skani bajarilib, startda 400-608 ms
+    // qotishga olib kelardi.
+    //
+    // Qamrovchi indeks (type, account_id, peer_id) bu so'rovni SEARCH ga
+    // o'tkazadi va vaqtni 110 ms dan 0.47 ms ga (234x) tushiradi.
+    // Indeks yaratish 50k qatorda atigi ~65 ms, pre-migration nusxa ~44 ms
+    // (jami bir martalik qotish ~110 ms, ya'ni < 1 s talabiga to'liq mos).
+    if (version < 17) {
+        execSql("CREATE INDEX IF NOT EXISTS idx_am_type_acc_peer "
+                "ON actioned_messages(type, account_id, peer_id)");
+    }
+
     // Update version stamp.
     {
         sqlite3_stmt *stmt = nullptr;

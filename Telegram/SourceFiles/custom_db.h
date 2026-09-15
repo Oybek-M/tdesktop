@@ -111,7 +111,9 @@ struct ActionedMessage {
 // v13 (A17): actioned_messages ga read_at ustuni
 // v14 (sync): sync_outbox + sync_state jadvallari
 // v15 (sync): sync_record_map jadvali va indeksi
-constexpr int kCurrentSchemaVersion = 16;
+// v16 (A21): egasi aniq bo'lgan legacy yozuvlarga account_id
+// v17 (A4+): actioned_messages(type, account_id, peer_id) qamrovchi indeksi
+constexpr int kCurrentSchemaVersion = 17;
 
 void Init();
 
