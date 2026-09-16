@@ -1,5 +1,6 @@
 #include "custom_archive.h"
 #include "base/debug_log.h"
+#include "base/weak_ptr.h"
 #include "crl/crl.h"
 
 #include "custom_db.h"
@@ -617,14 +618,24 @@ void RestoreDeletedChats(not_null<Main::Session*> session) {
 	// olinadi, UI ishi esa asosiy oqimda bajariladi.
 	// RestoreDeletedChats kechiktirilMAYDI -- u chatsListLoadedEvents da
 	// darhol ishga tushadi, faqat DB qismi fonga o'tgani uchun asosiy oqimni
-	// 608 ms ga bloklamaydi. Session yopilib qolsa crl::on_main(session, ...)
-	// uni bekor qiladi.
-	crl::async([session, accountId] {
+	// 608 ms ga bloklamaydi. Session yopilib qolsa weak guard uni bekor qiladi.
+	//
+	// MUHIM: weak ASOSIY oqimda olinadi. crl::on_main(session, ...) ga xom
+	// ko'rsatkich berilsa, guard aynan fon oqimida yasaladi -- ya'ni Session
+	// ob'ekti o'sha payt (chiqish, logout, akkaunt almashish) o'chirilgan
+	// bo'lsa, o'chirilgan xotiraga murojaat bo'lardi. Maintenance navbati
+	// bazani band qilib turganda so'rov cho'zilib, bu oyna kengayadi.
+	const auto weak = base::make_weak(session);
+	crl::async([weak, accountId] {
 		const auto peers = CustomDB::GetPeersWithDeletedMessages(accountId);
 		if (peers.isEmpty()) {
 			return;
 		}
-		crl::on_main(session, [session, peers] {
+		crl::on_main(weak, [weak, peers] {
+			const auto session = weak.get();
+			if (!session) {
+				return;
+			}
 			// CUSTOM 2026-09-12: ro'yxatda 200 ga yaqin peer bor. Qaysi qism
 			// qimmat ekanini bilish uchun ko'rilgan va haqiqatan tiklangan
 			// chatlar sonini ham yozamiz (faqat sekin bo'lsa).
