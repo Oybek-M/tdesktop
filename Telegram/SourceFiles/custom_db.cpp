@@ -4059,7 +4059,34 @@ int CompactActivityHistory() {
         return n;
     }();
 
-    execSql("BEGIN");
+    // 2026-09-16 (A4): ilgari bu YAGONA `DELETE ... WHERE id IN (oyna)`
+    // edi va 427-657 ms davom etardi. Bitta SQLite ulanishi FULLMUTEX
+    // bo'lgani uchun mutex ANA SHU STATEMENT tugagunicha ushlab turilardi,
+    // ya'ni fon ishi asosiy oqimni yarim soniyaga kutkazardi.
+    //
+    // Endi peer bo'yicha bo'laklanadi. Bu natijani O'ZGARTIRMAYDI: oyna
+    // `PARTITION BY peer_id, field` bilan ishlaydi, ya'ni har peer boshqa
+    // peerlardan mustaqil hisoblanadi. Bo'laklar orasida mutex bo'shaydi.
+    const auto peers = [&] {
+        auto result = QVector<QString>();
+        sqlite3_stmt *st = nullptr;
+        if (sqlite3_prepare_v2(gDb,
+                "SELECT DISTINCT peer_id FROM activity_history "
+                "WHERE source = 'observed'", -1, &st, nullptr) == SQLITE_OK) {
+            while (sqlite3_step(st) == SQLITE_ROW) {
+                const auto peerId = colText(st, 0);
+                if (!peerId.isEmpty()) {
+                    result.push_back(peerId);
+                }
+            }
+            sqlite3_finalize(st);
+        }
+        return result;
+    }();
+    if (peers.isEmpty()) {
+        return 0;
+    }
+
     // 1-qoida
     //
     // 2026-08-30: `source = 'observed'` sharti QO'SHILDI — bu filtr
@@ -4075,19 +4102,44 @@ int CompactActivityHistory() {
     // Shart oyna KIRISHIDA turibdi (WHERE ... WINDOW dan oldin), ya'ni
     // retroaktiv yozuvlar na o'chiriladi, na LAG orqali taqqoslashga
     // aralashadi.
-    execSql(
-        "DELETE FROM activity_history WHERE id IN (SELECT id FROM ("
-        "  SELECT id, field, new_value nv, observed_at obs,"
-        "         LAG(new_value) OVER w pv, LAG(observed_at) OVER w po"
-        "  FROM activity_history"
-        "  WHERE source = 'observed'"
-        "  WINDOW w AS (PARTITION BY peer_id, field ORDER BY id))"
-        " WHERE field = 'status' AND pv IS NOT NULL"
-        "   AND instr(nv, ':') > 0 AND instr(pv, ':') > 0"
-        "   AND substr(nv, 1, instr(nv, ':')) = substr(pv, 1, instr(pv, ':'))"
-        "   AND abs((obs - CAST(substr(nv, instr(nv, ':') + 1) AS INTEGER))"
-        "         - (po  - CAST(substr(pv, instr(pv, ':') + 1) AS INTEGER)))"
-        "       < 60)");
+    sqlite3_stmt *del = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "DELETE FROM activity_history WHERE id IN (SELECT id FROM ("
+            "  SELECT id, field, new_value nv, observed_at obs,"
+            "         LAG(new_value) OVER w pv, LAG(observed_at) OVER w po"
+            "  FROM activity_history"
+            "  WHERE source = 'observed' AND peer_id = ?1"
+            "  WINDOW w AS (PARTITION BY peer_id, field ORDER BY id))"
+            " WHERE field = 'status' AND pv IS NOT NULL"
+            "   AND instr(nv, ':') > 0 AND instr(pv, ':') > 0"
+            "   AND substr(nv, 1, instr(nv, ':')) = substr(pv, 1, instr(pv, ':'))"
+            "   AND abs((obs - CAST(substr(nv, instr(nv, ':') + 1) AS INTEGER))"
+            "         - (po  - CAST(substr(pv, instr(pv, ':') + 1) AS INTEGER)))"
+            "       < 60)", -1, &del, nullptr) != SQLITE_OK) {
+        return 0;
+    }
+    // Har bo'lak ~50 ms: shuncha vaqtdan keyin COMMIT qilinadi va yangi
+    // tranzaksiya ochiladi. Har peer uchun alohida COMMIT qilinmasligining
+    // sababi -- WAL'ga yozish ham arzon emas, minglab commit fon ishini
+    // cho'zib yuboradi.
+    constexpr auto kChunkBudgetMs = 50;
+    auto chunkTimer = QElapsedTimer();
+    auto index = 0;
+    while (index < peers.size()) {
+        execSql("BEGIN");
+        chunkTimer.start();
+        while (index < peers.size()) {
+            sqlite3_reset(del);
+            bindText(del, 1, peers[index]);
+            sqlite3_step(del);
+            ++index;
+            if (chunkTimer.elapsed() >= kChunkBudgetMs) {
+                break;
+            }
+        }
+        execSql("COMMIT");
+    }
+    sqlite3_finalize(del);
     // 2-QOIDA OLIB TASHLANDI (2026-08-24).
     //
     // Dastlab 60 soniyadan qisqa online->offline juftliklari "qurilma
@@ -4101,7 +4153,6 @@ int CompactActivityHistory() {
     // holatda ham bir xil. Shuning uchun DISKDA HAMMASI saqlanadi,
     // ajratish esa faqat KO'RSATISHDA qilinadi (Faollik tarixi oynasi
     // qisqa ulanishlarni bitta qatorga guruhlaydi, yo'qotmaydi).
-    execSql("COMMIT");
 
     int removed = 0;
     {

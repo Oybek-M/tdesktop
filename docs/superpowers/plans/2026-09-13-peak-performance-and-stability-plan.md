@@ -105,12 +105,14 @@ tranzaksiyalarga yo'l ochadi.
 
 ### A4. Vaqt byudjeti — uzun texnik xizmat ishlarini bo'laklash
 
-- [ ] `CompactActivityHistory` (bitta katta `DELETE ... WHERE id IN
-      (SELECT ... LAG ...)`, 427–657 ms) — `LIMIT` li ichki `SELECT` bilan
-      ~50 ms lik bo'laklarga, bo'laklar orasida navbatni bo'shatish.
-      Eslatma: SQLite'da `DELETE ... LIMIT` odatda kompilyatsiya qilinmagan
-      (`SQLITE_ENABLE_UPDATE_DELETE_LIMIT`) — ichki `SELECT id ... LIMIT`
-      ishlatilsin.
+- [x] `CompactActivityHistory` peer bo'yicha bo'laklandi (2026-09-16).
+      Oyna `PARTITION BY peer_id, field` bo'lgani uchun peerlar mustaqil —
+      natija bir xil qoladi, lekin bitta statement mutexni 5 ms dan ortiq
+      ushlamaydi. Bo'laklar ~50 ms budjet bilan tranzaksiyaga guruhlanadi
+      (har peer uchun alohida COMMIT WAL'ni ortiqcha yozardi).
+      Bazaning nusxasida tekshirildi: 55 246 qator, 753 peer —
+      bitta statement 133.8 ms -> eng uzuni 4.8 ms, o'chirilgan qatorlar
+      to'plami AYNAN bir xil (ID'lar bo'yicha solishtirildi).
 - [ ] `ActivityCacheLoad` (162–175 ms) — kerak bo'lsa bo'laklash;
       hozirgi qiymat qabul qilinadigan.
 
