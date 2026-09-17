@@ -215,6 +215,7 @@ void Histories::readInbox(not_null<History*> history) {
 void Histories::readInboxTill(not_null<HistoryItem*> item) {
 	const auto history = item->history();
 	if (!item->isRegular()) {
+		const auto wasDeletedLocally = item->isDeletedLocally();
 		readClientSideMessage(item);
 		auto view = item->mainView();
 		if (!view) {
@@ -242,6 +243,20 @@ void Histories::readInboxTill(not_null<HistoryItem*> item) {
 			}
 		}
 		if (!item->isRegular()) {
+			// CUSTOM: o'chirilgan (AntiDelete orqali tiklangan) xabarlar serverda
+			// mavjud emas va ularda isRegular() == false bo'ladi. Agar chatda
+			// undan oldingi birorta ham server xabari bo'lmasa (masalan butun
+			// chat o'chirilgan bo'lsa), bu kutilgan holat -- logga xato yozilmaydi,
+			// serverga yangi so'rov yuborilmaydi va mahalliy o'qilmagan holati
+			// (unread count / mark) xavfsiz tozalanadi.
+			if (wasDeletedLocally || item->isDeletedLocally()) {
+				if (history->unreadMark() || history->unreadCount() > 0) {
+					history->setUnreadMark(false);
+					history->setUnreadCount(0);
+					history->updateChatListEntry();
+				}
+				return;
+			}
 			LOG(("App Error: "
 				"Can't read history till unknown local message."));
 			return;
