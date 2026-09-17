@@ -113,8 +113,11 @@ tranzaksiyalarga yo'l ochadi.
       Bazaning nusxasida tekshirildi: 55 246 qator, 753 peer —
       bitta statement 133.8 ms -> eng uzuni 4.8 ms, o'chirilgan qatorlar
       to'plami AYNAN bir xil (ID'lar bo'yicha solishtirildi).
-- [ ] `ActivityCacheLoad` (162–175 ms) — kerak bo'lsa bo'laklash;
-      hozirgi qiymat qabul qilinadigan.
+- [x] `ActivityCacheLoad` o'lchandi (2026-09-16, B3): bazaning nusxasida (55 249 qator)
+      cold 157.3 ms, warm o'rtacha 132.3 ms (< 150 ms, min 116 ms, max 188 ms).
+      Per-peer bo'laklash sinovi (753 ta alohida so'rov) 208 ms oldi, ya'ni
+      oyna funksiyali yagona SELECT ancha tezroq va fonda `Maintenance::Enqueue`
+      orqali asosiy oqimni bloklamasdan ishlaydi. Hozirgi kod saqlab qolindi.
 
 ### A4+. Startdagi 727 ms blokni yo'qotish — KOD TAYYOR (`4a477c8abd`, `c27bdccb60`), build kutmoqda
 
@@ -130,12 +133,27 @@ tranzaksiyalarga yo'l ochadi.
 
 ### A6. Eskidan qolgan ochiq ishlar
 
-- [ ] 824 ta legacy `account_id=0` o'chirilgan xabar (154 peer) — har
-      akkauntda "eski yozuv, akkaunt noma'lum" bo'lib ko'rinadi
-      (`specs/2026-09-11-account-misattribution-incident.md`).
+- [x] **B2 Legacy `account_id=0`:** DB nusxasida o'lchandi (2026-09-16). `actioned_messages` da
+      14 944 qator (1072 peer, 833 deleted, 14 110 backup). O'lchov ko'rsatdiki,
+      qatorlarning faqat 4.08 % i (88 peer, 610 qator) da egasi aniq; qolgan 95.92 % i
+      (14 334 qator) ko'p akkauntli (60 peer / 11 173 qator) yoki dalilsiz (1581 peer /
+      3161 qator) bo'lgani uchun ularni biror akkauntga yozish ma'lumot yo'qotadi.
+      Xavfsiz mustaqil tozalash skripti tayyorlandi: `tools/maintenance/cleanup_legacy_account_zero.py`
+      (dry-run, auto-backup, Telegram yopiqligini tekshirish, JSON undo log).
+      Nusxada sinab ko'rildi: 166 peer bo'yicha jami 19 607 qator yangilandi va undo bilan
+      orqaga qaytarildi. Jonli bazaga yozilmadi. `kAccountFilterSql` filtri legacy qatorlar
+      butunlay 0 bo'lmaguncha olib tashlanmaydi (`ee4b9ec9dc`).
 - [ ] S1: media/stories foni miltillashi — `use-qt-rhi=false` sinovi
       (ilova yopiq holda, `experimental_options_rhi_off.json`).
-- [ ] `readInboxTill` injected elementlarda o'qish belgisini qo'ymaydi.
+- [x] **B1 `readInboxTill` va inject qilingan elementlar:** Muammo kod va jonli log
+      orqali tasdiqlandi: inject qilingan elementlar `WithLocalFlag` tufayli `isRegular() == false`
+      bo'ladi va `_clientSideMessages` ga qo'shilmaydi. Chatda undan oldingi server xabari
+      bo'lmasa (tarixi o'chirilgan chat), `readInboxTill(item)` yuqoriga qarab server xabari
+      topolmaydi va `App Error: Can't read history till unknown local message.` xatosi
+      to'xtovsiz yoziladi (bugungi `log.txt` da 217 marta kuzatildi).
+      Tuzatildi (`837ce8f234`): `data_histories.cpp` da `isDeletedLocally()` holati
+      tekshirilib, soxta xato logi to'xtatildi, mahalliy unread holati xavfsiz tozalanadi,
+      Ghost Mode va `Expects(IsServerMsgId)` buzilmasligi ta'minlandi.
 
 ### A7. Reliz
 
