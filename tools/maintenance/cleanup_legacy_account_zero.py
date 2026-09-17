@@ -112,6 +112,37 @@ def count_zeros(conn):
         counts[tbl] = (cnt0, cnt_tot)
     return counts
 
+def split_by_collision(cur, table, peer_id, account_id):
+    """
+    (account_id, peer_id, msg_id) -- PRIMARY KEY. Legacy qator ko'chirilganda
+    nishon qator ALLAQACHON mavjud bo'lishi mumkin.
+
+    Ilgari bu yerda `UPDATE OR REPLACE` ishlatilardi va SQLite mavjud (to'g'ri
+    account_id li, YANGIROQ) qatorni JIMGINA O'CHIRIB, uning o'rniga eski
+    legacy qatorni qo'yardi. Undo log esa o'chirilgan qatorni bilmaydi --
+    ya'ni yo'qotish qaytarilmas edi. Jonli bazada bu 1126 ta text_cache va
+    138 ta media_index qatorini yo'q qilardi.
+
+    Endi to'qnashgan legacy qatorlar KO'CHIRILMAYDI (mavjud qator saqlanadi)
+    va ular alohida sanaladi.
+    """
+    cur.execute(
+        f"SELECT msg_id FROM {table} WHERE peer_id = ? AND account_id = 0",
+        (peer_id,))
+    candidates = [r[0] for r in cur.fetchall()]
+    movable, skipped = [], 0
+    for msg_id in candidates:
+        cur.execute(
+            f"SELECT 1 FROM {table} "
+            "WHERE peer_id = ? AND msg_id = ? AND account_id = ?",
+            (peer_id, msg_id, account_id))
+        if cur.fetchone():
+            skipped += 1
+        else:
+            movable.append(msg_id)
+    return movable, skipped
+
+
 def apply_cleanup(conn, attributions, dry_run=False):
     """
     Aniq egasi topilgan peerlar uchun qatorlarni yangilaydi va undo log yozadi.
@@ -121,6 +152,7 @@ def apply_cleanup(conn, attributions, dry_run=False):
     tables = ['actioned_messages', 'text_cache', 'activity_history', 'media_index']
     
     updated_counts = {t: 0 for t in tables}
+    skipped_counts = {t: 0 for t in tables}
 
     if not dry_run:
         cur.execute("BEGIN TRANSACTION")
@@ -161,8 +193,9 @@ def apply_cleanup(conn, attributions, dry_run=False):
                             (account_id, peer_id))
 
         # text_cache (composite key: account_id, peer_id, msg_id)
-        cur.execute("SELECT msg_id FROM text_cache WHERE peer_id = ? AND account_id = 0", (peer_id,))
-        tc_msg_ids = [r[0] for r in cur.fetchall()]
+        tc_msg_ids, tc_skipped = split_by_collision(
+            cur, 'text_cache', peer_id, account_id)
+        skipped_counts['text_cache'] += tc_skipped
         if tc_msg_ids:
             updated_counts['text_cache'] += len(tc_msg_ids)
             for m_id in tc_msg_ids:
@@ -174,15 +207,15 @@ def apply_cleanup(conn, attributions, dry_run=False):
                     "new_acc": account_id
                 })
             if not dry_run:
-                cur.execute("""
-                    UPDATE OR REPLACE text_cache
-                    SET account_id = ?
-                    WHERE peer_id = ? AND account_id = 0
-                """, (account_id, peer_id))
+                cur.executemany(
+                    "UPDATE text_cache SET account_id = ? "
+                    "WHERE peer_id = ? AND msg_id = ? AND account_id = 0",
+                    [(account_id, peer_id, m_id) for m_id in tc_msg_ids])
 
         # media_index (composite key: account_id, peer_id, msg_id)
-        cur.execute("SELECT msg_id FROM media_index WHERE peer_id = ? AND account_id = 0", (peer_id,))
-        mi_msg_ids = [r[0] for r in cur.fetchall()]
+        mi_msg_ids, mi_skipped = split_by_collision(
+            cur, 'media_index', peer_id, account_id)
+        skipped_counts['media_index'] += mi_skipped
         if mi_msg_ids:
             updated_counts['media_index'] += len(mi_msg_ids)
             for m_id in mi_msg_ids:
@@ -194,16 +227,12 @@ def apply_cleanup(conn, attributions, dry_run=False):
                     "new_acc": account_id
                 })
             if not dry_run:
-                cur.execute("""
-                    UPDATE OR REPLACE media_index
-                    SET account_id = ?
-                    WHERE peer_id = ? AND account_id = 0
-                """, (account_id, peer_id))
+                cur.executemany(
+                    "UPDATE media_index SET account_id = ? "
+                    "WHERE peer_id = ? AND msg_id = ? AND account_id = 0",
+                    [(account_id, peer_id, m_id) for m_id in mi_msg_ids])
 
-    if not dry_run:
-        conn.commit()
-
-    return updated_counts, undo_records
+    return updated_counts, undo_records, skipped_counts
 
 def revert_undo(conn, undo_file_path):
     """Undo log faylidan foydalanib o'zgarishlarni orqaga qaytaradi."""
@@ -220,7 +249,9 @@ def revert_undo(conn, undo_file_path):
             cur.execute(f"UPDATE {tbl} SET account_id = ? WHERE {rec['pk_col']} = ?",
                         (rec["old_acc"], rec["pk_val"]))
         else:
-            cur.execute(f"UPDATE OR REPLACE {tbl} SET account_id = ? WHERE peer_id = ? AND msg_id = ? AND account_id = ?",
+            # OR REPLACE YO'Q: qaytarishda ham hech qanday qator
+            # jimgina o'chirilmasligi kerak.
+            cur.execute(f"UPDATE {tbl} SET account_id = ? WHERE peer_id = ? AND msg_id = ? AND account_id = ?",
                         (rec["old_acc"], rec["peer_id"], rec["msg_id"], rec["new_acc"]))
         reverted_count += 1
 
@@ -233,6 +264,9 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Faqat hisoblash, o'zgarish kiritmaslik")
     parser.add_argument("--apply", action="store_true", help="O'zgarishlarni bazaga qo'llash")
     parser.add_argument("--undo", help="Undo log fayli orqali orqaga qaytarish")
+    parser.add_argument("--copy", action="store_true",
+                        help="Ko'rsatilgan baza ATAYLAB olingan nusxa: Telegram "
+                             "ishlab tursa ham yozishga ruxsat beriladi")
     args = parser.parse_args()
 
     db_path = os.path.normpath(os.path.abspath(args.db_path))
@@ -245,18 +279,22 @@ def main():
         print(f"[!] Xato: Baza fayli topilmadi: {db_path}")
         sys.exit(1)
 
-    is_live = (db_path.lower() == DEFAULT_LIVE_DB.lower())
-
-    # 1. Telegram ishlayotganini tekshirish
-    if args.apply and not args.dry_run:
-        if is_telegram_running():
-            if is_live:
-                print("[!] XATO: Telegram.exe hozirda ishlab turibdi!")
-                print("    Jonli bazaga yozishdan oldin Telegram'ni butunlay yoping.")
-                sys.exit(1)
-            else:
-                print("[!] OGOHLANTIRISH: Telegram.exe ishlab turibdi, ammo ko'rsatilgan")
-                print("    baza jonli baza emas, alohida nusxa ekani tasdiqlandi.")
+    # 1. Telegram ishlayotganini tekshirish.
+    #
+    # DEFAULT_LIVE_DB yo'li FAQAT laptop'niki. PC'da jonli baza boshqa
+    # yo'lda turadi (docs/MACHINES.md), shuning uchun "yo'l mos kelmadi ->
+    # demak bu nusxa" degan xulosa XATO va jonli bazaga yozib yuborardi.
+    # Endi Telegram ishlab tursa yozish HAR QANDAY yo'l uchun rad etiladi;
+    # nusxada sinash uchun --copy bayrog'i ataylab beriladi.
+    if args.apply and not args.dry_run and is_telegram_running():
+        if not args.copy:
+            print("[!] XATO: Telegram.exe hozirda ishlab turibdi!")
+            print("    Bazaga yozishdan oldin Telegram'ni butunlay yoping.")
+            print("    Bu ATAYLAB olingan nusxa bo'lsa: --copy bayrog'ini bering.")
+            sys.exit(1)
+        print("[!] OGOHLANTIRISH: --copy berildi, Telegram ishlab turgani")
+        print("    e'tiborga olinmadi. Yo'l to'g'riligiga ISHONCH HOSIL QILING:")
+        print(f"    {db_path}")
 
     conn = sqlite3.connect(db_path)
 
@@ -301,16 +339,23 @@ def main():
     mode_str = "SIMULYATSIYA (DRY-RUN)" if is_dry else "HAQIQIY QO'LLASH (APPLY)"
     print(f"\n[*] Rejim: {mode_str}")
 
-    updated_counts, undo_records = apply_cleanup(conn, attributions, dry_run=is_dry)
+    updated_counts, undo_records, skipped_counts = apply_cleanup(
+        conn, attributions, dry_run=is_dry)
 
-    # 7. Undo log yozish
-    if not is_dry and undo_records:
-        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        undo_filename = f"cleanup_legacy_undo_{ts}.json"
-        undo_path = os.path.join(os.path.dirname(db_path), undo_filename)
-        with open(undo_path, "w", encoding="utf-8") as f:
-            json.dump(undo_records, f, indent=2)
-        print(f"[+] Undo log yozildi: {undo_path} ({len(undo_records)} ta yozuv)")
+    # 7. Undo log COMMIT'dan OLDIN yoziladi: aks holda commit bo'lib,
+    # keyin fayl yozishda uzilish bo'lsa, o'zgarishlarni qaytarib
+    # bo'lmasdi (faqat .bak qolardi).
+    if not is_dry:
+        if undo_records:
+            ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+            undo_filename = f"cleanup_legacy_undo_{ts}.json"
+            undo_path = os.path.join(os.path.dirname(db_path), undo_filename)
+            with open(undo_path, "w", encoding="utf-8") as f:
+                json.dump(undo_records, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            print(f"[+] Undo log yozildi: {undo_path} ({len(undo_records)} ta yozuv)")
+        conn.commit()
 
     # 8. Yakuniy holat
     after_counts = count_zeros(conn) if not is_dry else {
@@ -328,7 +373,16 @@ def main():
         print(f"{tbl:<20} | {b_z:>13} | {upd:>10} | {a_z:>13}")
 
     print("\n" + "=" * 60)
+    skipped_total = sum(skipped_counts.values())
+    if skipped_total:
+        print("--- To'qnashuv sababli TEGILMAGAN legacy qatorlar ---")
+        print("(nishon (account_id, peer_id, msg_id) allaqachon mavjud; "
+              "mavjud qator saqlandi)")
+        for tbl, n in skipped_counts.items():
+            if n:
+                print(f"  {tbl:<20}: {n}")
     print(f"Jami yangilangan qatorlar: {sum(updated_counts.values())}")
+    print(f"To'qnashuv sababli tegilmagan: {skipped_total}")
     print("=" * 60)
 
     conn.close()
