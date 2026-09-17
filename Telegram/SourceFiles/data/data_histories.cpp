@@ -252,7 +252,15 @@ void Histories::readInboxTill(not_null<HistoryItem*> item) {
 			if (wasDeletedLocally || item->isDeletedLocally()) {
 				if (history->unreadMark() || history->unreadCount() > 0) {
 					history->setUnreadMark(false);
-					history->setUnreadCount(0);
+					// setUnreadCount() da Expects(folderKnown()) bor.
+					// Tiklangan chatda papka NOMA'LUM bo'lishi mumkin --
+					// RestoreDeletedChats() aynan shu sababli
+					// refreshChatListEntry() o'rniga requestDialogEntry()
+					// ishlatadi. Shart qo'yilmasa shu yo'l ilovani
+					// yiqitardi.
+					if (history->folderKnown()) {
+						history->setUnreadCount(0);
+					}
 					history->updateChatListEntry();
 				}
 				return;
