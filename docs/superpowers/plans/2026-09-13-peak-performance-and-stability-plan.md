@@ -140,9 +140,22 @@ tranzaksiyalarga yo'l ochadi.
       3161 qator) bo'lgani uchun ularni biror akkauntga yozish ma'lumot yo'qotadi.
       Xavfsiz mustaqil tozalash skripti tayyorlandi: `tools/maintenance/cleanup_legacy_account_zero.py`
       (dry-run, auto-backup, Telegram yopiqligini tekshirish, JSON undo log).
-      Nusxada sinab ko'rildi: 166 peer bo'yicha jami 19 607 qator yangilandi va undo bilan
-      orqaga qaytarildi. Jonli bazaga yozilmadi. `kAccountFilterSql` filtri legacy qatorlar
+      Jonli bazaga yozilmadi. `kAccountFilterSql` filtri legacy qatorlar
       butunlay 0 bo'lmaguncha olib tashlanmaydi (`ee4b9ec9dc`).
+      **Tekshiruvda topilgan va tuzatilgan (`2af8bc7c1a`):** `text_cache` va
+      `media_index` kaliti `(account_id, peer_id, msg_id)`. Legacy qator
+      ko'chirilganda nishon qator allaqachon mavjud bo'lsa, `UPDATE OR REPLACE`
+      MAVJUD (to'g'ri egali, yangiroq) qatorni jimgina o'chirardi va undo log
+      uni bilmagani uchun yo'qotish qaytarilmas edi. Skriptning eski nusxasi
+      jonli bazaning nusxasida ishga tushirilganda 1126 ta `text_cache` va
+      138 ta `media_index` qatori yo'q qilindi. Endi to'qnashgan qatorlar
+      TEGILMAYDI va alohida sanaladi; undo log COMMIT'dan oldin yoziladi;
+      Telegram ishlab tursa yozish har qanday yo'l uchun rad etiladi
+      (eski tekshiruv faqat laptop yo'lini bilardi, PC'da jonli bazaga
+      ogohlantirish bilan yozib yuborardi) -- nusxada ataylab sinash uchun
+      `--copy`. Tuzatilgan skript nusxada boshdan-oxir sinaldi: 18 325 qator
+      yangilandi, 1264 tasi to'qnashuv sababli o'tkazib yuborildi, birorta
+      qator yo'qolmadi, `--undo` bazani aynan tiklaydi.
 - [ ] S1: media/stories foni miltillashi — `use-qt-rhi=false` sinovi
       (ilova yopiq holda, `experimental_options_rhi_off.json`).
 - [x] **B1 `readInboxTill` va inject qilingan elementlar:** Muammo kod va jonli log
@@ -154,6 +167,12 @@ tranzaksiyalarga yo'l ochadi.
       Tuzatildi (`837ce8f234`): `data_histories.cpp` da `isDeletedLocally()` holati
       tekshirilib, soxta xato logi to'xtatildi, mahalliy unread holati xavfsiz tozalanadi,
       Ghost Mode va `Expects(IsServerMsgId)` buzilmasligi ta'minlandi.
+      **Tekshiruvda topilgan va tuzatilgan (`3c1556847e`):** `setUnreadCount()` da
+      `Expects(folderKnown())` bor, tiklangan chatda esa papka noma'lum bo'lishi
+      mumkin (shuning uchun `RestoreDeletedChats` `requestDialogEntry()` ishlatadi) --
+      ya'ni yangi tarmoq aynan xavfsiz bo'lishi kerak joyda ilovani yiqitishi mumkin edi.
+      Endi `folderKnown()` sharti qo'yildi; `setUnreadMark()` va
+      `updateChatListEntry()` da bunday shart yo'q, shuning uchun badge baribir tozalanadi.
 
 ### A7. Reliz
 
