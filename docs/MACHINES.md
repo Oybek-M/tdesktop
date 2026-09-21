@@ -47,8 +47,8 @@ Loyiha laptop va PC'da olib boriladi. Bu promptdagi yo'llar laptop'niki
 bo'lishi mumkin.
 1. `hostname` ni aniqlang.
 2. `<tdesktop>\docs\MACHINES.md` jadvalidan shu kompyuter yo'llarini oling
-   (`<tdesktop>` = `C:\TBuild\tdesktop` yoki `D:\Oybek\Telegram\tdesktop`,
-   qaysi biri mavjud bo'lsa).
+   (`<tdesktop>`: laptopda `C:\TBuild\tdesktop`, PC'da
+   `D:\This PC\Documents\Projects programming\Telegram\tdesktop`).
 3. Jadvalda yo'q bo'lsa — topib jadvalga yozing va hisobotda ayting.
 4. `git fetch origin && git status -sb`; orqada bo'lsa `git pull --ff-only`.
    Ish oxirida hammasini push qiling.
@@ -66,18 +66,20 @@ bo'lishi mumkin.
 
 ## Jadval
 
+PC ustuni 2026-09-21 da to'ldirildi — har bir qator tekshirilgan, taxmin emas.
+
 | | Laptop | PC |
 |---|---|---|
-| `hostname` | `DESKTOP-L2J53IK` | ❓ birinchi sessiyada to'ldirilsin |
-| `<tdesktop>` repo | `C:\TBuild\tdesktop` | `D:\Oybek\Telegram\tdesktop` (❓ tasdiqlansin) |
-| `<server>` repo | `C:\Users\Oybek\Documents\Projects programming\Telegram\customsync-server` | ❓ |
-| Loyiha soyabon papkasi (sessiya ochiladigan joy) | `C:\Users\Oybek\Documents\Projects programming\Telegram` | ❓ |
-| Build chiqishi | `<tdesktop>\out\Release\Telegram.exe` | ❓ |
-| Sinov uchun ishga tushiriladigan nusxa | `C:\Users\Oybek\Pictures\Release\Telegram.exe` (log: shu papkadagi `log.txt`) | ❓ |
-| Build muhiti | Qt 6.11.1 (`QT` env), `Telegram.slnx` | ❓ |
-| Server testlari uchun baza sozlamasi | `<server>\src\CustomSync.Api\appsettings.Development.json` (gitignore — nusxalanadi yoki `scripts\db-bootstrap.ps1`) | ❓ |
-| Agent xotirasini sinxronlash | `C:\Users\Oybek\agent-sync-vault` (`agent-sync push/pull`) | ❓ |
-| CustomMod arxiv ildizi (`ArchiveRoot`) | `C:\Users\Oybek\Pictures\customizationMainFolder` (baza: `.../db/actioned_messages.db`) | ❓ |
+| `hostname` | `DESKTOP-L2J53IK` | `DESKTOP-5CAUS66` |
+| `<tdesktop>` repo | `C:\TBuild\tdesktop` | `D:\This PC\Documents\Projects programming\Telegram\tdesktop` |
+| `<server>` repo | `C:\Users\Oybek\Documents\Projects programming\Telegram\customsync-server` | `D:\This PC\Documents\Projects programming\Telegram\customsync-server` |
+| Loyiha soyabon papkasi (sessiya ochiladigan joy) | `C:\Users\Oybek\Documents\Projects programming\Telegram` | `D:\This PC\Documents\Projects programming\Telegram` — junction tufayli laptopdagi `C:\Users\Oybek\Documents\Projects programming\Telegram` yo'li ham SHU YERGA olib keladi |
+| Build chiqishi | `<tdesktop>\out\Release\Telegram.exe` | `<tdesktop>\out\Release\Telegram.exe` (nisbiy yo'l bir xil; hali build qilinmagan) |
+| Sinov uchun ishga tushiriladigan nusxa | `C:\Users\Oybek\Pictures\Release\Telegram.exe` (log: shu papkadagi `log.txt`) | **TAYYOR EMAS** — hali sozlanmagan (2026-09-21) |
+| Build muhiti | Qt 6.11.1 (`QT` env), `Telegram.slnx` | Visual Studio Community 2026 (18.7) C++ vositalari bilan BOR — standart joyda emas: `E:\Application's datas\Visual Studio\Program Files`. Qt esa **YO'Q** (2026-09-21): `QT` env yo'q, `qmake` PATH'da yo'q, C:/D:/E: da Qt papkasi topilmadi. Build uchun Qt 6.11.1 o'rnatish kerak |
+| Server testlari uchun baza sozlamasi | `<server>\src\CustomSync.Api\appsettings.Development.json` (gitignore — nusxalanadi yoki `scripts\db-bootstrap.ps1`) | **TAYYOR EMAS** — fayl hali yaratilmagan — `db-bootstrap.ps1` ishga tushirilsin |
+| Agent xotirasini sinxronlash | `C:\Users\Oybek\agent-sync-vault` (`agent-sync push/pull`) | `D:\This PC\Documents\Projects programming\agent-sync-vault` |
+| CustomMod arxiv ildizi (`ArchiveRoot`) | `C:\Users\Oybek\Pictures\customizationMainFolder` (baza: `.../db/actioned_messages.db`) | `C:\Users\Oybek\customizationMainFolder` — DIQQAT: laptopdan farqli, `Pictures` ICHIDA EMAS |
 
 Remote'lar (hamma kompyuterda bir xil): tdesktop -> `origin` =
 `Oybek-M/tdesktop` fork, branch `Oybek` (upstream'ga push TAQIQ);
