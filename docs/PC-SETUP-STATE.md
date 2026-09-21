@@ -78,12 +78,26 @@ powershell -NoProfile -ExecutionPolicy Bypass -File D:\TBuild\run-prepare.ps1
 - `JOBS=3` — i5-2400 (4 yadro) va ~8 GB bo'sh RAM uchun moslangan
 - Qt manbadan yig'iladi: `QT=6.11.2`, modullar qtbase/qtimageformats/qtshadertools/qtsvg
 - Uzilsa xavfsiz: `prepare.py` tugagan bosqichlarni keshlaydi
+- `win.bat qt6 **silent**` — SHART. Usiz `prepare.py` eskirgan bosqichda
+  `(r)ebuild, rebuild (a)ll, (s)kip...?` deb savol beradi va javobni
+  `msvcrt.getch()` bilan KONSOLDAN o'qiydi. Fon jarayonida konsol yo'q,
+  shuning uchun 09-21 08:33 dagi urinish 2/33-bosqichda (ThirdParty/msys64)
+  darhol `FAILED` bergan edi — aslida bu kompilyator muammosi EMAS edi.
+- Loglardagi `'vswhere.exe' is not recognized` va PowerShell
+  `The string is missing the terminator` xatolari ZARARSIZ: VS papkasi nomida
+  apostrof bor (`Application's datas`) va `vswhere` PATH da emas, lekin
+  `vcvars64.bat` baribir muvaffaqiyatli ishlaydi (tekshirildi: cl 19.44.35228).
 - Holat: `D:\TBuild\prepare-status.txt`, loglar: `D:\TBuild\prepare-logs\`
 
 **Kutish:** i5-2400 da yuklash bir necha soat, kompilyatsiya undan ham ko'p.
 
 ### Undan keyin: Telegram build
-`api_id` va `api_hash` kerak bo'ladi (foydalanuvchida).
+`api_id` = `28454823` (docs/superpowers/plans/2026-08-01-self-update-plan.md),
+`api_hash` foydalanuvchida — repo'ga ATAYLAB yozilmagan.
+
+```
+configure.bat x64 qt6 -D TDESKTOP_API_ID=28454823 -D TDESKTOP_API_HASH=<sizniki>
+```
 
 ---
 
