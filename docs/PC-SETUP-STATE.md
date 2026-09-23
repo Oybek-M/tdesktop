@@ -236,3 +236,62 @@ qiladi; hozirgi sxemada umuman ishlatilmaydi. Istasangiz VS Installer
 
 `D:\TBuild\tdesktop\out\Telegram.slnx` yaratildi, `TDESKTOP_API_ID` va
 `TDESKTOP_API_HASH` keshda. Qurish hali BOSHLANMAGAN.
+
+---
+
+## 2026-09-24: PC'da BOG'LASH IMKONSIZ -- ildiz sabab va qaror
+
+Kompilyatsiya (1091 manbadan 1037 obj) muvaffaqiyatli o'tdi. Yiqilgan
+joy -- faqat BOG'LASH (link) bosqichi.
+
+### O'lchangan ildiz sabab
+
+    1037 ta .obj   = 22.0 GB
+    kutubxonalar   =  5.8 GB
+    ------------------------
+    linker kirishi ~ 28 GB
+
+Linker bu 28 GB ni bir o'tishda qayta ishlaydi, shuning uchun uning
+~26 GB commit talabi kutilgan holat. `WholeProgramOptimization` va
+`LinkTimeCodeGeneration` YOQILMAGAN (tekshirilgan) -- LTCG sabab emas.
+
+PC'da 16 GB RAM bor, undan linkerга ~12 GB tegadi. Qolgan ~14 GB HDD
+pagefile'ga chiqadi. HDD'da tasodifiy o'qish ~10 ms, NVMe SSD'da
+~50-100 us -- **100 barobar** farq. Natijada linker qotib qoladi.
+
+### Sinalgan va YORDAM BERMAGAN yo'llar
+
+| # | Sozlama | Cho'qqi commit | CPU (60s da) |
+|---|---|---|---|
+| 1 | ikkala OPT yoqiq | 31.2 GB | 0.5 s |
+| 2 | ICF o'chiq, REF yoqiq | 20.6 GB | 4.3 s |
+| 3 | ikkala OPT o'chiq | 26.4 GB | 0.9 s |
+| 4 | 3 + `/DEBUG:FASTLINK` | 26.5 GB | 0.6 s |
+
+Nega hech biri ishlamadi: ularning hammasi linker QANDAY ishlashini
+o'zgartiradi, QANCHA ma'lumot o'qishini emas. Kirish 28 GB bo'lib
+qolaverdi. `/DEBUG:FASTLINK` ham yordam bermadi, chunki u LINKER'ning
+PDB'siga ta'sir qiladi, obj fayllar ichidagi debug ma'lumotiga emas --
+obj'lar allaqachon to'liq debug bilan kompilyatsiya qilingan edi.
+
+Pagefile'ni kattalashtirish (D: ga 32 GB, commit limit 23 -> 55 GB)
+LNK1102 ni yo'qotdi, LEKIN o'rniga o'tkazuvchanlik devorini ochdi.
+Ya'ni u qattiq xatoni hal qildi, sekinlikni emas.
+
+### Variantlar
+
+- **A. `C:` (SSD) da ~30 GB bo'shatib, pagefile'ni o'sha yerga qo'yish.**
+  PC'ni laptop bilan bir xil sharoitga keltiradi. Eng yaxshisi, agar
+  SSD'da joy topilsa (hozir C: 111 GB dan atigi ~5 GB bo'sh).
+- **B. Kod PC'da, build laptopda.** Hozirgi qaror. Repo `origin/Oybek`
+  orqali sinxron, hech nima ko'chirish shart emas.
+- **C. Debug simvollarsiz qayta kompilyatsiya.** obj hajmini keskin
+  kamaytiradi, lekin 3-5 soat va simvollar butunlay yo'qoladi.
+  Tavsiya etilmaydi.
+
+### PC'da tayyor holda turgan narsalar
+
+prepare 33/33, Qt 6.11.2 (qurilgan + kesh kaliti), `configure` o'tgan,
+`Telegram.slnx` va API kalitlari joyida, 1037 obj fayl qurilgan.
+Ya'ni RAM ko'paytirilsa yoki A varianti bajarilsa, faqat bog'lash
+qoladi -- qaytadan boshlash shart emas.
