@@ -482,13 +482,23 @@ mac:
     git checkout 7387476bb3b7200d3b044015696cb3c28f78593c
 """)
 
+# CustomMod o'zgarishi: yuklash `iwr` dan `curl` ga ko'chirildi.
+# Nega: Windows PowerShell 5.1 dagi Invoke-WebRequest 86 MB lik faylni
+# xotiraga yig'adi va bitta TCP uzilishi butun ishni bekor qiladi -- na
+# qayta urinish, na davom ettirish bor. 2026-09-21 kechasi PC'da ketma-ket
+# 3 ta prepare urinishi aynan shu yerda "An existing connection was
+# forcibly closed by the remote host" bilan yiqildi (26.8 / 15.1 / 0 MB).
+# Xuddi shu URL o'sha paytda `curl` bilan muammosiz yuklandi, ya'ni ayb
+# tarmoqda emas (Cloudflare WARP ham uzilgan holatda sinaldi).
+# `curl.exe` Windows 10 1803+ tarkibida bor; -C - yarim qolgan faylni
+# davom ettiradi, --retry-all-errors ulanish uzilishini ham qayta uradi.
 stage('msys64', """
 win:
     SET PATH=%THIRDPARTY_DIR%\\msys64\\usr\\bin;%PATH%
     SET CHERE_INVOKING=enabled_from_arguments
     SET MSYS2_PATH_TYPE=inherit
 
-    powershell -Command "iwr -OutFile ./msys64.exe https://github.com/msys2/msys2-installer/releases/download/2025-08-30/msys2-base-x86_64-20250830.sfx.exe"
+    curl -L --retry 10 --retry-all-errors --retry-delay 5 -C - -o msys64.exe https://github.com/msys2/msys2-installer/releases/download/2025-08-30/msys2-base-x86_64-20250830.sfx.exe
     msys64.exe
     del msys64.exe
 
@@ -664,8 +674,16 @@ mac:
     cmake --install build
 """)
 
+# CustomMod o'zgarishi: --depth 1 qo'shildi.
+# Nega: openssl repozitoriysining to'liq tarixi ~350 MB. PC'dagi kanalda
+# (~70-250 KB/s) bu bir soatdan oshadi va GitHub ulanishi oxiriga yetmay
+# uziladi: "fetch-pack: unexpected disconnect while reading sideband
+# packet / early EOF" (2026-09-22 da ketma-ket bir necha urinish shunday
+# yiqildi, biri 67 daqiqa ishlab turib). Sayoz klon ~30 MB.
+# Xavfsiz: bu yerda aniq teg (-b openssl-3.2.1) olinadi va keyin hech
+# qanday `git checkout <sha>` yo'q, ya'ni tarix kerak emas.
 stage('openssl3', """
-    git clone -b openssl-3.2.1 https://github.com/openssl/openssl openssl3
+    git clone --depth 1 -b openssl-3.2.1 https://github.com/openssl/openssl openssl3
     cd openssl3
 win32:
     perl Configure no-shared no-tests debug-VC-WIN32 /FS
@@ -973,12 +991,22 @@ mac:
     cmake --install . --config MinSizeRel
 """)
 
+# CustomMod o'zgarishi: ARCH=$X8664 aniq beriladi.
+# Nega: libwebp'ning Makefile.vc arxitekturani `cl 2>&1 | find "x64"` bilan
+# topmoqchi bo'ladi. Bu tekshiruv Windows'ning find.exe siga tayanadi;
+# prepare'ning PATH ida esa msys64 ham bor va u yerda Unix find.exe turibdi
+# (`find: 'x64': No such file or directory` deb 1 qaytaradi). Natijada
+# 2026-09-22 da bosqich `Makefile.vc(21) : fatal error U1050: Unable to
+# auto-detect toolchain architecture` bilan yiqildi. Toza cmd muhitida
+# o'sha tekshiruv ishlaydi, ya'ni ayb aniqlashning o'zida emas, uning
+# PATH ga bog'liqligida. Arxitekturani aniq berib, bog'liqlikni yo'q qilamiz
+# (xato matnining o'zi ham shuni taklif qiladi).
 stage('libwebp', """
     git clone -b v1.6.0 https://github.com/webmproject/libwebp.git
     cd libwebp
 win:
-    nmake /f Makefile.vc CFG=debug-static OBJDIR=out RTLIBCFG=static all
-    nmake /f Makefile.vc CFG=release-static OBJDIR=out RTLIBCFG=static all
+    nmake /f Makefile.vc CFG=debug-static OBJDIR=out RTLIBCFG=static ARCH=$X8664 all
+    nmake /f Makefile.vc CFG=release-static OBJDIR=out RTLIBCFG=static ARCH=$X8664 all
     copy out\\release-static\\$X8664\\lib\\libwebp.lib out\\release-static\\$X8664\\lib\\webp.lib
     copy out\\release-static\\$X8664\\lib\\libwebpdemux.lib out\\release-static\\$X8664\\lib\\webpdemux.lib
     copy out\\release-static\\$X8664\\lib\\libwebpmux.lib out\\release-static\\$X8664\\lib\\webpmux.lib
@@ -1227,8 +1255,14 @@ stage('regex', """
     git clone -b boost-1.83.0 https://github.com/boostorg/regex.git
 """)
 
+# CustomMod o'zgarishi: --depth 1 (openssl3 dagi bilan bir xil sabab).
+# FFmpeg tarixi ~200 MB; PC'dagi kanalda klon 50 daqiqa ketib, tugashiga
+# oz qolganda uzildi: "fetch-pack: unexpected disconnect while reading
+# sideband packet / early EOF" (2026-09-23 00:40).
+# Xavfsiz: aniq teg olinadi (-b n6.1.6) va keyin `git checkout <sha>` yo'q;
+# keyingi buyruq `git apply` bo'lib, unga tarix kerak emas.
 stage('ffmpeg', """
-    git clone -b n6.1.6 https://github.com/FFmpeg/FFmpeg.git ffmpeg
+    git clone --depth 1 -b n6.1.6 https://github.com/FFmpeg/FFmpeg.git ffmpeg
     cd ffmpeg
 win:
 depends:patches/ffmpeg.patch
@@ -1647,10 +1681,19 @@ win:
 """)
 else: # qt > '6'
     branch = 'v$QT' + ('-lts-lgpl' if qt.startswith('6.2.') else '')
+    # CustomMod o'zgarishi: super-repo ham, submodullar ham --depth 1 bilan.
+    # Nega: qtbase tarixi ~1.5 GB. PC'dagi kanalda (~80 KB/s) bitta urinish
+    # 5 soatdan oshadi va har safar uzilib ketdi:
+    #   "fetch-pack: unexpected disconnect ... / Failed to clone 'qtbase'.
+    #    Retry scheduled" (2026-09-23 02:40).
+    # git submodule uchun --depth 1 ishlaydi, chunki GitHub aniq SHA ni
+    # so'rashga ruxsat beradi (allowAnySHA1InWant). Sayoz qtbase ~300 MB.
+    # Qurish uchun tarix kerak emas: keyin faqat `git apply` bilan patchlar
+    # qo'llaniladi.
     stage('qt_' + qt, """
-    git clone -b """ + branch + """ https://github.com/qt/qt5.git qt_$QT
+    git clone --depth 1 -b """ + branch + """ https://github.com/qt/qt5.git qt_$QT
     cd qt_$QT
-    git submodule update --init --recursive --progress qtbase qtimageformats qtshadertools qtsvg
+    git submodule update --init --recursive --depth 1 --progress qtbase qtimageformats qtshadertools qtsvg
 depends:patches/qtbase_""" + qt + """/*.patch
 mac:
     if [ -d "../patches/qt6_highsierra" ]; then
@@ -1860,8 +1903,9 @@ release:
     lipo -create Release.arm64/libtg_owt.a Release.x86_64/libtg_owt.a -output Release/libtg_owt.a
 """)
 
+# CustomMod o'zgarishi: --depth 1 (aniq teg, keyin `git checkout <sha>` yo'q).
 stage('ada', """
-    git clone -b v3.2.4 https://github.com/ada-url/ada.git
+    git clone --depth 1 -b v3.2.4 https://github.com/ada-url/ada.git
     cd ada
 win:
     cmake -B out . ^
