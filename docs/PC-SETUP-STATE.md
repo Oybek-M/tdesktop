@@ -147,3 +147,79 @@ bo'lsa tekshirish kerak.
   internetida emas, xalqaro tranzitda. Katta klonlarni bo'lak-bo'lak qilish kerak.
 - `git clone` bir bo'lak — uzilsa noldan. Sayoz klon + `fetch --deepen`
   bo'laklari esa saqlanadi. tdesktop aynan shu usulda olindi.
+
+---
+
+## 2026-09-23: prepare TUGADI (33/33) va configure O'TDI
+
+### Qt qo'lda qurildi
+
+prepare'ning har bir bosqichi `removeDir(stage)` bilan boshlanadi, ya'ni
+qayta urinish Qt daraxtini butunlay o'chiradi. Klon + qurish soatlab
+vaqt olgani uchun Qt prepare'dan TASHQARIDA qurildi (`cmake --build`
+Debug/Release + `cmake --install`, `--parallel 3` bilan -- 4 da xotira
+tugab ninja `FAILED: [code=143]` bergan edi).
+
+Keyin prepare'ning kesh kaliti QO'LDA yozildi, aks holda keyingi ishga
+tushirishda Qt yana o'chirilardi. Usul: prepare.py ga vaqtincha
+`DUMPKEY` shohchasi qo'shildi (`writeCacheKey(stage)` + `continue`),
+`win.bat qt6 qt_6.11.2 silent` bilan chaqirildi, keyin yamoq olib
+tashlandi. Kalit muhitga bog'liq, shuning uchun uni AYNAN o'sha
+argumentlar bilan hisoblatish shart. Natija: `[29/33]
+(Libraries/qt_6.11.2): SKIPPING`.
+
+Bosqich nomlarini prepare'ga BERMANG: nomlangan bosqich `Forced`
+bo'lib qayta quriladi. Nomsiz ishga tushirilsa kesh kalitiga qaraydi.
+`crashpad` esa Windows'da umuman ro'yxatga olinmaydi (u faqat `mac:`
+bosqichi) -- nomlansa "Unknown argument: crashpad".
+
+### configure: uchta alohida to'siq
+
+1. **CMake VS nusxasini reestrdan topadi**, ya'ni junction'ni EMAS,
+   apostrofli HAQIQIY yo'lni oladi -> `MSB4092`. vcvars'ni junction
+   orqali chaqirish yetarli emas. Yechim:
+   `-D "CMAKE_GENERATOR_INSTANCE=E:\VS2026,version=18.7.11919.86"`.
+   - Ajratuvchi VERGUL (`?` bilan "invalid field").
+   - `version=` SHART: junction'ni VS Installer tanimaydi.
+   - Muhit o'zgaruvchisi sifatida ISHLAMAYDI ("will be ignored,
+     because CMAKE_GENERATOR is not set").
+2. **CMake keshi buzilgan qiymatni saqlab qoladi.** Noto'g'ri
+   `CMAKE_GENERATOR_INSTANCE` bir marta yozilsa, keyingi to'g'ri
+   urinishlar ham eski qiymat bilan yiqiladi. `out\CMakeCache.txt`
+   ni olib tashlash kerak.
+3. **v143 toolset bu mashinada BUZUQ.** `MSBuild\Microsoft\VC\v170\
+   Microsoft.Build.CppTasks.Common.dll` (575 KB, 2026-09-21) aslida
+   DLL emas: birinchi baytlari `21 3C 61 72` = `!<arch>`, ya'ni ar
+   arxivi. `[Reflection.AssemblyName]::GetAssemblyName` ham, MSBuild
+   ham uni o'qiy olmaydi (`MSB4062 ... Unknown file format`).
+   Haqiqiy yo'l orqali ham xuddi shunday, demak junction aybdor emas.
+
+### Toolset va Windows 7
+
+`cmake/run_cmake.py` rasmiy kodda `-T v143` ni QATTIQ yozadi, lekin u
+`cmake` SUBMODULE'ida -- unga tegilmaydi. Yechim: run_cmake.py aniq
+`-G` berilganda o'zining `-A`/`-T` bloklarini butunlay o'tkazib
+yuboradi. Shuning uchun `run-configure.bat` generator, arxitektura va
+toolset'ni o'zi beradi:
+
+    configure.bat qt6 "-GVisual Studio 18 2026" -Ax64 -Tv145 ...
+
+`x64` so'zi BERILMAYDI: run_cmake.py uni `vsArch` deb tushunadi va
+aniq generator bilan birga "x86/x64/arm switch is supported only with
+Visual Studio" xatosini beradi. `-Ax64` qo'shib yoziladi.
+
+v145 = MSVC 14.51. **Bu Windows 7
+qo'llab-quvvatlashini yo'qotadi.** 14.44 ni v145 targets bilan
+birlashtirish sinaldi va ishlamadi: `-T v145,version=14.44` ham,
+`version=14.44.35207` ham, `version=14.44.17.14` ham CMake'da
+"invalid version specification" beradi (papka `14.44.17.14` deb
+nomlangan, CMake bu formatni qabul qilmaydi).
+
+Windows 7 kerak bo'lsa tanlov: VS2022 Build Tools (v143) o'rnatish
+yoki VS2026 ni Repair qilib buzuq v170 faylini tiklash. Ikkalasi ham
+admin huquqini talab qiladi.
+
+### Holat
+
+`D:\TBuild\tdesktop\out\Telegram.slnx` yaratildi, `TDESKTOP_API_ID` va
+`TDESKTOP_API_HASH` keshda. Qurish hali BOSHLANMAGAN.
