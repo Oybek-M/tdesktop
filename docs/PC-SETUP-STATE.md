@@ -208,16 +208,29 @@ toolset'ni o'zi beradi:
 aniq generator bilan birga "x86/x64/arm switch is supported only with
 Visual Studio" xatosini beradi. `-Ax64` qo'shib yoziladi.
 
-v145 = MSVC 14.51. **Bu Windows 7
-qo'llab-quvvatlashini yo'qotadi.** 14.44 ni v145 targets bilan
-birlashtirish sinaldi va ishlamadi: `-T v145,version=14.44` ham,
-`version=14.44.35207` ham, `version=14.44.17.14` ham CMake'da
-"invalid version specification" beradi (papka `14.44.17.14` deb
-nomlangan, CMake bu formatni qabul qilmaydi).
+v145 targets'ning O'Z kompilyatori 14.51 bo'lardi, bu esa Windows 7
+qo'llab-quvvatlashini yo'qotardi. CMake'ning `-T v145,version=14.44`
+yo'li ISHLAMAYDI -- `14.44`, `14.44.35207`, `14.44.17.14`ning hammasi
+"invalid version specification" beradi, chunki VS2026 yonma-yon
+toolset papkasini VS versiyasi (`14.44.17.14`) bilan nomlagan, CMake
+esa bu formatni qabul qilmaydi.
 
-Windows 7 kerak bo'lsa tanlov: VS2022 Build Tools (v143) o'rnatish
-yoki VS2026 ni Repair qilib buzuq v170 faylini tiklash. Ikkalasi ham
-admin huquqini talab qiladi.
+**Yechim: MSBuild'ning `VCToolsVersion` xossasi.** U targets'ni v180
+da (sog'lom DLL) qoldiradi, lekin `cl.exe`/`link.exe` ni
+`14.44.35207` dan oladi:
+
+    -D CMAKE_VS_GLOBALS=VCToolsVersion=14.44.35207
+
+`CMAKE_VS_GLOBALS` uni har bir `.vcxproj` ga yozadi, ya'ni VS IDE dan
+qurilsa ham amal qiladi. Tasdiqlangan: sinov dasturi `_MSC_VER = 1944`
+berdi, `CL.exe` yo'li `E:\VS2026\VC\Tools\MSVC.44.35207\...`.
+
+Ya'ni **Windows 7 qo'llab-quvvatlashi SAQLANADI** va v143 ni tiklash,
+VS2022 Build Tools o'rnatish yoki admin huquqi KERAK EMAS.
+
+Buzuq v170 DLL'i o'z holicha qoldi. U faqat `-Tv143` ga to'sqinlik
+qiladi; hozirgi sxemada umuman ishlatilmaydi. Istasangiz VS Installer
+-> Repair uni tiklaydi (admin kerak), lekin bu shart emas.
 
 ### Holat
 
