@@ -592,3 +592,111 @@ Shundan keyin: `D:` faqat o'qiydi, swap `C:` (SSD) va `E:` (bo'sh,
    boshqa mashinada ishlamaydi).
 3. Agar shunda ham qotsa -- keyingi o'zgaruvchi `/OPT:REF` ni o'chirish
    (bir vaqtda BITTA o'zgaruvchi).
+
+---
+
+## 2026-09-25 00:45: BSOD (MEMORY_MANAGEMENT) -- va u XOTIRA YETMASLIGIDAN EMAS
+
+Oxirgi sinov (FASTLINK + 14.44 linker + pagefile C:/E:) **qulash bilan
+tugadi**: `MEMORY_MANAGEMENT` ko'k ekrani, tizim o'zi qayta yuklandi.
+
+### MUHIM: o'lchovlar "RAM yetmadi" degan talqinni RAD ETADI
+
+Qulashdan bir daqiqa oldingi yozuvlar (`link-watch.log`):
+
+    [00:42:06] CPU 10.5s/60s | commit 5.95 GB | RAM'da 11.93 GB | tizim 12.5/56.0 GB  <- sog'lom
+    [00:43:06] CPU 10.4s/60s | commit 6.78 GB | RAM'da 12.08 GB | tizim 13.3/56.0 GB  <- sog'lom
+
+Ya'ni qulash paytida:
+
+- `link.exe` **sog'lom** ishlayotgandi (10.4 s/60s, me'yor >10)
+- uning commit'i atigi **6.78 GB** edi (avvalgi urinishlarda 17-29 GB)
+- tizim commit'i **13.3 / 56 GB** -- chegaragacha **42 GB bo'sh joy**
+- swap deyarli ishlatilmayotgandi
+
+Bu uchala tuzatish (ForceImportAfterCppTargets, 14.44 linker, pagefile
+E: ga) **ishlaganini** ko'rsatadi -- xotira talabi 29.4 GB dan 6.8 GB
+gacha tushgan edi. Qulash konfiguratsiyadan EMAS.
+
+### Qulashlar tarixi -- bu birinchi marta emas
+
+`Get-WinEvent -FilterHashtable @{LogName='System'; Id=41}` da
+"rebooted without cleanly shutting down":
+
+    2026-09-25 00:45:50   <- bugungi, MEMORY_MANAGEMENT
+    2026-09-23 16:14:34   <- bir soat ichida BESH marta
+    2026-09-23 16:08:40
+    2026-09-23 16:03:06
+    2026-09-23 15:56:04
+    2026-09-23 15:17:00
+    2026-09-19 09:30:44
+    2026-08-02 11:42:34
+
+09-23 dagi klaster (1 soatda 5 ta qulash) o'sha paytda sezilmagan.
+Ya'ni bu mashinada **takrorlanuvchi beqarorlik** bor va u bizning
+build sozlamalarimizdan oldin ham mavjud edi.
+
+### Nega crash dump yozilmagan
+
+`CrashDumpEnabled = 7` (avtomatik), `DumpFile = C:\Windows\MEMORY.DMP`,
+lekin `C:\Windows\Minidump` BO'SH va `BugCheck` (Event Id 1001) yozuvi
+butun jurnalda BITTA ham yo'q.
+
+Ehtimoliy sabab: `C:` da atigi 6.6 GB bo'sh joy bor, avtomatik dump
+esa undan ko'proq talab qilishi mumkin -- Windows yoza olmay, jimgina
+tashlab yuboradi. Kelajakda dalil qolishi uchun `C:` da joy bo'shatish
+yoki `DedicatedDumpFile` ni `E:` ga qo'yish kerak.
+
+### Apparat ma'lumoti
+
+    ChannelA-DIMM0   8 GB  Samsung  S/N C9040CF5
+    ChannelB-DIMM0   8 GB  Samsung  S/N C9040CF5   <- BIR XIL seriya raqami
+
+Ikkala modul bir xil seriya raqamini ko'rsatishi g'ayrioddiy. Bu
+SMBIOS/SPD ma'lumotining noto'g'ri yozilgani bo'lishi mumkin (eski
+Sandy Bridge platformasida uchraydi), lekin e'tiborga olish kerak.
+Tezlik maydoni ham bo'sh.
+
+WHEA-Logger da apparat xatosi yo'q (bu RAM nosozligini INKOR ETMAYDI --
+xotira xatolari odatda WHEA ga tushmaydi).
+
+### XULOSA va TAVSIYA
+
+`MEMORY_MANAGEMENT` (0x1A) qulashi 42 GB commit zaxirasi bor holda,
+sog'lom ishlayotgan jarayon ustida sodir bo'lgan. Mantiqiy xotira
+tugashi bilan izohlab bo'lmaydi. Eng ehtimoliy sabablar:
+
+1. **Nosoz RAM moduli** (eng ehtimoliy)
+2. Drayver xotirani buzishi
+3. Eski platformada xotira nazoratchisi beqarorligi
+
+**BIRINCHI QADAM: xotirani sinash.**
+
+    mdsched.exe          (Windows'ning o'zida, qayta yuklanadi)
+
+yoki ishonchliroq: MemTest86 (USB'dan, kamida 4 o'tish, bir necha soat).
+
+**Bu build'dan MUHIMROQ:** nosoz RAM ma'lumotni JIMGINA buzadi.
+Bu mashinada CustomMod ma'lumotlar bazasi bor (399k+ xabar, 2026-09-21
+da merge qilingan). Agar RAM nosoz bo'lsa, u bazani ham buzishi mumkin
+-- va 2026-08-27 dagi DB buzilishi ham esga tushadi.
+
+### Build bo'yicha qaror
+
+Foydalanuvchi qarori (2026-09-25): **PC'da build qilishdan voz
+kechiladi.** Kod PC'da yoziladi, build laptopda qilinadi.
+Reja: `LAPTOP-BUILD-PLAN.md` (endi PAUZADA emas, FAOL).
+
+`D:\TBuild` dagi hamma narsa joyida qoladi (2059 obj saqlangan,
+qulashdan keyin ham tekshirilgan) -- RAM tuzatilsa yoki ko'paytirilsa,
+faqat bog'lash qoladi.
+
+**Laptopga o'tishda OLIB KETILADIGAN tuzatishlar:**
+
+`link-tuning.props` va `/p:ForceImportAfterCppTargets=` -- laptopda
+KERAK BO'LMASLIGI mumkin, chunki u FASTLINK'siz ham uddalaydi. Lekin
+agar laptopda ham xotira muammosi chiqsa, bu ikkalasi tayyor yechim:
+
+1. Bayroqni ItemDefinitionGroup orqali berish (global `/p:` ISHLAMAYDI)
+2. `/DEBUG:FASTLINK` uchun `LinkToolPath` ni 14.44 ga yo'naltirish
+   (VS 2026 linkeri bu bayroqni qo'llab-quvvatlamaydi)
