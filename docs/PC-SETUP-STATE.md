@@ -476,3 +476,119 @@ o'z kuchida qoladi:
    etadigan jarayonda o'lchov vaqti raqamni o'zgartiradi.
 3. "Imkonsiz" degan xulosani chiqarishdan oldin gipoteza haqiqatan
    sinalganini tekshiring.
+
+---
+
+## 2026-09-25 (tun): FASTLINK ISHLADI, qolgan yagona to'siq - pagefile joyi
+
+Bir kechada ikkita mustaqil to'siq ochildi va uchinchisi aniqlandi.
+
+### To'siq 1: bayroq yetib bormasligi -- HAL QILINDI
+
+Yuqoridagi bo'limda tasvirlangan. Yechim: `link-tuning.props` +
+`/p:ForceImportAfterCppTargets=`. Tasdiqlash usuli -- ishlayotgan
+`link.exe` ning javob faylini o'qish:
+
+    Get-CimInstance Win32_Process -Filter "Name='link.exe'" | ForEach-Object {
+      if ($_.CommandLine -match '@"?([^"]+\.rsp)"?') { Get-Content $Matches[1] -Raw }
+    }
+
+`/DEBUG:FASTLINK` `.rsp` da ko'rindi -- ya'ni mexanizm ishladi.
+
+### To'siq 2: bayroqning o'zi qo'llab-quvvatlanmasligi -- HAL QILINDI
+
+Bayroq yetib borgani bilan linker uni RAD ETDI:
+
+    LINK : warning LNK4315: /DEBUG:FASTLINK is no longer supported.
+    Using /DEBUG:FULL instead. Use a VS 2022 toolchain to continue
+    building with /DEBUG:FASTLINK
+
+`/DEBUG:FASTLINK` **VS 2026 linkeridan (14.51) olib tashlangan** va u
+jimgina `/DEBUG:FULL` ga o'tib ketadi. Ogohlantirish "warning" bo'lgani
+uchun build to'xtamaydi -- shuning uchun uni ATAYLAB qidirish kerak.
+
+Yechim: 14.44 (VS 2022 17.14 toolseti) linkerini majburan tanlash.
+`Link` vazifasi yo'lni PROPERTY dan oladi, shuning uchun oddiy
+`PropertyGroup` yetarli (metadata muammosi bu yerda YO'Q):
+
+    Microsoft.CppCommon.targets
+      1308:  ToolExe  ="$(LinkToolExe)"
+      1309:  ToolPath ="$(LinkToolPath)"
+
+`link-tuning.props` ichida:
+
+    <LinkToolPath>E:\VS2026\VC\Tools\MSVC\14.44.35207\bin\HostX64\x64</LinkToolPath>
+    <LibToolPath>E:\VS2026\VC\Tools\MSVC\14.44.35207\bin\HostX64\x64</LibToolPath>
+
+QO'SHIMCHA FOYDA: obj fayllar 14.44 bilan kompilyatsiya qilingan
+(`_MSC_VER = 1944`). 14.51 bilan bog'lash ARALASH holat edi; 14.44
+linkeri mos juftlik. Windows 7 uchun ham aynan 14.44 tanlangan edi.
+
+Natija: `LNK4315` yo'qoldi, FASTLINK qabul qilindi.
+
+### O'lchangan natijalar -- birinchi marta HAQIQIY raqamlar
+
+| Sozlama | link commit | CPU/60s | Holat |
+|---|---|---|---|
+| `/DEBUG:FULL` (14.51) | 29.4 GB | 2.0 s | qotgan |
+| `/DEBUG:FASTLINK` (14.44), boshida | 10.0 GB | **16.8 s** | **sog'lom** |
+| `/DEBUG:FASTLINK` (14.44), 30 daq keyin | 17.5 GB | 0.5 s | qotgan |
+
+Ya'ni FASTLINK cho'qqi commit'ni **29.4 -> 17.5 GB** ga tushirdi va
+bog'lash boshida haqiqatan sog'lom ketdi. Keyin qotdi.
+
+### To'siq 3: swap NOTO'G'RI DISKKA tushyapti -- HAL QILINMAGAN
+
+Qotgan paytdagi o'lchov hammasini ko'rsatdi:
+
+    Disk bandligi (5 s):
+      D:  135 %   <- obj o'qish + swap, IKKALASI shu yerda
+      E:    3 %   <- bo'sh turibdi
+      C:    0 %   <- SSD umuman ishlatilmayapti
+
+    pagefile ishlatilgan:  C: 0.52 GB    D: 2.30 GB
+    RAM: link.exe 11.68 GB, bo'sh 0.3 GB
+
+16 GB RAM'da linkerga ~11.7 GB tegadi. Commit 17.5 GB, demak ~5.8 GB
+swap'ga chiqishi kerak. Windows o'sha swap'ni `D:` ga yubordi -- aynan
+25.8 GB obj o'qilayotgan diskka. Disk boshi o'qish va yozish orasida
+sakrab, 135% ga to'yindi. `C:` (SSD) esa 0% da bo'sh turdi.
+
+**Sabab:** Windows pagefile tanlashda BO'SH JOYGA qaraydi (`C:` da
+~5 GB, `D:` da 808 GB), disk TEZLIGINI bilmaydi.
+
+**Kerakli o'zgarish (admin + qayta yuklash):**
+
+    D:  ->  No paging file      (Set bosilsin)
+    E:  ->  Custom 24576/24576  (Set bosilsin)
+    C:  ->  tegilmaydi, 16384/16384
+
+Har bir disk uchun **Set** ni ALOHIDA bosish shart -- 2026-09-24 da
+aynan shu qolib ketib, sozlama qo'llanmagan edi.
+
+Shundan keyin: `D:` faqat o'qiydi, swap `C:` (SSD) va `E:` (bo'sh,
+7200 rpm) ga tushadi, ikkalasi alohida shpindel.
+
+### Kuzatuv vositalaridagi ikkita xato (tuzatilgan)
+
+1. `watch-link.ps1` asosiy bog'lashni topa olmadi. Sabab: u har bir
+   `link.exe` ning `.rsp` faylini o'qirdi, lekin MSBuild `.rsp` ni
+   vaqtinchalik papkaga yozadi va linker o'qib bo'lgach O'CHIRADI.
+   Endi zaxira belgi bor: commit > 2 GB bo'lsa bu Telegram bog'lashi
+   (codegen vositalari 0.2 GB dan oshmaydi).
+
+2. `tail -f` kuzatuvchisi log faylini band qilib, PowerShell'ning
+   `Add-Content` ini bloklab qo'ydi -- loglar yangilanmay qoldi va
+   xatolik jim ketdi (`-EA 0` uni yashirdi). Bir faylga bir vaqtda
+   `tail -f` va `Add-Content` qo'ymang.
+
+### Keyingi qadam
+
+1. Pagefile `D:` -> `E:` (admin, qayta yuklash) va FASTLINK bilan
+   qaytadan bog'lash. Obj'lar joyida, qayta kompilyatsiya shart emas.
+2. O'tsa -- PC'da bog'lash mumkinligi ISBOTLANADI. Keyin `/Zi` bilan
+   to'liq qayta kompilyatsiya qilib, tarqatishga yaroqli mustaqil PDB
+   olish masalasi hal qilinadi (FASTLINK PDB'si obj fayllarga bog'liq,
+   boshqa mashinada ishlamaydi).
+3. Agar shunda ham qotsa -- keyingi o'zgaruvchi `/OPT:REF` ni o'chirish
+   (bir vaqtda BITTA o'zgaruvchi).
