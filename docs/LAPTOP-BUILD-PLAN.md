@@ -1,10 +1,25 @@
 # Laptopda build qilish rejasi
 
-2026-09-24 da yozildi. Sabab: PC'da bog'lash (link) bosqichi imkonsiz
-bo'lib chiqdi -- batafsili `PC-SETUP-STATE.md` ning oxirgi bo'limida.
-Qisqasi: linkerga 28 GB kirish keladi, PC'da 16 GB RAM va swap HDD'da,
-bu 100 barobar sekinlik beradi. Laptopda NVMe SSD bor, shuning uchun
-u xuddi shu yukni uddalaydi.
+> **HOLAT (2026-09-24 kechqurun): bu reja PAUZADA, shoshilinch emas.**
+> U "PC'da bog'lash imkonsiz" degan xulosaga asoslangan edi, lekin
+> o'sha xulosa NOTO'G'RI dalilga qurilgan: sinovlarda bayroqlar
+> `link.exe` ga yetib bormagan (global `/p:` MSBuild item metadata'ni
+> bekor qilmaydi). Batafsil: `PC-SETUP-STATE.md` ning eng oxirgi
+> bo'limi. Avval PC'da `/DEBUG:FASTLINK` haqiqatan sinaladi; u ham
+> yiqilsagina bu rejaga qaytiladi.
+>
+> Quyidagi qadamlar o'z-o'zidan to'g'ri va foydali -- laptopda qurish
+> kerak bo'lganda ishlatiladi.
+
+2026-09-24 da yozildi. Dastlabki sabab: PC'da bog'lash bosqichi
+yiqilardi. Linkerga ~28 GB kirish keladi (2059 obj = 25.8 GB + 5.8 GB
+kutubxona), PC'da 16 GB RAM va swap qisman HDD'da. Laptopda NVMe SSD
+bor, shuning uchun u xuddi shu yukni uddalaydi.
+
+**Muhim:** kirish hajmining 80-85 foizi -- `/Z7` (OldStyle) debug
+ma'lumoti. Ya'ni laptopda ham to'liq yuk tushadi. Agar PC'da
+`/DEBUG:FASTLINK` yoki `/Zi` ishlasa, laptop umuman kerak bo'lmasligi
+mumkin.
 
 Kod PC'da yoziladi, build laptopda qilinadi. Repo `origin/Oybek`
 orqali sinxron, qo'lda hech nima ko'chirilmaydi.
@@ -134,7 +149,20 @@ $c1=(Get-Process link).CPU; Start-Sleep 60
 
 ## PC'da nima tayyor turibdi
 
-RAM ko'paytirilsa yoki `C:` (SSD) da ~30 GB bo'shatib pagefile o'sha
-yerga qo'yilsa, PC'da faqat BOG'LASH qoladi -- qaytadan boshlash shart
-emas. Hozir tayyor: prepare 33/33, Qt 6.11.2 (kesh kaliti bilan),
-`configure` o'tgan, `Telegram.slnx`, API kalitlari, 1037 obj fayl.
+PC'da faqat BOG'LASH qoladi -- qaytadan boshlash shart emas.
+Hozir tayyor: prepare 33/33, Qt 6.11.2 (kesh kaliti bilan),
+`configure` o'tgan, `Telegram.slnx`, API kalitlari, **2059 obj fayl**.
+
+`C:` allaqachon bo'shatilgan (20.9 GB gacha) va pagefile SSD'ga
+qo'yilgan (C: 16 GB + D: 8 GB, commit limit 40 GB). `LNK1102` shundan
+keyin yo'qoldi.
+
+Qolgan sinalmagan yo'llar, tartib bo'yicha:
+
+1. `/DEBUG:FASTLINK` -- qayta kompilyatsiya KERAK EMAS, ~30-60 daqiqa
+2. `/Zi` (`/Z7` o'rniga) -- qayta kompilyatsiya kerak, lekin to'liq
+   mustaqil PDB beradi
+3. `D:` dagi pagefile'ni `E:` ga ko'chirish (alohida, tezroq shpindel)
+
+Ikkalasi ham `ForceImportAfterCppTargets` orqali beriladi -- `cmake`
+submodule'iga tegmasdan. Usuli `PC-SETUP-STATE.md` oxirida.

@@ -241,6 +241,13 @@ qiladi; hozirgi sxemada umuman ishlatilmaydi. Istasangiz VS Installer
 
 ## 2026-09-24: PC'da BOG'LASH IMKONSIZ -- ildiz sabab va qaror
 
+> **!!! BU BO'LIM ESKIRGAN VA XATO !!!**
+> Bu yerdagi jadval va xulosa ishonchsiz: o'sha sinovlarda bayroqlar
+> `link.exe` ga umuman yetib bormagan (global `/p:` item metadata'ni
+> bekor qilmaydi). Hujjatning ENG OXIRIDAGI
+> "YUQORIDAGI XULOSA NOTO'G'RI EDI -- tuzatish" bo'limini o'qing.
+> Quyidagi matn faqat tarix uchun saqlangan.
+
 Kompilyatsiya (1091 manbadan 1037 obj) muvaffaqiyatli o'tdi. Yiqilgan
 joy -- faqat BOG'LASH (link) bosqichi.
 
@@ -295,3 +302,177 @@ prepare 33/33, Qt 6.11.2 (qurilgan + kesh kaliti), `configure` o'tgan,
 `Telegram.slnx` va API kalitlari joyida, 1037 obj fayl qurilgan.
 Ya'ni RAM ko'paytirilsa yoki A varianti bajarilsa, faqat bog'lash
 qoladi -- qaytadan boshlash shart emas.
+
+---
+
+## 2026-09-24 (kechqurun): YUQORIDAGI XULOSA NOTO'G'RI EDI -- tuzatish
+
+> **DIQQAT.** Yuqoridagi "PC'da BOG'LASH IMKONSIZ" bo'limidagi jadval va
+> undan chiqarilgan xulosa **ishonchsiz**. Sabab: o'sha to'rtala
+> "sinov" da bayroqlar `link.exe` ga umuman YETIB BORMAGAN. Quyida
+> nima bo'lgani, qanday aniqlangani va to'g'ri usul yozilgan.
+> Bu bo'limni o'qimasdan yuqoridagi jadvalga tayanmang.
+
+### Xato nimada edi
+
+Bayroqlar MSBuild'ga shunday berilgan edi:
+
+    /p:OptimizeReferences=false
+    /p:EnableCOMDATFolding=false
+    /p:GenerateDebugInformation=DebugFastLink
+
+Bu **global property** shakli. Lekin `Microsoft.CppCommon.targets`
+da `Link` vazifasi qiymatlarni **item metadata** dan oladi:
+
+    E:/VS2026/MSBuild/Microsoft/VC/v180/Microsoft.CppCommon.targets
+    1223:  EnableCOMDATFolding      ="%(Link.EnableCOMDATFolding)"
+    1231:  GenerateDebugInformation ="%(Link.GenerateDebugInformation)"
+    1267:  OptimizeReferences       ="%(Link.OptimizeReferences)"
+
+`%(Link.X)` qiymati `.vcxproj` ichidagi `<ItemDefinitionGroup><Link>`
+blokidan keladi. **MSBuild'da global property item metadata'ni bekor
+qilmaydi.** Ya'ni `/p:` bilan berilgan uchala bayroq ham e'tiborsiz
+qoldirilgan.
+
+Tasdiq -- `Telegram.vcxproj` dagi Release bloki hech qachon
+o'zgarmagan:
+
+    Condition: '$(Configuration)|$(Platform)'=='Release|x64'
+      DebugInformationFormat     = OldStyle     (ya'ni /Z7)
+      GenerateDebugInformation   = true         (ya'ni /DEBUG)
+      OptimizeReferences         = true         (ya'ni /OPT:REF)
+      Optimization               = MaxSpeed
+      WholeProgramOptimization   = (yo'q)       <- LTCG haqiqatan o'chiq
+
+### Nega bu darhol sezilmadi
+
+Jadvaldagi raqamlar (31.2 / 20.6 / 26.4 / 26.5 GB) bir-biridan farq
+qilgani "bayroqlar ta'sir qilyapti, lekin yetarli emas" degan taassurot
+bergan. Aslida ular **bitta o'zgarmagan jarayonning turli vaqtlarda
+olingan o'lchovlari** edi. Bog'lash bosqichida commit vaqt o'tishi
+bilan o'sib boradi, shuning uchun qachon o'lchansa shuncha raqam
+chiqadi.
+
+Hujjatning o'zida "avvalgi 16.6 GB o'lchovi bog'lash O'RTASIDAN
+olingan edi, cho'qqi emas" deb yozilgan -- ya'ni ogohlantirish bor
+edi, lekin u xulosaga ta'sir qilmagan.
+
+**Saboq:** o'lchov farq qilishi bayroq ishlaganini ANGLATMAYDI. Avval
+bayroq haqiqatan qo'llanganini tasdiqlash kerak, keyin o'lchash.
+
+### Bayroq qo'llanganini QANDAY tekshirish kerak
+
+Tartib bo'yicha, birinchisi eng arzoni:
+
+1. **Targets faylini o'qing.** Vazifa `%(Item.X)` dan oladimi yoki
+   `$(Property)` dan? `%(...)` bo'lsa `/p:` ishlamaydi.
+
+       grep -nE "GenerateDebugInformation|OptimizeReferences" \
+         "E:/VS2026/MSBuild/Microsoft/VC/v180/Microsoft.CppCommon.targets"
+
+2. **tlog'ni o'qing** (bog'lash tugagan bo'lsa unda haqiqiy buyruq
+   satri turadi, UTF-16LE):
+
+       out/Telegram/Telegram.dir/Release/Telegram.tlog/link.command.1.tlog
+
+   Diqqat: bog'lash TUGAMAGAN bo'lsa fayl 2 bayt (faqat BOM) bo'ladi va
+   hech narsa isbotlamaydi -- bizda aynan shunday edi.
+
+3. **MSBuild'ni `-v:diag` bilan** ishga tushirib `Link` vazifasining
+   parametrlarini ko'ring.
+
+### To'g'ri usul: ForceImportAfterCppTargets
+
+`cmake` submodule'iga ham, repo fayllariga ham tegmasdan `Link`
+metadata'sini almashtirish mumkin. `Microsoft.Cpp.Current.targets`
+da rasmiy ilgak bor:
+
+    148:  <Import Condition="Exists('$(ForceImportAfterCppTargets)')"
+                  Project="$(ForceImportAfterCppTargets)"/>
+
+U eng oxirida import qilinadi, shuning uchun undagi
+`ItemDefinitionGroup` `.vcxproj` dagisini ustidan yozadi.
+(`ForceImportBeforeCppTargets` ham bor, 14-qatorda -- lekin u ERTA
+import qilinadi va `.vcxproj` uni ustidan yozib yuboradi. Kerakligi
+**After**.)
+
+Fayl `D:/TBuild/link-tuning.props` da turadi va build shunday
+chaqiriladi:
+
+    cmake --build ... -- /p:ForceImportAfterCppTargets=D:\TBuild\link-tuning.props
+
+Bekor qilish uchun shunchaki shu bitta bayroqni olib tashlash yetarli.
+
+### Haqiqiy ildiz sabab: /Z7 (OldStyle debug)
+
+Obj fayllar qayta o'lchandi -- oldingi "22.0 GB" ham past baho ekan:
+
+    2059 ta .obj = 25.8 GB,  o'rtacha 12.8 MB
+    eng kattalari:
+       317.0 MB  info_profile_actions.obj
+       241.7 MB  star_gift_box.obj
+       237.8 MB  history_widget.obj
+       236.7 MB  history_view_compose_controls.obj
+       204.4 MB  star_gift_auction_box.obj
+
+Bitta `.cpp` dan 317 MB obj chiqishi optimizatsiyalangan koddan emas,
+**debug ma'lumotidan**. Debug ma'lumotisiz Release obj odatda 1-3 MB.
+Ya'ni 25.8 GB ning taxminan 80-85 foizi debug ma'lumoti.
+
+`/Z7` (OldStyle) da debug ma'lumoti har bir obj fayl ICHIGA joylanadi
+va har bir obj o'ziga kerakli **barcha tiplarning to'liq nusxasini**
+ko'taradi. Qt sarlavhasini qo'shgan har bir fayl butun Qt tip jadvalini
+olib yuradi. Linker `/DEBUG` tufayli bularning hammasini o'qib,
+tiplarni deduplikatsiya qilib, bitta PDB ga birlashtirishi kerak --
+xotirani aynan shu yeydi.
+
+`/Zi` (ProgramDatabase) da esa tiplar HAR BIR LOYIHA uchun bir marta
+birlashtiriladi: 2059 nusxa o'rniga ~40 ta.
+
+### Keyingi qadamlar (tartib muhim)
+
+| | Qayta kompilyatsiya | PDB | Izoh |
+|---|---|---|---|
+| **A. `/DEBUG:FASTLINK`** | **kerak emas** | bor, obj'larga bog'liq | Avval SHU sinaladi |
+| **B. `/Zi` (`/Z7` o'rniga)** | kerak (soatlar) | to'liq, mustaqil | Tarqatish uchun |
+| **C. Debug ma'lumotisiz** | kerak (soatlar) | yo'q | Oxirgi chora |
+
+**A birinchi bo'lishi shart**, chunki 2059 obj joyida turibdi va u
+faqat bog'lashni qayta ishga tushiradi (~30-60 daqiqa, soatlar emas).
+A o'tsa -- bu mashinada bog'lash mumkinligi isbotlanadi va B ga
+o'tiladi. A ham yiqilsa -- ANA SHUNDA "PC'da imkonsiz" xulosasi
+haqiqatan asoslangan bo'ladi.
+
+### Pagefile haqida -- bu alohida, haqiqiy muammo edi
+
+Bayroq xatosidan mustaqil ravishda quyidagilar aniqlangan va ular
+o'z kuchida qoladi:
+
+- `C:` bo'shatildi (8.3 -> 20.9 GB), arxiv `E:` ga ko'chirildi.
+- Pagefile: `C:` 16 GB (SSD) + `D:` 8 GB (HDD), commit limit 40 GB.
+  `LNK1102: out of memory` shundan keyin yo'qoldi.
+- **Jismoniy disklar:**
+
+      Disk 0  WDC WD10EURX-63UY4Y0  932 GB  = D:  (AV-GP, 5400 rpm)
+      Disk 1  ST1000DM003-1ER162    932 GB  = E:  (Barracuda, 7200 rpm)
+      Disk 2  Ramsta SSD S800       112 GB  = C:
+
+- **Hal qilinmagan nuqson:** 28 GB obj/lib `D:` da turibdi va `D:` da
+  yana 8 GB pagefile bor. Ya'ni linker BIR disk boshidan ham o'qiydi,
+  ham swap yozadi -- bu seek raqobati. O'lchovda tasdiqlandi:
+  `C:` pagefile 0.34 GB, `D:` pagefile 1.48 GB ishlatilgan, ya'ni
+  swap'ning ko'p qismi SSD'ga emas, HDD'ga tushgan.
+- **Tavsiya (admin kerak):** `D:` dagi pagefile'ni O'CHIRIB, `E:` ga
+  24 GB qo'yish. Shunda `D:` faqat o'qish bilan, `E:` faqat swap bilan
+  shug'ullanadi, ikkalasi alohida shpindel va `E:` tezroq disk.
+  Qo'shish emas, KO'CHIRISH kerak -- `D:` qolsa raqobat saqlanadi.
+  Agar A/B varianti ishlasa, bu umuman keraksiz bo'lib qolishi mumkin.
+
+### Umumiy saboqlar
+
+1. Build tizimida bayroq berishdan oldin **u qayerdan o'qilishini**
+   aniqlang (property yoki item metadata).
+2. Raqam o'zgargani bayroq ishlaganini isbotlamaydi. Uzoq davom
+   etadigan jarayonda o'lchov vaqti raqamni o'zgartiradi.
+3. "Imkonsiz" degan xulosani chiqarishdan oldin gipoteza haqiqatan
+   sinalganini tekshiring.
