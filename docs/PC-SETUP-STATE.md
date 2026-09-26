@@ -700,3 +700,60 @@ agar laptopda ham xotira muammosi chiqsa, bu ikkalasi tayyor yechim:
 1. Bayroqni ItemDefinitionGroup orqali berish (global `/p:` ISHLAMAYDI)
 2. `/DEBUG:FASTLINK` uchun `LinkToolPath` ni 14.44 ga yo'naltirish
    (VS 2026 linkeri bu bayroqni qo'llab-quvvatlamaydi)
+
+---
+
+## 2026-09-26: E: diski bo'shatilmoqda, VS D: ga qayta o'rnatiladi, PC roli o'zgardi
+
+### Qaror: PC'da tdesktop qurilmaydi
+
+Foydalanuvchi qarori: bu mashinada faqat kod yoziladi va yengil
+loyihalar (web-api, web-app) quriladi. tdesktop build laptopda.
+Shuning uchun katta pagefile keraksiz: `C:` 16 -> 4 GB, `D:` 16 GB
+o'z holicha. Commit limit 36 GB. `C:` da bo'sh joy 24.6 -> 37.2 GB.
+
+Bu qaror /DEBUG:FASTLINK ishlamagani uchun EMAS -- u ishlagan
+(29.4 -> 6.8 GB). Sabab: nosoz E: disk va shu mashinaning roli.
+PC'da tdesktop qurish kerak bo'lsa, usul yuqorida yozilgan.
+
+### Bajarilgan
+
+- Pagefile E: dan olib tashlandi (E: xatolari 3 daqiqada 7 -> 0).
+- 67.5 GB E: -> D:\E-disk-backup-20260925 ga nusxalandi.
+- CustomMod arxivi D:\customizationMainFolder ga ilovaning o'z
+  vositasi bilan ko'chirildi (registr: archiveRootPath=D:/...).
+- Baza ko'chirishda buzildi (fayl 3 sahifaga kesilgan, sarlavha 4002
+  sahifa deydi, fayl 3999). Dasturning o'z premigrate zaxirasidan
+  tiklandi, integrity_check ok. Buzuq fayl saqlandi:
+  db\actioned_messages.db.CORRUPT-20260925-2320
+- Visual Studio E: dan o'chirildi (E:\Application's datas ~0.25 GB qoldi).
+
+### SABOQ: ochiq SQLite bazasini qo'lda nusxalamang
+
+Ilova ochiq turganda baza (WAL rejimi) nusxasi yaxlit chiqmaydi.
+D:\E-disk-backup-20260925 dagi actioned_messages.db shu sababli
+YAROQSIZ (media fayllar yaxshi). Ilovaning o'z ko'chirish
+vositasidan foydalaning yoki avval ilovani yoping.
+
+### VS qayta o'rnatish -- to'siqlar
+
+- Product: D:\VS2026, Download cache: D:\VS2026-cache (ular bir-biriga
+  kirmasligi shart: "root installation path cannot overlap with
+  package cache path").
+- "Shared components" maydoni kulrang va o'zgarmaydi (mashinada bir
+  marta belgilanadi) -- 6 GB E: da qoladi.
+- "System cache, tools, SDKs with fixed locations" 27.57 GB HAR DOIM
+  C: ga tushadi. C: da kamida shuncha bo'sh joy kerak.
+- ASP.NET and web development workload KERAK (customsync-server va
+  boshqa web loyihalar). Uni olib tashlab joy tejab bo'lmaydi.
+
+### O'rnatishdan keyin yangilanadigan yo'llar (hali BAJARILMAGAN)
+
+    D:\TBuild\run-build.bat        vcvars64.bat + CMAKE (E:\VS2026 -> D:\VS2026)
+    D:\TBuild\run-configure.bat    CMAKE_GENERATOR_INSTANCE (endi kerak emas bo'lishi mumkin)
+    D:\TBuild\link-tuning.props    LinkToolPath / LibToolPath
+
+E:\Applications main ichida Steam (~20 GB o'yin), Antigravity IDE,
+Cisco Packet Tracer, SKLauncher, Mem Reduct bor. O'rnatilgan dasturlarni
+papka nusxalab ko'chirib BO'LMAYDI (registr E: ga bog'langan).
+Steam o'yinlarini Steam Settings > Storage orqali ko'chiring.
