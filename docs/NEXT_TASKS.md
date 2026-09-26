@@ -1,6 +1,6 @@
 # CustomMod — Keyingi Tasklar Ro'yxati
 
-**Oxirgi yangilanish:** 2026-06-28 (NEXT-9 + NEXT-10 + T42 tugallandi)
+**Oxirgi yangilanish:** 2026-09-26 (T46 + T47 tugallandi; A22 ochiq)
 
 ---
 
@@ -80,9 +80,48 @@
 
 ---
 
+## 🔴 Ochiq Tasklar — 2026-09-26
+
+### A22 — Tiklangan xabarlar tartibidagi qoldiq chalkashlik
+
+**Holat:** ochiq, PRIORITET PAST (resurs bo'lganda ko'riladi).
+
+T47 tuzatishidan keyin qo'lda sinov **90% mos** keldi: `7053823996` chatida
+iyul-avgust o'chirilgan xabarlari chiqdi va boshqa chatga o'tib qaytilganda
+joyida qoldi. Qolgan muammolar:
+
+1. **Ba'zan tartib hamon chalkash.**
+2. **Ba'zida foydalanuvchi o'zi yozgan xabarlar qolib ketadi.**
+
+**MUHIM — log dalili (taxmin qilmaslik uchun):** 14:42 seansida log'da
+`reinserted` va `window` sonlari **0 bo'lib qoldi**, ya'ni T47 tuzatishi
+bu seansda **umuman ishga tushmadi**. Chat ochilganda `clear(Unload)`
+chaqirilmagan (inject qilingan xabarning `mainView()` bor edi, shuning
+uchun `isReadyFor()` true qaytargan) va bloklar qayta qurilmagan.
+Demak sinovdagi yaxshilanishni T47 ga bog'lab bo'lmaydi va qoldiq
+chalkashlik dastlabki nuqsonning o'zi bo'lishi ehtimoli yuqori.
+
+**Tekshirishni qaydan boshlash kerak:**
+- `History::insertMessageToBlocks()` — SANA bo'yicha qo'yadi, Telegram esa
+  bloklarni msg_id tartibida saqlaydi. Sana va ID bir-biriga mos kelmasa
+  (ayniqsa `msg_date` 0 bo'lib `currentSecsSinceEpoch()` fallback ishlaganda)
+  tartib buziladi. `actioned_messages` da `msg_date = 0` bo'lgan yozuvlarni
+  sanab ko'rish kerak.
+- `is_out = 1` yozuvlar: `fromId = session().userPeerId()` yo'li
+  (`history.cpp`, inject bloki) — "o'zim yozgan xabarlar qolib ketadi"
+  shikoyati shu shoxobcha bilan bog'liq bo'lishi mumkin.
+- `skipped: empty 36` — shu chatda 36 yozuv mazmunsiz deb tashlangan;
+  ular yo'qolgan xabarlarning bir qismi bo'lishi mumkin.
+
+**Sinov usuli:** log'da `reinserted`/`window` sonlarini kuzatish. Ular 0
+bo'lsa tuzatish yo'li umuman bosilmagan degani.
+
+---
+
 ## Muhim Eslatmalar
 
-- **Build va Git** — foydalanuvchi o'zi qiladi, Claude teginmaydi
+- **Build** — 2026-09-26 dan Claude o'zi qiladi, FAQAT laptopda
+- **Git** — commit+push ruxsati bor, FAQAT `origin/Oybek`; `upstream` ga hech qachon; `Co-Authored-By` qabul emas
 - **Javoblar** — O'zbek lotin tilida
 - **MEMORY.md** — kod holati + bug fix tarixi, `DOCs/MEMORY.md`
 - **PRD.md** — to'liq feature talablari + known limitations, `DOCs/PRD.md`

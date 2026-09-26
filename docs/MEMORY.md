@@ -1,14 +1,14 @@
 # CustomMod — Session Memory (Agent uchun)
 
-**Oxirgi yangilanish:** 2026-09-13 (T44 — stabil holat belgisi va peak performance rejasi)  
+**Oxirgi yangilanish:** 2026-09-26 (T46 + T47 — 11 commit build+sinovdan o'tdi; A22 ochiq)  
 **Loyiha:** Telegram Desktop custom mod
 
 ---
 
 ## Muhim Qoidalar (DOIM amal qilish kerak)
 
-1. **Build va Git bilan foydalanuvchi o'zi ishlaydi** — men teginmayman
-2. **Git commit larga teginmayman** — foydalanuvchi o'zi qiladi
+1. **Build** — 2026-09-26 dan Claude o'zi ishga tushiradi va kuzatadi. BUILD FAQAT LAPTOPDA (`DESKTOP-L2J53IK`); PC faqat kod yozish uchun. Og'ir ilova ishlab turgan bo'lsa oldin foydalanuvchidan so'raladi.
+2. **Git** — bu repo uchun commit+push ruxsati BERILGAN, lekin FAQAT `origin/Oybek` ga. `upstream` ga HECH QACHON. Commit xabarida `Co-Authored-By` QABUL EMAS. `cmake` submoduli hech qachon stage qilinmaydi.
 3. **Javoblar O'zbek lotin tilida** — har doim
 
 ---
@@ -400,6 +400,9 @@ void PaintPeerAvatar(QPainter &p, const QRect &rect,
 | T43 | (2026-09-12) Startda ~30-37 soniyalik qotish, oyna "not responding" | Sabab so'rovlarda emas, RAQOBATDA: avto-zaxira HAR startda +5 s da ishlab, 62 MB bazani nusxalardi (`RecentBackupExists()` yo'q edi). Bo'sh mashinada 374 ms lik so'rov ilovada 37 927 ms bo'lgan. Zaxira start+3 daq va 24 soatda bir; `ReconcileMediaIndex`/`CompactActivityHistory`/MediaQuota skaneri start+90 s; sync birinchi sikli +90 s; `wal_checkpoint` PASSIVE. Natija ~69 s -> ~1.9 s. Topilishi: `sqlite3_trace_v2` profayler + `CustomDB::PerfScope`. Commitlar `7c8479b441`..`f143015a1d`; `superpowers/specs/2026-09-12-startup-freeze-diagnosis.md` |
 | T44 | (2026-09-13) Stabil holat belgisi + keyingi reja | Tag `custommod-stable-20260913` (`d054d03a7b`): build 09-12 23:40, sinov 09-13 00:17, bloklar 1453/420/492 ms. Maintenance navbati tasdiqlandi. `06da91da35` (reconcile fonga + global texnik xizmat bir marta) build kutmoqda. Reja: `superpowers/plans/2026-09-13-peak-performance-and-stability-plan.md` (A2 3-bosqich klient tomonida, `/sync/head` bekor) |
 | T45 | (2026-09-14) A1 tasdiqlandi; soxta "qotish" yozuvlari | Build 09-14 00:26, sinov 00:47: 90-soniyadagi blok yo'q, ReconcileMediaIndex fon navbatida, compaction bir marta. Stall watchdog tizim uyqusini (57 455 410 ms) qotish deb yozardi — 10 daqiqadan uzun kechikish endi alohida log qatori, SQL jadvali nollanadi (`77d6162653`, `2a7596df04`). A2/A3 sync yoqilmagani va server deploy qilinmagani uchun deploy bosqichiga ko'chdi; keyingisi A5 |
+
+| T46 | (2026-09-26) 10 commitlik partiya: build + sinov | Build 13:21:46->13:35:15 (13.5 daq), ExitCode 0, 0 xato. Sxema v16->v17 toza o'tdi (`idx_am_type_acc_peer(type,account_id,peer_id)`), 0 `App Error`, `unknown local message` 0. `RestoreDeletedChats` 435 ms -> 81 ms (209 peer, 18 tiklandi). A5 profiling darvozasi ishlaydi (`CustomMod SQL:` 0 qator). Kvota `present` 10 633 MB -> 5 253 MB: 2 arvoh .rar `missing` ga o'tdi, ya'ni `ResyncFromDisk()` ishladi. `photoLoadDone` hooki olib tashlangach `C:\Users\Oybek\customizationMainFolder` ga yangi fayl YOZILMADI (qoldiq 21 fayl `.orphan-20260926` ga surildi). **Start vaqti: birinchi 7170 ms, ikkinchi 1774 ms -- bu SOVUQ start effekti, regressiya EMAS** (`CustomDB::Init` 268 ms; 5 s bo'shliq OpenAL/D3D11 RHI da). Commitlar `4a477c8abd`..`5e2ab33bb4` |
+| T47 | (2026-09-26) Tiklangan xabarlar ko'rinmasligi + tartib buzilishi | Peer `7053823996`: bazada 615 `deleted` (iyul-avgust), log'da `injected 579`, ekranda avval umuman yo'q, restart'dan keyin buzilgan tartibda (sentabr -> iyul/avgust -> yana sentabr). Ildiz: `loadDeletedMessages()` yuklangan OYNAni hisobga olmasdi. Zanjir: (1) `getReadyFor()` -> `clear(ClearType::Unload)` faqat `blocks.clear()` qiladi, xabar `owner()` da tirik qoladi lekin `mainView()` yo'qoladi; (2) `checkLocalMessages()` faqat `_clientSideMessages` ni qaytaradi, bizning yozuvlarni u yerga yozib BO'LMAYDI -- `registerClientSideMessage()` da `Expects(IsClientMsgId(id))`, biz esa haqiqiy server ID ishlatamiz; (3) `if (owner().message(...)) continue;` uni "mavjud" deb o'tkazardi; (4) `addCreatedOlderSlice()` server bo'lagini SHARTSIZ old blokka qo'yadi. Tuzatish `checkLocalMessages()` dagi `goodDate()` qoidasini takrorlaydi + `mainView()` yo'qolganini qaytaradi; LOG'ga `reinserted`/`window` qo'shildi. `9302f1e8a3`, build 14:28:23->14:37:53, 0 xato. **Sinov: 90% mos** (xabarlar chiqdi va chat almashtirilganda joyida qoldi), qoldiq muammo A22 da |
 
 ---
 
