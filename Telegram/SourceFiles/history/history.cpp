@@ -2230,6 +2230,42 @@ void History::loadDeletedMessages() {
 	auto deleted = CustomDB::GetDeletedMessages(key);
 	if (deleted.empty()) return;
 
+	// -- Yuklangan OYNA darvozasi (2026-09-26) -----------------------
+	//
+	// Telegram tarixni bloklarda saqlaydi va serverdan kelgan eski
+	// bo'lakni `addCreatedOlderSlice()` bilan SHARTSIZ old blokka
+	// qo'yadi. Shuning uchun yuklangan oynadan ESKI yozuvni hozir
+	// qo'ysak, keyin serverdan kelgan eski bo'lak uning OLDIGA tushadi
+	// va tartib buziladi:  sentabr -> iyul/avgust -> yana sentabr.
+	// (Haqiqiy holat, 2026-09-26, peer 7053823996: 579 yozuv.)
+	//
+	// Telegram o'zining lokal xabarlari uchun aynan shu muammoni
+	// `checkLocalMessages()` dagi `goodDate()` bilan hal qiladi -- shu
+	// qoidani AYNAN takrorlaymiz.
+	//
+	// Yozuv YO'QOLMAYDI: `addOlderSlice()` va `addNewerSlice()` oxirida
+	// `loadDeletedMessages()` qayta chaqiriladi, oyna kengaygach yozuv
+	// o'z joyiga tushadi. Server eski xabar bermasa `_loadedAtTop` true
+	// bo'ladi, `firstDate` 0 ga aylanadi -- hammasi huquqli bo'ladi.
+	//
+	// `isEmpty()` da hamma narsa huquqli: (a) blocks bo'sh bo'lgani
+	// uchun `blocks.front()` ni o'qish YIQILISHGA olib kelardi, (b) A13
+	// holati -- butun chat o'chirilganda tarix bo'sh bo'ladi va aynan
+	// o'sha paytda saqlangan xabarlarni ko'rsatish kerak.
+	//
+	// `_clientSideMessages` ga ro'yxatdan o'tkazish YO'LI YO'Q:
+	// `registerClientSideMessage()` da `Expects(IsClientMsgId(item->id))`
+	// bor, bizning yozuvlar esa haqiqiy server ID'laridan foydalanadi.
+	const auto windowFirstDate = (loadedAtTop() || isEmpty())
+		? TimeId(0)
+		: blocks.front()->messages.front()->data()->date();
+	const auto windowLastDate = (loadedAtBottom() || isEmpty())
+		? std::numeric_limits<TimeId>::max()
+		: blocks.back()->messages.back()->data()->date();
+	const auto inLoadedWindow = [&](TimeId date) {
+		return (date >= windowFirstDate) && (date < windowLastDate);
+	};
+
 	// ── Begona akkaunt yozuvlarini aniqlash uchun LANGARLAR ──────────
 	//
 	// Bitta akkauntning bitta chatidagi xabar ID'lari vaqt bo'yicha
@@ -2335,9 +2371,34 @@ void History::loadDeletedMessages() {
 	int injectedCount = 0;
 	int skippedEmpty = 0;   // mazmuni yo'qligi uchun chizilmagan
 	int skippedForeign = 0; // boshqa akkauntniki deb topilgan
+	int skippedWindow = 0;  // yuklangan oynadan tashqarida (keyin qo'yiladi)
+	int reinserted = 0;     // ko'rinishdan tushib qolgani qaytarildi
 	for (const auto &msg : deleted) {
-		// Skip if already present (loaded from server or already injected).
-		if (owner().message(peer, MsgId(msg.msgId))) continue;
+		// Xabar allaqachon mavjudmi (serverdan yuklangan yoki avval
+		// inject qilingan).
+		//
+		// 2026-09-26: ilgari bu shartsiz `continue` edi va shu sababli
+		// xabar ilova qayta ishga tushirilmaguncha ko'rinmay ketardi.
+		// Sabab zanjiri:
+		//   1. Chat ochilganda `getReadyFor()` -> `clear(ClearType::Unload)`
+		//      chaqiriladi, u esa faqat `blocks.clear()` qiladi -- xabar
+		//      obyekti `owner()` xaritasida TIRIK qoladi, lekin
+		//      `mainView()` ni yo'qotadi, ya'ni ekranda yo'q.
+		//   2. `checkLocalMessages()` bloklarga faqat
+		//      `_clientSideMessages` ni qaytaradi, bizning xabar u yerda
+		//      yo'q (yuqoridagi izohga qarang).
+		//   3. Shu shart esa uni "mavjud" deb o'tkazib yuborardi.
+		// Natijada 579 yozuv bazada ham, xotirada ham bor, ekranda yo'q.
+		if (const auto existing = owner().message(peer, MsgId(msg.msgId))) {
+			if (existing->isDeletedLocally()
+				&& !existing->mainView()
+				&& inLoadedWindow(existing->date())) {
+				insertMessageToBlocks(existing);
+				owner().requestItemViewRefresh(existing);
+				reinserted++;
+			}
+			continue;
+		}
 
 		// Eski (egasi noma'lum) yozuvlar uchun ikki bosqichli tekshiruv.
 		// Yangi yozuvlarda account_id to'g'ri, ularga TEGILMAYDI.
@@ -2363,6 +2424,14 @@ void History::loadDeletedMessages() {
 		if (!effectiveDate) {
 			effectiveDate = static_cast<unsigned int>(
 				QDateTime::currentSecsSinceEpoch());
+		}
+
+		// Oynadan tashqarida bo'lsa HOZIR yaratmaymiz. Yaratib qo'ysak
+		// yuqoridagi "mavjudmi" sharti uni abadiy topib turadi va tartib
+		// buzilgan joyda qolib ketadi.
+		if (!inLoadedWindow(static_cast<TimeId>(effectiveDate))) {
+			skippedWindow++;
+			continue;
 		}
 
 		auto flags = MessageFlag::Local | MessageFlag::HasFromId;
@@ -2487,12 +2556,15 @@ void History::loadDeletedMessages() {
 		owner().requestItemViewRefresh(item);
 		injectedCount++;
 	}
-	if (injectedCount > 0) {
+	if (injectedCount > 0 || reinserted > 0) {
 		// LOG(), qDebug() EMAS -- qDebug log.txt ga tushmaydi.
+		// `reinserted` va `window` ataylab log'da: ular bo'lmasa
+		// "nega ko'rinmayapti?" savoliga log'dan javob topilmaydi.
 		LOG(("CustomMod: injected %1 deleted messages for peer %2 "
-			"| skipped: empty %3, foreign %4"
+			"| reinserted %3 | skipped: empty %4, foreign %5, window %6"
 			).arg(injectedCount).arg(peer->id.value
-			).arg(skippedEmpty).arg(skippedForeign));
+			).arg(reinserted).arg(skippedEmpty).arg(skippedForeign
+			).arg(skippedWindow));
 	}
 }
 
@@ -4802,8 +4874,6 @@ std::vector<MsgId> History::collectMessagesFromParticipantToDelete(
 }
 
 void History::clear(ClearType type, bool markEmpty) {
-	// ... (existing clear logic)
-	// (I will read the function first to ensure correct placement)
 	_unreadBarView = nullptr;
 	_firstUnreadView = nullptr;
 	removeJoinedMessage();
