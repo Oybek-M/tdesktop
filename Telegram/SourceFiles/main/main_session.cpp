@@ -269,13 +269,32 @@ Session::Session(
 				// fayl o'chirilgandan keyin kvota 10.4 GB deb ko'rsatib,
 				// oldindan yuklashni keraksiz to'xtatib turgan edi.
 				CustomMediaQuota::ResyncFromDisk();
+				// Ogohlantirish AYNAN shu yerdan — resync'dan KEYIN.
+				// Ilgari u Session konstruktorida, ya'ni resync'dan
+				// 90 soniya oldin chiqardi va shu sababli eskirgan
+				// raqamni ko'rsatardi (26-09: diskda 5.2 GB bo'la turib
+				// "10.4 GB / 10.0 GB" deb ogohlantirgan).
+				//
+				// crl::on_main GUARD'SIZ: box'ni ko'rsatish asosiy oqimda
+				// bo'lishi shart, lekin bu yer fon oqimi. Guard'li shakl
+				// (crl::on_main(obj, ...)) bu yerda XAVFLI bo'lardi --
+				// weak guard CHAQIRUV JOYIDA quriladi va ob'ektga fon
+				// oqimidan murojaat qiladi (A4+ da topilgan use-after-free).
+				// Lambda hech qanday ob'ektni ushlamaydi: u faqat
+				// globallar va Core::App() bilan ishlaydi.
+				crl::on_main([] {
+					CustomMediaQuota::ShowQuotaAlertIfNeeded();
+				});
 			});
 			// Faollik tarixini siqish -- navbatda Reconcile'dan KEYIN.
 			// Tugagach keshni O'ZI qayta yuklaydi.
 			CustomDB::CompactActivityHistoryAsync();
 		});
-		// Kvota ogohlantirishi shu yerda — konstruktorda hali oyna yo'q.
-		CustomMediaQuota::ShowQuotaAlertIfNeeded();
+		// Kvota ogohlantirishi bu yerdan OLIB TASHLANDI (26-09) — u endi
+		// yuqoridagi Maintenance navbatida, ResyncFromDisk() dan keyin
+		// ko'rsatiladi, ya'ni raqam har doim to'g'ri bo'ladi. Yon ta'siri
+		// foydali: ilgari bu qator HAR Session uchun (ya'ni har akkaunt
+		// uchun) ishlardi, endi jarayon davomida bir marta.
 		// 2026-08-24: faollik tarixini ishga tushishda bir marta tozalash.
 		// Ilgari tozalash FAQAT yangi yozuv kelganda ishlardi — ya'ni
 		// kuzatiladigan kontakt bo'lmasa eski yozuvlar abadiy qolardi.

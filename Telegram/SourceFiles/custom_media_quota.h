@@ -56,8 +56,11 @@ void ResyncFromDisk();
 // yoki kvota kengaytirilmaguncha) HAR ISHGA TUSHISHDA takrorlanadi.
 // Hech qanday fayl avtomatik o'chirilmaydi.
 //
-// Chat ro'yxati yuklangach chaqiriladi — sessiya konstruktorida hali
-// oyna mavjud emas.
+// 2026-09-26: ResyncFromDisk() dan KEYIN, Maintenance navbatidan
+// chaqiriladi (main_session.cpp). Ilgari Session konstruktorida edi va
+// shu sababli eskirgan raqamni ko'rsatardi. Fon oqimidan chaqirilgani
+// uchun chaqiruvchi uni crl::on_main ga o'rashi SHART — box faqat asosiy
+// oqimda ko'rsatiladi.
 void ShowQuotaAlertIfNeeded();
 
 } // namespace CustomMediaQuota
