@@ -260,6 +260,15 @@ Session::Session(
 			// oqim xavfsizligi amalda tasdiqlangan.
 			CustomDB::Maintenance::Enqueue("ReconcileMediaIndex", [] {
 				CustomDB::ReconcileMediaIndex(CustomSettings::ArchiveRoot());
+				// 2026-09-26: kvota hisoblagichini AYNAN shu yerdan
+				// yangilaymiz. Init() uni startda indeksdan oladi, lekin
+				// o'shanda indeks hali moslashtirilmagan: diskda yo'q
+				// fayllar 'present' bo'lib turadi va hisoblagich yuqori
+				// chiqadi. MediaQuotaScan ham reconcile'dan OLDIN ishlaydi,
+				// ya'ni u ham yordam bermaydi. Amalda: 5.24 GB lik ikki
+				// fayl o'chirilgandan keyin kvota 10.4 GB deb ko'rsatib,
+				// oldindan yuklashni keraksiz to'xtatib turgan edi.
+				CustomMediaQuota::ResyncFromDisk();
 			});
 			// Faollik tarixini siqish -- navbatda Reconcile'dan KEYIN.
 			// Tugagach keshni O'ZI qayta yuklaydi.

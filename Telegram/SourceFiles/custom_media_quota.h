@@ -32,6 +32,23 @@ void Init();
 // skanerlamaslik uchun.
 void AddBytes(long long bytes);
 
+// Hisoblagichni diskdagi va indeksdagi HOZIRGI holatdan qayta o'rnatadi.
+//
+// Nega kerak (2026-09-26): Init() va AddBytes() hisoblagichni faqat
+// OSHIRADI, kamaytiradigan yo'l yo'q edi. Fayl seans o'rtasida yo'qolsa
+// (foydalanuvchi o'chirsa), raqam qayta ishga tushirilmaguncha yuqoriligicha
+// qolardi. Amalda: 5.24 GB lik ikki fayl o'chirilgandan keyin ham kvota
+// 10.4 GB deb ko'rsatib, oldindan yuklashni keraksiz to'xtatib turdi.
+//
+// ReconcileMediaIndex() dan KEYIN chaqirilishi shart: u 'present' bo'lgan,
+// lekin diskda yo'q yozuvlarni 'missing' ga tushiradi, ya'ni SQL yig'indisi
+// aynan shundan keyin to'g'ri bo'ladi. Papka ham qayta skanerlanadi, chunki
+// startdagi skaner reconcile'dan OLDIN ishlaydi va u ham eskirgan bo'lishi
+// mumkin (12:01:55 skaner, 12:01:59 reconcile).
+//
+// Fon oqimidan (Maintenance navbatidan) chaqirilsin — papkani yurib chiqadi.
+void ResyncFromDisk();
+
 // Kvota to'lgan bo'lsa ogohlantirish oynasini ko'rsatadi.
 //
 // Toast EMAS, balki tasdiqlash talab qiladigan box — foydalanuvchi

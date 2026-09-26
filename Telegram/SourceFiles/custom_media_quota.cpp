@@ -12,6 +12,7 @@
 #include <QtCore/QDirIterator>
 #include <QtCore/QFileInfo>
 
+#include <algorithm>
 #include <atomic>
 
 namespace CustomMediaQuota {
@@ -100,6 +101,23 @@ void AddBytes(long long bytes) {
     if (bytes > 0) {
         gUsedBytes.fetch_add(bytes);
     }
+}
+
+void ResyncFromDisk() {
+    if (!gInitialized) {
+        return; // Init() hali chaqirilmagan — o'rnatadigan narsa yo'q
+    }
+    const auto indexed = CustomDB::TotalArchivedMediaBytes();
+    const auto mediaDir = CustomSettings::ArchiveMediasDir();
+    const auto scanned = QDir(mediaDir).exists()
+        ? ScanFolderBytes(mediaDir)
+        : 0LL;
+    // ATAYLAB store() — fetch_max emas. Init() dagi "kam baholashdan ko'ra
+    // ko'p baholash xavfsizroq" qoidasi start uchun to'g'ri edi, lekin bu
+    // yerda maqsadning o'zi hisoblagichni PASAYTIRA olish. Ikkala manba
+    // ham shu yerda yangilanadi, shuning uchun kattaroq qiymatni tanlash
+    // eski, eskirgan raqamni saqlab qolmaydi.
+    gUsedBytes.store(std::max(indexed, scanned));
 }
 
 void ShowQuotaAlertIfNeeded() {
