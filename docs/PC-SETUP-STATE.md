@@ -757,3 +757,82 @@ E:\Applications main ichida Steam (~20 GB o'yin), Antigravity IDE,
 Cisco Packet Tracer, SKLauncher, Mem Reduct bor. O'rnatilgan dasturlarni
 papka nusxalab ko'chirib BO'LMAYDI (registr E: ga bog'langan).
 Steam o'yinlarini Steam Settings > Storage orqali ko'chiring.
+
+---
+
+## 2026-09-26 (kech): E: BO'SHATILDI -- yakuniy holat
+
+`E:` diski (ST1000DM003, Disk 1) nosoz ekani tasdiqlandi; undagi hamma
+narsa `D:` ga olindi va `E:` deyarli bo'sh (930.3 / 932 GB bo'sh).
+Qolgan: `E:\Application's datas` (0.67 GB, VS "shared" komponentlari)
+va `bootTel.dat`. Diskni fizik almashtirish qoldi.
+
+### Yangi joylar (PC)
+
+| Nima | Endi | Avval |
+|---|---|---|
+| Visual Studio 2026 (18.10) | `D:\VS2026` | `E:\Application's datas\Visual Studio\Program Files` |
+| VS yuklab olish keshi | `D:\DVS2026-cache` (registr: CachePath) | `E:` |
+| Steam (engine + WoT Blitz) | `D:\Steam` (registr `d:/steam`) | `E:\Applications main` |
+| SKLauncher ma'lumotlari | `D:\Apps\SKLauncher` | `E:\Applications main\SKLauncher` |
+| CustomMod arxivi | `D:\customizationMainFolder` | `E:\customizationMainFolder` |
+| Zaxira (67.5 GB) | `D:\E-disk-backup-20260925` | -- |
+| Pagefile | C: 4 GB + D: 16 GB | C: 16 + E: 24 (BSOD sababi) |
+
+Steam: papkani nusxalab (robocopy), keyin `D:\Steam\steam.exe` ni
+ishga tushirish yetarli -- Steam registrni o'zi tuzatadi (kutubxona
+papkasi Steam'ning o'zi ichida bo'lsa). SKLauncher: launcher `C:\Program
+Files\sklauncher` da, u faqat MA'LUMOT papkasini `%APPDATA%\.sklauncher\
+location.json` (`dataDir`) va `instances.json` (`directory`) dan oladi --
+ikkalasi `D:\Apps\SKLauncher` ga o'zgartirildi (`.bak-20260926` nusxalari
+shu yerda). Mem Reduct `C:\Program Files\Mem Reduct` da o'z nusxasi bor
+edi (E: dagisi ortiqcha edi). Antigravity IDE va Cisco Packet Tracer
+o'chirildi (kerak bo'lsa `D:\Apps` ga qayta o'rnatiladi; sozlamalari
+`C:` da).
+
+### Skriptlar yangilandi (D:\TBuild ildizi, repoda EMAS)
+
+`run-build.bat`, `run-configure.bat`, `run-prepare.bat`,
+`run-prepare-rest.bat`, `run-prepare.ps1`, `link-tuning.props`:
+`E:\VS2026` -> `D:\VS2026`, `configure` dagi
+`CMAKE_GENERATOR_INSTANCE=D:\VS2026,version=18.10.12217.157`.
+Yangi VS da ikkala toolset ham bor: `14.44.35207` va `14.51.36231`.
+`D:\TBuild\tdesktop\out\CMakeCache.txt` eski `E:` yo'llarini eslab
+qolgan -- tdesktop shu yerda qurilsa, `out` ni tozalab `configure`
+qaytadan ishlatish kerak. `out` (37.8 GB, chala 2 MB Telegram.exe) ATAYLAB
+o'chirilmadi: 2059 obj -- bir kunlik ish, va FASTLINK bilan bog'lash
+sog'lom ketgan edi.
+
+### VS qayta o'rnatish -- to'siqlar (keyingi safar uchun)
+
+1. **Product va Download cache bir-biriga kirmasin**: "The root
+   installation path cannot overlap with package cache path".
+2. **"Shared components" maydoni kulrang**, o'rnatuvchida o'zgarmaydi.
+   U registrda saqlanadi:
+   `HKLM\SOFTWARE\Microsoft\VisualStudio\Setup\SharedInstallationPath`.
+   Eski o'rnatmadan `E:` da qolgan, shuning uchun Android NDK yozishda
+   *"The request failed due to a fatal device hardware error"* bilan
+   yiqildi (1024 amaldan 1 tasi). Yechim: Android komponentlarini
+   olib tashlash (Modify). Disk almashtirilgach VS ni toza o'rnatib,
+   bu qiymatni `D:\VS-Shared` ga qo'yish (admin, regedit).
+3. `C:` ga har doim ~27.6 GB "fixed location" komponentlar tushadi
+   (Windows SDK, .NET). C: da o'rnatish oldidan kamida ~30 GB bo'sh joy
+   kerak. Buning uchun C: pagefile 16 -> 4 GB qilindi (bo'sh joy
+   24.6 -> 37.2 GB). O'rnatishdan keyin C: bo'sh joyi ~19.9 GB.
+4. **ASP.NET and web development workload KERAK** (customsync-server
+   va boshqa web loyihalar). Uni olib tashlab joy tejab bo'lmaydi.
+5. Xato logi: `%TEMP%\dd_setup_*_errors.log` (haqiqiy sabab shu yerda,
+   oynadagi "Sorry, something went wrong" hech narsa demaydi).
+   "Could not sync DCAT registration ... Access denied" -- zararsiz.
+
+### Qolgan ishlar
+
+- E: diskini fizik almashtirish (Disk 1, ST1000DM003, 92+ apparat xatosi)
+- Shundan keyin VS ni toza o'rnatish + SharedInstallationPath
+- PostgreSQL o'rnatish: o'rnatuvchi `D:\E-disk-backup-20260925\Installers\
+  postgresql-17.6-1-windows-x64.exe` da
+- RAM sinovi (`mdsched.exe`), 09-23 dagi klaster hali to'liq tushuntirilmagan
+- Eski Uninstall registri yozuvlari (Steam, WoT Blitz, Cisco, Mem Reduct,
+  Antigravity) hamon `E:` ga ishora qilishi mumkin -- zararsiz
+- Steam va Public Desktop yorliqlari (admin talab qiladi) eski `E:` yo'liga
+  ishora qilishi mumkin -- `D:\Steam\steam.exe` dan yangisini yarating
