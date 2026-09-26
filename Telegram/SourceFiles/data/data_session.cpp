@@ -7,10 +7,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_session.h"
 
-#include <QtCore/QStandardPaths>
-#include <QtCore/QDir>
-#include <QtCore/QFile>
-#include <QtCore/QFileInfo>
 #include "custom_archive.h"
 #include "custom_db.h"
 #include "custom_peer_key.h"
@@ -2054,26 +2050,13 @@ void Session::photoLoadDone(not_null<PhotoData*> photo) {
 	notifyPhotoLayoutChanged(photo);
 	_photoLoadProgress.fire_copy(photo);
 
-	// Eager permanent backup, mirroring DocumentData::finishLoad()'s hook:
-	// save into the unified ~/customizationMainFolder/medias/images/ tree as
-	// soon as the full-size image is available, instead of relying solely on
-	// HistoryItem::setDeletedLocally() to grab it later (which can miss the
-	// photo if it's already been evicted from Telegram's own image cache by
-	// the time the message is deleted). No peerId/msgId here — PhotoData
-	// isn't tied to one message — so it's keyed by photo id, same as the
-	// document-level hook.
-	if (CustomSettings::AntiDelete()) {
-		if (const auto media = photo->activeMediaView()) {
-			const QString path =
-				QStandardPaths::writableLocation(QStandardPaths::HomeLocation)
-				+ "/customizationMainFolder/medias/images/"
-				+ QString::number(photo->id) + ".jpg";
-			if (!QFile::exists(path)) {
-				QDir().mkpath(QFileInfo(path).absolutePath());
-				media->saveToFile(path);
-			}
-		}
-	}
+	// 2026-09-26: bu yerda rasmlarni "proaktiv zaxiralash" hook'i bor
+	// edi (ddbd54daf4, 11-07). U 24-08 da custom_archive.cpp dagi
+	// to'g'ri yo'l bilan ALMASHTIRILGAN, lekin o'chirilmay qolgan va
+	// arxiv ildizi sozlanadigan bo'lgach (2901819e1f) yo'lni qo'lda
+	// yig'gani uchun fayllarni sozlangan ildizdan TASHQARIGA yozardi,
+	// media_index ga qo'shmasdan va hech kim o'qimaydigan nom bilan.
+	// Qayta qo'shilmasin: rasm arxivlash custom_archive.cpp da.
 }
 
 void Session::photoLoadFail(
