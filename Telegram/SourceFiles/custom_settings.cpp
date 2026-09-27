@@ -1,7 +1,10 @@
 #include "custom_settings.h"
 #include "custom_db.h"
+#include "custom_sync_outbox.h"
+#include "custom_sync_record.h"
 #include <algorithm> // std::clamp
 #include <utility>   // std::pair (arxiv layout migratsiyasi)
+#include <QtCore/QDateTime>
 #include <QtCore/QDir>
 #include <QtCore/QFile>
 #include <QtCore/QHash>
@@ -16,6 +19,8 @@ namespace {
 
 Values gValues;
 bool gInitialized = false;
+qint64 gActiveAccountId = 0;
+bool gApplyingRemoteScopeSetting = false;
 
 // Legacy per-peer overrides (C12 / C14) + NEXT-6 anti-edit.
 QHash<QString, bool> gGhostPerPeer;
@@ -109,6 +114,11 @@ void SavePeerLists() {
     if (f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         f.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
     }
+
+    EnqueueScopeSetting(QStringLiteral("scope.whitelist"));
+    EnqueueScopeSetting(QStringLiteral("scope.blacklist"));
+    EnqueueScopeSetting(QStringLiteral("scope.wl_categories"));
+    EnqueueScopeSetting(QStringLiteral("scope.bl_categories"));
 }
 
 void LoadPeerLists() {
@@ -167,8 +177,13 @@ void UpdateValue(const QString &id, bool value) {
     if (id == "ghostMode") gValues.ghostMode = value;
     else if (id == "bypassRestrictions") gValues.bypassRestrictions = value;
     else if (id == "offlineDb") gValues.offlineDb = value;
-    else if (id == "antiDelete") gValues.antiDelete = value;
-    else if (id == "antiEdit") gValues.antiEdit = value;
+    else if (id == "antiDelete") {
+        gValues.antiDelete = value;
+        EnqueueScopeSetting(QStringLiteral("scope.antidelete_global"));
+    } else if (id == "antiEdit") {
+        gValues.antiEdit = value;
+        EnqueueScopeSetting(QStringLiteral("scope.antiedit_global"));
+    }
     else if (id == "spoofMobile") gValues.spoofMobile = value;
     else if (id == "storyAnonymousView") gValues.storyAnonymousView = value;
     else if (id == "mutualContactShowInChatList") gValues.mutualContactShowInChatList = value;
@@ -483,6 +498,7 @@ void SetAntiDeleteForPeer(const QString &peerId, bool enabled) {
     settings.beginGroup("AntiDeletePerPeer");
     settings.setValue(peerId, enabled);
     settings.endGroup();
+    EnqueueScopeSetting(QStringLiteral("scope.antidelete_per_peer"));
 }
 
 void ResetAntiDeleteForPeer(const QString &peerId) {
@@ -492,6 +508,7 @@ void ResetAntiDeleteForPeer(const QString &peerId) {
     settings.beginGroup("AntiDeletePerPeer");
     settings.remove(peerId);
     settings.endGroup();
+    EnqueueScopeSetting(QStringLiteral("scope.antidelete_per_peer"));
 }
 
 // ── Media backup per-chat override (2026-08-14) ──────────────────────────
@@ -1022,6 +1039,7 @@ void SetAntiEditForPeer(const QString &peerId, bool enabled) {
     settings.beginGroup("AntiEditPerPeer");
     settings.setValue(peerId, enabled);
     settings.endGroup();
+    EnqueueScopeSetting(QStringLiteral("scope.antiedit_per_peer"));
 }
 
 void ResetAntiEditForPeer(const QString &peerId) {
@@ -1031,6 +1049,7 @@ void ResetAntiEditForPeer(const QString &peerId) {
     settings.beginGroup("AntiEditPerPeer");
     settings.remove(peerId);
     settings.endGroup();
+    EnqueueScopeSetting(QStringLiteral("scope.antiedit_per_peer"));
 }
 
 // ── Per-Chat Settings boshqaruvi (NEXT-6) ────────────────────────────────
@@ -1059,6 +1078,9 @@ void AddPerPeerOverride(const QString &peerId, const QString &displayName) {
     settings.beginGroup("AntiEditPerPeer");
     settings.setValue(peerId, gAntiEditPerPeer[peerId]);
     settings.endGroup();
+
+    EnqueueScopeSetting(QStringLiteral("scope.antidelete_per_peer"));
+    EnqueueScopeSetting(QStringLiteral("scope.antiedit_per_peer"));
 }
 
 void RemovePerPeerOverride(const QString &peerId) {
@@ -1081,6 +1103,9 @@ void RemovePerPeerOverride(const QString &peerId) {
 
     // Ghost reset: DB ham tozalansin.
     CustomDB::ResetGhostReadForPeerAllAccounts(peerId);
+
+    EnqueueScopeSetting(QStringLiteral("scope.antidelete_per_peer"));
+    EnqueueScopeSetting(QStringLiteral("scope.antiedit_per_peer"));
 }
 
 void ClearAllPerPeerOverrides() {
@@ -1099,6 +1124,9 @@ void ClearAllPerPeerOverrides() {
     settings.remove("GhostModePerPeer");
     settings.remove("AntiDeletePerPeer");
     settings.remove("AntiEditPerPeer");
+
+    EnqueueScopeSetting(QStringLiteral("scope.antidelete_per_peer"));
+    EnqueueScopeSetting(QStringLiteral("scope.antiedit_per_peer"));
 }
 
 bool HasPerPeerOverride(const QString &peerId) {
@@ -1229,6 +1257,225 @@ bool ShouldTrackActivity(const QString &peerId, bool isContact) {
     if (IsInActivityExclude(peerId)) return false;
     if (IsInActivityInclude(peerId)) return true;
     return gValues.activityHistoryTrackAllContacts && isContact;
+}
+
+// ── Scope Sync (2026-09-27) ──────────────────────────────────────────────
+
+void SetActiveAccountId(qint64 accountId) {
+    gActiveAccountId = accountId;
+}
+
+qint64 ActiveAccountId() {
+    return gActiveAccountId;
+}
+
+std::optional<QString> GetScopeSettingValue(const QString &key) {
+    if (!gInitialized) Init();
+
+    if (key == QStringLiteral("scope.whitelist")) {
+        QJsonArray arr;
+        auto keys = gWhitelist.keys();
+        std::sort(keys.begin(), keys.end());
+        for (const auto &k : keys) {
+            arr.append(k);
+        }
+        return QString::fromUtf8(QJsonDocument(arr).toJson(QJsonDocument::Compact));
+    }
+    if (key == QStringLiteral("scope.blacklist")) {
+        QJsonArray arr;
+        auto keys = gBlocklist.keys();
+        std::sort(keys.begin(), keys.end());
+        for (const auto &k : keys) {
+            arr.append(k);
+        }
+        return QString::fromUtf8(QJsonDocument(arr).toJson(QJsonDocument::Compact));
+    }
+    if (key == QStringLiteral("scope.wl_categories")) {
+        QJsonObject obj{
+            { QStringLiteral("user"),    IsWhitelistCategoryEnabled(PeerType::User) },
+            { QStringLiteral("group"),   IsWhitelistCategoryEnabled(PeerType::Group) },
+            { QStringLiteral("channel"), IsWhitelistCategoryEnabled(PeerType::Channel) },
+        };
+        return QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+    }
+    if (key == QStringLiteral("scope.bl_categories")) {
+        QJsonObject obj{
+            { QStringLiteral("user"),    IsBlocklistCategoryEnabled(PeerType::User) },
+            { QStringLiteral("group"),   IsBlocklistCategoryEnabled(PeerType::Group) },
+            { QStringLiteral("channel"), IsBlocklistCategoryEnabled(PeerType::Channel) },
+        };
+        return QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+    }
+    if (key == QStringLiteral("scope.antidelete_global")) {
+        return gValues.antiDelete ? QStringLiteral("true") : QStringLiteral("false");
+    }
+    if (key == QStringLiteral("scope.antiedit_global")) {
+        return gValues.antiEdit ? QStringLiteral("true") : QStringLiteral("false");
+    }
+    if (key == QStringLiteral("scope.antidelete_per_peer")) {
+        QJsonObject obj;
+        auto keys = gAntiDeletePerPeer.keys();
+        std::sort(keys.begin(), keys.end());
+        for (const auto &k : keys) {
+            obj[k] = gAntiDeletePerPeer.value(k);
+        }
+        return QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+    }
+    if (key == QStringLiteral("scope.antiedit_per_peer")) {
+        QJsonObject obj;
+        auto keys = gAntiEditPerPeer.keys();
+        std::sort(keys.begin(), keys.end());
+        for (const auto &k : keys) {
+            obj[k] = gAntiEditPerPeer.value(k);
+        }
+        return QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+    }
+
+    return std::nullopt;
+}
+
+void EnqueueScopeSetting(const QString &key, qint64 accountId) {
+    if (gApplyingRemoteScopeSetting) {
+        return;
+    }
+    const auto accId = (accountId > 0) ? accountId : gActiveAccountId;
+    if (accId <= 0) {
+        return;
+    }
+    const auto msgId = CustomSync::DiscriminatorFor(key);
+    const auto occurredAt = QDateTime::currentSecsSinceEpoch();
+    CustomSync::Outbox::Enqueue(
+        QLatin1String(CustomSync::Kind::Setting),
+        accId,
+        QStringLiteral("0"),
+        msgId,
+        occurredAt,
+        key);
+}
+
+void SyncAllScopeSettings(qint64 accountId) {
+    const auto accId = (accountId > 0) ? accountId : gActiveAccountId;
+    if (accId <= 0) {
+        return;
+    }
+    static const QStringList kAllScopeKeys = {
+        QStringLiteral("scope.whitelist"),
+        QStringLiteral("scope.blacklist"),
+        QStringLiteral("scope.wl_categories"),
+        QStringLiteral("scope.bl_categories"),
+        QStringLiteral("scope.antidelete_global"),
+        QStringLiteral("scope.antiedit_global"),
+        QStringLiteral("scope.antidelete_per_peer"),
+        QStringLiteral("scope.antiedit_per_peer"),
+    };
+    for (const auto &k : kAllScopeKeys) {
+        EnqueueScopeSetting(k, accId);
+    }
+}
+
+void ApplyScopeSetting(const QString &key, const QString &value) {
+    if (!gInitialized) Init();
+
+    struct Guard {
+        bool &flag;
+        ~Guard() { flag = false; }
+    };
+    gApplyingRemoteScopeSetting = true;
+    Guard guard{ gApplyingRemoteScopeSetting };
+
+    if (key == QStringLiteral("scope.whitelist")) {
+        const auto doc = QJsonDocument::fromJson(value.toUtf8());
+        if (doc.isArray()) {
+            QHash<QString, QString> newWl;
+            for (const auto &val : doc.array()) {
+                const auto id = val.toString();
+                if (!id.isEmpty()) {
+                    newWl[id] = gWhitelist.value(id, gPeerNameCache.value(id));
+                }
+            }
+            gWhitelist = newWl;
+            SavePeerLists();
+        }
+    } else if (key == QStringLiteral("scope.blacklist")) {
+        const auto doc = QJsonDocument::fromJson(value.toUtf8());
+        if (doc.isArray()) {
+            QHash<QString, QString> newBl;
+            for (const auto &val : doc.array()) {
+                const auto id = val.toString();
+                if (!id.isEmpty()) {
+                    newBl[id] = gBlocklist.value(id, gPeerNameCache.value(id));
+                }
+            }
+            gBlocklist = newBl;
+            SavePeerLists();
+        }
+    } else if (key == QStringLiteral("scope.wl_categories")) {
+        const auto doc = QJsonDocument::fromJson(value.toUtf8());
+        if (doc.isObject()) {
+            const auto obj = doc.object();
+            if (obj.contains(QStringLiteral("user"))) {
+                gWhitelistCategories[static_cast<int>(PeerType::User)] = obj[QStringLiteral("user")].toBool();
+            }
+            if (obj.contains(QStringLiteral("group"))) {
+                gWhitelistCategories[static_cast<int>(PeerType::Group)] = obj[QStringLiteral("group")].toBool();
+            }
+            if (obj.contains(QStringLiteral("channel"))) {
+                gWhitelistCategories[static_cast<int>(PeerType::Channel)] = obj[QStringLiteral("channel")].toBool();
+            }
+            SavePeerLists();
+        }
+    } else if (key == QStringLiteral("scope.bl_categories")) {
+        const auto doc = QJsonDocument::fromJson(value.toUtf8());
+        if (doc.isObject()) {
+            const auto obj = doc.object();
+            if (obj.contains(QStringLiteral("user"))) {
+                gBlocklistCategories[static_cast<int>(PeerType::User)] = obj[QStringLiteral("user")].toBool();
+            }
+            if (obj.contains(QStringLiteral("group"))) {
+                gBlocklistCategories[static_cast<int>(PeerType::Group)] = obj[QStringLiteral("group")].toBool();
+            }
+            if (obj.contains(QStringLiteral("channel"))) {
+                gBlocklistCategories[static_cast<int>(PeerType::Channel)] = obj[QStringLiteral("channel")].toBool();
+            }
+            SavePeerLists();
+        }
+    } else if (key == QStringLiteral("scope.antidelete_global")) {
+        const bool enabled = (value.trimmed().compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0);
+        Set(QStringLiteral("antiDelete"), enabled);
+    } else if (key == QStringLiteral("scope.antiedit_global")) {
+        const bool enabled = (value.trimmed().compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0);
+        Set(QStringLiteral("antiEdit"), enabled);
+    } else if (key == QStringLiteral("scope.antidelete_per_peer")) {
+        const auto doc = QJsonDocument::fromJson(value.toUtf8());
+        if (doc.isObject()) {
+            const auto obj = doc.object();
+            gAntiDeletePerPeer.clear();
+            QSettings settings("CustomMod", "TelegramDesktop");
+            settings.remove("AntiDeletePerPeer");
+            settings.beginGroup("AntiDeletePerPeer");
+            for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
+                const bool en = it.value().toBool();
+                gAntiDeletePerPeer[it.key()] = en;
+                settings.setValue(it.key(), en);
+            }
+            settings.endGroup();
+        }
+    } else if (key == QStringLiteral("scope.antiedit_per_peer")) {
+        const auto doc = QJsonDocument::fromJson(value.toUtf8());
+        if (doc.isObject()) {
+            const auto obj = doc.object();
+            gAntiEditPerPeer.clear();
+            QSettings settings("CustomMod", "TelegramDesktop");
+            settings.remove("AntiEditPerPeer");
+            settings.beginGroup("AntiEditPerPeer");
+            for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
+                const bool en = it.value().toBool();
+                gAntiEditPerPeer[it.key()] = en;
+                settings.setValue(it.key(), en);
+            }
+            settings.endGroup();
+        }
+    }
 }
 
 } // namespace CustomSettings

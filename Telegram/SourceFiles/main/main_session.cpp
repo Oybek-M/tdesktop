@@ -200,6 +200,8 @@ Session::Session(
 	// Sync orkestrator: Start() idempotent — statik gOrchestrator tekshiruvi
 	// tufayli nechta Session yaratilishidan qat'i nazar faqat BITTA nusxa
 	// ishlaydi. SyncEnabled() false bo'lsa timer qurilmaydi (K5).
+	CustomSettings::SetActiveAccountId(qint64(_userId.bare));
+	CustomSettings::SyncAllScopeSettings(qint64(_userId.bare));
 	CustomSync::Start();
 	// A13/K1b: arxivdan tiklanadigan chatlarni chat ro'yxatiga qaytarish.
 	// Konstruktorda EMAS, balki chat ro'yxati serverdan yuklangach —

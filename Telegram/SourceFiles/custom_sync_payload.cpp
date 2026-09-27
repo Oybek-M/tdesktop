@@ -1,5 +1,6 @@
 #include "custom_sync_payload.h"
 #include "custom_sync_record.h"
+#include "custom_settings.h"
 #include "custom_db.h"
 
 #include <QtCore/QJsonObject>
@@ -219,6 +220,20 @@ BuildResult BuildTombstone(const OutboxEntry &entry) {
     return { BuildStatus::Ok, QJsonDocument(obj).toJson(QJsonDocument::Compact) };
 }
 
+BuildResult BuildSetting(const OutboxEntry &entry) {
+    const auto val = CustomSettings::GetScopeSettingValue(entry.targetRecordId);
+    if (!val.has_value()) {
+        return { BuildStatus::SourceGone, {} };
+    }
+    QJsonObject obj{
+        { QStringLiteral("account_id"), QString::number(entry.accountId) },
+        { QStringLiteral("peer_id"),    entry.peerId.isEmpty() ? QStringLiteral("0") : entry.peerId },
+        { QStringLiteral("key"),        entry.targetRecordId },
+        { QStringLiteral("value"),      *val },
+    };
+    return { BuildStatus::Ok, QJsonDocument(obj).toJson(QJsonDocument::Compact) };
+}
+
 } // namespace
 
 BuildResult Build(const OutboxEntry &entry) {
@@ -227,6 +242,9 @@ BuildResult Build(const OutboxEntry &entry) {
     }
     if (entry.kind == QLatin1String(Kind::Tombstone)) {
         return BuildTombstone(entry);
+    }
+    if (entry.kind == QLatin1String(Kind::Setting)) {
+        return BuildSetting(entry);
     }
 
     auto *db = CustomDB::RawHandle();

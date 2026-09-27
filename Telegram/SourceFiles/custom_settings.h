@@ -3,6 +3,7 @@
 #include <QtCore/QJsonObject>
 #include <QtCore/QString>
 #include <QtCore/QVector>
+#include <optional>
 
 namespace CustomSettings {
 
@@ -328,5 +329,15 @@ void RemoveFromActivityExclude(const QString &peerId);
 // bog'liq emas, boshqa CustomSettings funksiyalari kabi faqat QString bilan
 // ishlaydi).
 [[nodiscard]] bool ShouldTrackActivity(const QString &peerId, bool isContact);
+
+// ── Scope Sync (2026-09-27) ──────────────────────────────────────────────
+// Scope sozlamalarini boshqa qurilmalar va VPS capture xizmatiga sync
+// qilish uchun yordamchilar. Spec §3.2.1.
+[[nodiscard]] std::optional<QString> GetScopeSettingValue(const QString &key);
+void EnqueueScopeSetting(const QString &key, qint64 accountId = 0);
+void SyncAllScopeSettings(qint64 accountId = 0);
+void ApplyScopeSetting(const QString &key, const QString &value);
+void SetActiveAccountId(qint64 accountId);
+[[nodiscard]] qint64 ActiveAccountId();
 
 } // namespace CustomSettings
