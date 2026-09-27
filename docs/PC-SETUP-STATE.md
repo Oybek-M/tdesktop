@@ -836,3 +836,78 @@ sog'lom ketgan edi.
   Antigravity) hamon `E:` ga ishora qilishi mumkin -- zararsiz
 - Steam va Public Desktop yorliqlari (admin talab qiladi) eski `E:` yo'liga
   ishora qilishi mumkin -- `D:\Steam\steam.exe` dan yangisini yarating
+
+---
+
+## 2026-09-27: E: diski ALMASHTIRILDI, D: da xavf belgisi topildi
+
+### Yangi E: diski
+
+Nosoz Seagate (ST1000DM003) olib tashlandi. O'rniga ishlatilgan (tanishdan
+olingan) disk qo'yildi: **TOSHIBA HDWD110 (P300, 1 TB, 7200 rpm),
+S/N `Z9G27L7FS`, 2019-12**. Endi u **Disk 1**.
+
+- **Event log'dagi "Disk 1" yozuvlari 2026-09-27 15:01 dan OLDIN = eski
+  Seagate.** Yangi disk xatolarini faqat shu vaqtdan keyin sanang.
+- Kelgan holati: MBR, bitta 140.5 GB bo'lim (tanishning eski Windows 10
+  tizim bo'limi, ~115 GB band), qolgan 791 GB ajratilmagan. Explorer
+  shuning uchun "140 GB" ko'rsatgan -- disk to'liq 931.5 GB.
+- SMART (15:26): qayta ajratilgan 0, pending 0, offline uncorrectable 0,
+  CRC 0, 6276 soat, 36 C -- **toza**.
+- Eski bo'lim o'chirildi, butun diskka bitta NTFS **E:** (931.51 GB)
+  yaratildi. Birinchi urinish tez format bo'lib qolgan (931 GB 15 daqiqada
+  -- HDD uchun imkonsiz, 0.19 GB/s dan oshmaydi), shuning uchun **to'liq
+  format** (sirt tekshiruvi) qayta boshlandi: 22:45 da, 183 MB/s,
+  23:15 da 31%.
+- Harf **E:** ataylab qoldirildi: VS `SharedInstallationPath` =
+  `E:\Application's datas\Visual Studio\Program Files (x86)` (o'rnatuvchida
+  o'zgarmaydi). vswhere: `D:\VS2026` isComplete=1, isLaunchable=1. VS
+  shared komponent so'rasa -- **Repair** ularni yangi E: ga tiklaydi.
+  Eski shared papkaning nusxasi (3.53 GB, oxirgi yozuv 2026-06-29):
+  `D:\E-disk-backup-20260925\Application's datas\Visual Studio\Program Files (x86)`.
+
+### ⚠️ D: (WD10EURX, Disk 0) -- 349 ta pending sektor
+
+Xuddi shu SMART o'qishda: **`Current_Pending_Sector` = 349**,
+`ReadErrorsUncorrected` = 349, qayta ajratilgan hali 0, 37 246 soat
+(~4.3 yil to'xtovsiz). Windows event log'da Disk 0 uchun 120 kunda **0 ta**
+xato -- ya'ni hozircha o'qilayotgan fayllarga tegmagan. Lekin bu disk
+endi PC'dagi DEYARLI HAMMA ma'lumotni saqlaydi (arxiv, E: zaxirasi, VS,
+Steam).
+
+**Qaror:** yangi E: faqat qo'shimcha joy emas -- D: dagi muhim
+ma'lumotlarning **ikkinchi nusxasi** (birinchi navbatda
+`D:\customizationMainFolder`, keyin E: zaxirasining keraklari va
+GitHub'da yo'q loyihalar). Keyin: D: dagi barcha fayllarni bir marta
+to'liq o'qib, buzuq sektorga tushgan fayl bor-yo'qligini aniqlash.
+
+SMART skripti: `D:\TBuild\disk-smart-check.ps1` (repoda EMAS, faqat
+o'qiydi, **admin** kerak), natija `D:\TBuild\disk-smart-result.txt`.
+`Get-PhysicalDisk` ning "Healthy" javobiga ISHONMANG -- Seagate ham,
+349 pending'li WD ham "Healthy" deydi.
+
+### C: (SSD)
+
+- Start'dan keyin 0.3-0.4 GB bo'sh qolgan edi (sababi aniqlanmadi:
+  dump, Windows Update, katta temp topilmadi).
+- Eng katta yangi iste'molchi: Claude Desktop ilovasining Cowork VM
+  to'plami, **9.61 GB**
+  (`%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\vm_bundles`,
+  2026-09-27 12:48-12:55 da yaratilgan). `AppData\Roaming\Claude` dagi
+  "ikkinchi nusxa" -- MSIX virtualizatsiyasi, haqiqiy fayl BITTA
+  (konteynerdan tashqaridagi WMI jarayoni bilan tekshirildi). Qo'lda
+  o'chirilmaydi -- ilova o'zi boshqaradi. BIOS'da VT-x o'chiq ("Hypervisor
+  launch failed; VMX not present or not enabled in BIOS").
+- `powercfg /h off` qilindi: `hiberfil.sys` (6.38 GB) va Fast Startup
+  o'chdi. C: bo'sh joyi 3.1 -> ~16 GB.
+- Pagefile o'zgarmadi: C: 4 GB + D: 16 GB.
+
+### Qolgan ishlar (yangilangan)
+
+- To'liq format tugashi -> event log + SMART qayta (pending/reallocated 0
+  qolishi kerak)
+- D: -> E: muhim ma'lumotlar nusxasi, keyin D: ni to'liq o'qish sinovi
+- PostgreSQL 17.6 O'RNATILDI (customsync-server testlari 190/190)
+- RAM sinovi (`mdsched.exe`) -- hali qilinmagan
+- Eski Uninstall yozuvlari (Steam, WoT Blitz -> `E:\Applications main`)
+  va yorliqlar -- zararsiz, admin bilan keyin

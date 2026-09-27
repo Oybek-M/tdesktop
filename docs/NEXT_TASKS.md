@@ -1,6 +1,34 @@
 # CustomMod — Keyingi Tasklar Ro'yxati
 
-**Oxirgi yangilanish:** 2026-09-26 (T46 + T47 tugallandi; A22 ochiq)
+**Oxirgi yangilanish:** 2026-09-27 (sync scope/edit_date kodi build kutmoqda; upstream v7.2.9 chiqqan; A22 ochiq)
+
+---
+
+## 🟡 2026-09-27 holati — keyingi sessiya shu yerdan boshlaydi
+
+**Upstream:** rasmiy `telegramdesktop/tdesktop` da **v7.2.8 va v7.2.9**
+chiqqan, bizda **7.2.7** (oxirgi merge `9b081b2a43`, 2026-09-10).
+Repo'da `upstream` remote YO'Q — tekshirish faqat o'qiydi:
+`git ls-remote --tags --refs https://github.com/telegramdesktop/tdesktop.git 'v7.*'`
+
+**Build QILINMAGAN kod (09-27, push qilingan):**
+
+| Commit | Nima |
+|---|---|
+| `a6f0874e77` | docs(sync): `edited` uchun `edit_date`, scope setting kalitlari protokoli |
+| `d4cc460156` | `edited` xabarlar `edit_date` bilan yoziladi, fon tahrir nomuvofiqligi tuzatildi |
+| `7b6079f81d` | scope sozlamalari (WL/BL, AntiDelete/AntiEdit) outbox'ga chiqadi va qabul qilinadi |
+| `a06ed12373` | docs(sync): activity `msg_id = DiscriminatorFor(field)`, `status` kodlashi (§3.2.2, `userStatusEmpty -> long_ago`), test vektorlari |
+| `a119ef83cb` | activity kuzatuv sozlamalari (`scope.activity_*`) outbox'ga chiqadi va qabul qilinadi |
+
+**Tartib (kelishilgan):** laptopdagi ish tugab push qilinguncha PC'da
+tdesktop kodiga tegilmaydi -> **upstream v7.2.8+v7.2.9 merge** -> laptop
+build (yuqoridagi commitlar ham shunga kiradi) -> sinov -> A22 -> A21 ->
+A7 reliz (avval VPS mirrorlari).
+
+**PC holati:** E: diski almashtirildi; D: da **349 pending sektor**
+topildi — muhim ma'lumotlar yangi E: ga nusxalanadi. Batafsil:
+`PC-SETUP-STATE.md` §2026-09-27.
 
 ---
 
