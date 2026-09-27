@@ -530,11 +530,12 @@ almashuv fayli, PostgreSQL qatori. Ikkita alohida kod yo'li yozilmaydi.
 ### 3.1 `record_id` — deterministik dedup
 
 ```
-record_id = hex( SHA256( kind ‖ 0x00 ‖ peer_hash ‖ 0x00 ‖
+record_id = hex( SHA256( kind ‖ 0x00 ‖ account_hash ‖ 0x00 ‖ peer_hash ‖ 0x00 ‖
                          msg_id_decimal ‖ 0x00 ‖ occurred_at_decimal ) )
 ```
 
 `‖` — konkatenatsiya, `0x00` — ajratuvchi bayt (ambiguity oldini oladi).
+`account_hash` — spec §0.12 (kind='activity' uchun `""`, boshqa barcha kind'lar uchun `HMAC-SHA256(account_key, account_id)[0:16]`).
 
 `msg_id` tabiiy ravishda mavjud bo'lmagan kind'lar uchun uning o'rniga
 **diskriminator** ishlatiladi (aks holda bitta peer uchun bir soniyada
@@ -548,6 +549,16 @@ yo'qolardi):
 | `setting` | `SHA256(setting_key)` ning birinchi 8 bayti |
 | `peer_directory` | `0` (bitta peer uchun bitta yozuv, `occurred_at` ajratadi) |
 
+**`occurred_at` semantikasi (2026-09-27 yangilanishi):**
+- `deleted`: xabarning asl yuborilgan sanasi (`msg_date`).
+- `edited`: shu tahrirning **Telegram `edit_date`** sanasi (agar mavjud bo'lmasa, `observed_at` / `msg_date` zaxirasi).
+  *Nima uchun:* ilgari `msg_date` ishlatilgan, oqibatda bir xabarning barcha tahrirlari bir xil `record_id` olib, lokal outbox'da faqat oxirgisi (`INSERT OR REPLACE`), serverda esa faqat birinchi kuzatilgani (dedup) saqlanardi. Oraliq versiyalarni saqlash uchun Telegram serveri belgilagan `edit_date` ishlatiladi — har tahrir o'z `record_id` sini oladi, ikki qurilma bir tahrirni ko'rganda esa bir xil `edit_date` tufayli dedup xossasi saqlanadi.
+- `activity`: kuzatilgan vaqt (`observed_at`).
+- `ghost_read`: o'qilgan vaqt.
+- `setting`: sozlama o'zgartirilgan vaqt (timestamp).
+- `peer_directory`: katalog yangilangan vaqt.
+- `media_index`: arxivlangan vaqt (`archived_at`).
+
 **Xossasi:** ikki xil qurilma bir xil hodisani ko'rsa — bir xil `record_id`
 hosil qiladi. Dedup hech qanday muvofiqlashtirishsiz ishlaydi. Server uni
 PRIMARY KEY sifatida ishlatadi, shuning uchun push **idempotent** — qayta
@@ -557,20 +568,38 @@ yuborish xavfsiz.
 
 Payload — shifrlanishdan oldingi JSON obyekti.
 
-| kind | msg_id | Payload (shifrlanadi) |
-|---|---|---|
-| `deleted` | xabar id | `{text, sender_id, is_out, is_media}` |
-| `edited` | xabar id | `{old_text, new_text, is_out}` |
-| `activity` | 0 | `{field, old_value, has_old_value, new_value}` |
-| `ghost_read` | o'qilgan max id | `{}` (metadata yetarli) |
-| `setting` | 0 | `{key, value}` |
-| `peer_directory` | 0 | `{entries: [{peer_hash, name, username, type}]}` |
-| `media_index` | xabar id (manfiy bo'lishi mumkin) | 0.4 ga qarang |
-| `tombstone` | `SHA256(target_record_id)[0:8]` | `{target_record_id}` |
+| kind | msg_id | occurred_at | Payload (shifrlanadi) |
+|---|---|---|---|
+| `deleted` | xabar id | xabar sanasi (`msg_date`) | `{text, sender_id, is_out, is_media}` |
+| `edited` | xabar id | Telegram tahrir sanasi (`edit_date`) | `{old_text, new_text, is_out}` |
+| `activity` | 0 | kuzatilgan vaqt (`observed_at`) | `{field, old_value, has_old_value, new_value}` |
+| `ghost_read` | o'qilgan max id | o'qilgan vaqt | `{}` (metadata yetarli) |
+| `setting` | `SHA256(setting_key)[0:8]` | o'zgarish vaqti | `{key, value}` |
+| `peer_directory` | 0 | katalog yangilanish vaqti | `{entries: [{peer_hash, name, username, type}]}` |
+| `media_index` | xabar id (manfiy bo'lishi mumkin) | arxivlangan vaqt | 0.4 ga qarang |
+| `tombstone` | `SHA256(target_record_id)[0:8]` | o'chirish vaqti | `{target_record_id}` |
 
 Bu jadvalga qo'shimcha: **§0.14** bo'yicha HAR payload yana ikkita
 majburiy maydon oladi — `account_id` va `peer_id` (o'nlik satrlar).
 Ularsiz qabul qiluvchi yozuvni qaysi lokal chatga yozishni bilolmaydi.
+Global sozlamalar uchun `peer_id` odatda `"0"` bo'ladi.
+
+### 3.2.1 Scope sozlamalari (`setting` kind kalitlari va qiymat formati)
+
+Qurilmalar (tdesktop) va VPS capture xizmati (`CustomSync.Capture`) o'rtasida
+qamrov (scope) qoidalarini uzatish uchun quyidagi kanonik kalitlar va qiymatlar
+ishlatiladi. `value` maydoni doimiy ravishda satr (string) shaklida uzatiladi:
+
+| Kalit | Qiymat formati | Tavsif va namuna |
+|---|---|---|
+| `scope.whitelist` | JSON satrlar massivi | Oq ro'yxatdagi peer ID lar: `["7053823996", "562952781246744"]` |
+| `scope.blacklist` | JSON satrlar massivi | Qora ro'yxatdagi peer ID lar: `["12345678"]` |
+| `scope.wl_categories` | JSON obyekt | Oq ro'yxat kategoriyalari: `{"user": true, "group": false, "channel": false}` |
+| `scope.bl_categories` | JSON obyekt | Qora ro'yxat kategoriyalari: `{"user": false, "group": false, "channel": true}` |
+| `scope.antidelete_global` | Satr (`"true"` / `"false"`) | Global AntiDelete bayrog'i |
+| `scope.antiedit_global` | Satr (`"true"` / `"false"`) | Global AntiEdit bayrog'i |
+| `scope.antidelete_per_peer` | JSON obyekt | Chat bo'yicha AntiDelete override: `{"7053823996": true, "12345678": false}` |
+| `scope.antiedit_per_peer` | JSON obyekt | Chat bo'yicha AntiEdit override: `{"7053823996": true}` |
 
 ### 3.3 Ikki xil semantika — aralashtirmaslik kerak
 

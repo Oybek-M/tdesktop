@@ -57,11 +57,13 @@
   },
   "record_id": {
     "_note": [
-      "spec §0.12 (2026-08-26).",
+      "spec §0.12 (2026-08-26) va §3.1/§3.2 (2026-09-27).",
       "SHA256(kind || 0x00 || account_hash || 0x00 || peer_hash || 0x00 || msg_id_decimal || 0x00 || occurred_at_decimal)",
       "msg_id MANFIY bo'lishi mumkin (avatar -photo_id, story -story_id).",
       "Ishora SAQLANADI: -42 va 42 turli yozuvlar.",
       "account_hash = BO'SH SATR faqat kind='activity' uchun (tashxis §4.1/§5.1: last-seen bypass akkauntlar bo'ylab birlashadi). Boshqa hamma kind haqiqiy account_hash oladi.",
+      "edited: occurred_at = Telegram edit_date (har tahrir o'z record_id sini oladi). Bir xil xabar ikki xil edit_date bilan turli record_id berishi shart.",
+      "setting: msg_id = DiscriminatorFor(setting_key) = SHA256(setting_key)[0:8] int64 sifatida.",
       "Oxirgi 2 holat: bir xil deleted/peer_hash/msg_id/occurred_at, FAQAT account_hash farq qiladi -> turli record_id (ajratma ishlayapti).",
       "Undan oldingi 2 holat: bir xil activity/peer_hash/msg_id/occurred_at, ikki turli akkaunt, account_hash ikkalasida ham bo'sh -> BIR XIL record_id (birlashish ishlayapti)."
     ],
@@ -121,6 +123,30 @@
         "msg_id": 0,
         "occurred_at": 1787000006,
         "record_id": "18a10da6b8b9086ee5c7d08701bf97d97cb215fdb0c97a2780bfb473a2e9d149"
+      },
+      {
+        "kind": "edited",
+        "account_hash": "8ce7fd6f2c871df09e218375ad4bb5c4",
+        "peer_hash": "cbcd16f7c84f024ee6791c08453e35e0",
+        "msg_id": 390234,
+        "occurred_at": 1787000010,
+        "record_id": "3c4f559f35d724a641ac3491606454664c7bbcbd1f546c93f12a2b202249ded3"
+      },
+      {
+        "kind": "edited",
+        "account_hash": "8ce7fd6f2c871df09e218375ad4bb5c4",
+        "peer_hash": "cbcd16f7c84f024ee6791c08453e35e0",
+        "msg_id": 390234,
+        "occurred_at": 1787000020,
+        "record_id": "5a8bf1df47768796c0105c3ca8616fbcfc7f9245f7c9df93ad3324e824744772"
+      },
+      {
+        "kind": "setting",
+        "account_hash": "8ce7fd6f2c871df09e218375ad4bb5c4",
+        "peer_hash": "176abfa087519bd2668f7ebe5ab16d63",
+        "msg_id": 3528686638094831585,
+        "occurred_at": 1787000007,
+        "record_id": "3de27f66fd99705bfc58df4d06987d54b4764733f4b7751c78225baebb9a267b"
       },
       {
         "kind": "activity",

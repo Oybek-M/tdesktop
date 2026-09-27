@@ -9,6 +9,23 @@ Format: `## YYYY-MM-DD — sarlavha`
 
 ---
 
+## 2026-09-27 — `edited` uchun `occurred_at = Telegram edit_date` va scope sozlama kalitlari
+
+**Nima:**
+1. `edited` yozuvlarida `occurred_at` sifatida xabarning asl sanasi (`msg_date`) emas, Telegram serveri bergan **`edit_date`** qiymati belgilandi (mavjud bo'lmasa `observed_at` / `msg_date` zaxirasi). Spec §3.1/§3.2.
+2. Scope ro'yxatlari uchun `setting` kalitlari va qiymat formati standartlashtirildi: `scope.whitelist`, `scope.blacklist`, `scope.wl_categories`, `scope.bl_categories`, `scope.antidelete_global`, `scope.antiedit_global`, `scope.antidelete_per_peer`, `scope.antiedit_per_peer`. Spec §3.2.1.
+3. `test-vectors.json` ga bitta xabarning turli `edit_date` li tahrirlari turli `record_id` hosil qilishini isbotlovchi vektor hamda `setting` kind vektori qo'shildi.
+
+**Nima uchun:**
+- Ilgari `msg_date` ishlatilganda, bir xabarning barcha tahrirlari bir xil `record_id` olardi. Natijada lokal outbox faqat oxirgisini (`INSERT OR REPLACE`), server esa faqat birinchi kuzatilganini (dedup) saqlardi va oraliq tahrirlar yo'qolib ketardi. `edit_date` har tahrir uchun noyob va har ikki qurilmada bir xil, shuning uchun oraliq tahrirlar saqlanadi va dedup saqlanadi.
+- Hozirgacha tdesktop birorta ham `setting` yozuvi yubormagani sababli VPS capture xizmati (`CustomSync.Capture`) foydalanuvchining Whitelist/Blacklist va AntiDelete/AntiEdit parametrlarini ko'rmas edi.
+
+**Ta'sirlanadi:**
+- tdesktop: `updateEditedMessage` va `applyEdition` ikkalasi ham `edit_date` bilan yozadi; sozlamalar o'zgarganda `setting` kind outbox'ga chiqariladi; `custom_sync_payload.cpp` `BuildSetting` ni qo'llab-quvvatlaydi.
+- customsync-server: Capture Task 5/Task 4c shu shartlarga tayanadi.
+
+---
+
 ## 2026-09-05 — payload ochiq `account_id` va `peer_id` ni olib yuradi
 
 **Nima:** har kind'ning shifrlanadigan payload'iga ikkita majburiy

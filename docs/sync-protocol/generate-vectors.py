@@ -88,11 +88,13 @@ vec = {
 
   "record_id": {
     "_note": [
-      "spec §0.12 (2026-08-26).",
+      "spec §0.12 (2026-08-26) va §3.1/§3.2 (2026-09-27).",
       "SHA256(kind || 0x00 || account_hash || 0x00 || peer_hash || 0x00 || msg_id_decimal || 0x00 || occurred_at_decimal)",
       "msg_id MANFIY bo'lishi mumkin (avatar -photo_id, story -story_id).",
       "Ishora SAQLANADI: -42 va 42 turli yozuvlar.",
       "account_hash = BO'SH SATR faqat kind='activity' uchun (tashxis §4.1/§5.1: last-seen bypass akkauntlar bo'ylab birlashadi). Boshqa hamma kind haqiqiy account_hash oladi.",
+      "edited: occurred_at = Telegram edit_date (har tahrir o'z record_id sini oladi). Bir xil xabar ikki xil edit_date bilan turli record_id berishi shart.",
+      "setting: msg_id = DiscriminatorFor(setting_key) = SHA256(setting_key)[0:8] int64 sifatida.",
       "Oxirgi 2 holat: bir xil deleted/peer_hash/msg_id/occurred_at, FAQAT account_hash farq qiladi -> turli record_id (ajratma ishlayapti).",
       "Undan oldingi 2 holat: bir xil activity/peer_hash/msg_id/occurred_at, ikki turli akkaunt, account_hash ikkalasida ham bo'sh -> BIR XIL record_id (birlashish ishlayapti)."
     ],
@@ -134,6 +136,25 @@ for kind, mid, occ in [
         "kind": kind, "account_hash": ah, "peer_hash": ph, "msg_id": mid,
         "occurred_at": occ, "record_id": record_id(kind, ah, ph, mid, occ)
     })
+
+# Tahrir (edited) ajratma tekshiruvi: bir xil xabar (msg_id 390234), lekin ikki xil
+# Telegram edit_date (1787000010 va 1787000020) -- record_id lar ham FARQ QILISHI SHART.
+for occ in (1787000010, 1787000020):
+    vec["record_id"]["cases"].append({
+        "kind": "edited", "account_hash": ah_a, "peer_hash": ph,
+        "msg_id": 390234, "occurred_at": occ,
+        "record_id": record_id("edited", ah_a, ph, 390234, occ)
+    })
+
+# setting kind tekshiruvi: msg_id = DiscriminatorFor(setting_key)
+# SHA256(setting_key)[0:8] int64 sifatida (big-endian), eng yuqori bit tozalangan (& 0x7FFFFFFFFFFFFFFF)
+setting_key = "scope.whitelist"
+setting_mid = int.from_bytes(hashlib.sha256(setting_key.encode()).digest()[:8], "big") & 0x7FFFFFFFFFFFFFFF
+vec["record_id"]["cases"].append({
+    "kind": "setting", "account_hash": ah_a, "peer_hash": peer_hash("0"),
+    "msg_id": setting_mid, "occurred_at": 1787000007,
+    "record_id": record_id("setting", ah_a, peer_hash("0"), setting_mid, 1787000007)
+})
 
 # Birlashish tekshiruvi: activity, ikki turli akkaunt, account_hash
 # ikkalasida ham "" -- record_id BIR XIL bo'lishi SHART (last-seen
