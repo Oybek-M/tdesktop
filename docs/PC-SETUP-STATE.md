@@ -861,7 +861,9 @@ S/N `Z9G27L7FS`, 2019-12**. Endi u **Disk 1**.
   23:15 da 31%. **TUGADI 00:40 (110 daqiqa), 0 ta disk/NTFS xatosi**,
   tezlik 185 -> 101 MB/s bir tekis pasaygan (tashqi -> ichki izlar, normal),
   to'xtab qolish yo'q. E: 931.51 GB NTFS Healthy, yozish/o'qish sinovi o'tdi.
-  Qoldi: SMART'ni qayta o'qish (admin) -- pending/reallocated 0 qolishi kerak.
+  SMART formatdan keyin (09-28 00:53): reallocated 0, pending 0, uncorrectable 0,
+  CRC 0, Raw_Read_Error_Rate 2 -> 0, 34 C. **Disk ishonchli -- foydalanishga tayyor.**
+  D: (WD) o'zgarmadi: pending 349 (9 soatda o'smagan), reallocated 0.
 - Harf **E:** ataylab qoldirildi: VS `SharedInstallationPath` =
   `E:\Application's datas\Visual Studio\Program Files (x86)` (o'rnatuvchida
   o'zgarmaydi). vswhere: `D:\VS2026` isComplete=1, isLaunchable=1. VS
