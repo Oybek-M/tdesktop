@@ -115,6 +115,7 @@ struct ActionedMessage {
     QString mediaPath;
     bool isOut = false;
     unsigned int msgDate = 0;
+    unsigned int editDate = 0; // 2026-09-27: Telegram edit_date (0 = yo'q / dastlabki sana)
     QDateTime timestamp;
     QString senderId;       // v5: guruhda haqiqiy yuboruvchi peer id (bo'sh = noma'lum)
     bool isMedia = false;   // v5: media xabar (matn bo'sh bo'lsa ham o'chirilganini biламiz)
@@ -562,7 +563,17 @@ bool RecordBackgroundEdit(
     long long msgId,
     const QString &newText,
     bool isOut,
-    unsigned int msgDate);
+    unsigned int msgDate,
+    unsigned int editDate = 0);
+
+// In-memory edit qayd qilish (applyEdition dan).
+// HistoryItem xotirada bor bo'lganda chaqiriladi.
+// actioned_messages ga 'edited' yozadi va sync outbox ga qo'shadi.
+void RecordLiveEdit(
+    HistoryItem *item,
+    const QString &oldText,
+    const QString &newText,
+    unsigned int editDate = 0);
 
 // Eski cache yozuvlarini tozalash. Avtomatik chaqiriladi (har CacheMessageText da).
 // A13/D4: is_archived=1 bo'lgan (doimiy arxiv) qatorlarga TEGMAYDI.

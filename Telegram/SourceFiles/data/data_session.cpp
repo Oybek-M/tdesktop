@@ -3117,8 +3117,9 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 			const auto newText = qs(d.vmessage());
 			const auto isOut = d.is_out();
 			const auto msgDate = static_cast<unsigned int>(d.vdate().v);
+			const auto editDate = static_cast<unsigned int>(d.vedit_date().value_or_empty());
 			CustomDB::RecordBackgroundEdit(
-				CustomDB::Key(session(), peerId), msgId, newText, isOut, msgDate);
+				CustomDB::Key(session(), peerId), msgId, newText, isOut, msgDate, editDate);
 		});
 		Reactions::CheckUnknownForUnread(this, data);
 		return;

@@ -1692,7 +1692,10 @@ void SaveActionedMessage(const ActionedMessage &msg) {
     }
 
     if (msg.type == u"edited"_q) {
-        CustomSync::Outbox::Enqueue(CustomSync::Kind::Edited, msg.accountId, msg.peerId, msg.msgId, msg.msgDate > 0 ? qint64(msg.msgDate) : msg.timestamp.toSecsSinceEpoch());
+        const auto occurredAt = msg.editDate > 0
+            ? qint64(msg.editDate)
+            : (msg.msgDate > 0 ? qint64(msg.msgDate) : msg.timestamp.toSecsSinceEpoch());
+        CustomSync::Outbox::Enqueue(CustomSync::Kind::Edited, msg.accountId, msg.peerId, msg.msgId, occurredAt);
     }
 }
 
@@ -2759,7 +2762,8 @@ bool RecordBackgroundEdit(
         long long msgId,
         const QString &newText,
         bool isOut,
-        unsigned int msgDate) {
+        unsigned int msgDate,
+        unsigned int editDate) {
     Init();
     if (!gDb || key.peerId.isEmpty() || msgId == 0) return false;
 
@@ -2783,6 +2787,20 @@ bool RecordBackgroundEdit(
     // Agar matn o'zgarmagan bo'lsa — yozmaymiz.
     if (oldText == newText) return false;
 
+    // Cache ni yangi matn bilan har doim yangilab qo'yamiz — kelajakdagi
+    // tahrir yoki o'chirish (AntiDelete) uchun to'g'ri matn saqlansin.
+    // YANGI-2: avvalgi sender/media saqlanadi (T36 edit→delete da buzilmasin).
+    CacheMessageText(key, msgId, newText, isOut, msgDate,
+        cachedSender, cachedMedia);
+
+    // AntiEdit bu peer uchun yoqilganmi?
+    // Nomuvofiqlik tuzatildi (2026-09-27): avval faqat ShouldBackgroundCache
+    // tekshirilardi, natijada AntiEdit o'chiq bo'lsa ham 'edited' yozilardi.
+    // Endi xotiradagi yo'l (history_item.cpp:2502) bilan to'liq mos:
+    if (!::CustomSettings::ShouldAntiEdit(key.peerId)) {
+        return false;
+    }
+
     // actioned_messages ga 'edited' yozuvi (rasmiy applyEdition o'rniga).
     // Format `restoreFromCustomDB` bilan mos: original_text = eski, new_text = yangi.
     ActionedMessage msg;
@@ -2794,7 +2812,10 @@ bool RecordBackgroundEdit(
     msg.newText = newText;
     msg.isOut = isOut;
     msg.msgDate = msgDate;
-    msg.timestamp = QDateTime::currentDateTime();
+    msg.editDate = editDate;
+    msg.timestamp = (editDate > 0)
+        ? QDateTime::fromSecsSinceEpoch(editDate)
+        : QDateTime::currentDateTime();
     SaveActionedMessage(msg);
 
     // In-memory cache ham yangilash — restoreFromCustomDB() uchun.
@@ -2806,11 +2827,50 @@ bool RecordBackgroundEdit(
         }
     }
 
-    // Cache ni yangi matn bilan yangilab qo'yamiz — keyingi tahrir uchun.
-    // YANGI-2: avvalgi sender/media saqlanadi (T36 edit→delete da buzilmasin).
-    CacheMessageText(key, msgId, newText, isOut, msgDate,
-        cachedSender, cachedMedia);
     return true;
+}
+
+void RecordLiveEdit(
+        HistoryItem *item,
+        const QString &oldText,
+        const QString &newText,
+        unsigned int editDate) {
+    if (!item || oldText.isEmpty() || newText.isEmpty() || oldText == newText) {
+        return;
+    }
+    const auto key = Key(item);
+    if (!::CustomSettings::ShouldAntiEdit(key.peerId)) {
+        return;
+    }
+
+    Init();
+    if (!gDb || key.peerId.isEmpty()) return;
+
+    ActionedMessage msg;
+    msg.accountId = key.accountId;
+    msg.peerId = key.peerId;
+    msg.msgId = static_cast<long long>(item->id.bare);
+    msg.type = "edited";
+    msg.originalText = oldText;
+    msg.newText = newText;
+    msg.isOut = item->out();
+    msg.msgDate = static_cast<unsigned int>(item->date());
+    msg.editDate = editDate;
+    msg.timestamp = (editDate > 0)
+        ? QDateTime::fromSecsSinceEpoch(editDate)
+        : QDateTime::currentDateTime();
+    SaveActionedMessage(msg);
+
+    EnsurePeerCacheLoaded(key);
+    {
+        QMutexLocker locker(&gCacheMutex);
+        if (!gEditedCache[key].contains(msg.msgId)) {
+            gEditedCache[key][msg.msgId] = oldText;
+        }
+    }
+
+    // Cache ni yangi matn bilan yangilab qo'yamiz (keyingi tahrir yoki o'chirish uchun).
+    CacheMessageText(key, msg.msgId, newText, msg.isOut, msg.msgDate);
 }
 
 void TryRecordBackgroundDelete(qint64 accountId, long long msgId) {
