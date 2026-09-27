@@ -659,15 +659,14 @@ ishlatiladi. `value` maydoni doimiy ravishda satr (string) shaklida uzatiladi:
 
 **Activity tracking scope sozlamalari** (faollik tarixi kuzatuvi):
 
-> [!WARNING]
-> Bu uch kalit 2026-09-27 da **faqat spec'da** belgilandi. tdesktop ularni
-> hali **yubormaydi va qabul qilmaydi**: `EnqueueScopeSetting` /
-> `ApplyScopeSetting` (`custom_settings.cpp`, `7b6079f81d`) faqat yuqoridagi
-> xabar kalitlarini qamraydi. Include/Exclude ro'yxatlari hozircha faqat
-> lokal `peer_lists.json` da (`activity_include` / `activity_exclude`).
-> tdesktop'da amalga oshirilmaguncha capture bu kalitlarni kutmasligi va
-> standart qiymat ishlatishi kerak (`activity_track_all_contacts = true`,
-> ro'yxatlar bo'sh). Ustuvorlik: Exclude > Include > (track_all && kontakt).
+> [!NOTE]
+> Bu uch kalit 2026-09-27 da tdesktop'da amalga oshirildi (`custom_settings.cpp`):
+> `EnqueueScopeSetting` / `ApplyScopeSetting` / `GetScopeSettingValue` / `SyncAllScopeSettings`
+> xabar scope sozlamalari bilan bir xil tarzda to'liq qo'llab-quvvatlaydi.
+> Include/Exclude ro'yxatlari o'zgarganda yoki `activityHistoryTrackAllContacts` o'zgarganda
+> avtomatik ravishda outbox'ga enqueue qilinadi.
+> Standart qiymatlar: `activity_track_all_contacts = true`, ro'yxatlar bo'sh.
+> Ustuvorlik: Exclude > Include > (track_all && kontakt).
 
 | Kalit | Qiymat formati | Tavsif va namuna |
 |---|---|---|

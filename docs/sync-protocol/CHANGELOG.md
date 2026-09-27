@@ -9,6 +9,21 @@ Format: `## YYYY-MM-DD — sarlavha`
 
 ---
 
+## 2026-09-27 — tdesktop: activity scope sozlamalari sinxronizatsiyasi qo'shildi
+
+**Nima:**
+1. `custom_settings.cpp`: `scope.activity_track_all_contacts`, `scope.activity_include`, `scope.activity_exclude` kalitlari qo'shildi.
+2. `GetScopeSettingValue`: track_all uchun `"true"`/`"false"`, include/exclude uchun saralangan JSON massiv shaklida qiymat qaytaradi.
+3. `ApplyScopeSetting`: kelgan sozlamalarni lokal xotiraga va `peer_lists.json` ga xavfsiz (guard bayrog'i bilan) yozadi.
+4. `SyncAllScopeSettings` ro'yxatiga kiritildi; `SavePeerLists` va `UpdateValue` da o'zgarish sodir bo'lganda avtomatik `EnqueueScopeSetting` chaqiriladi.
+
+**Nima uchun:** VPS capture xizmati (`CustomSync.Capture`) faollik tarixi kuzatuvi bo'yicha tdesktop'da belgilangan kontaktlar va istisnolar qamrovini qabul qilib, shunga muvofiq kuzatuv olib borishi uchun.
+
+**Ta'sirlanadi:**
+- tdesktop: faollik kuzatuvi sozlamalari outbox orqali server va boshqa qurilmalarga uzatiladi.
+
+---
+
 ## 2026-09-27 — activity `msg_id`, `status` kodlashi va activity scope kalitlari (hujjat kodga moslandi)
 
 **Nima:**

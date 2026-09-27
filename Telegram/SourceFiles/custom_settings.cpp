@@ -119,6 +119,8 @@ void SavePeerLists() {
     EnqueueScopeSetting(QStringLiteral("scope.blacklist"));
     EnqueueScopeSetting(QStringLiteral("scope.wl_categories"));
     EnqueueScopeSetting(QStringLiteral("scope.bl_categories"));
+    EnqueueScopeSetting(QStringLiteral("scope.activity_include"));
+    EnqueueScopeSetting(QStringLiteral("scope.activity_exclude"));
 }
 
 void LoadPeerLists() {
@@ -190,7 +192,10 @@ void UpdateValue(const QString &id, bool value) {
     else if (id == "mutualContactShowInContactsList") gValues.mutualContactShowInContactsList = value;
     else if (id == "mutualContactShowInProfile") gValues.mutualContactShowInProfile = value;
     else if (id == "mutualContactShowInMembersList") gValues.mutualContactShowInMembersList = value;
-    else if (id == "activityHistoryTrackAllContacts") gValues.activityHistoryTrackAllContacts = value;
+    else if (id == "activityHistoryTrackAllContacts") {
+        gValues.activityHistoryTrackAllContacts = value;
+        EnqueueScopeSetting(QStringLiteral("scope.activity_track_all_contacts"));
+    }
     else if (id == "upstreamCheckEnabled") gValues.upstreamCheckEnabled = value;
     else if (id == "storyMediaBackupEnabled") gValues.storyMediaBackupEnabled = value;
     else if (id == "syncEnabled") gValues.syncEnabled = value;
@@ -1330,6 +1335,27 @@ std::optional<QString> GetScopeSettingValue(const QString &key) {
         }
         return QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
     }
+    if (key == QStringLiteral("scope.activity_track_all_contacts")) {
+        return gValues.activityHistoryTrackAllContacts ? QStringLiteral("true") : QStringLiteral("false");
+    }
+    if (key == QStringLiteral("scope.activity_include")) {
+        QJsonArray arr;
+        auto keys = gActivityInclude.keys();
+        std::sort(keys.begin(), keys.end());
+        for (const auto &k : keys) {
+            arr.append(k);
+        }
+        return QString::fromUtf8(QJsonDocument(arr).toJson(QJsonDocument::Compact));
+    }
+    if (key == QStringLiteral("scope.activity_exclude")) {
+        QJsonArray arr;
+        auto keys = gActivityExclude.keys();
+        std::sort(keys.begin(), keys.end());
+        for (const auto &k : keys) {
+            arr.append(k);
+        }
+        return QString::fromUtf8(QJsonDocument(arr).toJson(QJsonDocument::Compact));
+    }
 
     return std::nullopt;
 }
@@ -1367,6 +1393,9 @@ void SyncAllScopeSettings(qint64 accountId) {
         QStringLiteral("scope.antiedit_global"),
         QStringLiteral("scope.antidelete_per_peer"),
         QStringLiteral("scope.antiedit_per_peer"),
+        QStringLiteral("scope.activity_track_all_contacts"),
+        QStringLiteral("scope.activity_include"),
+        QStringLiteral("scope.activity_exclude"),
     };
     for (const auto &k : kAllScopeKeys) {
         EnqueueScopeSetting(k, accId);
@@ -1474,6 +1503,37 @@ void ApplyScopeSetting(const QString &key, const QString &value) {
                 settings.setValue(it.key(), en);
             }
             settings.endGroup();
+        }
+    } else if (key == QStringLiteral("scope.activity_track_all_contacts")) {
+        const bool enabled = (value.trimmed().compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0);
+        Set(QStringLiteral("activityHistoryTrackAllContacts"), enabled);
+    } else if (key == QStringLiteral("scope.activity_include")) {
+        const auto doc = QJsonDocument::fromJson(value.toUtf8());
+        if (doc.isArray()) {
+            QHash<QString, QString> newInc;
+            for (const auto &val : doc.array()) {
+                const auto id = val.toString();
+                if (!id.isEmpty()) {
+                    newInc[id] = gActivityInclude.value(id, gPeerNameCache.value(id));
+                    gActivityExclude.remove(id);
+                }
+            }
+            gActivityInclude = newInc;
+            SavePeerLists();
+        }
+    } else if (key == QStringLiteral("scope.activity_exclude")) {
+        const auto doc = QJsonDocument::fromJson(value.toUtf8());
+        if (doc.isArray()) {
+            QHash<QString, QString> newExc;
+            for (const auto &val : doc.array()) {
+                const auto id = val.toString();
+                if (!id.isEmpty()) {
+                    newExc[id] = gActivityExclude.value(id, gPeerNameCache.value(id));
+                    gActivityInclude.remove(id);
+                }
+            }
+            gActivityExclude = newExc;
+            SavePeerLists();
         }
     }
 }

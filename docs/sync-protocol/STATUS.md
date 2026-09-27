@@ -139,6 +139,12 @@ yo'qotish — tiklab bo'lmaydi.
    oraliq tahrirlar saqlanadi va server/outbox deduplikatsiyasi to'g'ri ishlaydi.
    Spec §3.1/§3.2 va `test-vectors.json` yangilandi.
 
+   ✅ **Activity tracking scope sozlamalari (`scope.activity_*`) HAL QILINDI** (2026-09-27).
+   `custom_settings.cpp` da `scope.activity_track_all_contacts`, `scope.activity_include`,
+   va `scope.activity_exclude` kalitlari qo'shildi. Sozlamalar o'zgarganda outbox'ga
+   enqueue qilinadi va serverdan kelganda lokal xotiraga/faylga tatbiq etiladi.
+
+
 6. 🔴 **Tombstone qabul qilish -- Task 7c.** 7b da kelgan tombstone
    ogohlantirish bilan o'tkazib yuboriladi va **cursor undan o'tib
    ketadi**, ya'ni u boshqa qayta o'qilmaydi. Hozir hech narsa
