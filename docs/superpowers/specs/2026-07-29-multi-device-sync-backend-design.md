@@ -572,12 +572,66 @@ Payload — shifrlanishdan oldingi JSON obyekti.
 |---|---|---|---|
 | `deleted` | xabar id | xabar sanasi (`msg_date`) | `{text, sender_id, is_out, is_media}` |
 | `edited` | xabar id | Telegram tahrir sanasi (`edit_date`) | `{old_text, new_text, is_out}` |
-| `activity` | 0 | kuzatilgan vaqt (`observed_at`) | `{field, old_value, has_old_value, new_value}` |
+| `activity` | `DiscriminatorFor(field)` | kuzatilgan vaqt (`observed_at`) | `{field, old_value, has_old_value, new_value}` |
 | `ghost_read` | o'qilgan max id | o'qilgan vaqt | `{}` (metadata yetarli) |
-| `setting` | `SHA256(setting_key)[0:8]` | o'zgarish vaqti | `{key, value}` |
+| `setting` | `DiscriminatorFor(setting_key)` | o'zgarish vaqti | `{key, value}` |
 | `peer_directory` | 0 | katalog yangilanish vaqti | `{entries: [{peer_hash, name, username, type}]}` |
 | `media_index` | xabar id (manfiy bo'lishi mumkin) | arxivlangan vaqt | 0.4 ga qarang |
-| `tombstone` | `SHA256(target_record_id)[0:8]` | o'chirish vaqti | `{target_record_id}` |
+| `tombstone` | `DiscriminatorFor(target_record_id)` | o'chirish vaqti | `{target_record_id}` |
+
+**`DiscriminatorFor(text)`** (`custom_sync_record.cpp`): `SHA256(UTF-8(text))`
+ning birinchi 8 bayti **big-endian** int64 sifatida, so'ng **eng yuqori bit
+tozalanadi** (`& 0x7FFFFFFFFFFFFFFF`), natija doim `>= 0`. Niqobni unutish
+oson xato: masalan `DiscriminatorFor("name")` ning birinchi bayti `0x82`,
+niqobsiz manfiy son chiqadi va `record_id` farq qiladi. Test vektorlari:
+`test-vectors.json` -> `discriminator` bo'limi.
+
+> [!IMPORTANT]
+> `activity` uchun `msg_id` bu jadvalda 2026-09-27 gacha `0` deb yozilgan
+> edi — bu XATO edi, kod doim `DiscriminatorFor(field)` ishlatgan
+> (`custom_db.cpp`, `Outbox::Enqueue(Kind::Activity, ...)`).
+> Sabab: bitta peer uchun bir soniyada ikki turli field (masalan `name` va
+> `status`) o'zgarsa, `msg_id = 0` bilan ikkala hodisa bir xil `record_id`
+> oladi va biri yo'qoladi. Capture tomoni (`ActivityMapper.cs`) ham shu
+> formulani ishlatadi. Vektorlar: `record_id` bo'limidagi activity holatlari
+> endi discriminator bilan, to'qnashuv juftligi (`status` / `name`, bitta
+> soniya) ham qo'shildi.
+
+#### 3.2.2 `activity` qiymatlari: `field = "status"` kodlashi
+
+Birlashish (§0.12, activity `account_hash` bo'sh) faqat **barcha manbalar
+bir xil satr yozganda** ishlaydi. Kanonik manba: tdesktop
+`CustomActivityHistory::EncodeStatus()` (`custom_activity_history.cpp`).
+MTProto / TDLib holatlari quyidagicha kodlanadi:
+
+| MTProto (tdesktop) | TDLib (capture) | Kodlangan qiymat |
+|---|---|---|
+| `userStatusOnline{expires}`, `expires > now` | `userStatusOnline{expires}` | `online:<expires>` |
+| `userStatusOnline{expires}`, `expires <= now` | — | `offline:<expires>` |
+| `userStatusOffline{was_online}` | `userStatusOffline{was_online}` | `offline:<was_online>` |
+| `userStatusRecently` | `userStatusRecently` | `recently` |
+| `userStatusLastWeek` | `userStatusLastWeek` | `within_week` |
+| `userStatusLastMonth` | `userStatusLastMonth` | `within_month` |
+| **`userStatusEmpty`** | **`userStatusEmpty`** | **`long_ago`** (`empty` EMAS) |
+| vaqt `< 1375315204` (0 ham) bo'lgan online/offline | shu qoida | `long_ago` |
+
+- `empty` qiymatini `EncodeStatus()` amalda HECH QACHON qaytarmaydi:
+  `LastseenStatus::OnlineTill(t)` `t < kLifeStartDate + 4` (`1375315204`,
+  2013-08-01) bo'lsa `LongAgo()` qaytaradi, standart `LastseenStatus()`
+  ham `long_ago` hisoblanadi. `empty` faqat himoya uchun qolgan zaxira —
+  capture uni ishlatmasligi kerak; noma'lum TDLib holati uchun ham
+  `long_ago` yozilsin.
+
+- tdesktop `userStatusEmpty` ni `LastseenFromMTP()` da `LastseenStatus::LongAgo()`
+  ga aylantiradi, `EncodeStatus()` esa uni `long_ago` deb yozadi. Shuning
+  uchun capture ham `userStatusEmpty` -> `long_ago` yozishi SHART, aks holda
+  bir xil hodisa ikki xil `new_value` bilan keladi.
+- `online:` / `offline:` dagi son — Unix vaqti (soniya), o'nlik satr.
+- `recently` holatida tdesktop foydalanuvchi hozir lokal "online" deb
+  hisoblansa, `online:<till>` yozishi mumkin (`isLocalOnlineValue`) — bu
+  faqat klientning o'z taxmini, capture'da bunday holat yo'q.
+- Qo'shimcha manba: story/rasm signali ham `online:<vaqt>` yozadi
+  (`custom_activity_history.cpp`, `photo` belgisi bilan).
 
 Bu jadvalga qo'shimcha: **§0.14** bo'yicha HAR payload yana ikkita
 majburiy maydon oladi — `account_id` va `peer_id` (o'nlik satrlar).
@@ -590,6 +644,8 @@ Qurilmalar (tdesktop) va VPS capture xizmati (`CustomSync.Capture`) o'rtasida
 qamrov (scope) qoidalarini uzatish uchun quyidagi kanonik kalitlar va qiymatlar
 ishlatiladi. `value` maydoni doimiy ravishda satr (string) shaklida uzatiladi:
 
+**Xabar scope sozlamalari** (AntiDelete / AntiEdit / WL / BL):
+
 | Kalit | Qiymat formati | Tavsif va namuna |
 |---|---|---|
 | `scope.whitelist` | JSON satrlar massivi | Oq ro'yxatdagi peer ID lar: `["7053823996", "562952781246744"]` |
@@ -600,6 +656,24 @@ ishlatiladi. `value` maydoni doimiy ravishda satr (string) shaklida uzatiladi:
 | `scope.antiedit_global` | Satr (`"true"` / `"false"`) | Global AntiEdit bayrog'i |
 | `scope.antidelete_per_peer` | JSON obyekt | Chat bo'yicha AntiDelete override: `{"7053823996": true, "12345678": false}` |
 | `scope.antiedit_per_peer` | JSON obyekt | Chat bo'yicha AntiEdit override: `{"7053823996": true}` |
+
+**Activity tracking scope sozlamalari** (faollik tarixi kuzatuvi):
+
+> [!WARNING]
+> Bu uch kalit 2026-09-27 da **faqat spec'da** belgilandi. tdesktop ularni
+> hali **yubormaydi va qabul qilmaydi**: `EnqueueScopeSetting` /
+> `ApplyScopeSetting` (`custom_settings.cpp`, `7b6079f81d`) faqat yuqoridagi
+> xabar kalitlarini qamraydi. Include/Exclude ro'yxatlari hozircha faqat
+> lokal `peer_lists.json` da (`activity_include` / `activity_exclude`).
+> tdesktop'da amalga oshirilmaguncha capture bu kalitlarni kutmasligi va
+> standart qiymat ishlatishi kerak (`activity_track_all_contacts = true`,
+> ro'yxatlar bo'sh). Ustuvorlik: Exclude > Include > (track_all && kontakt).
+
+| Kalit | Qiymat formati | Tavsif va namuna |
+|---|---|---|
+| `scope.activity_track_all_contacts` | Satr (`"true"` / `"false"`) | Global: barcha kontaktlarni kuzatish (tdesktop: `activityHistoryTrackAllContacts`) |
+| `scope.activity_include` | JSON satrlar massivi | Kuzatish ro'yxati (Include): `["7053823996"]` |
+| `scope.activity_exclude` | JSON satrlar massivi | Istisno ro'yxati (Exclude): `["12345678"]` |
 
 ### 3.3 Ikki xil semantika — aralashtirmaslik kerak
 

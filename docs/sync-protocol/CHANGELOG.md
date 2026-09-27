@@ -9,6 +9,22 @@ Format: `## YYYY-MM-DD — sarlavha`
 
 ---
 
+## 2026-09-27 — activity `msg_id`, `status` kodlashi va activity scope kalitlari (hujjat kodga moslandi)
+
+**Nima:**
+1. Spec §3.2 jadvalida `activity` uchun `msg_id` `0` deb yozilgan edi — XATO. Kod doim `DiscriminatorFor(field)` ishlatgan. Jadval tuzatildi; `DiscriminatorFor` ta'rifi (big-endian, eng yuqori bit tozalanadi) aniq yozildi.
+2. `test-vectors.json`: activity holatlari endi `DiscriminatorFor("status")` bilan; bir soniyadagi `status`/`name` to'qnashuv juftligi va yangi `discriminator` bo'limi (6 holat, jumladan yuqori biti 1 bo'lgan `name`) qo'shildi. Boshqa bo'limlar o'zgarmadi.
+3. Yangi §3.2.2: `field = "status"` qiymatlarining to'liq ro'yxati. **`userStatusEmpty` -> `long_ago`** (`empty` emas); `empty` amalda chiqmaydi.
+4. §3.2.1: `scope.activity_track_all_contacts`, `scope.activity_include`, `scope.activity_exclude` kalitlari belgilandi, lekin tdesktop'da **hali amalga oshirilmagan**.
+
+**Nima uchun:** customsync-server Capture Task 4b tekshiruvida spec va kod o'rtasidagi farq topildi. Capture `userStatusEmpty` uchun `empty` yozardi — tdesktop'ning `long_ago` yozuvi bilan birlashmasdi.
+
+**Ta'sirlanadi:**
+- customsync-server: `ActivityMapper.cs` da `userStatusEmpty` va noma'lum holat -> `long_ago`; ixtiyoriy ravishda `discriminator` vektor testi qo'shish.
+- tdesktop: kod o'zgarmadi. Activity scope kalitlarini yuborish/qabul qilish — alohida vazifa.
+
+---
+
 ## 2026-09-27 — `edited` uchun `occurred_at = Telegram edit_date` va scope sozlama kalitlari
 
 **Nima:**

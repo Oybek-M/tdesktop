@@ -94,9 +94,19 @@ vec = {
       "Ishora SAQLANADI: -42 va 42 turli yozuvlar.",
       "account_hash = BO'SH SATR faqat kind='activity' uchun (tashxis §4.1/§5.1: last-seen bypass akkauntlar bo'ylab birlashadi). Boshqa hamma kind haqiqiy account_hash oladi.",
       "edited: occurred_at = Telegram edit_date (har tahrir o'z record_id sini oladi). Bir xil xabar ikki xil edit_date bilan turli record_id berishi shart.",
-      "setting: msg_id = DiscriminatorFor(setting_key) = SHA256(setting_key)[0:8] int64 sifatida.",
+      "setting: msg_id = DiscriminatorFor(setting_key). activity: msg_id = DiscriminatorFor(field) (2026-09-27 gacha 0 deb yozilgan edi -- XATO). DiscriminatorFor ta'rifi 'discriminator' bo'limida.",
+      "Setting holatidan keyingi 2 holat: bir xil activity/peer/occurred_at, field 'status' va 'name' -> turli msg_id va turli record_id (bir soniyadagi ikki field to'qnashmaydi).",
       "Oxirgi 2 holat: bir xil deleted/peer_hash/msg_id/occurred_at, FAQAT account_hash farq qiladi -> turli record_id (ajratma ishlayapti).",
       "Undan oldingi 2 holat: bir xil activity/peer_hash/msg_id/occurred_at, ikki turli akkaunt, account_hash ikkalasida ham bo'sh -> BIR XIL record_id (birlashish ishlayapti)."
+    ],
+    "cases": []
+  },
+
+  "discriminator": {
+    "_note": [
+      "tdesktop custom_sync_record.cpp DiscriminatorFor(text).",
+      "SHA256(UTF-8(text)) ning birinchi 8 bayti big-endian int64, eng yuqori bit tozalangan (& 0x7FFFFFFFFFFFFFFF) -- natija doim >= 0.",
+      "Ishlatilishi: activity -> field, setting -> setting_key, tombstone -> target_record_id."
     ],
     "cases": []
   },
@@ -116,7 +126,16 @@ vec = {
   }
 }
 
+def discriminator(text):
+    return int.from_bytes(hashlib.sha256(text.encode("utf-8")).digest()[:8], "big") & 0x7FFFFFFFFFFFFFFF
+
+# "name" -- birinchi baytining yuqori biti 1, ya'ni niqob haqiqatan ishlaydi
+# (niqobsiz manfiy bo'lardi). Qolganlari -- haqiqiy field/kalit qiymatlari.
+for text in ("status", "name", "username", "photo", "scope.whitelist", "o'zbek matn"):
+    vec["discriminator"]["cases"].append({"text": text, "value": discriminator(text)})
+
 # record_id holatlari — manfiy va nol ham bor
+act_mid = discriminator("status")
 acc_a = "111222333"
 acc_b = "444555666"
 ah_a = account_hash(acc_a)
@@ -125,7 +144,7 @@ ph = peer_hash("7053823996")
 for kind, mid, occ in [
     ("deleted",    395278,          1787000000),
     ("edited",     390234,          1787000001),
-    ("activity",   0,               1787000002),   # account_hash="" -- pastga qarang
+    ("activity",   act_mid,         1787000002),   # account_hash="" -- pastga qarang
     ("media_index", 597,            1787000003),
     ("media_index", -5190442718973336697, 1787000004),   # avatar: -photo_id
     ("media_index", -12345,         1787000005),          # story: -story_id
@@ -149,12 +168,22 @@ for occ in (1787000010, 1787000020):
 # setting kind tekshiruvi: msg_id = DiscriminatorFor(setting_key)
 # SHA256(setting_key)[0:8] int64 sifatida (big-endian), eng yuqori bit tozalangan (& 0x7FFFFFFFFFFFFFFF)
 setting_key = "scope.whitelist"
-setting_mid = int.from_bytes(hashlib.sha256(setting_key.encode()).digest()[:8], "big") & 0x7FFFFFFFFFFFFFFF
+setting_mid = discriminator(setting_key)
 vec["record_id"]["cases"].append({
     "kind": "setting", "account_hash": ah_a, "peer_hash": peer_hash("0"),
     "msg_id": setting_mid, "occurred_at": 1787000007,
     "record_id": record_id("setting", ah_a, peer_hash("0"), setting_mid, 1787000007)
 })
+
+# activity to'qnashuv tekshiruvi: bitta peer, bitta soniya, ikki field.
+# msg_id = 0 bo'lganda ikkalasi BIR XIL record_id olib, biri yo'qolardi.
+for field in ("status", "name"):
+    mid = discriminator(field)
+    vec["record_id"]["cases"].append({
+        "kind": "activity", "account_hash": "", "peer_hash": ph,
+        "msg_id": mid, "occurred_at": 1787000300,
+        "record_id": record_id("activity", "", ph, mid, 1787000300)
+    })
 
 # Birlashish tekshiruvi: activity, ikki turli akkaunt, account_hash
 # ikkalasida ham "" -- record_id BIR XIL bo'lishi SHART (last-seen
@@ -162,8 +191,8 @@ vec["record_id"]["cases"].append({
 for _ in (acc_a, acc_b):
     vec["record_id"]["cases"].append({
         "kind": "activity", "account_hash": "", "peer_hash": ph,
-        "msg_id": 0, "occurred_at": 1787000200,
-        "record_id": record_id("activity", "", ph, 0, 1787000200)
+        "msg_id": act_mid, "occurred_at": 1787000200,
+        "record_id": record_id("activity", "", ph, act_mid, 1787000200)
     })
 
 # Ajratma tekshiruvi: bir xil deleted/peer_hash/msg_id/occurred_at,
@@ -212,5 +241,6 @@ print("yozildi:", out)
 print("  account_hash:", len(vec["account_hash"]["cases"]), "holat")
 print("  peer_hash   :", len(vec["peer_hash"]["cases"]), "holat")
 print("  record_id   :", len(vec["record_id"]["cases"]), "holat")
+print("  discriminator:", len(vec["discriminator"]["cases"]), "holat")
 print("  aes_gcm     :", len(vec["aes_gcm"]["cases"]), "holat")
 print("  pbkdf2      :", len(vec["pbkdf2"]["cases"]), "holat")

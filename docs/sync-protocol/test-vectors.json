@@ -63,7 +63,8 @@
       "Ishora SAQLANADI: -42 va 42 turli yozuvlar.",
       "account_hash = BO'SH SATR faqat kind='activity' uchun (tashxis §4.1/§5.1: last-seen bypass akkauntlar bo'ylab birlashadi). Boshqa hamma kind haqiqiy account_hash oladi.",
       "edited: occurred_at = Telegram edit_date (har tahrir o'z record_id sini oladi). Bir xil xabar ikki xil edit_date bilan turli record_id berishi shart.",
-      "setting: msg_id = DiscriminatorFor(setting_key) = SHA256(setting_key)[0:8] int64 sifatida.",
+      "setting: msg_id = DiscriminatorFor(setting_key). activity: msg_id = DiscriminatorFor(field) (2026-09-27 gacha 0 deb yozilgan edi -- XATO). DiscriminatorFor ta'rifi 'discriminator' bo'limida.",
+      "Setting holatidan keyingi 2 holat: bir xil activity/peer/occurred_at, field 'status' va 'name' -> turli msg_id va turli record_id (bir soniyadagi ikki field to'qnashmaydi).",
       "Oxirgi 2 holat: bir xil deleted/peer_hash/msg_id/occurred_at, FAQAT account_hash farq qiladi -> turli record_id (ajratma ishlayapti).",
       "Undan oldingi 2 holat: bir xil activity/peer_hash/msg_id/occurred_at, ikki turli akkaunt, account_hash ikkalasida ham bo'sh -> BIR XIL record_id (birlashish ishlayapti)."
     ],
@@ -88,9 +89,9 @@
         "kind": "activity",
         "account_hash": "",
         "peer_hash": "cbcd16f7c84f024ee6791c08453e35e0",
-        "msg_id": 0,
+        "msg_id": 521316072760462774,
         "occurred_at": 1787000002,
-        "record_id": "eea4dc5e11301c50d7460fc9ebc7f86be92f9dbf3b95ab661a004f4c57a3c919"
+        "record_id": "d3bf5d27518a6f84dc541dfb5ab9b1a005df698d687364980534838f4c976d1c"
       },
       {
         "kind": "media_index",
@@ -152,17 +153,33 @@
         "kind": "activity",
         "account_hash": "",
         "peer_hash": "cbcd16f7c84f024ee6791c08453e35e0",
-        "msg_id": 0,
-        "occurred_at": 1787000200,
-        "record_id": "4f797254a6293dfc20d1cbb5650b8368ea562a4f8d8d38b6ae5dd3b70b224bd9"
+        "msg_id": 521316072760462774,
+        "occurred_at": 1787000300,
+        "record_id": "1328c082fa83cf2bf0936bdc7374a232cb02445b13ce221d47bdfa370350fecf"
       },
       {
         "kind": "activity",
         "account_hash": "",
         "peer_hash": "cbcd16f7c84f024ee6791c08453e35e0",
-        "msg_id": 0,
+        "msg_id": 190087418246581886,
+        "occurred_at": 1787000300,
+        "record_id": "4086dd8f3e411a44a6181c3aa76f5a8ae88ee02050f7d2f1dd21482d55ecac10"
+      },
+      {
+        "kind": "activity",
+        "account_hash": "",
+        "peer_hash": "cbcd16f7c84f024ee6791c08453e35e0",
+        "msg_id": 521316072760462774,
         "occurred_at": 1787000200,
-        "record_id": "4f797254a6293dfc20d1cbb5650b8368ea562a4f8d8d38b6ae5dd3b70b224bd9"
+        "record_id": "a59b9a0591316e9317af3900519fc7223a5753d1b6ea013c12dfefac9561a040"
+      },
+      {
+        "kind": "activity",
+        "account_hash": "",
+        "peer_hash": "cbcd16f7c84f024ee6791c08453e35e0",
+        "msg_id": 521316072760462774,
+        "occurred_at": 1787000200,
+        "record_id": "a59b9a0591316e9317af3900519fc7223a5753d1b6ea013c12dfefac9561a040"
       },
       {
         "kind": "deleted",
@@ -179,6 +196,39 @@
         "msg_id": 999999,
         "occurred_at": 1787000100,
         "record_id": "1436a30172e86f07b80a32009420ae2899a85136e6e411e6984e7d33c692cb1c"
+      }
+    ]
+  },
+  "discriminator": {
+    "_note": [
+      "tdesktop custom_sync_record.cpp DiscriminatorFor(text).",
+      "SHA256(UTF-8(text)) ning birinchi 8 bayti big-endian int64, eng yuqori bit tozalangan (& 0x7FFFFFFFFFFFFFFF) -- natija doim >= 0.",
+      "Ishlatilishi: activity -> field, setting -> setting_key, tombstone -> target_record_id."
+    ],
+    "cases": [
+      {
+        "text": "status",
+        "value": 521316072760462774
+      },
+      {
+        "text": "name",
+        "value": 190087418246581886
+      },
+      {
+        "text": "username",
+        "value": 1654943659220005122
+      },
+      {
+        "text": "photo",
+        "value": 6180712268879076703
+      },
+      {
+        "text": "scope.whitelist",
+        "value": 3528686638094831585
+      },
+      {
+        "text": "o'zbek matn",
+        "value": 5824325475625183511
       }
     ]
   },
