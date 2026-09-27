@@ -858,7 +858,10 @@ S/N `Z9G27L7FS`, 2019-12**. Endi u **Disk 1**.
   yaratildi. Birinchi urinish tez format bo'lib qolgan (931 GB 15 daqiqada
   -- HDD uchun imkonsiz, 0.19 GB/s dan oshmaydi), shuning uchun **to'liq
   format** (sirt tekshiruvi) qayta boshlandi: 22:45 da, 183 MB/s,
-  23:15 da 31%.
+  23:15 da 31%. **TUGADI 00:40 (110 daqiqa), 0 ta disk/NTFS xatosi**,
+  tezlik 185 -> 101 MB/s bir tekis pasaygan (tashqi -> ichki izlar, normal),
+  to'xtab qolish yo'q. E: 931.51 GB NTFS Healthy, yozish/o'qish sinovi o'tdi.
+  Qoldi: SMART'ni qayta o'qish (admin) -- pending/reallocated 0 qolishi kerak.
 - Harf **E:** ataylab qoldirildi: VS `SharedInstallationPath` =
   `E:\Application's datas\Visual Studio\Program Files (x86)` (o'rnatuvchida
   o'zgarmaydi). vswhere: `D:\VS2026` isComplete=1, isLaunchable=1. VS
