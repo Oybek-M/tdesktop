@@ -1,6 +1,6 @@
 # Track C uchun platformalararo test vektorlarini generatsiya qiladi.
 # Natija: docs/sync-protocol/test-vectors.json
-import hashlib, hmac, json, sys
+import base64, hashlib, hmac, json, sys
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 def h(b): return b.hex()
@@ -107,6 +107,26 @@ vec = {
       "tdesktop custom_sync_record.cpp DiscriminatorFor(text).",
       "SHA256(UTF-8(text)) ning birinchi 8 bayti big-endian int64, eng yuqori bit tozalangan (& 0x7FFFFFFFFFFFFFFF) -- natija doim >= 0.",
       "Ishlatilishi: activity -> field, setting -> setting_key, tombstone -> target_record_id."
+    ],
+    "cases": []
+  },
+
+  "key_wrap": {
+    "_note": [
+      "spec §4.4.0. Parol o'rami (wrap_type='passphrase'), tdesktop custom_sync_keyshare.cpp.",
+      "KEK = PBKDF2-HMAC-SHA256(UTF-8(passphrase), salt, iterations, dkLen=32). iterations O'RAMDAN o'qiladi.",
+      "master = AES-256-GCM-Open(KEK, nonce, wrapped_key[0:32] = ct, wrapped_key[32:48] = tag), AAD YO'Q.",
+      "salt/nonce/wrapped_key -- base64 (API javobidagidek). master_hex -- kutilgan natija.",
+      "wrong_passphrase bilan ochish GCM tag xatosi berishi SHART (yagona xato signali).",
+      "Haqiqiy o'ramda salt va nonce har safar yangi tasodifiy; bu yerda ular test uchun qat'iy."
+    ],
+    "cases": []
+  },
+
+  "fingerprint": {
+    "_note": [
+      "spec §4.4.0. FP = hex(SHA256('customsync-fingerprint-v1' || master)[0:8]) -- 16 hex belgi.",
+      "tdesktop Sync tab'idagi 'Kalit barmoq izi (FP)' bilan solishtiriladi."
     ],
     "cases": []
   },
@@ -234,6 +254,36 @@ for pwd, salt, it in [
         "iterations": it, "kek_hex": h(kek)
     })
 
+# Parol o'rami (key_wrap) holatlari -- spec §4.4.0
+def b64(b): return base64.b64encode(b).decode("ascii")
+def fingerprint(master):
+    return hashlib.sha256(b"customsync-fingerprint-v1" + master).digest()[:8].hex()
+
+wrap_master = hashlib.sha256(b"customsync-test-master-key").digest()
+for name, pwd, salt, nonce, it in [
+    ("oddiy parol, 600 000",   "arxiv-paroli-2026",        bytes(range(40, 56)), bytes(range(60, 72)), 600000),
+    ("UTF-8 parol, 1 000",     "o'zbekcha parol ✓ Ёё",     bytes(range(80, 96)), bytes(range(100, 112)), 1000),
+]:
+    kek = hashlib.pbkdf2_hmac("sha256", pwd.encode("utf-8"), salt, it, 32)
+    wrapped = AESGCM(kek).encrypt(nonce, wrap_master, None)   # ct[32] || tag[16]
+    assert len(wrapped) == 48
+    vec["key_wrap"]["cases"].append({
+        "name": name, "wrap_type": "passphrase",
+        "passphrase": pwd, "wrong_passphrase": pwd + "x",
+        "iterations": it, "salt": b64(salt), "nonce": b64(nonce),
+        "wrapped_key": b64(wrapped),
+        "master_hex": h(wrap_master), "fingerprint": fingerprint(wrap_master)
+    })
+
+for name, master in [
+    ("nol kalit", bytes(32)),
+    ("key_wrap master", wrap_master),
+    ("0..31", bytes(range(32))),
+]:
+    vec["fingerprint"]["cases"].append({
+        "name": name, "master_hex": h(master), "fingerprint": fingerprint(master)
+    })
+
 out = sys.argv[1]
 with open(out, "w", encoding="utf-8", newline="\n") as f:
     json.dump(vec, f, indent=2, ensure_ascii=False)
@@ -242,5 +292,7 @@ print("  account_hash:", len(vec["account_hash"]["cases"]), "holat")
 print("  peer_hash   :", len(vec["peer_hash"]["cases"]), "holat")
 print("  record_id   :", len(vec["record_id"]["cases"]), "holat")
 print("  discriminator:", len(vec["discriminator"]["cases"]), "holat")
+print("  key_wrap    :", len(vec["key_wrap"]["cases"]), "holat")
+print("  fingerprint :", len(vec["fingerprint"]["cases"]), "holat")
 print("  aes_gcm     :", len(vec["aes_gcm"]["cases"]), "holat")
 print("  pbkdf2      :", len(vec["pbkdf2"]["cases"]), "holat")

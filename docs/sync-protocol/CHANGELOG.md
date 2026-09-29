@@ -13,6 +13,7 @@ Format: `## YYYY-MM-DD — sarlavha`
 
 **Nima:**
 1. Spec §3.2.1a: scope sozlamalari tdesktop'da **global**. `setting` yozuvi haqiqiy `account_hash` bilan, `peer_id = "0"`, `msg_id = DiscriminatorFor(key)`, `occurred_at` = yuborilgan vaqt. Startda har kirgan akkaunt nomidan alohida yuboriladi. Qabul qiluvchi `account_hash` bo'yicha **filtrlamaydi**, har `key` uchun eng katta `occurred_at` g'olib.
+3. `test-vectors.json` ga `key_wrap` (2 holat: 600 000 va 1 000 iteratsiya, UTF-8 parol, noto'g'ri parol) va `fingerprint` (3 holat) bo'limlari qo'shildi; boshqa bo'limlar bayt-bayt o'zgarmadi. .NET (CNG) bilan mustaqil tekshirildi.
 2. Spec §4.4.0: amalga oshirilgan parol o'rami formati — PBKDF2-HMAC-SHA256 (salt 16, iterations o'ramdan), AES-256-GCM (nonce 12, `wrapped_key` = ct[32] ‖ tag[16], AAD yo'q), barmoq izi `SHA256("customsync-fingerprint-v1" ‖ master)[0:8]`. tdesktop master kalitni eksport qilmaydi; tiklash kodi o'rami tdesktop'da hali yo'q.
 
 **Nima uchun:** customsync-server capture xizmati (Task 6) setting'larni qaysi akkauntdan qabul qilishni va master kalitni qanday olishni bilishi kerak edi.

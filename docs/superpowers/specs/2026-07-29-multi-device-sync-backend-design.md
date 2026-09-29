@@ -644,6 +644,8 @@ Qurilmalar (tdesktop) va VPS capture xizmati (`CustomSync.Capture`) o'rtasida
 qamrov (scope) qoidalarini uzatish uchun quyidagi kanonik kalitlar va qiymatlar
 ishlatiladi. `value` maydoni doimiy ravishda satr (string) shaklida uzatiladi:
 
+**Bu sozlamalar tdesktop'da GLOBAL (akkauntga bog'liq emas) va har startda har bir kirgan akkaunt nomidan qayta yuboriladi — qabul qilish qoidasi §3.2.1a da.**
+
 **Xabar scope sozlamalari** (AntiDelete / AntiEdit / WL / BL):
 
 | Kalit | Qiymat formati | Tavsif va namuna |
@@ -846,6 +848,9 @@ Ochish:
                               tag = wrapped_key[32:48], AAD = YO'Q)
 
 Tag mos kelmasa — parol noto'g'ri (yagona xato signali).
+
+Test vektorlari: `test-vectors.json` -> `key_wrap` (parol, salt, iterations, nonce,
+`wrapped_key` -> master, noto'g'ri parol rad etilishi) va `fingerprint` (master -> FP).
 
 Tekshirish (barmoq izi, tdesktop Sync tab'idagi "Kalit barmoq izi (FP)"):
 

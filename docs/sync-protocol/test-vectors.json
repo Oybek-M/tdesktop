@@ -232,6 +232,65 @@
       }
     ]
   },
+  "key_wrap": {
+    "_note": [
+      "spec §4.4.0. Parol o'rami (wrap_type='passphrase'), tdesktop custom_sync_keyshare.cpp.",
+      "KEK = PBKDF2-HMAC-SHA256(UTF-8(passphrase), salt, iterations, dkLen=32). iterations O'RAMDAN o'qiladi.",
+      "master = AES-256-GCM-Open(KEK, nonce, wrapped_key[0:32] = ct, wrapped_key[32:48] = tag), AAD YO'Q.",
+      "salt/nonce/wrapped_key -- base64 (API javobidagidek). master_hex -- kutilgan natija.",
+      "wrong_passphrase bilan ochish GCM tag xatosi berishi SHART (yagona xato signali).",
+      "Haqiqiy o'ramda salt va nonce har safar yangi tasodifiy; bu yerda ular test uchun qat'iy."
+    ],
+    "cases": [
+      {
+        "name": "oddiy parol, 600 000",
+        "wrap_type": "passphrase",
+        "passphrase": "arxiv-paroli-2026",
+        "wrong_passphrase": "arxiv-paroli-2026x",
+        "iterations": 600000,
+        "salt": "KCkqKywtLi8wMTIzNDU2Nw==",
+        "nonce": "PD0+P0BBQkNERUZH",
+        "wrapped_key": "Cug75xwQQNiafOS08PCbX7dHylfAacnUXWn5gu8apduA+UB86ZV5uef2QCKO+GB5",
+        "master_hex": "e794994d73c8555ae348a2c986edde0a5ad0b2eacb5949b606933c2d7f864ab5",
+        "fingerprint": "5c7fb6d968d4b5a5"
+      },
+      {
+        "name": "UTF-8 parol, 1 000",
+        "wrap_type": "passphrase",
+        "passphrase": "o'zbekcha parol ✓ Ёё",
+        "wrong_passphrase": "o'zbekcha parol ✓ Ёёx",
+        "iterations": 1000,
+        "salt": "UFFSU1RVVldYWVpbXF1eXw==",
+        "nonce": "ZGVmZ2hpamtsbW5v",
+        "wrapped_key": "cjg/gIXMYU3dWRnkW3Tu7qPSgFylRhdPOPGh6nt7VD5mlu7EEjcJpfFxVKzVtlvh",
+        "master_hex": "e794994d73c8555ae348a2c986edde0a5ad0b2eacb5949b606933c2d7f864ab5",
+        "fingerprint": "5c7fb6d968d4b5a5"
+      }
+    ]
+  },
+  "fingerprint": {
+    "_note": [
+      "spec §4.4.0. FP = hex(SHA256('customsync-fingerprint-v1' || master)[0:8]) -- 16 hex belgi.",
+      "tdesktop Sync tab'idagi 'Kalit barmoq izi (FP)' bilan solishtiriladi."
+    ],
+    "cases": [
+      {
+        "name": "nol kalit",
+        "master_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+        "fingerprint": "e6c1914ba593770f"
+      },
+      {
+        "name": "key_wrap master",
+        "master_hex": "e794994d73c8555ae348a2c986edde0a5ad0b2eacb5949b606933c2d7f864ab5",
+        "fingerprint": "5c7fb6d968d4b5a5"
+      },
+      {
+        "name": "0..31",
+        "master_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "fingerprint": "7b759d5f8690b828"
+      }
+    ]
+  },
   "aes_gcm": {
     "_note": [
       "AES-256-GCM. nonce 12 bayt, tag 16 bayt.",
