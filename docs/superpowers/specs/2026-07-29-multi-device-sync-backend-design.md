@@ -674,6 +674,51 @@ ishlatiladi. `value` maydoni doimiy ravishda satr (string) shaklida uzatiladi:
 | `scope.activity_include` | JSON satrlar massivi | Kuzatish ro'yxati (Include): `["7053823996"]` |
 | `scope.activity_exclude` | JSON satrlar massivi | Istisno ro'yxati (Exclude): `["12345678"]` |
 
+#### 3.2.1a `setting` yozuvlarining akkaunt semantikasi (2026-09-29, kodga moslab)
+
+**Scope sozlamalari tdesktop'da GLOBAL** — akkauntga bog'liq emas: bitta
+jarayonda bitta `gValues` + `peer_lists.json`, hamma kirgan akkauntlar bir
+xil WL/BL, AntiDelete/AntiEdit va `activity_*` qiymatlarini ishlatadi.
+Ro'yxatlardagi peer ID lar bir nechta akkauntga tegishli bo'lishi mumkin.
+
+Yozuv tuzilishi (`EnqueueScopeSetting`, `custom_settings.cpp`):
+
+| Maydon | Qiymat |
+|---|---|
+| `kind` | `setting` |
+| `account_hash` | **haqiqiy** akkaunt hash (activity'dagidek bo'sh EMAS) |
+| `peer_hash` | `peer_hash("0")` |
+| `msg_id` | `DiscriminatorFor(key)` |
+| `occurred_at` | yuborilgan vaqt (`currentSecsSinceEpoch`) |
+| payload | `{key, value}` + §0.14 bo'yicha `account_id` (o'nlik), `peer_id = "0"` |
+
+- **Qaysi akkaunt nomidan:** `accountId` berilmasa — `gActiveAccountId`.
+  Uni har bir `Main::Session` konstruktori o'rnatadi (`main_session.cpp`),
+  ya'ni bu **oxirgi yaratilgan sessiya**, ekranda ko'rinib turgan akkaunt
+  emas.
+- **Startda:** har sessiya `SyncAllScopeSettings(o'z userId)` chaqiradi —
+  bir xil global sozlama har bir kirgan akkaunt nomidan ALOHIDA yuboriladi
+  (turli `account_hash` -> turli `record_id`). `occurred_at` har startda
+  yangi, shuning uchun har start — yangi "snapshot" yozuvlar.
+
+**Qabul qiluvchilar uchun qoida:** `setting` yozuvini **`account_hash`
+bo'yicha filtrlamang**. Egasining master kaliti bilan ochiladigan barcha
+`setting` yozuvlari bitta global holatni tasvirlaydi; har bir `key` uchun
+**eng katta `occurred_at` g'olib** (teng bo'lsa — `record_id` leksikografik
+kattasi, deterministik bo'lishi uchun). O'z akkauntiga tegishli bo'lmagan
+peer ID lar e'tiborsiz qoldiriladi. VPS capture xizmati shu qoidaga amal
+qiladi.
+
+> [!WARNING]
+> **tdesktop'dagi ma'lum kamchiliklar (A24, `docs/NEXT_TASKS.md`):**
+> 1. `ApplyScopeSetting` kiruvchi qiymatni `occurred_at` bilan
+>    solishtirmay qo'llaydi — pull tartibida oxirgisi g'olib, ya'ni eskirgan
+>    qiymat yangisini bosishi mumkin. Yuqoridagi "eng katta `occurred_at`"
+>    qoidasi tdesktop'da HALI bajarilmaydi.
+> 2. `gActiveAccountId` — oxirgi yaratilgan sessiya; ko'p akkauntda o'zgarish
+>    "noto'g'ri" akkaunt nomidan yuborilishi mumkin. Global semantika
+>    tufayli ma'lumot yo'qolmaydi, lekin `account_id` ga tayanib bo'lmaydi.
+
 ### 3.3 Ikki xil semantika — aralashtirmaslik kerak
 
 Bu yerda ikkita **butunlay boshqa** mexanizm bor va ular bir-birini
@@ -773,6 +818,42 @@ Istalgan bittasi kalitni ochadi.
 | Har bir qurilma | **Lokal** OS keystore | OS himoyasi (biometrika/PIN) |
 | Tiklash kodi | Server (`key_wraps`) | PBKDF2(kod, salt) |
 | Email escrow | Server (`key_wraps`) | PBKDF2(email_qismi ‖ PIN, salt) — 4.4.1 ga qarang |
+
+#### 4.4.0 O'ram formati — amalga oshirilgan holat (2026-09-29, kodga moslab)
+
+tdesktop hozir faqat **parol o'ramini** (`wrap_type = "passphrase"`)
+yaratadi va ochadi (`custom_sync_keyshare.cpp`). Tiklash kodi va email
+escrow o'ramlari tdesktop'da HALI yo'q. Master kalit (32 bayt, tasodifiy)
+tdesktop'da "Yangi arxiv paroli" oqimida yaratiladi, lokal nusxasi DPAPI
+ostida saqlanadi. **tdesktop master kalitni ko'rsatmaydi va eksport
+qilmaydi** — Sync tab'da faqat barmoq izi (FP).
+
+API: `GET /api/v1/keys/wraps` (ro'yxat), `GET /api/v1/keys/wraps/{wrap_id}`
+(to'liq o'ram), `POST /api/v1/keys/wraps` (yaratish). JSON:
+
+| Maydon | Format |
+|---|---|
+| `wrap_id`, `wrap_type`, `label` | satr |
+| `iterations` | butun son (hozir 600 000) — **o'ramdan o'qing, qat'iy yozmang** |
+| `salt` | base64, 16 bayt, har o'ramda yangi |
+| `nonce` | base64, 12 bayt, har o'ramda yangi |
+| `wrapped_key` | base64, **48 bayt = ciphertext[32] ‖ GCM tag[16]** |
+
+Ochish:
+
+    KEK    = PBKDF2-HMAC-SHA256(UTF-8(parol), salt, iterations, dkLen = 32)
+    master = AES-256-GCM-Open(key = KEK, nonce, ct = wrapped_key[0:32],
+                              tag = wrapped_key[32:48], AAD = YO'Q)
+
+Tag mos kelmasa — parol noto'g'ri (yagona xato signali).
+
+Tekshirish (barmoq izi, tdesktop Sync tab'idagi "Kalit barmoq izi (FP)"):
+
+    FP = hex( SHA256( "customsync-fingerprint-v1" ‖ master )[0:8] )
+
+VPS capture xizmati kalitni shu yo'l bilan oladi: egasi parolni faqat
+sozlash paytida kiritadi (interaktiv yoki secret), ochilgan master kalit
+oddiy matnda repo, log yoki env'da saqlanmaydi.
 
 #### 4.4.1 Email escrow va PIN kuchi
 

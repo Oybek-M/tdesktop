@@ -108,6 +108,24 @@ topildi — muhim ma'lumotlar yangi E: ga nusxalanadi. Batafsil:
 
 ---
 
+## 🔴 A24 — Scope `setting` qo'llanishidagi ikki kamchilik (2026-09-29)
+
+**Holat:** ochiq, kichik, disk ishlaridan keyin asosiy ish bilan birga.
+Spec §3.2.1a (qoida) va CHANGELOG 2026-09-29.
+
+1. **`ApplyScopeSetting` `occurred_at` ni solishtirmaydi** (`custom_sync_client.cpp`,
+   `Kind::Setting` shoxobchasi) — pull tartibida oxirgisi g'olib, eskirgan qiymat
+   yangisini bosishi mumkin. Tuzatish: har `key` uchun oxirgi qo'llangan
+   `occurred_at` (va teng bo'lsa `record_id`) ni saqlash (`sync_state` yoki alohida
+   jadval), kichigini tashlab yuborish. Lokal o'zgarish ham shu vaqtni yangilasin.
+2. **`gActiveAccountId` = oxirgi yaratilgan sessiya** (`main_session.cpp:203`),
+   ekrandagi akkaunt emas. Global semantika tufayli ma'lumot yo'qolmaydi, lekin
+   `account_id` ma'nosiz. Tuzatish: aktiv akkaunt o'zgarishiga obuna bo'lish
+   (`Core::App().domain().activeChanges()`) yoki sozlama yozuvini hamma kirgan
+   akkauntlar uchun yuborish.
+
+---
+
 ## 🔴 A23 — Arxiv papkasi sifatida disk ildizini tanlashga ruxsat bor (2026-09-29)
 
 **Holat:** ochiq, kod o'zgarishi kichik, PRIORITET O'RTA (ma'lumot xavfi).
