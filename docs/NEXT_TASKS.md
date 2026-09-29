@@ -108,6 +108,31 @@ topildi — muhim ma'lumotlar yangi E: ga nusxalanadi. Batafsil:
 
 ---
 
+## 🔴 A23 — Arxiv papkasi sifatida disk ildizini tanlashga ruxsat bor (2026-09-29)
+
+**Holat:** ochiq, kod o'zgarishi kichik, PRIORITET O'RTA (ma'lumot xavfi).
+
+2026-09-29 da PC'da arxiv "📁 Papkani o'zgartirish" orqali ko'chirilganda
+foydalanuvchi papka o'rniga `E:\` ni tanladi -> `archiveRootPath = E:/`,
+arxiv (`medias`, `db`, ...) disk ildiziga tushdi. Ko'chirishning o'zi
+to'g'ri o'tdi, lekin:
+
+- `MoveTree(from, to)` (`custom_settings.cpp`) manba papkadagi **HAMMA**
+  narsani ko'chiradi. Ildiz arxiv bo'lsa, keyingi "Ko'chirish" butun
+  diskni (boshqa papkalar, `System Volume Information`, `$RECYCLE.BIN`)
+  yangi papkaga sudraydi.
+
+**Tuzatish:** `custom_tab_storage.cpp` dagi tanlovdan keyin
+`QDir(chosen).isRoot()` bo'lsa rad etish yoki avtomatik
+`<chosen>/customizationMainFolder` ga aylantirish; `MoveTree` ga faqat
+ma'lum arxiv papkalarini (`medias`, `db`, `config`, `backups`,
+`bombmedia`) ko'chirish cheklovi.
+
+PC'da qo'lda tuzatildi: papkalar `E:\customizationMainFolder` ga
+ko'chirildi, reestr `E:/customizationMainFolder`.
+
+---
+
 ## 🔴 Ochiq Tasklar — 2026-09-26
 
 ### A22 — Tiklangan xabarlar tartibidagi qoldiq chalkashlik
