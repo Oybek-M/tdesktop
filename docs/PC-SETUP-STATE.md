@@ -943,7 +943,19 @@ Disk eski (37 267 soat) -- oyiga bir marta `disk-smart-check.ps1`.
 Disklar: C: (SSD) toza, D: (WD, 37k soat) sog'lom -- pending 0, E: (Toshiba,
 yangi) toza. Pagefile C: 4 GB + D: 16 GB, gibernatsiya o'chiq.
 
-- [ ] **D: -> E: ko'chirish** -- foydalanuvchi AYTGANDA (o'zi boshlanmaydi).
+- [x] **D: -> E: ko'chirish BAJARILDI 09-30** (skript OK, ortiqchalar faqat
+      eski Steam paketlari; foydalanuvchi D: dagi eskilarni o'chirdi).
+      **VS D: da QOLADI** (`D:\VS2026`, kesh `D:\DVS2026-cache`) -- ko'chirish
+      resursga arzimaydi, PC'da og'ir build yo'q. Reestrdagi
+      `SharedInstallationPath` = `E:\Application's datas\Visual Studio\Program
+      Files (x86)` (o'zgartirib bo'lmaydi) papkasi YO'Q edi -> Installer'da
+      **Repair** (foydalanuvchi). Oldingi reja: **E: = ilovalar, D: =
+      fayllar/loyihalar** (loyihalar KO'CHIRILMAYDI). Skript
+      `D:\TBuild\d-to-e-move-back.ps1` (faqat nusxalaydi): 09-25 zaxirasi asl
+      joyiga (`Applications main`, `Application's datas` VS'siz va h.k.;
+      `This PC` -- fayllar, D: da qoladi), ustiga
+      D: dagi jonli Steam/SKLauncher/Cisco. Keyin `E:\Applications main\steam.exe`
+      bir marta ishga tushiriladi. Eski yozuv:
       Sabab: E: 7200 rpm va yoshroq. Ro'yxat: `D:\Steam`, `D:\Apps\SKLauncher`
       (`location.json`/`instances.json` yangilanadi), `D:\E-disk-backup-20260925`
       ichidagi `This PC`, `Installers`, `Applications other datas`. VS --
