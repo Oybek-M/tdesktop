@@ -909,11 +909,11 @@ o'qiydi, **admin** kerak), natija `D:\TBuild\disk-smart-result.txt`.
 
 ### Qolgan ishlar (yangilangan)
 
-- To'liq format tugashi -> event log + SMART qayta (pending/reallocated 0
-  qolishi kerak)
-- D: -> E: muhim ma'lumotlar nusxasi, keyin D: ni to'liq o'qish sinovi
-- PostgreSQL 17.6 O'RNATILDI (customsync-server testlari 190/190)
-- RAM sinovi (`mdsched.exe`) -- hali qilinmagan
+- [x] To'liq format tugashi -> event log + SMART qayta -- toza (09-28 00:53)
+- [x] D: to'liq o'qish sinovi + `cipher` + SMART -- D: sog'lom (09-30, pastda)
+- [x] Arxiv E: ga qaytarildi (`E:\customizationMainFolder`, 09-29)
+- [x] PostgreSQL 17.6 O'RNATILDI (customsync-server testlari 190/190)
+- [ ] RAM sinovi -- pastdagi "Holat 2026-09-30" ro'yxatiga qarang
 - Eski Uninstall yozuvlari (Steam, WoT Blitz -> `E:\Applications main`)
   va yorliqlar -- zararsiz, admin bilan keyin
 
@@ -937,3 +937,29 @@ o'qiydi, **admin** kerak), natija `D:\TBuild\disk-smart-result.txt`.
 **Xulosa:** 349 sektor chala yozilgan (BSOD/qotish/to'g'ri o'chirilmaslik),
 yuza sog'lom -- birorta sektor almashtirilmadi. D: ishlatishda davom etadi.
 Disk eski (37 267 soat) -- oyiga bir marta `disk-smart-check.ps1`.
+
+### Holat 2026-09-30: disk ishlari YOPILDI, qolgan ishlar
+
+Disklar: C: (SSD) toza, D: (WD, 37k soat) sog'lom -- pending 0, E: (Toshiba,
+yangi) toza. Pagefile C: 4 GB + D: 16 GB, gibernatsiya o'chiq.
+
+- [ ] **D: -> E: ko'chirish** -- foydalanuvchi AYTGANDA (o'zi boshlanmaydi).
+      Sabab: E: 7200 rpm va yoshroq. Ro'yxat: `D:\Steam`, `D:\Apps\SKLauncher`
+      (`location.json`/`instances.json` yangilanadi), `D:\E-disk-backup-20260925`
+      ichidagi `This PC`, `Installers`, `Applications other datas`. VS --
+      faqat qayta o'rnatish bilan (`SharedInstallationPath` allaqachon E: da).
+- [ ] **RAM sinovi** -- avval `mdsched.exe` Standard (~20-40 daq, Windows'dan
+      TASHQARIDA, sinov paytida kompyuter band). Xato topsa -> RAM aybdor;
+      toza chiqsa va BSOD takrorlansa -> MemTest86 (4 o'tish). Natija event
+      log'da: `MemoryDiagnostics-Results`.
+- [ ] **Qo'lda o'chirish (foydalanuvchi):** `E:\Backup\customizationMainFolder`
+      (13.7 GB, 09-29 nusxasi -- endi ortiqcha, ichida Defender bloklagan crack),
+      bo'sh `D:\EFSTMPWP`, `E:\__rw_test.tmp`.
+- [ ] **Oyiga bir marta SMART:** `D:\TBuild\disk-smart-check.ps1` (admin).
+- [ ] Eski Uninstall yozuvlari va yorliqlar (`E:\Applications main`) -- zararsiz.
+
+Yordamchi skriptlar (repoda EMAS, `D:\TBuild`): `disk-smart-check.ps1`
+(SMART, admin), `d-read-test.py` (hamma fayllarni o'qish),
+`after-read-run-cipher.ps1` (o'qish tugagach `cipher /w`),
+`copy-archive-to-e.ps1` (arxiv nusxasi + SQLite backup + xesh). Loglar:
+`E:\Backup\*.log`.

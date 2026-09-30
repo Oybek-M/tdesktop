@@ -26,9 +26,13 @@ tdesktop kodiga tegilmaydi -> **upstream v7.2.8+v7.2.9 merge** -> laptop
 build (yuqoridagi commitlar ham shunga kiradi) -> sinov -> A22 -> A21 ->
 A7 reliz (avval VPS mirrorlari).
 
-**PC holati:** E: diski almashtirildi; D: da **349 pending sektor**
-topildi — muhim ma'lumotlar yangi E: ga nusxalanadi. Batafsil:
-`PC-SETUP-STATE.md` §2026-09-27.
+**PC holati (09-30):** disk ishlari YOPILDI. E: yangi Toshiba (toza), D:
+pending 349 -> 0 (yumshoq xato, sog'lom), arxiv `E:\customizationMainFolder`.
+Qolgan (tdesktop'ga bog'liq emas): RAM sinovi, D: -> E: ko'chirish
+(foydalanuvchi aytganda). Batafsil: `PC-SETUP-STATE.md` §2026-09-30.
+
+**Asosiy ish tartibi:** upstream v7.2.8+v7.2.9 merge -> laptop build ->
+sinov -> A22 -> A21 -> A23 -> A24 -> A7 reliz.
 
 ---
 
