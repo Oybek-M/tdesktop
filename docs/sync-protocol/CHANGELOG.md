@@ -9,6 +9,23 @@ Format: `## YYYY-MM-DD — sarlavha`
 
 ---
 
+## 2026-09-30 — `setting` yozuvining `occurred_at` i endi qiymat versiyasi (A24)
+
+**Nima:**
+1. `occurred_at` = shu `key` qiymati oxirgi o'zgargan vaqt (versiya), yuborilgan vaqt EMAS. Startdagi qayta yuborish shu versiya bilan ketadi — o'zgarmagan qiymat o'sha `record_id` ni beradi, server `duplicate` qaytaradi. Hech o'zgartirilmagan kalit `occurred_at = 1`.
+2. tdesktop kiruvchi `setting` ni faqat `(occurred_at, record_id)` bo'yicha saqlangan versiyadan kattaroq bo'lsa qo'llaydi (spec §3.2.1a qoidasi endi bajariladi).
+3. `account_id` endi ekrandagi (aktiv) akkaunt, oxirgi yaratilgan sessiya emas.
+
+Sim formati o'zgarmadi. tdesktop kodi tayyor, build qilinmagan.
+
+**Nima uchun:** oldin har start `occurred_at = hozir` bilan "snapshot" yuborardi. Natijada eskirgan qurilma ishga tushishi bilan boshqa qurilmadagi yangiroq o'zgarishni "eng katta `occurred_at` g'olib" qoidasi orqali bosib ketardi.
+
+**Ta'sirlanadi:**
+- customsync-server / VPS capture: qoida o'zgarmadi (eng katta `occurred_at`, teng bo'lsa `record_id`). `occurred_at = 1` qiymatini rad etmaslik kerak — bu "seed", haqiqiy o'zgarish emas. Bir xil `(key, occurred_at)` bilan qayta kelgan yozuv — oddiy `duplicate`.
+- tdesktop: A24 yopildi (build + sinov kutilmoqda).
+
+---
+
 ## 2026-09-29 — `setting` akkaunt semantikasi va master kalit o'rami formati (hujjat kodga moslandi)
 
 **Nima:**

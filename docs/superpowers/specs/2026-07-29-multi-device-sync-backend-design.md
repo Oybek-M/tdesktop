@@ -691,17 +691,25 @@ Yozuv tuzilishi (`EnqueueScopeSetting`, `custom_settings.cpp`):
 | `account_hash` | **haqiqiy** akkaunt hash (activity'dagidek bo'sh EMAS) |
 | `peer_hash` | `peer_hash("0")` |
 | `msg_id` | `DiscriminatorFor(key)` |
-| `occurred_at` | yuborilgan vaqt (`currentSecsSinceEpoch`) |
+| `occurred_at` | shu `key` qiymatining **versiyasi** — oxirgi lokal o'zgarish vaqti (yoki qo'llangan kiruvchi yozuvniki); hech o'zgartirilmagan kalit = `1` (2026-09-30 dan, A24) |
 | payload | `{key, value}` + §0.14 bo'yicha `account_id` (o'nlik), `peer_id = "0"` |
 
-- **Qaysi akkaunt nomidan:** `accountId` berilmasa — `gActiveAccountId`.
-  Uni har bir `Main::Session` konstruktori o'rnatadi (`main_session.cpp`),
-  ya'ni bu **oxirgi yaratilgan sessiya**, ekranda ko'rinib turgan akkaunt
-  emas.
+- **Qaysi akkaunt nomidan:** `accountId` berilmasa — `gActiveAccountId`,
+  ya'ni **ekrandagi (aktiv) akkaunt**: har sessiya
+  `domain().activeValue()` ga obuna bo'lib uni yangilaydi
+  (`main_session.cpp`, 2026-09-30 gacha oxirgi yaratilgan sessiya edi).
 - **Startda:** har sessiya `SyncAllScopeSettings(o'z userId)` chaqiradi —
   bir xil global sozlama har bir kirgan akkaunt nomidan ALOHIDA yuboriladi
-  (turli `account_hash` -> turli `record_id`). `occurred_at` har startda
-  yangi, shuning uchun har start — yangi "snapshot" yozuvlar.
+  (turli `account_hash` -> turli `record_id`). 2026-09-30 dan `occurred_at`
+  **saqlangan versiya** (startdagi "hozir" EMAS), shuning uchun o'zgarmagan
+  qiymatning qayta yuborilishi o'sha `record_id` ni beradi va server uni
+  `duplicate` deb qaytaradi. Eskirgan qurilma ishga tushganda boshqa
+  qurilmadagi yangiroq o'zgarishni endi bosib keta olmaydi.
+- **Versiya qachon oshadi:** faqat kalit qiymati haqiqatan o'zgarganda
+  (`sync_state` dagi `setting_ver.<key>` = `occurred_at|record_id|qiymat
+  xeshi`). Yangi versiya `max(hozir, oldingi + 1)`. Versiyasi yo'q kalit
+  `occurred_at = 1` bilan yuboriladi: boshqa qurilmadagi har qanday haqiqiy
+  o'zgarishga yutqazadi, serverda qiymat bo'lmasa uni to'ldiradi.
 
 **Qabul qiluvchilar uchun qoida:** `setting` yozuvini **`account_hash`
 bo'yicha filtrlamang**. Egasining master kaliti bilan ochiladigan barcha
@@ -711,15 +719,13 @@ kattasi, deterministik bo'lishi uchun). O'z akkauntiga tegishli bo'lmagan
 peer ID lar e'tiborsiz qoldiriladi. VPS capture xizmati shu qoidaga amal
 qiladi.
 
-> [!WARNING]
-> **tdesktop'dagi ma'lum kamchiliklar (A24, `docs/NEXT_TASKS.md`):**
-> 1. `ApplyScopeSetting` kiruvchi qiymatni `occurred_at` bilan
->    solishtirmay qo'llaydi — pull tartibida oxirgisi g'olib, ya'ni eskirgan
->    qiymat yangisini bosishi mumkin. Yuqoridagi "eng katta `occurred_at`"
->    qoidasi tdesktop'da HALI bajarilmaydi.
-> 2. `gActiveAccountId` — oxirgi yaratilgan sessiya; ko'p akkauntda o'zgarish
->    "noto'g'ri" akkaunt nomidan yuborilishi mumkin. Global semantika
->    tufayli ma'lumot yo'qolmaydi, lekin `account_id` ga tayanib bo'lmaydi.
+> [!NOTE]
+> **A24 (2026-09-30, kod tayyor, build qilinmagan):** tdesktop endi yuqoridagi
+> qoidaga amal qiladi — `ApplyRemoteScopeSetting` kiruvchi yozuvni faqat u
+> shu kalitning saqlangan versiyasidan `(occurred_at, record_id)` bo'yicha
+> kattaroq bo'lsa qo'llaydi (aks holda merge natijasi `stale_setting`).
+> Lokal o'zgarish versiyasining `record_id` si bo'sh, shuning uchun o'z
+> yozuvining qaytib kelishi (echo) uni bir marta "qo'llaydi" — qiymat bir xil.
 
 ### 3.3 Ikki xil semantika — aralashtirmaslik kerak
 

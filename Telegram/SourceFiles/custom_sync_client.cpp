@@ -813,11 +813,16 @@ MergeResult MergeRecord(
     if (record.kind == QLatin1String(Kind::Setting)) {
         const auto settingKey = obj.value(QStringLiteral("key")).toString();
         const auto settingVal = obj.value(QStringLiteral("value")).toString();
-        if (!settingKey.isEmpty()) {
-            CustomSettings::ApplyScopeSetting(settingKey, settingVal);
-        }
+        // A24: pull tartibida emas, (occurred_at, record_id) bo'yicha
+        // eng yangisi g'olib -- eskirgan yozuv qo'llanmaydi.
+        const auto applied = !settingKey.isEmpty()
+            && CustomSettings::ApplyRemoteScopeSetting(
+                settingKey,
+                settingVal,
+                record.occurredAt,
+                record.recordId);
         Outbox::SaveRecordMap(record.recordId, record.kind, key.accountId, key.peerId, record.msgId, record.occurredAt);
-        return { MergeStatus::Merged, QString() };
+        return { MergeStatus::Merged, applied ? QString() : QStringLiteral("stale_setting") };
     }
 
     return { MergeStatus::Unsupported, QStringLiteral("unsupported_kind") };

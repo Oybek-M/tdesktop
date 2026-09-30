@@ -31,8 +31,10 @@ pending 349 -> 0 (yumshoq xato, sog'lom), arxiv `E:\customizationMainFolder`.
 Qolgan (tdesktop'ga bog'liq emas): RAM sinovi, D: -> E: ko'chirish
 (foydalanuvchi aytganda). Batafsil: `PC-SETUP-STATE.md` §2026-09-30.
 
-**Asosiy ish tartibi:** upstream v7.2.8+v7.2.9 merge -> laptop build ->
-sinov -> A22 -> A21 -> A23 -> A24 -> A7 reliz.
+**Asosiy ish tartibi:** upstream v7.2.8+v7.2.9+v7.2.10 merge -> laptop
+build -> sinov -> A22 -> A21 -> A7 reliz. **A23 va A24 kodi 09-30 da
+PC'da yozildi** (build qilinmagan) — o'sha build'ga kiradi, sinovi
+ularning bo'limida.
 
 ---
 
@@ -114,8 +116,21 @@ sinov -> A22 -> A21 -> A23 -> A24 -> A7 reliz.
 
 ## 🔴 A24 — Scope `setting` qo'llanishidagi ikki kamchilik (2026-09-29)
 
-**Holat:** ochiq, kichik, disk ishlaridan keyin asosiy ish bilan birga.
-Spec §3.2.1a (qoida) va CHANGELOG 2026-09-29.
+**Holat:** 🟡 KOD TAYYOR 2026-09-30 (PC'da, BUILD QILINMAGAN). Spec
+§3.2.1a va CHANGELOG 2026-09-30. Yo'l-yo'lakay 3-kamchilik topildi va
+tuzatildi: startdagi qayta yuborish `occurred_at = hozir` bilan ketardi,
+ya'ni eskirgan qurilma ishga tushishi bilan yangiroq o'zgarishni bosib
+ketardi. Endi `occurred_at` = kalit versiyasi (`sync_state`
+`setting_ver.<key>`), versiya faqat qiymat xeshi o'zgarganda oshadi.
+1-qism -> `ApplyRemoteScopeSetting`; 2-qism -> `main_session.cpp` da
+`domain().activeValue()` obunasi.
+
+**Sinov (build'dan keyin, 2 qurilma):** A'da WL o'zgartirish -> B pull
+qiladi -> B qayta ishga tushadi -> A'da WL B'nikiga QAYTMASLIGI kerak;
+log'da eski yozuv uchun `stale_setting`. Ko'p akkauntda akkaunt
+almashtirib sozlama o'zgartirish -> outbox `account_id` = ekrandagi.
+
+Asl tavsif:
 
 1. **`ApplyScopeSetting` `occurred_at` ni solishtirmaydi** (`custom_sync_client.cpp`,
    `Kind::Setting` shoxobchasi) — pull tartibida oxirgisi g'olib, eskirgan qiymat
@@ -132,7 +147,21 @@ Spec §3.2.1a (qoida) va CHANGELOG 2026-09-29.
 
 ## 🔴 A23 — Arxiv papkasi sifatida disk ildizini tanlashga ruxsat bor (2026-09-29)
 
-**Holat:** ochiq, kod o'zgarishi kichik, PRIORITET O'RTA (ma'lumot xavfi).
+**Holat:** 🟡 KOD TAYYOR 2026-09-30 (PC'da, BUILD QILINMAGAN) — laptop
+build + sinov kerak. Nima qilindi:
+- `NormalizeArchiveRootChoice()`: disk ildizi tanlansa
+  `<ildiz>/customizationMainFolder` ga aylanadi.
+- `IsSameOrInsidePath()`: joriy arxivning o'zi yoki ichidagi papka
+  tanlansa toast bilan rad etiladi (aks holda `MoveTree` cheksiz rekursiya).
+- `EnsureArchiveLayout`: ko'chirish faqat `medias`, `db`, `config`,
+  `backups`, `bombmedia` bilan cheklandi, keyin eski ildiz bo'sh bo'lsa
+  o'chiriladi (`rmdir`, faqat bo'sh papka).
+
+**Sinov (build'dan keyin):** 1) `E:\` tanlash -> dialogda
+`E:/customizationMainFolder` ko'rinadi; 2) joriy arxiv ichidagi papkani
+tanlash -> rad etiladi; 3) oddiy ko'chirish -> 5 papka o'tadi, eski papka
+yo'qoladi; 4) begona fayli bor papkadan ko'chirish -> begona fayl joyida
+qoladi.
 
 2026-09-29 da PC'da arxiv "📁 Papkani o'zgartirish" orqali ko'chirilganda
 foydalanuvchi papka o'rniga `E:\` ni tanladi -> `archiveRootPath = E:/`,

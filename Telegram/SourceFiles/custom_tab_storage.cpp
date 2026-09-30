@@ -46,12 +46,19 @@ void fillStorageTab(
 		st::boxRowPadding
 	)->addClickHandler([=] {
 		const auto current = CustomSettings::ArchiveRoot();
-		const auto chosen = QFileDialog::getExistingDirectory(
-			dialogParent,
-			u"Arxiv uchun papka tanlang"_q,
-			current);
+		// A23: disk ildizi tanlansa ichiga customizationMainFolder qo'shiladi.
+		const auto chosen = CustomSettings::NormalizeArchiveRootChoice(
+			QFileDialog::getExistingDirectory(
+				dialogParent,
+				u"Arxiv uchun papka tanlang"_q,
+				current));
 		if (chosen.isEmpty()
 			|| QDir::cleanPath(chosen) == QDir::cleanPath(current)) {
+			return;
+		}
+		if (CustomSettings::IsSameOrInsidePath(chosen, current)) {
+			Ui::Toast::Show(
+				u"Arxivni o'zining ichidagi papkaga ko'chirib bo'lmaydi. Boshqa papka tanlang."_q);
 			return;
 		}
 
