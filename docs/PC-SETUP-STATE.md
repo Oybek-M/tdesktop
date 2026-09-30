@@ -916,3 +916,24 @@ o'qiydi, **admin** kerak), natija `D:\TBuild\disk-smart-result.txt`.
 - RAM sinovi (`mdsched.exe`) -- hali qilinmagan
 - Eski Uninstall yozuvlari (Steam, WoT Blitz -> `E:\Applications main`)
   va yorliqlar -- zararsiz, admin bilan keyin
+
+
+### 2026-09-29/30: D: tekshiruvi -- YUMSHOQ xato edi, disk sog'lom
+
+1. **Arxiv E: ga qaytdi** (ilovaning o'z vositasi bilan): `E:\customizationMainFolder`
+   (reestr `E:/customizationMainFolder`). Papka tanlashda `E:\` ildizi tanlanib
+   qolgani qo'lda tuzatildi -- nuqson A23 (`NEXT_TASKS.md`). Defender 2 ta
+   `Adobe Photoshop 2024.exe` (HackTool:Win32/Crack, 2x2.83 GB) ni karantinga
+   olgan -- ko'chirishda yo'qolgan narsa emas.
+2. **D: dagi barcha fayllar o'qildi** (`D:\TBuild\d-read-test.py`, log
+   `E:\Backup\d-read-test.log`): 606 062 fayl, 259.5 GB, 275 daqiqa --
+   **buzuq sektorga tushgan fayl YO'Q** (29 ta faqat MAX_PATH uzun yo'l).
+3. **`cipher /w:D:\`** (bo'sh joyni 3 marta qayta yozish, 01:37-07:24, 346 daq,
+   kod 0). 02:10 da 1 ta `disk` 153 (LBA 0x5ef9c8, qayta urinishda o'tdi) +
+   4 ta `storahci` 129 (reset) -- disk sektorni ichkarida tuzatayotgan payt.
+4. **SMART (09-30 07:47):** `Current_Pending_Sector` **349 -> 0**,
+   `Reallocated_Sector_Ct` **0 -> 0**, ReadErrorsUncorrected 349 -> 0.
+
+**Xulosa:** 349 sektor chala yozilgan (BSOD/qotish/to'g'ri o'chirilmaslik),
+yuza sog'lom -- birorta sektor almashtirilmadi. D: ishlatishda davom etadi.
+Disk eski (37 267 soat) -- oyiga bir marta `disk-smart-check.ps1`.
