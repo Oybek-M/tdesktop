@@ -114,6 +114,43 @@ ularning bo'limida.
 
 ---
 
+## 🔴 A25 — Faollik tarixi: startdagi holat yozilmaydi va 3 ta nuqson (2026-10-06)
+
+**Holat:** ochiq, tekshirildi (haqiqiy DB, kontakt `8720525440`), kod HALI
+o'zgartirilmagan. Foydalanuvchi skrinshoti: oyna "hozir online (19:22 gacha)"
+deydi, Telegram esa "last seen 21:17".
+
+1. **Startdagi holat yo'qoladi (asosiy).** Ilova 21:18:32 da ochilgan,
+   kontakt 21:17 da offline bo'lgan. Holat serverdan start paytida keladi,
+   lekin `RecordField` kesh tayyor bo'lmaguncha (start+~90 s) jimgina
+   qaytadi va keyin hech kim qayta yozmaydi (story uchun retry bor, status
+   uchun yo'q). Natija: ilova yopiq bo'lgan vaqtdagi oxirgi holat HECH
+   QACHON bazaga tushmaydi. Tuzatish: kesh tayyor bo'lgach kuzatiladigan
+   barcha kontaktlar uchun bir marta `RecordCurrentState` (mavjud funksiya).
+2. **Story/rasm nuqtasi "joriy holat" bo'lib qoladi.** Story 19:22 da
+   `status = online:<story vaqti>` sifatida yozilgan va eng oxirgi status
+   bo'lgani uchun sarlavha "hozir online" deydi. `DecodeStatusLabel`
+   sarlavhada manba `story/photo/read/manual` bo'lsa "hozir online" emas,
+   "📖 HH:mm da hikoya qo'ygan" deyishi kerak.
+3. **"online:<hozir+1>" aslida offline.** Kontakt chiqib ketganda
+   `was_online` server/lokal soat farqi tufayli `now` dan 1 s katta keladi,
+   `EncodeStatus` uni `online:` deb yozadi (22.09 dagi barcha "aniq lahza"
+   qatorlari shu: 09:05:32 online(+5 daq) -> 09:05:40 online:09:05:41).
+   Tuzatish: `EncodeStatus` da `onlineTill - now <= 30` -> `offline:`;
+   eski ma'lumot uchun `ReconstructOnlinePeriods` ham shu qoidani qo'llasin
+   (davr 09:05:32-09:05:41 bo'lib chiqadi, "lahza" emas).
+4. **Ro'yxat eskisidan boshlanadi.** Oxirgi 300 yozuv olinadi, lekin
+   davrlar eskidan yangiga chiqadi -- foydalanuvchi tepada 22.09 ni ko'radi,
+   bugungisini pastda qidiradi. Teskari tartib kerak.
+
+**Muhim kontekst:** VPS Capture (customsync-server Plan 05, statuslarni 24/7
+yozadi) kodi tayyor, lekin **deploy to'xtatilgan** (VPS buzilgan, audit
+ketmoqda); lokal `sync_state` bo'sh -- ya'ni hozir ilova yopiq paytdagi
+bo'shliqni to'ldiradigan hech narsa ishlamayapti. 02-03.10 dagi deyarli
+nol yozuv ham shu (ilova yopiq bo'lgan).
+
+---
+
 ## 🔴 A24 — Scope `setting` qo'llanishidagi ikki kamchilik (2026-09-29)
 
 **Holat:** 🟡 KOD TAYYOR 2026-09-30 (PC'da, BUILD QILINMAGAN). Spec
