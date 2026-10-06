@@ -147,7 +147,7 @@ deydi, Telegram esa "last seen 21:17".
 yozadi) kodi tayyor, lekin **deploy to'xtatilgan** (VPS buzilgan, audit
 ketmoqda); lokal `sync_state` bo'sh -- ya'ni hozir ilova yopiq paytdagi
 bo'shliqni to'ldiradigan hech narsa ishlamayapti. 02-03.10 dagi deyarli
-nol yozuv ham shu (ilova yopiq bo'lgan).
+nol yozuv ham ehtimol shu (ilova yopiq bo'lgan -- tasdiqlanmagan).
 
 ---
 
