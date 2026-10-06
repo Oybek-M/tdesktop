@@ -516,6 +516,50 @@ void RecordPhotoOnlineMoment(
 		u"photo"_q);
 }
 
+// A25: start paytida kontaktlar holati serverdan keladi, lekin RecordField
+// kesh tayyor bo'lmaguncha (start + ~90 s) jimgina qaytadi, keyin esa bu
+// holat qayta otilmaydi (o'zgarmagan) -- ilova yopiq bo'lgan vaqtdagi
+// oxirgi holat bazaga UMUMAN tushmasdi.
+//
+// Dalil (haqiqiy DB, 2026-10-06): kontakt 21:17 da chiqib ketgan, ilova
+// 21:18:32 da ochilgan; bazada 04.10 dan keyin birorta status yo'q edi,
+// oyna esa 19:22 dagi story nuqtasini "hozir online" deb ko'rsatardi.
+//
+// Kesh tayyor bo'lgach kuzatiladigan foydalanuvchilarning joriy statusi
+// BIR MARTA yoziladi. RecordField dublikat va shovqinni o'zi filtrlaydi --
+// o'zgarmagan holat yozilmaydi, ya'ni odatda bir necha o'nlab qator.
+constexpr auto kCatchUpPollDelay = crl::time(10 * 1000);
+constexpr auto kCatchUpMaxAttempts = 30; // ~5 daqiqa
+
+void ScheduleStartupStatusCatchUp(
+		not_null<Main::Session*> session,
+		int attempt) {
+	base::call_delayed(kCatchUpPollDelay, session, [=] {
+		if (!CustomDB::IsActivityCacheReady()) {
+			if (attempt + 1 < kCatchUpMaxAttempts) {
+				ScheduleStartupStatusCatchUp(session, attempt + 1);
+			}
+			return;
+		}
+		const auto now = base::unixtime::now();
+		session->data().enumerateUsers([&](not_null<UserData*> user) {
+			if (user->isSelf() || user->isBot()) {
+				return;
+			}
+			const auto peerId = QString::number(user->id.value);
+			if (!CustomSettings::ShouldTrackActivity(
+					peerId,
+					user->isContact())) {
+				return;
+			}
+			const auto encoded = EncodeStatus(user->lastseen(), now);
+			if (encoded != u"empty"_q) {
+				RecordField(session, peerId, u"status"_q, encoded, now);
+			}
+		});
+	});
+}
+
 } // namespace
 
 QString EncodeStatus(const Data::LastseenStatus &status, int32 now) {
@@ -527,7 +571,11 @@ QString EncodeStatus(const Data::LastseenStatus &status, int32 now) {
 		return u"within_month"_q;
 	} else if (status.isLongAgo()) {
 		return u"long_ago"_q;
-	} else if (status.isOnline(now)) {
+	} else if (status.isOnline(now)
+			&& (status.onlineTill() - now) > kOfflineSkewSeconds) {
+		// A25: kontakt chiqib ketganda `was_online` soat farqi tufayli
+		// `now` dan 1-2 s katta kelishi mumkin -- bu online EMAS, offline.
+		// Haqiqiy online muddati odatda hozir + bir necha daqiqa.
 		return u"online:"_q + QString::number(status.onlineTill());
 	}
 	const auto till = status.onlineTill();
@@ -786,6 +834,8 @@ void Init(not_null<Main::Session*> session) {
 		CheckPendingStoryMedia();
 		CheckPendingUserpics();
 	}, session->lifetime());
+
+	ScheduleStartupStatusCatchUp(session, 0);
 }
 
 int RecordCurrentState(

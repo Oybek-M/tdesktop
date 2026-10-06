@@ -116,8 +116,21 @@ ularning bo'limida.
 
 ## 🔴 A25 — Faollik tarixi: startdagi holat yozilmaydi va 3 ta nuqson (2026-10-06)
 
-**Holat:** ochiq, tekshirildi (haqiqiy DB, kontakt `8720525440`), kod HALI
-o'zgartirilmagan. Foydalanuvchi skrinshoti: oyna "hozir online (19:22 gacha)"
+**Holat:** 🟡 KOD TAYYOR 2026-10-06 (PC'da, BUILD QILINMAGAN). Tekshirildi
+(haqiqiy DB, kontakt `8720525440`). Qilingani: (1) `ScheduleStartupStatusCatchUp`
+-- kesh tayyor bo'lgach (10 s so'rov, ~5 daq gacha) kuzatiladigan hamma
+foydalanuvchining joriy statusi bir marta; (2) sarlavha faqat
+`observed/snapshot` statusdan, lahza alohida "Undan keyingi faollik belgisi"
+qatorida, muddati o'tgan online -> "online edi"; (3) `EncodeStatus` da
+`kOfflineSkewSeconds = 5`, eski yozuvlar ham shu qoida bilan; qo'shimcha:
+online muddati yangilanishi seans DAVOMI deb olinadi (offline kelmasa seans
+o'z muddati bilan yopiladi) -- Python simulyatsiyasida 22.09: 65 yozuv -> 32
+haqiqiy seans, soxta lahza 0; (4) davrlar yangisi tepada.
+**Sinov (build'dan keyin):** kontakt offline bo'lgandan keyin ilovani ochish
+-> ~2 daqiqada bazada `offline:<vaqt>` paydo bo'ladi, sarlavha Telegram'dagi
+last-seen bilan mos; 22.09 ro'yxati qisqa ulanish guruhlari bo'lib chiqadi.
+Startdagi yozuvlar asosiy oqimda -- startdagi qotish (09-12) qaytmaganini
+log'da tekshirish. Foydalanuvchi skrinshoti: oyna "hozir online (19:22 gacha)"
 deydi, Telegram esa "last seen 21:17".
 
 1. **Startdagi holat yo'qoladi (asosiy).** Ilova 21:18:32 da ochilgan,
