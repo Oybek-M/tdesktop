@@ -1,40 +1,43 @@
 # CustomMod — Keyingi Tasklar Ro'yxati
 
-**Oxirgi yangilanish:** 2026-09-27 (sync scope/edit_date kodi build kutmoqda; upstream v7.2.9 chiqqan; A22 ochiq)
+**Oxirgi yangilanish:** 2026-10-08 (`b19d83c2a1` build O'TDI, SINOVDAN O'TMAGAN; o'rnatish + sinov keyingi sessiyada)
 
 ---
 
-## 🟡 2026-09-27 holati — keyingi sessiya shu yerdan boshlaydi
+## 🟡 2026-10-08 holati — keyingi sessiya shu yerdan boshlaydi
 
-**Upstream:** rasmiy `telegramdesktop/tdesktop` da **v7.2.8 va v7.2.9**
-chiqqan, bizda **7.2.7** (oxirgi merge `9b081b2a43`, 2026-09-10).
-Repo'da `upstream` remote YO'Q — tekshirish faqat o'qiydi:
+**Upstream:** v7.2.8+v7.2.9+v7.2.10 merge qilindi (`94e0d660a1`),
+o'rnatildi va sinovdan o'tdi (T48). Yangi reliz bor-yo'qligini tekshirish
+(repo'da `upstream` remote YO'Q — faqat o'qiydi):
 `git ls-remote --tags --refs https://github.com/telegramdesktop/tdesktop.git 'v7.*'`
 
-**Build QILINMAGAN kod (09-27, push qilingan):**
+**🔴 Build O'TDI, lekin SINOVDAN O'TMAGAN — `b19d83c2a1`** (T49):
+7.2.10 + PC'dagi 21 commit (09-26..10-06): A23+A24 `0c1a158c32`, A25
+`b0e933957e`, sync scope/`edit_date` (`7b6079f81d`, `d4cc460156`,
+`a119ef83cb`). Build 2026-10-08 00:16:51 -> 01:37:56, ExitCode 0, 0 xato;
+exe `7.2.10.0`, SHA256 `beebfef1c6f67f7b…`. Hozir o'rnatilgani — 10-07
+dagi `94e0d660a1` build'i (unda A23/A24/A25 YO'Q).
 
-| Commit | Nima |
-|---|---|
-| `a6f0874e77` | docs(sync): `edited` uchun `edit_date`, scope setting kalitlari protokoli |
-| `d4cc460156` | `edited` xabarlar `edit_date` bilan yoziladi, fon tahrir nomuvofiqligi tuzatildi |
-| `7b6079f81d` | scope sozlamalari (WL/BL, AntiDelete/AntiEdit) outbox'ga chiqadi va qabul qilinadi |
-| `a06ed12373` | docs(sync): activity `msg_id = DiscriminatorFor(field)`, `status` kodlashi (§3.2.2, `userStatusEmpty -> long_ago`), test vektorlari |
-| `a119ef83cb` | activity kuzatuv sozlamalari (`scope.activity_*`) outbox'ga chiqadi va qabul qilinadi |
+**Build QAYTA QILINMAYDI** — nusxasi laptopda saqlangan:
+`C:\TBuild\staged\b19d83c2a1-20261008\` (`Telegram.exe`, `SHA256.txt`,
+`HOLAT.txt`, `build.log`). Mos PDB faqat `out\Release\Telegram.pdb` da
+(3.64 GB, nusxalanmagan) — keyingi build uni qayta yozadi.
 
-**Tartib (kelishilgan):** laptopdagi ish tugab push qilinguncha PC'da
-tdesktop kodiga tegilmaydi -> **upstream v7.2.8+v7.2.9 merge** -> laptop
-build (yuqoridagi commitlar ham shunga kiradi) -> sinov -> A22 -> A21 ->
-A7 reliz (avval VPS mirrorlari).
+**Keyingi sessiya tartibi:**
+1. Telegram TO'LIQ yopiladi ->
+   `bash /c/TBuild/install-staged.sh b19d83c2a1-20261008`
+   (`--check` bilan oldindan tekshirish mumkin). Skript SHA256 ni
+   tekshiradi, tdata (user_data'siz) va bazani zaxiralaydi, eski exe'ni
+   `Telegram.exe.pre-…` qilib qo'yadi.
+2. Ketma-ket IKKI start: iliq start 7.2.7 bazasi (1380-1774 ms) bilan
+   solishtiriladi; birinchi start sovuq bo'lishi mumkin (T46).
+3. Sinovlar o'z bo'limlarida: A25, A23. A24 — 2 qurilma + sync server kerak.
+4. Keyin: A26 -> A22 -> A21 -> A7 reliz (avval VPS mirrorlari).
 
 **PC holati (09-30):** disk ishlari YOPILDI. E: yangi Toshiba (toza), D:
 pending 349 -> 0 (yumshoq xato, sog'lom), arxiv `E:\customizationMainFolder`.
 Qolgan (tdesktop'ga bog'liq emas): RAM sinovi, D: -> E: ko'chirish
 (foydalanuvchi aytganda). Batafsil: `PC-SETUP-STATE.md` §2026-09-30.
-
-**Asosiy ish tartibi:** upstream v7.2.8+v7.2.9+v7.2.10 merge -> laptop
-build -> sinov -> A22 -> A21 -> A7 reliz. **A23 va A24 kodi 09-30 da
-PC'da yozildi** (build qilinmagan) — o'sha build'ga kiradi, sinovi
-ularning bo'limida.
 
 ---
 
@@ -113,6 +116,23 @@ ularning bo'limida.
 ### ~~NEXT-10: Background AntiDelete — msgDate==0 fallback~~ ✅ T44 da tugadi
 
 ---
+
+## 🟡 A26 — Start'dagi qat'iy 90 s kutishni "UI bo'shadi" signaliga almashtirish (2026-10-08, g'oya)
+
+Hozir start'dan keyin fon ishlari qat'iy 90 s kutadi: `kStartupQuietMs`
+(`main_session.cpp:86`) va `kStartupScanDelayMs` (`custom_media_quota.cpp:23`)
+— start paytidagi SQLite raqobatining oldini olish uchun. Foydalanuvchi
+(10-07): shu 90 s davomida CustomMod servislari umuman ishlamaydi —
+qisqartirish mumkinmi?
+
+**G'oya:** qat'iy vaqt o'rniga "UI bo'shadi" signali (masalan, birinchi
+chat ro'yxati chizilgandan keyin asosiy oqim bir necha soniya band
+bo'lmasa); 90 s faqat yuqori chegara bo'lib qoladi.
+**Shart:** A25 o'zgarishlari (startdagi holatni yozish) ko'rib chiqilib,
+T49 build sinovdan o'tgandan KEYIN. A3.1 (alohida SQLite ulanishi) rejada qoladi.
+**Eslatma:** 7.2.10 startidagi 5.2-7.5 s asosiy oqim bloki CustomMod emas —
+OpenAL (~3 s) + D3D11 RHI probe (~2 s); S1 (`use-qt-rhi=false`) sinovi
+bilan birga tekshiriladi.
 
 ## 🔴 A25 — Faollik tarixi: startdagi holat yozilmaydi va 3 ta nuqson (2026-10-06)
 
