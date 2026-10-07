@@ -700,3 +700,278 @@ agar laptopda ham xotira muammosi chiqsa, bu ikkalasi tayyor yechim:
 1. Bayroqni ItemDefinitionGroup orqali berish (global `/p:` ISHLAMAYDI)
 2. `/DEBUG:FASTLINK` uchun `LinkToolPath` ni 14.44 ga yo'naltirish
    (VS 2026 linkeri bu bayroqni qo'llab-quvvatlamaydi)
+
+---
+
+## 2026-09-26: E: diski bo'shatilmoqda, VS D: ga qayta o'rnatiladi, PC roli o'zgardi
+
+### Qaror: PC'da tdesktop qurilmaydi
+
+Foydalanuvchi qarori: bu mashinada faqat kod yoziladi va yengil
+loyihalar (web-api, web-app) quriladi. tdesktop build laptopda.
+Shuning uchun katta pagefile keraksiz: `C:` 16 -> 4 GB, `D:` 16 GB
+o'z holicha. Commit limit 36 GB. `C:` da bo'sh joy 24.6 -> 37.2 GB.
+
+Bu qaror /DEBUG:FASTLINK ishlamagani uchun EMAS -- u ishlagan
+(29.4 -> 6.8 GB). Sabab: nosoz E: disk va shu mashinaning roli.
+PC'da tdesktop qurish kerak bo'lsa, usul yuqorida yozilgan.
+
+### Bajarilgan
+
+- Pagefile E: dan olib tashlandi (E: xatolari 3 daqiqada 7 -> 0).
+- 67.5 GB E: -> D:\E-disk-backup-20260925 ga nusxalandi.
+- CustomMod arxivi D:\customizationMainFolder ga ilovaning o'z
+  vositasi bilan ko'chirildi (registr: archiveRootPath=D:/...).
+- Baza ko'chirishda buzildi (fayl 3 sahifaga kesilgan, sarlavha 4002
+  sahifa deydi, fayl 3999). Dasturning o'z premigrate zaxirasidan
+  tiklandi, integrity_check ok. Buzuq fayl saqlandi:
+  db\actioned_messages.db.CORRUPT-20260925-2320
+- Visual Studio E: dan o'chirildi (E:\Application's datas ~0.25 GB qoldi).
+
+### SABOQ: ochiq SQLite bazasini qo'lda nusxalamang
+
+Ilova ochiq turganda baza (WAL rejimi) nusxasi yaxlit chiqmaydi.
+D:\E-disk-backup-20260925 dagi actioned_messages.db shu sababli
+YAROQSIZ (media fayllar yaxshi). Ilovaning o'z ko'chirish
+vositasidan foydalaning yoki avval ilovani yoping.
+
+### VS qayta o'rnatish -- to'siqlar
+
+- Product: D:\VS2026, Download cache: D:\VS2026-cache (ular bir-biriga
+  kirmasligi shart: "root installation path cannot overlap with
+  package cache path").
+- "Shared components" maydoni kulrang va o'zgarmaydi (mashinada bir
+  marta belgilanadi) -- 6 GB E: da qoladi.
+- "System cache, tools, SDKs with fixed locations" 27.57 GB HAR DOIM
+  C: ga tushadi. C: da kamida shuncha bo'sh joy kerak.
+- ASP.NET and web development workload KERAK (customsync-server va
+  boshqa web loyihalar). Uni olib tashlab joy tejab bo'lmaydi.
+
+### O'rnatishdan keyin yangilanadigan yo'llar (hali BAJARILMAGAN)
+
+    D:\TBuild\run-build.bat        vcvars64.bat + CMAKE (E:\VS2026 -> D:\VS2026)
+    D:\TBuild\run-configure.bat    CMAKE_GENERATOR_INSTANCE (endi kerak emas bo'lishi mumkin)
+    D:\TBuild\link-tuning.props    LinkToolPath / LibToolPath
+
+E:\Applications main ichida Steam (~20 GB o'yin), Antigravity IDE,
+Cisco Packet Tracer, SKLauncher, Mem Reduct bor. O'rnatilgan dasturlarni
+papka nusxalab ko'chirib BO'LMAYDI (registr E: ga bog'langan).
+Steam o'yinlarini Steam Settings > Storage orqali ko'chiring.
+
+---
+
+## 2026-09-26 (kech): E: BO'SHATILDI -- yakuniy holat
+
+`E:` diski (ST1000DM003, Disk 1) nosoz ekani tasdiqlandi; undagi hamma
+narsa `D:` ga olindi va `E:` deyarli bo'sh (930.3 / 932 GB bo'sh).
+Qolgan: `E:\Application's datas` (0.67 GB, VS "shared" komponentlari)
+va `bootTel.dat`. Diskni fizik almashtirish qoldi.
+
+### Yangi joylar (PC)
+
+| Nima | Endi | Avval |
+|---|---|---|
+| Visual Studio 2026 (18.10) | `D:\VS2026` | `E:\Application's datas\Visual Studio\Program Files` |
+| VS yuklab olish keshi | `D:\DVS2026-cache` (registr: CachePath) | `E:` |
+| Steam (engine + WoT Blitz) | `D:\Steam` (registr `d:/steam`) | `E:\Applications main` |
+| SKLauncher ma'lumotlari | `D:\Apps\SKLauncher` | `E:\Applications main\SKLauncher` |
+| CustomMod arxivi | `D:\customizationMainFolder` | `E:\customizationMainFolder` |
+| Zaxira (67.5 GB) | `D:\E-disk-backup-20260925` | -- |
+| Pagefile | C: 4 GB + D: 16 GB | C: 16 + E: 24 (BSOD sababi) |
+
+Steam: papkani nusxalab (robocopy), keyin `D:\Steam\steam.exe` ni
+ishga tushirish yetarli -- Steam registrni o'zi tuzatadi (kutubxona
+papkasi Steam'ning o'zi ichida bo'lsa). SKLauncher: launcher `C:\Program
+Files\sklauncher` da, u faqat MA'LUMOT papkasini `%APPDATA%\.sklauncher\
+location.json` (`dataDir`) va `instances.json` (`directory`) dan oladi --
+ikkalasi `D:\Apps\SKLauncher` ga o'zgartirildi (`.bak-20260926` nusxalari
+shu yerda). Mem Reduct `C:\Program Files\Mem Reduct` da o'z nusxasi bor
+edi (E: dagisi ortiqcha edi). Antigravity IDE va Cisco Packet Tracer
+o'chirildi (kerak bo'lsa `D:\Apps` ga qayta o'rnatiladi; sozlamalari
+`C:` da).
+
+### Skriptlar yangilandi (D:\TBuild ildizi, repoda EMAS)
+
+`run-build.bat`, `run-configure.bat`, `run-prepare.bat`,
+`run-prepare-rest.bat`, `run-prepare.ps1`, `link-tuning.props`:
+`E:\VS2026` -> `D:\VS2026`, `configure` dagi
+`CMAKE_GENERATOR_INSTANCE=D:\VS2026,version=18.10.12217.157`.
+Yangi VS da ikkala toolset ham bor: `14.44.35207` va `14.51.36231`.
+`D:\TBuild\tdesktop\out\CMakeCache.txt` eski `E:` yo'llarini eslab
+qolgan -- tdesktop shu yerda qurilsa, `out` ni tozalab `configure`
+qaytadan ishlatish kerak. `out` (37.8 GB, chala 2 MB Telegram.exe) ATAYLAB
+o'chirilmadi: 2059 obj -- bir kunlik ish, va FASTLINK bilan bog'lash
+sog'lom ketgan edi.
+
+### VS qayta o'rnatish -- to'siqlar (keyingi safar uchun)
+
+1. **Product va Download cache bir-biriga kirmasin**: "The root
+   installation path cannot overlap with package cache path".
+2. **"Shared components" maydoni kulrang**, o'rnatuvchida o'zgarmaydi.
+   U registrda saqlanadi:
+   `HKLM\SOFTWARE\Microsoft\VisualStudio\Setup\SharedInstallationPath`.
+   Eski o'rnatmadan `E:` da qolgan, shuning uchun Android NDK yozishda
+   *"The request failed due to a fatal device hardware error"* bilan
+   yiqildi (1024 amaldan 1 tasi). Yechim: Android komponentlarini
+   olib tashlash (Modify). Disk almashtirilgach VS ni toza o'rnatib,
+   bu qiymatni `D:\VS-Shared` ga qo'yish (admin, regedit).
+3. `C:` ga har doim ~27.6 GB "fixed location" komponentlar tushadi
+   (Windows SDK, .NET). C: da o'rnatish oldidan kamida ~30 GB bo'sh joy
+   kerak. Buning uchun C: pagefile 16 -> 4 GB qilindi (bo'sh joy
+   24.6 -> 37.2 GB). O'rnatishdan keyin C: bo'sh joyi ~19.9 GB.
+4. **ASP.NET and web development workload KERAK** (customsync-server
+   va boshqa web loyihalar). Uni olib tashlab joy tejab bo'lmaydi.
+5. Xato logi: `%TEMP%\dd_setup_*_errors.log` (haqiqiy sabab shu yerda,
+   oynadagi "Sorry, something went wrong" hech narsa demaydi).
+   "Could not sync DCAT registration ... Access denied" -- zararsiz.
+
+### Qolgan ishlar
+
+- E: diskini fizik almashtirish (Disk 1, ST1000DM003, 92+ apparat xatosi)
+- Shundan keyin VS ni toza o'rnatish + SharedInstallationPath
+- PostgreSQL o'rnatish: o'rnatuvchi `D:\E-disk-backup-20260925\Installers\
+  postgresql-17.6-1-windows-x64.exe` da
+- RAM sinovi (`mdsched.exe`), 09-23 dagi klaster hali to'liq tushuntirilmagan
+- Eski Uninstall registri yozuvlari (Steam, WoT Blitz, Cisco, Mem Reduct,
+  Antigravity) hamon `E:` ga ishora qilishi mumkin -- zararsiz
+- Steam va Public Desktop yorliqlari (admin talab qiladi) eski `E:` yo'liga
+  ishora qilishi mumkin -- `D:\Steam\steam.exe` dan yangisini yarating
+
+---
+
+## 2026-09-27: E: diski ALMASHTIRILDI, D: da xavf belgisi topildi
+
+### Yangi E: diski
+
+Nosoz Seagate (ST1000DM003) olib tashlandi. O'rniga ishlatilgan (tanishdan
+olingan) disk qo'yildi: **TOSHIBA HDWD110 (P300, 1 TB, 7200 rpm),
+S/N `Z9G27L7FS`, 2019-12**. Endi u **Disk 1**.
+
+- **Event log'dagi "Disk 1" yozuvlari 2026-09-27 15:01 dan OLDIN = eski
+  Seagate.** Yangi disk xatolarini faqat shu vaqtdan keyin sanang.
+- Kelgan holati: MBR, bitta 140.5 GB bo'lim (tanishning eski Windows 10
+  tizim bo'limi, ~115 GB band), qolgan 791 GB ajratilmagan. Explorer
+  shuning uchun "140 GB" ko'rsatgan -- disk to'liq 931.5 GB.
+- SMART (15:26): qayta ajratilgan 0, pending 0, offline uncorrectable 0,
+  CRC 0, 6276 soat, 36 C -- **toza**.
+- Eski bo'lim o'chirildi, butun diskka bitta NTFS **E:** (931.51 GB)
+  yaratildi. Birinchi urinish tez format bo'lib qolgan (931 GB 15 daqiqada
+  -- HDD uchun imkonsiz, 0.19 GB/s dan oshmaydi), shuning uchun **to'liq
+  format** (sirt tekshiruvi) qayta boshlandi: 22:45 da, 183 MB/s,
+  23:15 da 31%. **TUGADI 00:40 (110 daqiqa), 0 ta disk/NTFS xatosi**,
+  tezlik 185 -> 101 MB/s bir tekis pasaygan (tashqi -> ichki izlar, normal),
+  to'xtab qolish yo'q. E: 931.51 GB NTFS Healthy, yozish/o'qish sinovi o'tdi.
+  SMART formatdan keyin (09-28 00:53): reallocated 0, pending 0, uncorrectable 0,
+  CRC 0, Raw_Read_Error_Rate 2 -> 0, 34 C. **Disk ishonchli -- foydalanishga tayyor.**
+  D: (WD) o'zgarmadi: pending 349 (9 soatda o'smagan), reallocated 0.
+- Harf **E:** ataylab qoldirildi: VS `SharedInstallationPath` =
+  `E:\Application's datas\Visual Studio\Program Files (x86)` (o'rnatuvchida
+  o'zgarmaydi). vswhere: `D:\VS2026` isComplete=1, isLaunchable=1. VS
+  shared komponent so'rasa -- **Repair** ularni yangi E: ga tiklaydi.
+  Eski shared papkaning nusxasi (3.53 GB, oxirgi yozuv 2026-06-29):
+  `D:\E-disk-backup-20260925\Application's datas\Visual Studio\Program Files (x86)`.
+
+### ⚠️ D: (WD10EURX, Disk 0) -- 349 ta pending sektor
+
+Xuddi shu SMART o'qishda: **`Current_Pending_Sector` = 349**,
+`ReadErrorsUncorrected` = 349, qayta ajratilgan hali 0, 37 246 soat
+(~4.3 yil to'xtovsiz). Windows event log'da Disk 0 uchun 120 kunda **0 ta**
+xato -- ya'ni hozircha o'qilayotgan fayllarga tegmagan. Lekin bu disk
+endi PC'dagi DEYARLI HAMMA ma'lumotni saqlaydi (arxiv, E: zaxirasi, VS,
+Steam).
+
+**Qaror:** yangi E: faqat qo'shimcha joy emas -- D: dagi muhim
+ma'lumotlarning **ikkinchi nusxasi** (birinchi navbatda
+`D:\customizationMainFolder`, keyin E: zaxirasining keraklari va
+GitHub'da yo'q loyihalar). Keyin: D: dagi barcha fayllarni bir marta
+to'liq o'qib, buzuq sektorga tushgan fayl bor-yo'qligini aniqlash.
+
+SMART skripti: `D:\TBuild\disk-smart-check.ps1` (repoda EMAS, faqat
+o'qiydi, **admin** kerak), natija `D:\TBuild\disk-smart-result.txt`.
+`Get-PhysicalDisk` ning "Healthy" javobiga ISHONMANG -- Seagate ham,
+349 pending'li WD ham "Healthy" deydi.
+
+### C: (SSD)
+
+- Start'dan keyin 0.3-0.4 GB bo'sh qolgan edi (sababi aniqlanmadi:
+  dump, Windows Update, katta temp topilmadi).
+- Eng katta yangi iste'molchi: Claude Desktop ilovasining Cowork VM
+  to'plami, **9.61 GB**
+  (`%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\vm_bundles`,
+  2026-09-27 12:48-12:55 da yaratilgan). `AppData\Roaming\Claude` dagi
+  "ikkinchi nusxa" -- MSIX virtualizatsiyasi, haqiqiy fayl BITTA
+  (konteynerdan tashqaridagi WMI jarayoni bilan tekshirildi). Qo'lda
+  o'chirilmaydi -- ilova o'zi boshqaradi. BIOS'da VT-x o'chiq ("Hypervisor
+  launch failed; VMX not present or not enabled in BIOS").
+- `powercfg /h off` qilindi: `hiberfil.sys` (6.38 GB) va Fast Startup
+  o'chdi. C: bo'sh joyi 3.1 -> ~16 GB.
+- Pagefile o'zgarmadi: C: 4 GB + D: 16 GB.
+
+### Qolgan ishlar (yangilangan)
+
+- [x] To'liq format tugashi -> event log + SMART qayta -- toza (09-28 00:53)
+- [x] D: to'liq o'qish sinovi + `cipher` + SMART -- D: sog'lom (09-30, pastda)
+- [x] Arxiv E: ga qaytarildi (`E:\customizationMainFolder`, 09-29)
+- [x] PostgreSQL 17.6 O'RNATILDI (customsync-server testlari 190/190)
+- [ ] RAM sinovi -- pastdagi "Holat 2026-09-30" ro'yxatiga qarang
+- Eski Uninstall yozuvlari (Steam, WoT Blitz -> `E:\Applications main`)
+  va yorliqlar -- zararsiz, admin bilan keyin
+
+
+### 2026-09-29/30: D: tekshiruvi -- YUMSHOQ xato edi, disk sog'lom
+
+1. **Arxiv E: ga qaytdi** (ilovaning o'z vositasi bilan): `E:\customizationMainFolder`
+   (reestr `E:/customizationMainFolder`). Papka tanlashda `E:\` ildizi tanlanib
+   qolgani qo'lda tuzatildi -- nuqson A23 (`NEXT_TASKS.md`). Defender 2 ta
+   `Adobe Photoshop 2024.exe` (HackTool:Win32/Crack, 2x2.83 GB) ni karantinga
+   olgan -- ko'chirishda yo'qolgan narsa emas.
+2. **D: dagi barcha fayllar o'qildi** (`D:\TBuild\d-read-test.py`, log
+   `E:\Backup\d-read-test.log`): 606 062 fayl, 259.5 GB, 275 daqiqa --
+   **buzuq sektorga tushgan fayl YO'Q** (29 ta faqat MAX_PATH uzun yo'l).
+3. **`cipher /w:D:\`** (bo'sh joyni 3 marta qayta yozish, 01:37-07:24, 346 daq,
+   kod 0). 02:10 da 1 ta `disk` 153 (LBA 0x5ef9c8, qayta urinishda o'tdi) +
+   4 ta `storahci` 129 (reset) -- disk sektorni ichkarida tuzatayotgan payt.
+4. **SMART (09-30 07:47):** `Current_Pending_Sector` **349 -> 0**,
+   `Reallocated_Sector_Ct` **0 -> 0**, ReadErrorsUncorrected 349 -> 0.
+
+**Xulosa:** 349 sektor chala yozilgan (BSOD/qotish/to'g'ri o'chirilmaslik),
+yuza sog'lom -- birorta sektor almashtirilmadi. D: ishlatishda davom etadi.
+Disk eski (37 267 soat) -- oyiga bir marta `disk-smart-check.ps1`.
+
+### Holat 2026-09-30: disk ishlari YOPILDI, qolgan ishlar
+
+Disklar: C: (SSD) toza, D: (WD, 37k soat) sog'lom -- pending 0, E: (Toshiba,
+yangi) toza. Pagefile C: 4 GB + D: 16 GB, gibernatsiya o'chiq.
+
+- [x] **D: -> E: ko'chirish BAJARILDI 09-30** (skript OK, ortiqchalar faqat
+      eski Steam paketlari; foydalanuvchi D: dagi eskilarni o'chirdi).
+      **VS D: da QOLADI** (`D:\VS2026`, kesh `D:\DVS2026-cache`) -- ko'chirish
+      resursga arzimaydi, PC'da og'ir build yo'q. Reestrdagi
+      `SharedInstallationPath` = `E:\Application's datas\Visual Studio\Program
+      Files (x86)` (o'zgartirib bo'lmaydi) papkasi YO'Q edi -> Installer'da
+      **Repair** (foydalanuvchi). Oldingi reja: **E: = ilovalar, D: =
+      fayllar/loyihalar** (loyihalar KO'CHIRILMAYDI). Skript
+      `D:\TBuild\d-to-e-move-back.ps1` (faqat nusxalaydi): 09-25 zaxirasi asl
+      joyiga (`Applications main`, `Application's datas` VS'siz va h.k.;
+      `This PC` -- fayllar, D: da qoladi), ustiga
+      D: dagi jonli Steam/SKLauncher/Cisco. Keyin `E:\Applications main\steam.exe`
+      bir marta ishga tushiriladi. Eski yozuv:
+      Sabab: E: 7200 rpm va yoshroq. Ro'yxat: `D:\Steam`, `D:\Apps\SKLauncher`
+      (`location.json`/`instances.json` yangilanadi), `D:\E-disk-backup-20260925`
+      ichidagi `This PC`, `Installers`, `Applications other datas`. VS --
+      faqat qayta o'rnatish bilan (`SharedInstallationPath` allaqachon E: da).
+- [ ] **RAM sinovi** -- avval `mdsched.exe` Standard (~20-40 daq, Windows'dan
+      TASHQARIDA, sinov paytida kompyuter band). Xato topsa -> RAM aybdor;
+      toza chiqsa va BSOD takrorlansa -> MemTest86 (4 o'tish). Natija event
+      log'da: `MemoryDiagnostics-Results`.
+- [ ] **Qo'lda o'chirish (foydalanuvchi):** `E:\Backup\customizationMainFolder`
+      (13.7 GB, 09-29 nusxasi -- endi ortiqcha, ichida Defender bloklagan crack),
+      bo'sh `D:\EFSTMPWP`, `E:\__rw_test.tmp`.
+- [ ] **Oyiga bir marta SMART:** `D:\TBuild\disk-smart-check.ps1` (admin).
+- [ ] Eski Uninstall yozuvlari va yorliqlar (`E:\Applications main`) -- zararsiz.
+
+Yordamchi skriptlar (repoda EMAS, `D:\TBuild`): `disk-smart-check.ps1`
+(SMART, admin), `d-read-test.py` (hamma fayllarni o'qish),
+`after-read-run-cipher.ps1` (o'qish tugagach `cipher /w`),
+`copy-archive-to-e.ps1` (arxiv nusxasi + SQLite backup + xesh). Loglar:
+`E:\Backup\*.log`.

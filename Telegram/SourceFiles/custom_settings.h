@@ -3,6 +3,7 @@
 #include <QtCore/QJsonObject>
 #include <QtCore/QString>
 #include <QtCore/QVector>
+#include <optional>
 
 namespace CustomSettings {
 
@@ -178,6 +179,17 @@ void ClearAllPerPeerOverrides();
 // MoveArchiveRoot() orqali qiladi). Bo'sh qiymat standartga qaytaradi.
 void SetArchiveRoot(const QString &path);
 
+// A23: foydalanuvchi tanlagan papkani arxiv ildiziga aylantiradi. Disk
+// ildizi (masalan E:\) tanlansa ichiga "customizationMainFolder"
+// qo'shiladi -- aks holda arxiv papkalari diskning o'ziga tushib qoladi.
+[[nodiscard]] QString NormalizeArchiveRootChoice(const QString &path);
+
+// path parent'ning o'zi yoki uning ichidami (Windows'da katta-kichik harf
+// farqsiz). Arxivni o'z ichiga ko'chirishni to'sish uchun.
+[[nodiscard]] bool IsSameOrInsidePath(
+    const QString &path,
+    const QString &parent);
+
 // Ildiz o'zgartirilganda mavjud ma'lumotlarni ko'chirishni belgilaydi.
 // Ko'chirishning O'ZI keyingi ishga tushishda, baza OCHILMASDAN OLDIN
 // bajariladi (EnsureArchiveLayout) — ilova ishlayotganda SQLite fayli
@@ -328,5 +340,24 @@ void RemoveFromActivityExclude(const QString &peerId);
 // bog'liq emas, boshqa CustomSettings funksiyalari kabi faqat QString bilan
 // ishlaydi).
 [[nodiscard]] bool ShouldTrackActivity(const QString &peerId, bool isContact);
+
+// ── Scope Sync (2026-09-27) ──────────────────────────────────────────────
+// Scope sozlamalarini boshqa qurilmalar va VPS capture xizmatiga sync
+// qilish uchun yordamchilar. Spec §3.2.1.
+[[nodiscard]] std::optional<QString> GetScopeSettingValue(const QString &key);
+void EnqueueScopeSetting(const QString &key, qint64 accountId = 0);
+void SyncAllScopeSettings(qint64 accountId = 0);
+void ApplyScopeSetting(const QString &key, const QString &value);
+
+// A24: kiruvchi setting yozuvini faqat u shu kalitning oxirgi ma'lum
+// versiyasidan yangiroq bo'lsa qo'llaydi -- (occurred_at, record_id)
+// bo'yicha, spec §3.2.1a. Qo'llangan bo'lsa true.
+bool ApplyRemoteScopeSetting(
+    const QString &key,
+    const QString &value,
+    qint64 occurredAt,
+    const QString &recordId);
+void SetActiveAccountId(qint64 accountId);
+[[nodiscard]] qint64 ActiveAccountId();
 
 } // namespace CustomSettings

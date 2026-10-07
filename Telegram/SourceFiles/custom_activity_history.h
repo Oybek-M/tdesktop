@@ -27,6 +27,11 @@ void Init(not_null<Main::Session*> session);
 // "recently" / "within_week" / "within_month" / "long_ago" / "empty".
 [[nodiscard]] QString EncodeStatus(const Data::LastseenStatus &status, int32 now);
 
+// A25: "online:<T>" dagi T kuzatilgan vaqtdan shuncha soniya yoki kamroq
+// keyin bo'lsa, bu aslida chiqib ketish (server/lokal soat farqi) --
+// offline deb hisoblanadi. Eski yozuvlarni ko'rsatishda ham ishlatiladi.
+inline constexpr auto kOfflineSkewSeconds = 5;
+
 // EncodeStatus() natijasini inson o'qiy oladigan matnga aylantiradi.
 // History Viewer Box (custom_activity_history_box.cpp, later task) shu
 // funksiyani ishlatadi.

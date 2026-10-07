@@ -206,6 +206,21 @@ Session::Session(
 	// Sync orkestrator: Start() idempotent — statik gOrchestrator tekshiruvi
 	// tufayli nechta Session yaratilishidan qat'i nazar faqat BITTA nusxa
 	// ishlaydi. SyncEnabled() false bo'lsa timer qurilmaydi (K5).
+	// A24: sozlama yozuvlari EKRANDAGI akkaunt nomidan ketadi. Oldin bu
+	// yerda to'g'ridan-to'g'ri o'rnatilardi -- ya'ni oxirgi YARATILGAN
+	// sessiya bo'lardi. Har sessiya obuna bo'ladi, hammasi bir xil qiymat
+	// yozadi; obuna sessiya bilan birga tugaydi.
+	Core::App().domain().activeValue(
+	) | rpl::map([](Main::Account *account) {
+		return account ? account->sessionValue() : rpl::never<Session*>();
+	}) | rpl::flatten_latest(
+	) | rpl::on_next([](Main::Session *session) {
+		if (session) {
+			CustomSettings::SetActiveAccountId(
+				qint64(session->userId().bare));
+		}
+	}, _lifetime);
+	CustomSettings::SyncAllScopeSettings(qint64(_userId.bare));
 	CustomSync::Start();
 	// A13/K1b: arxivdan tiklanadigan chatlarni chat ro'yxatiga qaytarish.
 	// Konstruktorda EMAS, balki chat ro'yxati serverdan yuklangach —

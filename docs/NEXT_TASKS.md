@@ -1,6 +1,40 @@
 # CustomMod — Keyingi Tasklar Ro'yxati
 
-**Oxirgi yangilanish:** 2026-09-26 (T46 + T47 tugallandi; A22 ochiq)
+**Oxirgi yangilanish:** 2026-09-27 (sync scope/edit_date kodi build kutmoqda; upstream v7.2.9 chiqqan; A22 ochiq)
+
+---
+
+## 🟡 2026-09-27 holati — keyingi sessiya shu yerdan boshlaydi
+
+**Upstream:** rasmiy `telegramdesktop/tdesktop` da **v7.2.8 va v7.2.9**
+chiqqan, bizda **7.2.7** (oxirgi merge `9b081b2a43`, 2026-09-10).
+Repo'da `upstream` remote YO'Q — tekshirish faqat o'qiydi:
+`git ls-remote --tags --refs https://github.com/telegramdesktop/tdesktop.git 'v7.*'`
+
+**Build QILINMAGAN kod (09-27, push qilingan):**
+
+| Commit | Nima |
+|---|---|
+| `a6f0874e77` | docs(sync): `edited` uchun `edit_date`, scope setting kalitlari protokoli |
+| `d4cc460156` | `edited` xabarlar `edit_date` bilan yoziladi, fon tahrir nomuvofiqligi tuzatildi |
+| `7b6079f81d` | scope sozlamalari (WL/BL, AntiDelete/AntiEdit) outbox'ga chiqadi va qabul qilinadi |
+| `a06ed12373` | docs(sync): activity `msg_id = DiscriminatorFor(field)`, `status` kodlashi (§3.2.2, `userStatusEmpty -> long_ago`), test vektorlari |
+| `a119ef83cb` | activity kuzatuv sozlamalari (`scope.activity_*`) outbox'ga chiqadi va qabul qilinadi |
+
+**Tartib (kelishilgan):** laptopdagi ish tugab push qilinguncha PC'da
+tdesktop kodiga tegilmaydi -> **upstream v7.2.8+v7.2.9 merge** -> laptop
+build (yuqoridagi commitlar ham shunga kiradi) -> sinov -> A22 -> A21 ->
+A7 reliz (avval VPS mirrorlari).
+
+**PC holati (09-30):** disk ishlari YOPILDI. E: yangi Toshiba (toza), D:
+pending 349 -> 0 (yumshoq xato, sog'lom), arxiv `E:\customizationMainFolder`.
+Qolgan (tdesktop'ga bog'liq emas): RAM sinovi, D: -> E: ko'chirish
+(foydalanuvchi aytganda). Batafsil: `PC-SETUP-STATE.md` §2026-09-30.
+
+**Asosiy ish tartibi:** upstream v7.2.8+v7.2.9+v7.2.10 merge -> laptop
+build -> sinov -> A22 -> A21 -> A7 reliz. **A23 va A24 kodi 09-30 da
+PC'da yozildi** (build qilinmagan) — o'sha build'ga kiradi, sinovi
+ularning bo'limida.
 
 ---
 
@@ -77,6 +111,126 @@
 ### ~~NEXT-9: Per-Chat "Barchasini tozalash"~~ ✅ T43 da tugadi
 
 ### ~~NEXT-10: Background AntiDelete — msgDate==0 fallback~~ ✅ T44 da tugadi
+
+---
+
+## 🔴 A25 — Faollik tarixi: startdagi holat yozilmaydi va 3 ta nuqson (2026-10-06)
+
+**Holat:** 🟡 KOD TAYYOR 2026-10-06 (PC'da, BUILD QILINMAGAN). Tekshirildi
+(haqiqiy DB, kontakt `8720525440`). Qilingani: (1) `ScheduleStartupStatusCatchUp`
+-- kesh tayyor bo'lgach (10 s so'rov, ~5 daq gacha) kuzatiladigan hamma
+foydalanuvchining joriy statusi bir marta; (2) sarlavha faqat
+`observed/snapshot` statusdan, lahza alohida "Undan keyingi faollik belgisi"
+qatorida, muddati o'tgan online -> "online edi"; (3) `EncodeStatus` da
+`kOfflineSkewSeconds = 5`, eski yozuvlar ham shu qoida bilan; qo'shimcha:
+online muddati yangilanishi seans DAVOMI deb olinadi (offline kelmasa seans
+o'z muddati bilan yopiladi) -- Python simulyatsiyasida 22.09: 65 yozuv -> 32
+haqiqiy seans, soxta lahza 0; (4) davrlar yangisi tepada.
+**Sinov (build'dan keyin):** kontakt offline bo'lgandan keyin ilovani ochish
+-> ~2 daqiqada bazada `offline:<vaqt>` paydo bo'ladi, sarlavha Telegram'dagi
+last-seen bilan mos; 22.09 ro'yxati qisqa ulanish guruhlari bo'lib chiqadi.
+Startdagi yozuvlar asosiy oqimda -- startdagi qotish (09-12) qaytmaganini
+log'da tekshirish. Foydalanuvchi skrinshoti: oyna "hozir online (19:22 gacha)"
+deydi, Telegram esa "last seen 21:17".
+
+1. **Startdagi holat yo'qoladi (asosiy).** Ilova 21:18:32 da ochilgan,
+   kontakt 21:17 da offline bo'lgan. Holat serverdan start paytida keladi,
+   lekin `RecordField` kesh tayyor bo'lmaguncha (start+~90 s) jimgina
+   qaytadi va keyin hech kim qayta yozmaydi (story uchun retry bor, status
+   uchun yo'q). Natija: ilova yopiq bo'lgan vaqtdagi oxirgi holat HECH
+   QACHON bazaga tushmaydi. Tuzatish: kesh tayyor bo'lgach kuzatiladigan
+   barcha kontaktlar uchun bir marta `RecordCurrentState` (mavjud funksiya).
+2. **Story/rasm nuqtasi "joriy holat" bo'lib qoladi.** Story 19:22 da
+   `status = online:<story vaqti>` sifatida yozilgan va eng oxirgi status
+   bo'lgani uchun sarlavha "hozir online" deydi. `DecodeStatusLabel`
+   sarlavhada manba `story/photo/read/manual` bo'lsa "hozir online" emas,
+   "📖 HH:mm da hikoya qo'ygan" deyishi kerak.
+3. **"online:<hozir+1>" aslida offline.** Kontakt chiqib ketganda
+   `was_online` server/lokal soat farqi tufayli `now` dan 1 s katta keladi,
+   `EncodeStatus` uni `online:` deb yozadi (22.09 dagi barcha "aniq lahza"
+   qatorlari shu: 09:05:32 online(+5 daq) -> 09:05:40 online:09:05:41).
+   Tuzatish: `EncodeStatus` da `onlineTill - now <= 30` -> `offline:`;
+   eski ma'lumot uchun `ReconstructOnlinePeriods` ham shu qoidani qo'llasin
+   (davr 09:05:32-09:05:41 bo'lib chiqadi, "lahza" emas).
+4. **Ro'yxat eskisidan boshlanadi.** Oxirgi 300 yozuv olinadi, lekin
+   davrlar eskidan yangiga chiqadi -- foydalanuvchi tepada 22.09 ni ko'radi,
+   bugungisini pastda qidiradi. Teskari tartib kerak.
+
+**Muhim kontekst:** VPS Capture (customsync-server Plan 05, statuslarni 24/7
+yozadi) kodi tayyor, lekin **deploy to'xtatilgan** (VPS buzilgan, audit
+ketmoqda); lokal `sync_state` bo'sh -- ya'ni hozir ilova yopiq paytdagi
+bo'shliqni to'ldiradigan hech narsa ishlamayapti. 02-03.10 dagi deyarli
+nol yozuv ham ehtimol shu (ilova yopiq bo'lgan -- tasdiqlanmagan).
+
+---
+
+## 🔴 A24 — Scope `setting` qo'llanishidagi ikki kamchilik (2026-09-29)
+
+**Holat:** 🟡 KOD TAYYOR 2026-09-30 (PC'da, BUILD QILINMAGAN). Spec
+§3.2.1a va CHANGELOG 2026-09-30. Yo'l-yo'lakay 3-kamchilik topildi va
+tuzatildi: startdagi qayta yuborish `occurred_at = hozir` bilan ketardi,
+ya'ni eskirgan qurilma ishga tushishi bilan yangiroq o'zgarishni bosib
+ketardi. Endi `occurred_at` = kalit versiyasi (`sync_state`
+`setting_ver.<key>`), versiya faqat qiymat xeshi o'zgarganda oshadi.
+1-qism -> `ApplyRemoteScopeSetting`; 2-qism -> `main_session.cpp` da
+`domain().activeValue()` obunasi.
+
+**Sinov (build'dan keyin, 2 qurilma):** A'da WL o'zgartirish -> B pull
+qiladi -> B qayta ishga tushadi -> A'da WL B'nikiga QAYTMASLIGI kerak;
+log'da eski yozuv uchun `stale_setting`. Ko'p akkauntda akkaunt
+almashtirib sozlama o'zgartirish -> outbox `account_id` = ekrandagi.
+
+Asl tavsif:
+
+1. **`ApplyScopeSetting` `occurred_at` ni solishtirmaydi** (`custom_sync_client.cpp`,
+   `Kind::Setting` shoxobchasi) — pull tartibida oxirgisi g'olib, eskirgan qiymat
+   yangisini bosishi mumkin. Tuzatish: har `key` uchun oxirgi qo'llangan
+   `occurred_at` (va teng bo'lsa `record_id`) ni saqlash (`sync_state` yoki alohida
+   jadval), kichigini tashlab yuborish. Lokal o'zgarish ham shu vaqtni yangilasin.
+2. **`gActiveAccountId` = oxirgi yaratilgan sessiya** (`main_session.cpp:203`),
+   ekrandagi akkaunt emas. Global semantika tufayli ma'lumot yo'qolmaydi, lekin
+   `account_id` ma'nosiz. Tuzatish: aktiv akkaunt o'zgarishiga obuna bo'lish
+   (`Core::App().domain().activeChanges()`) yoki sozlama yozuvini hamma kirgan
+   akkauntlar uchun yuborish.
+
+---
+
+## 🔴 A23 — Arxiv papkasi sifatida disk ildizini tanlashga ruxsat bor (2026-09-29)
+
+**Holat:** 🟡 KOD TAYYOR 2026-09-30 (PC'da, BUILD QILINMAGAN) — laptop
+build + sinov kerak. Nima qilindi:
+- `NormalizeArchiveRootChoice()`: disk ildizi tanlansa
+  `<ildiz>/customizationMainFolder` ga aylanadi.
+- `IsSameOrInsidePath()`: joriy arxivning o'zi yoki ichidagi papka
+  tanlansa toast bilan rad etiladi (aks holda `MoveTree` cheksiz rekursiya).
+- `EnsureArchiveLayout`: ko'chirish faqat `medias`, `db`, `config`,
+  `backups`, `bombmedia` bilan cheklandi, keyin eski ildiz bo'sh bo'lsa
+  o'chiriladi (`rmdir`, faqat bo'sh papka).
+
+**Sinov (build'dan keyin):** 1) `E:\` tanlash -> dialogda
+`E:/customizationMainFolder` ko'rinadi; 2) joriy arxiv ichidagi papkani
+tanlash -> rad etiladi; 3) oddiy ko'chirish -> 5 papka o'tadi, eski papka
+yo'qoladi; 4) begona fayli bor papkadan ko'chirish -> begona fayl joyida
+qoladi.
+
+2026-09-29 da PC'da arxiv "📁 Papkani o'zgartirish" orqali ko'chirilganda
+foydalanuvchi papka o'rniga `E:\` ni tanladi -> `archiveRootPath = E:/`,
+arxiv (`medias`, `db`, ...) disk ildiziga tushdi. Ko'chirishning o'zi
+to'g'ri o'tdi, lekin:
+
+- `MoveTree(from, to)` (`custom_settings.cpp`) manba papkadagi **HAMMA**
+  narsani ko'chiradi. Ildiz arxiv bo'lsa, keyingi "Ko'chirish" butun
+  diskni (boshqa papkalar, `System Volume Information`, `$RECYCLE.BIN`)
+  yangi papkaga sudraydi.
+
+**Tuzatish:** `custom_tab_storage.cpp` dagi tanlovdan keyin
+`QDir(chosen).isRoot()` bo'lsa rad etish yoki avtomatik
+`<chosen>/customizationMainFolder` ga aylantirish; `MoveTree` ga faqat
+ma'lum arxiv papkalarini (`medias`, `db`, `config`, `backups`,
+`bombmedia`) ko'chirish cheklovi.
+
+PC'da qo'lda tuzatildi: papkalar `E:\customizationMainFolder` ga
+ko'chirildi, reestr `E:/customizationMainFolder`.
 
 ---
 

@@ -530,11 +530,12 @@ almashuv fayli, PostgreSQL qatori. Ikkita alohida kod yo'li yozilmaydi.
 ### 3.1 `record_id` — deterministik dedup
 
 ```
-record_id = hex( SHA256( kind ‖ 0x00 ‖ peer_hash ‖ 0x00 ‖
+record_id = hex( SHA256( kind ‖ 0x00 ‖ account_hash ‖ 0x00 ‖ peer_hash ‖ 0x00 ‖
                          msg_id_decimal ‖ 0x00 ‖ occurred_at_decimal ) )
 ```
 
 `‖` — konkatenatsiya, `0x00` — ajratuvchi bayt (ambiguity oldini oladi).
+`account_hash` — spec §0.12 (kind='activity' uchun `""`, boshqa barcha kind'lar uchun `HMAC-SHA256(account_key, account_id)[0:16]`).
 
 `msg_id` tabiiy ravishda mavjud bo'lmagan kind'lar uchun uning o'rniga
 **diskriminator** ishlatiladi (aks holda bitta peer uchun bir soniyada
@@ -548,6 +549,16 @@ yo'qolardi):
 | `setting` | `SHA256(setting_key)` ning birinchi 8 bayti |
 | `peer_directory` | `0` (bitta peer uchun bitta yozuv, `occurred_at` ajratadi) |
 
+**`occurred_at` semantikasi (2026-09-27 yangilanishi):**
+- `deleted`: xabarning asl yuborilgan sanasi (`msg_date`).
+- `edited`: shu tahrirning **Telegram `edit_date`** sanasi (agar mavjud bo'lmasa, `observed_at` / `msg_date` zaxirasi).
+  *Nima uchun:* ilgari `msg_date` ishlatilgan, oqibatda bir xabarning barcha tahrirlari bir xil `record_id` olib, lokal outbox'da faqat oxirgisi (`INSERT OR REPLACE`), serverda esa faqat birinchi kuzatilgani (dedup) saqlanardi. Oraliq versiyalarni saqlash uchun Telegram serveri belgilagan `edit_date` ishlatiladi — har tahrir o'z `record_id` sini oladi, ikki qurilma bir tahrirni ko'rganda esa bir xil `edit_date` tufayli dedup xossasi saqlanadi.
+- `activity`: kuzatilgan vaqt (`observed_at`).
+- `ghost_read`: o'qilgan vaqt.
+- `setting`: sozlama o'zgartirilgan vaqt (timestamp).
+- `peer_directory`: katalog yangilangan vaqt.
+- `media_index`: arxivlangan vaqt (`archived_at`).
+
 **Xossasi:** ikki xil qurilma bir xil hodisani ko'rsa — bir xil `record_id`
 hosil qiladi. Dedup hech qanday muvofiqlashtirishsiz ishlaydi. Server uni
 PRIMARY KEY sifatida ishlatadi, shuning uchun push **idempotent** — qayta
@@ -557,20 +568,164 @@ yuborish xavfsiz.
 
 Payload — shifrlanishdan oldingi JSON obyekti.
 
-| kind | msg_id | Payload (shifrlanadi) |
+| kind | msg_id | occurred_at | Payload (shifrlanadi) |
+|---|---|---|---|
+| `deleted` | xabar id | xabar sanasi (`msg_date`) | `{text, sender_id, is_out, is_media}` |
+| `edited` | xabar id | Telegram tahrir sanasi (`edit_date`) | `{old_text, new_text, is_out}` |
+| `activity` | `DiscriminatorFor(field)` | kuzatilgan vaqt (`observed_at`) | `{field, old_value, has_old_value, new_value}` |
+| `ghost_read` | o'qilgan max id | o'qilgan vaqt | `{}` (metadata yetarli) |
+| `setting` | `DiscriminatorFor(setting_key)` | o'zgarish vaqti | `{key, value}` |
+| `peer_directory` | 0 | katalog yangilanish vaqti | `{entries: [{peer_hash, name, username, type}]}` |
+| `media_index` | xabar id (manfiy bo'lishi mumkin) | arxivlangan vaqt | 0.4 ga qarang |
+| `tombstone` | `DiscriminatorFor(target_record_id)` | o'chirish vaqti | `{target_record_id}` |
+
+**`DiscriminatorFor(text)`** (`custom_sync_record.cpp`): `SHA256(UTF-8(text))`
+ning birinchi 8 bayti **big-endian** int64 sifatida, so'ng **eng yuqori bit
+tozalanadi** (`& 0x7FFFFFFFFFFFFFFF`), natija doim `>= 0`. Niqobni unutish
+oson xato: masalan `DiscriminatorFor("name")` ning birinchi bayti `0x82`,
+niqobsiz manfiy son chiqadi va `record_id` farq qiladi. Test vektorlari:
+`test-vectors.json` -> `discriminator` bo'limi.
+
+> [!IMPORTANT]
+> `activity` uchun `msg_id` bu jadvalda 2026-09-27 gacha `0` deb yozilgan
+> edi — bu XATO edi, kod doim `DiscriminatorFor(field)` ishlatgan
+> (`custom_db.cpp`, `Outbox::Enqueue(Kind::Activity, ...)`).
+> Sabab: bitta peer uchun bir soniyada ikki turli field (masalan `name` va
+> `status`) o'zgarsa, `msg_id = 0` bilan ikkala hodisa bir xil `record_id`
+> oladi va biri yo'qoladi. Capture tomoni (`ActivityMapper.cs`) ham shu
+> formulani ishlatadi. Vektorlar: `record_id` bo'limidagi activity holatlari
+> endi discriminator bilan, to'qnashuv juftligi (`status` / `name`, bitta
+> soniya) ham qo'shildi.
+
+#### 3.2.2 `activity` qiymatlari: `field = "status"` kodlashi
+
+Birlashish (§0.12, activity `account_hash` bo'sh) faqat **barcha manbalar
+bir xil satr yozganda** ishlaydi. Kanonik manba: tdesktop
+`CustomActivityHistory::EncodeStatus()` (`custom_activity_history.cpp`).
+MTProto / TDLib holatlari quyidagicha kodlanadi:
+
+| MTProto (tdesktop) | TDLib (capture) | Kodlangan qiymat |
 |---|---|---|
-| `deleted` | xabar id | `{text, sender_id, is_out, is_media}` |
-| `edited` | xabar id | `{old_text, new_text, is_out}` |
-| `activity` | 0 | `{field, old_value, has_old_value, new_value}` |
-| `ghost_read` | o'qilgan max id | `{}` (metadata yetarli) |
-| `setting` | 0 | `{key, value}` |
-| `peer_directory` | 0 | `{entries: [{peer_hash, name, username, type}]}` |
-| `media_index` | xabar id (manfiy bo'lishi mumkin) | 0.4 ga qarang |
-| `tombstone` | `SHA256(target_record_id)[0:8]` | `{target_record_id}` |
+| `userStatusOnline{expires}`, `expires > now` | `userStatusOnline{expires}` | `online:<expires>` |
+| `userStatusOnline{expires}`, `expires <= now` | — | `offline:<expires>` |
+| `userStatusOffline{was_online}` | `userStatusOffline{was_online}` | `offline:<was_online>` |
+| `userStatusRecently` | `userStatusRecently` | `recently` |
+| `userStatusLastWeek` | `userStatusLastWeek` | `within_week` |
+| `userStatusLastMonth` | `userStatusLastMonth` | `within_month` |
+| **`userStatusEmpty`** | **`userStatusEmpty`** | **`long_ago`** (`empty` EMAS) |
+| vaqt `< 1375315204` (0 ham) bo'lgan online/offline | shu qoida | `long_ago` |
+
+- `empty` qiymatini `EncodeStatus()` amalda HECH QACHON qaytarmaydi:
+  `LastseenStatus::OnlineTill(t)` `t < kLifeStartDate + 4` (`1375315204`,
+  2013-08-01) bo'lsa `LongAgo()` qaytaradi, standart `LastseenStatus()`
+  ham `long_ago` hisoblanadi. `empty` faqat himoya uchun qolgan zaxira —
+  capture uni ishlatmasligi kerak; noma'lum TDLib holati uchun ham
+  `long_ago` yozilsin.
+
+- tdesktop `userStatusEmpty` ni `LastseenFromMTP()` da `LastseenStatus::LongAgo()`
+  ga aylantiradi, `EncodeStatus()` esa uni `long_ago` deb yozadi. Shuning
+  uchun capture ham `userStatusEmpty` -> `long_ago` yozishi SHART, aks holda
+  bir xil hodisa ikki xil `new_value` bilan keladi.
+- `online:` / `offline:` dagi son — Unix vaqti (soniya), o'nlik satr.
+- `recently` holatida tdesktop foydalanuvchi hozir lokal "online" deb
+  hisoblansa, `online:<till>` yozishi mumkin (`isLocalOnlineValue`) — bu
+  faqat klientning o'z taxmini, capture'da bunday holat yo'q.
+- Qo'shimcha manba: story/rasm signali ham `online:<vaqt>` yozadi
+  (`custom_activity_history.cpp`, `photo` belgisi bilan).
 
 Bu jadvalga qo'shimcha: **§0.14** bo'yicha HAR payload yana ikkita
 majburiy maydon oladi — `account_id` va `peer_id` (o'nlik satrlar).
 Ularsiz qabul qiluvchi yozuvni qaysi lokal chatga yozishni bilolmaydi.
+Global sozlamalar uchun `peer_id` odatda `"0"` bo'ladi.
+
+### 3.2.1 Scope sozlamalari (`setting` kind kalitlari va qiymat formati)
+
+Qurilmalar (tdesktop) va VPS capture xizmati (`CustomSync.Capture`) o'rtasida
+qamrov (scope) qoidalarini uzatish uchun quyidagi kanonik kalitlar va qiymatlar
+ishlatiladi. `value` maydoni doimiy ravishda satr (string) shaklida uzatiladi:
+
+**Bu sozlamalar tdesktop'da GLOBAL (akkauntga bog'liq emas) va har startda har bir kirgan akkaunt nomidan qayta yuboriladi — qabul qilish qoidasi §3.2.1a da.**
+
+**Xabar scope sozlamalari** (AntiDelete / AntiEdit / WL / BL):
+
+| Kalit | Qiymat formati | Tavsif va namuna |
+|---|---|---|
+| `scope.whitelist` | JSON satrlar massivi | Oq ro'yxatdagi peer ID lar: `["7053823996", "562952781246744"]` |
+| `scope.blacklist` | JSON satrlar massivi | Qora ro'yxatdagi peer ID lar: `["12345678"]` |
+| `scope.wl_categories` | JSON obyekt | Oq ro'yxat kategoriyalari: `{"user": true, "group": false, "channel": false}` |
+| `scope.bl_categories` | JSON obyekt | Qora ro'yxat kategoriyalari: `{"user": false, "group": false, "channel": true}` |
+| `scope.antidelete_global` | Satr (`"true"` / `"false"`) | Global AntiDelete bayrog'i |
+| `scope.antiedit_global` | Satr (`"true"` / `"false"`) | Global AntiEdit bayrog'i |
+| `scope.antidelete_per_peer` | JSON obyekt | Chat bo'yicha AntiDelete override: `{"7053823996": true, "12345678": false}` |
+| `scope.antiedit_per_peer` | JSON obyekt | Chat bo'yicha AntiEdit override: `{"7053823996": true}` |
+
+**Activity tracking scope sozlamalari** (faollik tarixi kuzatuvi):
+
+> [!NOTE]
+> Bu uch kalit 2026-09-27 da tdesktop'da amalga oshirildi (`custom_settings.cpp`):
+> `EnqueueScopeSetting` / `ApplyScopeSetting` / `GetScopeSettingValue` / `SyncAllScopeSettings`
+> xabar scope sozlamalari bilan bir xil tarzda to'liq qo'llab-quvvatlaydi.
+> Include/Exclude ro'yxatlari o'zgarganda yoki `activityHistoryTrackAllContacts` o'zgarganda
+> avtomatik ravishda outbox'ga enqueue qilinadi.
+> Standart qiymatlar: `activity_track_all_contacts = true`, ro'yxatlar bo'sh.
+> Ustuvorlik: Exclude > Include > (track_all && kontakt).
+
+| Kalit | Qiymat formati | Tavsif va namuna |
+|---|---|---|
+| `scope.activity_track_all_contacts` | Satr (`"true"` / `"false"`) | Global: barcha kontaktlarni kuzatish (tdesktop: `activityHistoryTrackAllContacts`) |
+| `scope.activity_include` | JSON satrlar massivi | Kuzatish ro'yxati (Include): `["7053823996"]` |
+| `scope.activity_exclude` | JSON satrlar massivi | Istisno ro'yxati (Exclude): `["12345678"]` |
+
+#### 3.2.1a `setting` yozuvlarining akkaunt semantikasi (2026-09-29, kodga moslab)
+
+**Scope sozlamalari tdesktop'da GLOBAL** — akkauntga bog'liq emas: bitta
+jarayonda bitta `gValues` + `peer_lists.json`, hamma kirgan akkauntlar bir
+xil WL/BL, AntiDelete/AntiEdit va `activity_*` qiymatlarini ishlatadi.
+Ro'yxatlardagi peer ID lar bir nechta akkauntga tegishli bo'lishi mumkin.
+
+Yozuv tuzilishi (`EnqueueScopeSetting`, `custom_settings.cpp`):
+
+| Maydon | Qiymat |
+|---|---|
+| `kind` | `setting` |
+| `account_hash` | **haqiqiy** akkaunt hash (activity'dagidek bo'sh EMAS) |
+| `peer_hash` | `peer_hash("0")` |
+| `msg_id` | `DiscriminatorFor(key)` |
+| `occurred_at` | shu `key` qiymatining **versiyasi** — oxirgi lokal o'zgarish vaqti (yoki qo'llangan kiruvchi yozuvniki); hech o'zgartirilmagan kalit = `1` (2026-09-30 dan, A24) |
+| payload | `{key, value}` + §0.14 bo'yicha `account_id` (o'nlik), `peer_id = "0"` |
+
+- **Qaysi akkaunt nomidan:** `accountId` berilmasa — `gActiveAccountId`,
+  ya'ni **ekrandagi (aktiv) akkaunt**: har sessiya
+  `domain().activeValue()` ga obuna bo'lib uni yangilaydi
+  (`main_session.cpp`, 2026-09-30 gacha oxirgi yaratilgan sessiya edi).
+- **Startda:** har sessiya `SyncAllScopeSettings(o'z userId)` chaqiradi —
+  bir xil global sozlama har bir kirgan akkaunt nomidan ALOHIDA yuboriladi
+  (turli `account_hash` -> turli `record_id`). 2026-09-30 dan `occurred_at`
+  **saqlangan versiya** (startdagi "hozir" EMAS), shuning uchun o'zgarmagan
+  qiymatning qayta yuborilishi o'sha `record_id` ni beradi va server uni
+  `duplicate` deb qaytaradi. Eskirgan qurilma ishga tushganda boshqa
+  qurilmadagi yangiroq o'zgarishni endi bosib keta olmaydi.
+- **Versiya qachon oshadi:** faqat kalit qiymati haqiqatan o'zgarganda
+  (`sync_state` dagi `setting_ver.<key>` = `occurred_at|record_id|qiymat
+  xeshi`). Yangi versiya `max(hozir, oldingi + 1)`. Versiyasi yo'q kalit
+  `occurred_at = 1` bilan yuboriladi: boshqa qurilmadagi har qanday haqiqiy
+  o'zgarishga yutqazadi, serverda qiymat bo'lmasa uni to'ldiradi.
+
+**Qabul qiluvchilar uchun qoida:** `setting` yozuvini **`account_hash`
+bo'yicha filtrlamang**. Egasining master kaliti bilan ochiladigan barcha
+`setting` yozuvlari bitta global holatni tasvirlaydi; har bir `key` uchun
+**eng katta `occurred_at` g'olib** (teng bo'lsa — `record_id` leksikografik
+kattasi, deterministik bo'lishi uchun). O'z akkauntiga tegishli bo'lmagan
+peer ID lar e'tiborsiz qoldiriladi. VPS capture xizmati shu qoidaga amal
+qiladi.
+
+> [!NOTE]
+> **A24 (2026-09-30, kod tayyor, build qilinmagan):** tdesktop endi yuqoridagi
+> qoidaga amal qiladi — `ApplyRemoteScopeSetting` kiruvchi yozuvni faqat u
+> shu kalitning saqlangan versiyasidan `(occurred_at, record_id)` bo'yicha
+> kattaroq bo'lsa qo'llaydi (aks holda merge natijasi `stale_setting`).
+> Lokal o'zgarish versiyasining `record_id` si bo'sh, shuning uchun o'z
+> yozuvining qaytib kelishi (echo) uni bir marta "qo'llaydi" — qiymat bir xil.
 
 ### 3.3 Ikki xil semantika — aralashtirmaslik kerak
 
@@ -671,6 +826,45 @@ Istalgan bittasi kalitni ochadi.
 | Har bir qurilma | **Lokal** OS keystore | OS himoyasi (biometrika/PIN) |
 | Tiklash kodi | Server (`key_wraps`) | PBKDF2(kod, salt) |
 | Email escrow | Server (`key_wraps`) | PBKDF2(email_qismi ‖ PIN, salt) — 4.4.1 ga qarang |
+
+#### 4.4.0 O'ram formati — amalga oshirilgan holat (2026-09-29, kodga moslab)
+
+tdesktop hozir faqat **parol o'ramini** (`wrap_type = "passphrase"`)
+yaratadi va ochadi (`custom_sync_keyshare.cpp`). Tiklash kodi va email
+escrow o'ramlari tdesktop'da HALI yo'q. Master kalit (32 bayt, tasodifiy)
+tdesktop'da "Yangi arxiv paroli" oqimida yaratiladi, lokal nusxasi DPAPI
+ostida saqlanadi. **tdesktop master kalitni ko'rsatmaydi va eksport
+qilmaydi** — Sync tab'da faqat barmoq izi (FP).
+
+API: `GET /api/v1/keys/wraps` (ro'yxat), `GET /api/v1/keys/wraps/{wrap_id}`
+(to'liq o'ram), `POST /api/v1/keys/wraps` (yaratish). JSON:
+
+| Maydon | Format |
+|---|---|
+| `wrap_id`, `wrap_type`, `label` | satr |
+| `iterations` | butun son (hozir 600 000) — **o'ramdan o'qing, qat'iy yozmang** |
+| `salt` | base64, 16 bayt, har o'ramda yangi |
+| `nonce` | base64, 12 bayt, har o'ramda yangi |
+| `wrapped_key` | base64, **48 bayt = ciphertext[32] ‖ GCM tag[16]** |
+
+Ochish:
+
+    KEK    = PBKDF2-HMAC-SHA256(UTF-8(parol), salt, iterations, dkLen = 32)
+    master = AES-256-GCM-Open(key = KEK, nonce, ct = wrapped_key[0:32],
+                              tag = wrapped_key[32:48], AAD = YO'Q)
+
+Tag mos kelmasa — parol noto'g'ri (yagona xato signali).
+
+Test vektorlari: `test-vectors.json` -> `key_wrap` (parol, salt, iterations, nonce,
+`wrapped_key` -> master, noto'g'ri parol rad etilishi) va `fingerprint` (master -> FP).
+
+Tekshirish (barmoq izi, tdesktop Sync tab'idagi "Kalit barmoq izi (FP)"):
+
+    FP = hex( SHA256( "customsync-fingerprint-v1" ‖ master )[0:8] )
+
+VPS capture xizmati kalitni shu yo'l bilan oladi: egasi parolni faqat
+sozlash paytida kiritadi (interaktiv yoki secret), ochilgan master kalit
+oddiy matnda repo, log yoki env'da saqlanmaydi.
 
 #### 4.4.1 Email escrow va PIN kuchi
 

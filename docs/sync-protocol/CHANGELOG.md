@@ -9,6 +9,86 @@ Format: `## YYYY-MM-DD — sarlavha`
 
 ---
 
+## 2026-09-30 — `setting` yozuvining `occurred_at` i endi qiymat versiyasi (A24)
+
+**Nima:**
+1. `occurred_at` = shu `key` qiymati oxirgi o'zgargan vaqt (versiya), yuborilgan vaqt EMAS. Startdagi qayta yuborish shu versiya bilan ketadi — o'zgarmagan qiymat o'sha `record_id` ni beradi, server `duplicate` qaytaradi. Hech o'zgartirilmagan kalit `occurred_at = 1`.
+2. tdesktop kiruvchi `setting` ni faqat `(occurred_at, record_id)` bo'yicha saqlangan versiyadan kattaroq bo'lsa qo'llaydi (spec §3.2.1a qoidasi endi bajariladi).
+3. `account_id` endi ekrandagi (aktiv) akkaunt, oxirgi yaratilgan sessiya emas.
+
+Sim formati o'zgarmadi. tdesktop kodi tayyor, build qilinmagan.
+
+**Nima uchun:** oldin har start `occurred_at = hozir` bilan "snapshot" yuborardi. Natijada eskirgan qurilma ishga tushishi bilan boshqa qurilmadagi yangiroq o'zgarishni "eng katta `occurred_at` g'olib" qoidasi orqali bosib ketardi.
+
+**Ta'sirlanadi:**
+- customsync-server / VPS capture: qoida o'zgarmadi (eng katta `occurred_at`, teng bo'lsa `record_id`). `occurred_at = 1` qiymatini rad etmaslik kerak — bu "seed", haqiqiy o'zgarish emas. Bir xil `(key, occurred_at)` bilan qayta kelgan yozuv — oddiy `duplicate`.
+- tdesktop: A24 yopildi (build + sinov kutilmoqda).
+
+---
+
+## 2026-09-29 — `setting` akkaunt semantikasi va master kalit o'rami formati (hujjat kodga moslandi)
+
+**Nima:**
+1. Spec §3.2.1a: scope sozlamalari tdesktop'da **global**. `setting` yozuvi haqiqiy `account_hash` bilan, `peer_id = "0"`, `msg_id = DiscriminatorFor(key)`, `occurred_at` = yuborilgan vaqt. Startda har kirgan akkaunt nomidan alohida yuboriladi. Qabul qiluvchi `account_hash` bo'yicha **filtrlamaydi**, har `key` uchun eng katta `occurred_at` g'olib.
+2. Spec §4.4.0: amalga oshirilgan parol o'rami formati — PBKDF2-HMAC-SHA256 (salt 16, iterations o'ramdan), AES-256-GCM (nonce 12, `wrapped_key` = ct[32] ‖ tag[16], AAD yo'q), barmoq izi `SHA256("customsync-fingerprint-v1" ‖ master)[0:8]`. tdesktop master kalitni eksport qilmaydi; tiklash kodi o'rami tdesktop'da hali yo'q.
+3. `test-vectors.json` ga `key_wrap` (2 holat: 600 000 va 1 000 iteratsiya, UTF-8 parol, noto'g'ri parol) va `fingerprint` (3 holat) bo'limlari qo'shildi; boshqa bo'limlar bayt-bayt o'zgarmadi. .NET (CNG) bilan mustaqil tekshirildi.
+
+**Nima uchun:** customsync-server capture xizmati (Task 6) setting'larni qaysi akkauntdan qabul qilishni va master kalitni qanday olishni bilishi kerak edi.
+
+**Ta'sirlanadi:**
+- customsync-server: capture setting'larni barcha akkauntlardan oladi (last-writer-wins by `occurred_at`); master kalitni parol o'rami orqali ochadi.
+- tdesktop: A24 — `ApplyScopeSetting` `occurred_at` ni solishtirmaydi; `gActiveAccountId` oxirgi yaratilgan sessiya. Kod o'zgarmadi.
+
+---
+
+## 2026-09-27 — tdesktop: activity scope sozlamalari sinxronizatsiyasi qo'shildi
+
+**Nima:**
+1. `custom_settings.cpp`: `scope.activity_track_all_contacts`, `scope.activity_include`, `scope.activity_exclude` kalitlari qo'shildi.
+2. `GetScopeSettingValue`: track_all uchun `"true"`/`"false"`, include/exclude uchun saralangan JSON massiv shaklida qiymat qaytaradi.
+3. `ApplyScopeSetting`: kelgan sozlamalarni lokal xotiraga va `peer_lists.json` ga xavfsiz (guard bayrog'i bilan) yozadi.
+4. `SyncAllScopeSettings` ro'yxatiga kiritildi; `SavePeerLists` va `UpdateValue` da o'zgarish sodir bo'lganda avtomatik `EnqueueScopeSetting` chaqiriladi.
+
+**Nima uchun:** VPS capture xizmati (`CustomSync.Capture`) faollik tarixi kuzatuvi bo'yicha tdesktop'da belgilangan kontaktlar va istisnolar qamrovini qabul qilib, shunga muvofiq kuzatuv olib borishi uchun.
+
+**Ta'sirlanadi:**
+- tdesktop: faollik kuzatuvi sozlamalari outbox orqali server va boshqa qurilmalarga uzatiladi.
+
+---
+
+## 2026-09-27 — activity `msg_id`, `status` kodlashi va activity scope kalitlari (hujjat kodga moslandi)
+
+**Nima:**
+1. Spec §3.2 jadvalida `activity` uchun `msg_id` `0` deb yozilgan edi — XATO. Kod doim `DiscriminatorFor(field)` ishlatgan. Jadval tuzatildi; `DiscriminatorFor` ta'rifi (big-endian, eng yuqori bit tozalanadi) aniq yozildi.
+2. `test-vectors.json`: activity holatlari endi `DiscriminatorFor("status")` bilan; bir soniyadagi `status`/`name` to'qnashuv juftligi va yangi `discriminator` bo'limi (6 holat, jumladan yuqori biti 1 bo'lgan `name`) qo'shildi. Boshqa bo'limlar o'zgarmadi.
+3. Yangi §3.2.2: `field = "status"` qiymatlarining to'liq ro'yxati. **`userStatusEmpty` -> `long_ago`** (`empty` emas); `empty` amalda chiqmaydi.
+4. §3.2.1: `scope.activity_track_all_contacts`, `scope.activity_include`, `scope.activity_exclude` kalitlari belgilandi, lekin tdesktop'da **hali amalga oshirilmagan**.
+
+**Nima uchun:** customsync-server Capture Task 4b tekshiruvida spec va kod o'rtasidagi farq topildi. Capture `userStatusEmpty` uchun `empty` yozardi — tdesktop'ning `long_ago` yozuvi bilan birlashmasdi.
+
+**Ta'sirlanadi:**
+- customsync-server: `ActivityMapper.cs` da `userStatusEmpty` va noma'lum holat -> `long_ago`; ixtiyoriy ravishda `discriminator` vektor testi qo'shish.
+- tdesktop: kod o'zgarmadi. Activity scope kalitlarini yuborish/qabul qilish — alohida vazifa.
+
+---
+
+## 2026-09-27 — `edited` uchun `occurred_at = Telegram edit_date` va scope sozlama kalitlari
+
+**Nima:**
+1. `edited` yozuvlarida `occurred_at` sifatida xabarning asl sanasi (`msg_date`) emas, Telegram serveri bergan **`edit_date`** qiymati belgilandi (mavjud bo'lmasa `observed_at` / `msg_date` zaxirasi). Spec §3.1/§3.2.
+2. Scope ro'yxatlari uchun `setting` kalitlari va qiymat formati standartlashtirildi: `scope.whitelist`, `scope.blacklist`, `scope.wl_categories`, `scope.bl_categories`, `scope.antidelete_global`, `scope.antiedit_global`, `scope.antidelete_per_peer`, `scope.antiedit_per_peer`. Spec §3.2.1.
+3. `test-vectors.json` ga bitta xabarning turli `edit_date` li tahrirlari turli `record_id` hosil qilishini isbotlovchi vektor hamda `setting` kind vektori qo'shildi.
+
+**Nima uchun:**
+- Ilgari `msg_date` ishlatilganda, bir xabarning barcha tahrirlari bir xil `record_id` olardi. Natijada lokal outbox faqat oxirgisini (`INSERT OR REPLACE`), server esa faqat birinchi kuzatilganini (dedup) saqlardi va oraliq tahrirlar yo'qolib ketardi. `edit_date` har tahrir uchun noyob va har ikki qurilmada bir xil, shuning uchun oraliq tahrirlar saqlanadi va dedup saqlanadi.
+- Hozirgacha tdesktop birorta ham `setting` yozuvi yubormagani sababli VPS capture xizmati (`CustomSync.Capture`) foydalanuvchining Whitelist/Blacklist va AntiDelete/AntiEdit parametrlarini ko'rmas edi.
+
+**Ta'sirlanadi:**
+- tdesktop: `updateEditedMessage` va `applyEdition` ikkalasi ham `edit_date` bilan yozadi; sozlamalar o'zgarganda `setting` kind outbox'ga chiqariladi; `custom_sync_payload.cpp` `BuildSetting` ni qo'llab-quvvatlaydi.
+- customsync-server: Capture Task 5/Task 4c shu shartlarga tayanadi.
+
+---
+
 ## 2026-09-05 — payload ochiq `account_id` va `peer_id` ni olib yuradi
 
 **Nima:** har kind'ning shifrlanadigan payload'iga ikkita majburiy

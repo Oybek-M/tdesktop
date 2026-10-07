@@ -132,16 +132,18 @@ yo'qotish — tiklab bo'lmaydi.
    (bo'sh `recordId` da darhol qaytadi), lekin u xatoni yashiradi emas,
    to'xtatadi xolos.
 
-5. 🔴 **`edited` uchun `occurred_at` ikki tahrirni ajratmaydi.**
-   Enqueue nuqtasi `msg.msgDate` ni beradi -- xabarning ASL sanasi, u
-   tahrirda o'zgarmaydi. Ya'ni bir xabar ikki marta tahrirlansa ikkala
-   hodisa bir xil `record_id` oladi va ikkinchisi dedup'da yo'qoladi.
-   Lokal tahrir vaqtiga o'tish YECHIM EMAS: `occurred_at` aynan shu
-   sabab deterministik -- ikki qurilma bir hodisani ko'rganda bir xil
-   `record_id` chiqarishi kerak, lokal soat esa har qurilmada boshqa.
-   To'g'ri yechim Telegram'ning tahrir sanasini talab qiladi,
-   `ActionedMessage` da esa bunday maydon yo'q. Alohida ish sifatida
-   qoldirildi (2026-09-05 da Task 7a tayyorlanayotganda topildi).
+5. ✅ **`edited` uchun `occurred_at = Telegram edit_date` HAL QILINDI** (2026-09-27).
+   `ActionedMessage` ga `editDate` maydoni qo'shildi. `Data::Session::updateEditedMessage`
+   va `HistoryItem::applyEdition` ikkalasi ham Telegram `edit_date` qiymatini oladi
+   va outbox'ga uzatadi. Bitta xabarning turli tahrirlari turli `record_id` oladi,
+   oraliq tahrirlar saqlanadi va server/outbox deduplikatsiyasi to'g'ri ishlaydi.
+   Spec §3.1/§3.2 va `test-vectors.json` yangilandi.
+
+   ✅ **Activity tracking scope sozlamalari (`scope.activity_*`) HAL QILINDI** (2026-09-27).
+   `custom_settings.cpp` da `scope.activity_track_all_contacts`, `scope.activity_include`,
+   va `scope.activity_exclude` kalitlari qo'shildi. Sozlamalar o'zgarganda outbox'ga
+   enqueue qilinadi va serverdan kelganda lokal xotiraga/faylga tatbiq etiladi.
+
 
 6. 🔴 **Tombstone qabul qilish -- Task 7c.** 7b da kelgan tombstone
    ogohlantirish bilan o'tkazib yuboriladi va **cursor undan o'tib

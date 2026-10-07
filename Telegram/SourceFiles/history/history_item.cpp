@@ -2505,10 +2505,23 @@ void HistoryItem::applyEdition(HistoryMessageEdition &&edition) {
 		const auto peerIdStr = QString::number(history()->peer->id.value);
 		if (CustomSettings::ShouldAntiEdit(peerIdStr)) {
 			if (!_text.text.isEmpty() && _text.text != updatedText.text) {
-				auto newCombinedText = _text;
-				const auto tahrirMarker = QString::fromUtf8(
+				QString cleanOldText = _text.text;
+				const auto tahrMarker = QString::fromUtf8(
 					"\xe2\x80\x94\xe2\x80\x94 TAHRIRLANDI");
-				const int nextN = newCombinedText.text.count(tahrirMarker) + 1;
+				const int lastTm = cleanOldText.lastIndexOf(tahrMarker);
+				if (lastTm >= 0) {
+					const int nl = cleanOldText.indexOf('\n', lastTm);
+					cleanOldText = (nl >= 0)
+						? cleanOldText.mid(nl + 1).trimmed()
+						: cleanOldText.mid(lastTm).trimmed();
+				}
+				const auto editDate = (edition.editDate > 0)
+					? static_cast<unsigned int>(edition.editDate)
+					: 0U;
+				CustomDB::RecordLiveEdit(this, cleanOldText, updatedText.text, editDate);
+
+				auto newCombinedText = _text;
+				const int nextN = newCombinedText.text.count(tahrMarker) + 1;
 				newCombinedText.append(QString::fromUtf8(
 					"\n\n\xe2\x80\x94\xe2\x80\x94 TAHRIRLANDI %1 \xe2\x80\x94\xe2\x80\x94\n").arg(nextN));
 				newCombinedText.append(std::move(updatedText));

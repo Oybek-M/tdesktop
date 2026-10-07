@@ -8,7 +8,17 @@ sessiya boshlanganda birinchi shu yerga qarang.
 > kompyuterdasiz (laptop / PC) va shu kompyuterdagi yo'llar. Bu fayldagi
 > `C:\TBuild\...` kabi yo'llar laptop'niki.
 
-Oxirgi yangilanish: 2026-09-14 (01:10)
+Oxirgi yangilanish: 2026-09-27
+
+---
+
+# 🟡 2026-09-27 — eng so'nggi holat `../NEXT_TASKS.md` da
+
+09-14 dan keyingi ishlar (T46/T47 partiyasi, A22, sync scope/`edit_date`
+kodi, upstream v7.2.9) **`docs/NEXT_TASKS.md`** ning boshida. Qisqasi:
+upstream v7.2.8+v7.2.9 merge qilinmagan (bizda 7.2.7); 09-27 dagi 5 ta
+sync commiti build qilinmagan; PC'da tdesktop laptop ishi tugaguncha
+PAUZADA. PC disk holati: `../PC-SETUP-STATE.md` §2026-09-27.
 
 ---
 

@@ -534,18 +534,19 @@ static QString colText(sqlite3_stmt *stmt, int col) {
     return text ? QString::fromUtf8(text) : QString();
 }
 
-static bool HasEditedMessage(sqlite3 *db, const CustomDB::PeerKey &key, qint64 msgId) {
+static bool HasEditedMessage(sqlite3 *db, const CustomDB::PeerKey &key, qint64 msgId, const QString &newText) {
     if (!db) return false;
     sqlite3_stmt *stmt = nullptr;
     bool exists = false;
     if (sqlite3_prepare_v2(db,
             "SELECT 1 FROM actioned_messages "
-            "WHERE peer_id = ? AND msg_id = ? AND type = 'edited' AND account_id IN (0, ?) "
+            "WHERE peer_id = ? AND msg_id = ? AND type = 'edited' AND new_text = ? AND account_id IN (0, ?) "
             "LIMIT 1",
             -1, &stmt, nullptr) == SQLITE_OK) {
         bindText(stmt, 1, key.peerId);
         sqlite3_bind_int64(stmt, 2, msgId);
-        sqlite3_bind_int64(stmt, 3, key.accountId);
+        bindText(stmt, 3, newText);
+        sqlite3_bind_int64(stmt, 4, key.accountId);
         if (sqlite3_step(stmt) == SQLITE_ROW) {
             exists = true;
         }
@@ -743,13 +744,13 @@ MergeResult MergeRecord(
 
     if (record.kind == QLatin1String(Kind::Edited)) {
         auto *db = CustomDB::RawHandle();
-        if (HasEditedMessage(db, key, record.msgId)) {
+        const auto oldText = obj.value(QStringLiteral("old_text")).toString();
+        const auto newText = obj.value(QStringLiteral("new_text")).toString();
+        if (HasEditedMessage(db, key, record.msgId, newText)) {
             // Allaqachon mavjud -- qayta insert qilmaymiz (K4 idempotency)
             Outbox::SaveRecordMap(record.recordId, record.kind, key.accountId, key.peerId, record.msgId, record.occurredAt);
             return { MergeStatus::Merged, QStringLiteral("already_exists") };
         }
-        const auto oldText = obj.value(QStringLiteral("old_text")).toString();
-        const auto newText = obj.value(QStringLiteral("new_text")).toString();
         const bool isOut = obj.value(QStringLiteral("is_out")).toBool();
         CustomDB::ActionedMessage msg;
         msg.accountId = key.accountId;
@@ -760,6 +761,7 @@ MergeResult MergeRecord(
         msg.newText = newText;
         msg.isOut = isOut;
         msg.msgDate = static_cast<unsigned int>(std::max<qint64>(0, record.occurredAt));
+        msg.editDate = static_cast<unsigned int>(std::max<qint64>(0, record.occurredAt));
         msg.timestamp = (record.observedAt > 0)
             ? QDateTime::fromSecsSinceEpoch(record.observedAt)
             : QDateTime::currentDateTime();
@@ -806,6 +808,21 @@ MergeResult MergeRecord(
         CustomDB::UpsertMediaIndex(key, entry);
         Outbox::SaveRecordMap(record.recordId, record.kind, key.accountId, key.peerId, record.msgId, record.occurredAt);
         return { MergeStatus::Merged, QString() };
+    }
+
+    if (record.kind == QLatin1String(Kind::Setting)) {
+        const auto settingKey = obj.value(QStringLiteral("key")).toString();
+        const auto settingVal = obj.value(QStringLiteral("value")).toString();
+        // A24: pull tartibida emas, (occurred_at, record_id) bo'yicha
+        // eng yangisi g'olib -- eskirgan yozuv qo'llanmaydi.
+        const auto applied = !settingKey.isEmpty()
+            && CustomSettings::ApplyRemoteScopeSetting(
+                settingKey,
+                settingVal,
+                record.occurredAt,
+                record.recordId);
+        Outbox::SaveRecordMap(record.recordId, record.kind, key.accountId, key.peerId, record.msgId, record.occurredAt);
+        return { MergeStatus::Merged, applied ? QString() : QStringLiteral("stale_setting") };
     }
 
     return { MergeStatus::Unsupported, QStringLiteral("unsupported_kind") };

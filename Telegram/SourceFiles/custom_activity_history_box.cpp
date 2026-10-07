@@ -6,6 +6,7 @@
 #include "custom_sync_outbox.h"
 #include "custom_sync_record.h"
 #include "main/main_session.h"
+#include "base/unixtime.h"
 #include "ui/layers/generic_box.h"
 #include "ui/widgets/buttons.h" // Ui::LinkButton
 #include "ui/widgets/labels.h"
@@ -148,28 +149,61 @@ QVector<OnlinePeriod> ReconstructOnlinePeriods(
 
 	QVector<OnlinePeriod> result;
 	qint64 openFrom = 0;
+	qint64 openTill = 0; // ochiq kuzatilgan seansning online muddati
 	QString openSource;
+	const auto closeOpen = [&](qint64 to) {
+		result.append({ openFrom, to, false, openSource });
+		openFrom = openTill = 0;
+		openSource.clear();
+	};
 	for (const auto &e : chrono) {
-		if (e.newValue.startsWith(u"online:"_q)) {
-			// Agar oldingi online: uchun offline: kelmasdan yangi online: kelsa,
-			// avvalgi ochiq qolgan yozuvni alohida LAHZA sifatida saqlaymiz.
+		// A25: "online:<T>" va T kuzatilgan vaqtdan atigi 1-2 s keyin --
+		// bu chiqib ketish (EncodeStatus tuzatilishidan oldingi yozuvlar).
+		// Uni offline:T deb olamiz, shunda "09:05:32 online, 09:05:40
+		// online:09:05:41" ikkita "lahza" emas, 9 soniyalik davr bo'ladi.
+		const auto isOnline = e.newValue.startsWith(u"online:"_q);
+		const auto onlineTill = isOnline ? e.newValue.mid(7).toLongLong() : 0;
+		const auto observed = (e.source == u"observed"_q);
+		const auto wentOffline = isOnline
+			&& observed
+			&& onlineTill > 0
+			&& (onlineTill - e.observedAt) <= kOfflineSkewSeconds;
+		if (wentOffline) {
 			if (openFrom > 0) {
+				closeOpen(onlineTill);
+			}
+		} else if (isOnline) {
+			if (openFrom > 0 && observed && openSource == u"observed"_q) {
+				// A25: online paytida server muddatni bir necha daqiqada
+				// yangilab turadi -- bu yangi seans emas, davomi.
+				if (openTill > 0 && e.observedAt <= openTill) {
+					openTill = std::max(openTill, onlineTill);
+					continue;
+				}
+				// Offline yozuvi kelmagan, muddat o'tib ketgan -- seans
+				// o'z muddati bilan tugagan deb olamiz.
+				closeOpen(openTill > openFrom ? openTill : openFrom);
+			} else if (openFrom > 0) {
+				// Juftisiz lahza (story, o'qish, qo'lda va h.k.).
 				result.append({ openFrom, openFrom, true, openSource });
 			}
 			openFrom = e.observedAt;
+			openTill = observed ? onlineTill : 0;
 			openSource = e.source;
 		} else if (e.newValue.startsWith(u"offline:"_q)) {
 			if (openFrom > 0) {
 				const auto till = e.newValue.mid(8).toLongLong();
-				const auto toTime = (till > 0) ? till : e.observedAt;
-				result.append({ openFrom, toTime, false, openSource });
-				openFrom = 0;
-				openSource.clear();
+				closeOpen((till > 0) ? till : e.observedAt);
 			}
 		}
 	}
 	if (openFrom > 0) {
-		result.append({ openFrom, openFrom, true, openSource });
+		if (openSource == u"observed"_q && openTill > openFrom) {
+			// Hali davom etayotgan yoki offline'i kuzatilmagan seans.
+			closeOpen(std::min(openTill, qint64(base::unixtime::now())));
+		} else {
+			result.append({ openFrom, openFrom, true, openSource });
+		}
 	}
 	return result;
 }
@@ -189,17 +223,75 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 		const auto content = box->verticalLayout();
 
 		// ── 1) Joriy holat + 2) So'nggi ko'ra olgan holatim ─────────
+		// A25: "joriy holat" faqat KUZATILGAN statusdan olinadi. Story,
+		// rasm, o'qish va qo'lda nuqtalar ham field='status' da
+		// "online:<lahza>" sifatida yoziladi; ilgari ular eng oxirgi
+		// yozuv bo'lsa sarlavha "hozir online (19:22 gacha)" der edi,
+		// Telegram esa "last seen 21:17" ko'rsatardi. Lahzalar alohida
+		// qatorda chiqadi.
+		const CustomDB::ActivityHistoryEntry *latestObserved = nullptr;
+		const CustomDB::ActivityHistoryEntry *latestMoment = nullptr;
+		for (const auto &e : entries) {
+			if (e.field != u"status"_q) {
+				continue;
+			} else if (e.source == u"observed"_q
+					|| e.source == u"snapshot"_q) {
+				latestObserved = &e;
+				break;
+			} else if (!latestMoment) {
+				latestMoment = &e; // observed'dan YANGIROQ lahza
+			}
+		}
 		QString latestStatus;
-		const auto hasStatus = CustomDB::GetLatestActivityHistoryValue(
-			peerId, u"status"_q, latestStatus);
+		auto hasStatus = false;
+		if (latestObserved) {
+			latestStatus = latestObserved->newValue;
+			hasStatus = true;
+		} else {
+			// 300 ta yozuv ichida kuzatilgan status bo'lmasa -- keshdan.
+			hasStatus = CustomDB::GetLatestActivityHistoryValue(
+				peerId, u"status"_q, latestStatus);
+		}
+		const auto headerLabel = [&]() -> QString {
+			if (!hasStatus) {
+				return u"noma'lum (hali kuzatilmagan)"_q;
+			}
+			if (latestObserved && latestStatus.startsWith(u"online:"_q)) {
+				const auto till = latestStatus.mid(7).toLongLong();
+				const auto at = latestObserved->observedAt;
+				const auto fmt = [](qint64 ts) {
+					return QDateTime::fromSecsSinceEpoch(ts).toString(
+						u"dd.MM.yyyy HH:mm"_q);
+				};
+				if (till > 0 && till - at <= kOfflineSkewSeconds) {
+					return u"oxirgi marta ko'rilgan: "_q + fmt(till);
+				} else if (till > 0
+						&& till < qint64(base::unixtime::now())) {
+					return u"online edi (taxminan "_q + fmt(till)
+						+ u" gacha), keyingi holat kuzatilmagan"_q;
+				}
+			}
+			return DecodeStatusLabel(latestStatus);
+		}();
 		content->add(
 			object_ptr<Ui::FlatLabel>(
 				content,
-				rpl::single(u"Eng so'nggi aniqlangan holat: "_q + (hasStatus
-					? DecodeStatusLabel(latestStatus)
-					: u"noma'lum (hali kuzatilmagan)"_q)),
+				rpl::single(u"Eng so'nggi aniqlangan holat: "_q + headerLabel),
 				st::boxLabel),
 			st::boxRowPadding);
+		if (latestMoment) {
+			content->add(
+				object_ptr<Ui::FlatLabel>(
+					content,
+					rpl::single(u"Undan keyingi faollik belgisi: "_q
+						+ FormatInstantLabel({
+							latestMoment->observedAt,
+							latestMoment->observedAt,
+							true,
+							latestMoment->source })),
+					st::boxLabel),
+				st::boxRowPadding);
+		}
 
 		if (hasStatus && (latestStatus == u"recently"_q
 				|| latestStatus == u"within_week"_q
@@ -309,6 +401,10 @@ object_ptr<Ui::BoxContent> MakeHistoryBox(
 					st::boxLabel),
 				st::boxRowPadding);
 		}
+		// A25: yangisi tepada -- davrlar xronologik quriladi (guruhlash
+		// shunga bog'liq), lekin foydalanuvchi bugungisini qidiradi;
+		// ilgari tepada eng eski (300 yozuvning boshi) turardi.
+		std::reverse(rows.begin(), rows.end());
 		for (const auto &line : rows) {
 			content->add(
 				object_ptr<Ui::FlatLabel>(

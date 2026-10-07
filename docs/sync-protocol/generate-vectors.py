@@ -1,6 +1,6 @@
 # Track C uchun platformalararo test vektorlarini generatsiya qiladi.
 # Natija: docs/sync-protocol/test-vectors.json
-import hashlib, hmac, json, sys
+import base64, hashlib, hmac, json, sys
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 def h(b): return b.hex()
@@ -88,13 +88,45 @@ vec = {
 
   "record_id": {
     "_note": [
-      "spec §0.12 (2026-08-26).",
+      "spec §0.12 (2026-08-26) va §3.1/§3.2 (2026-09-27).",
       "SHA256(kind || 0x00 || account_hash || 0x00 || peer_hash || 0x00 || msg_id_decimal || 0x00 || occurred_at_decimal)",
       "msg_id MANFIY bo'lishi mumkin (avatar -photo_id, story -story_id).",
       "Ishora SAQLANADI: -42 va 42 turli yozuvlar.",
       "account_hash = BO'SH SATR faqat kind='activity' uchun (tashxis §4.1/§5.1: last-seen bypass akkauntlar bo'ylab birlashadi). Boshqa hamma kind haqiqiy account_hash oladi.",
+      "edited: occurred_at = Telegram edit_date (har tahrir o'z record_id sini oladi). Bir xil xabar ikki xil edit_date bilan turli record_id berishi shart.",
+      "setting: msg_id = DiscriminatorFor(setting_key). activity: msg_id = DiscriminatorFor(field) (2026-09-27 gacha 0 deb yozilgan edi -- XATO). DiscriminatorFor ta'rifi 'discriminator' bo'limida.",
+      "Setting holatidan keyingi 2 holat: bir xil activity/peer/occurred_at, field 'status' va 'name' -> turli msg_id va turli record_id (bir soniyadagi ikki field to'qnashmaydi).",
       "Oxirgi 2 holat: bir xil deleted/peer_hash/msg_id/occurred_at, FAQAT account_hash farq qiladi -> turli record_id (ajratma ishlayapti).",
       "Undan oldingi 2 holat: bir xil activity/peer_hash/msg_id/occurred_at, ikki turli akkaunt, account_hash ikkalasida ham bo'sh -> BIR XIL record_id (birlashish ishlayapti)."
+    ],
+    "cases": []
+  },
+
+  "discriminator": {
+    "_note": [
+      "tdesktop custom_sync_record.cpp DiscriminatorFor(text).",
+      "SHA256(UTF-8(text)) ning birinchi 8 bayti big-endian int64, eng yuqori bit tozalangan (& 0x7FFFFFFFFFFFFFFF) -- natija doim >= 0.",
+      "Ishlatilishi: activity -> field, setting -> setting_key, tombstone -> target_record_id."
+    ],
+    "cases": []
+  },
+
+  "key_wrap": {
+    "_note": [
+      "spec §4.4.0. Parol o'rami (wrap_type='passphrase'), tdesktop custom_sync_keyshare.cpp.",
+      "KEK = PBKDF2-HMAC-SHA256(UTF-8(passphrase), salt, iterations, dkLen=32). iterations O'RAMDAN o'qiladi.",
+      "master = AES-256-GCM-Open(KEK, nonce, wrapped_key[0:32] = ct, wrapped_key[32:48] = tag), AAD YO'Q.",
+      "salt/nonce/wrapped_key -- base64 (API javobidagidek). master_hex -- kutilgan natija.",
+      "wrong_passphrase bilan ochish GCM tag xatosi berishi SHART (yagona xato signali).",
+      "Haqiqiy o'ramda salt va nonce har safar yangi tasodifiy; bu yerda ular test uchun qat'iy."
+    ],
+    "cases": []
+  },
+
+  "fingerprint": {
+    "_note": [
+      "spec §4.4.0. FP = hex(SHA256('customsync-fingerprint-v1' || master)[0:8]) -- 16 hex belgi.",
+      "tdesktop Sync tab'idagi 'Kalit barmoq izi (FP)' bilan solishtiriladi."
     ],
     "cases": []
   },
@@ -114,7 +146,16 @@ vec = {
   }
 }
 
+def discriminator(text):
+    return int.from_bytes(hashlib.sha256(text.encode("utf-8")).digest()[:8], "big") & 0x7FFFFFFFFFFFFFFF
+
+# "name" -- birinchi baytining yuqori biti 1, ya'ni niqob haqiqatan ishlaydi
+# (niqobsiz manfiy bo'lardi). Qolganlari -- haqiqiy field/kalit qiymatlari.
+for text in ("status", "name", "username", "photo", "scope.whitelist", "o'zbek matn"):
+    vec["discriminator"]["cases"].append({"text": text, "value": discriminator(text)})
+
 # record_id holatlari — manfiy va nol ham bor
+act_mid = discriminator("status")
 acc_a = "111222333"
 acc_b = "444555666"
 ah_a = account_hash(acc_a)
@@ -123,7 +164,7 @@ ph = peer_hash("7053823996")
 for kind, mid, occ in [
     ("deleted",    395278,          1787000000),
     ("edited",     390234,          1787000001),
-    ("activity",   0,               1787000002),   # account_hash="" -- pastga qarang
+    ("activity",   act_mid,         1787000002),   # account_hash="" -- pastga qarang
     ("media_index", 597,            1787000003),
     ("media_index", -5190442718973336697, 1787000004),   # avatar: -photo_id
     ("media_index", -12345,         1787000005),          # story: -story_id
@@ -135,14 +176,43 @@ for kind, mid, occ in [
         "occurred_at": occ, "record_id": record_id(kind, ah, ph, mid, occ)
     })
 
+# Tahrir (edited) ajratma tekshiruvi: bir xil xabar (msg_id 390234), lekin ikki xil
+# Telegram edit_date (1787000010 va 1787000020) -- record_id lar ham FARQ QILISHI SHART.
+for occ in (1787000010, 1787000020):
+    vec["record_id"]["cases"].append({
+        "kind": "edited", "account_hash": ah_a, "peer_hash": ph,
+        "msg_id": 390234, "occurred_at": occ,
+        "record_id": record_id("edited", ah_a, ph, 390234, occ)
+    })
+
+# setting kind tekshiruvi: msg_id = DiscriminatorFor(setting_key)
+# SHA256(setting_key)[0:8] int64 sifatida (big-endian), eng yuqori bit tozalangan (& 0x7FFFFFFFFFFFFFFF)
+setting_key = "scope.whitelist"
+setting_mid = discriminator(setting_key)
+vec["record_id"]["cases"].append({
+    "kind": "setting", "account_hash": ah_a, "peer_hash": peer_hash("0"),
+    "msg_id": setting_mid, "occurred_at": 1787000007,
+    "record_id": record_id("setting", ah_a, peer_hash("0"), setting_mid, 1787000007)
+})
+
+# activity to'qnashuv tekshiruvi: bitta peer, bitta soniya, ikki field.
+# msg_id = 0 bo'lganda ikkalasi BIR XIL record_id olib, biri yo'qolardi.
+for field in ("status", "name"):
+    mid = discriminator(field)
+    vec["record_id"]["cases"].append({
+        "kind": "activity", "account_hash": "", "peer_hash": ph,
+        "msg_id": mid, "occurred_at": 1787000300,
+        "record_id": record_id("activity", "", ph, mid, 1787000300)
+    })
+
 # Birlashish tekshiruvi: activity, ikki turli akkaunt, account_hash
 # ikkalasida ham "" -- record_id BIR XIL bo'lishi SHART (last-seen
 # bypass akkauntlar bo'ylab birlashadi, tashxis §5.1).
 for _ in (acc_a, acc_b):
     vec["record_id"]["cases"].append({
         "kind": "activity", "account_hash": "", "peer_hash": ph,
-        "msg_id": 0, "occurred_at": 1787000200,
-        "record_id": record_id("activity", "", ph, 0, 1787000200)
+        "msg_id": act_mid, "occurred_at": 1787000200,
+        "record_id": record_id("activity", "", ph, act_mid, 1787000200)
     })
 
 # Ajratma tekshiruvi: bir xil deleted/peer_hash/msg_id/occurred_at,
@@ -184,6 +254,36 @@ for pwd, salt, it in [
         "iterations": it, "kek_hex": h(kek)
     })
 
+# Parol o'rami (key_wrap) holatlari -- spec §4.4.0
+def b64(b): return base64.b64encode(b).decode("ascii")
+def fingerprint(master):
+    return hashlib.sha256(b"customsync-fingerprint-v1" + master).digest()[:8].hex()
+
+wrap_master = hashlib.sha256(b"customsync-test-master-key").digest()
+for name, pwd, salt, nonce, it in [
+    ("oddiy parol, 600 000",   "arxiv-paroli-2026",        bytes(range(40, 56)), bytes(range(60, 72)), 600000),
+    ("UTF-8 parol, 1 000",     "o'zbekcha parol ✓ Ёё",     bytes(range(80, 96)), bytes(range(100, 112)), 1000),
+]:
+    kek = hashlib.pbkdf2_hmac("sha256", pwd.encode("utf-8"), salt, it, 32)
+    wrapped = AESGCM(kek).encrypt(nonce, wrap_master, None)   # ct[32] || tag[16]
+    assert len(wrapped) == 48
+    vec["key_wrap"]["cases"].append({
+        "name": name, "wrap_type": "passphrase",
+        "passphrase": pwd, "wrong_passphrase": pwd + "x",
+        "iterations": it, "salt": b64(salt), "nonce": b64(nonce),
+        "wrapped_key": b64(wrapped),
+        "master_hex": h(wrap_master), "fingerprint": fingerprint(wrap_master)
+    })
+
+for name, master in [
+    ("nol kalit", bytes(32)),
+    ("key_wrap master", wrap_master),
+    ("0..31", bytes(range(32))),
+]:
+    vec["fingerprint"]["cases"].append({
+        "name": name, "master_hex": h(master), "fingerprint": fingerprint(master)
+    })
+
 out = sys.argv[1]
 with open(out, "w", encoding="utf-8", newline="\n") as f:
     json.dump(vec, f, indent=2, ensure_ascii=False)
@@ -191,5 +291,8 @@ print("yozildi:", out)
 print("  account_hash:", len(vec["account_hash"]["cases"]), "holat")
 print("  peer_hash   :", len(vec["peer_hash"]["cases"]), "holat")
 print("  record_id   :", len(vec["record_id"]["cases"]), "holat")
+print("  discriminator:", len(vec["discriminator"]["cases"]), "holat")
+print("  key_wrap    :", len(vec["key_wrap"]["cases"]), "holat")
+print("  fingerprint :", len(vec["fingerprint"]["cases"]), "holat")
 print("  aes_gcm     :", len(vec["aes_gcm"]["cases"]), "holat")
 print("  pbkdf2      :", len(vec["pbkdf2"]["cases"]), "holat")
