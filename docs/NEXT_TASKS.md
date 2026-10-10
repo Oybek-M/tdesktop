@@ -1,38 +1,40 @@
 # CustomMod — Keyingi Tasklar Ro'yxati
 
-**Oxirgi yangilanish:** 2026-10-08 (`b19d83c2a1` build O'TDI, SINOVDAN O'TMAGAN; o'rnatish + sinov keyingi sessiyada)
+**Oxirgi yangilanish:** 2026-10-10 (`b19d83c2a1` o'rnatildi va sinovdan O'TDI; keyingisi A26)
 
 ---
 
-## 🟡 2026-10-08 holati — keyingi sessiya shu yerdan boshlaydi
+## 🟡 2026-10-10 holati — keyingi sessiya shu yerdan boshlaydi
 
-**Upstream:** v7.2.8+v7.2.9+v7.2.10 merge qilindi (`94e0d660a1`),
-o'rnatildi va sinovdan o'tdi (T48). Yangi reliz bor-yo'qligini tekshirish
-(repo'da `upstream` remote YO'Q — faqat o'qiydi):
+**Upstream:** v7.2.8+v7.2.9+v7.2.10 merge qilindi (`94e0d660a1`, T48).
+Yangi reliz bor-yo'qligini tekshirish (repo'da `upstream` remote YO'Q —
+faqat o'qiydi):
 `git ls-remote --tags --refs https://github.com/telegramdesktop/tdesktop.git 'v7.*'`
 
-**🔴 Build O'TDI, lekin SINOVDAN O'TMAGAN — `b19d83c2a1`** (T49):
-7.2.10 + PC'dagi 21 commit (09-26..10-06): A23+A24 `0c1a158c32`, A25
-`b0e933957e`, sync scope/`edit_date` (`7b6079f81d`, `d4cc460156`,
-`a119ef83cb`). Build 2026-10-08 00:16:51 -> 01:37:56, ExitCode 0, 0 xato;
-exe `7.2.10.0`, SHA256 `beebfef1c6f67f7b…`. Hozir o'rnatilgani — 10-07
-dagi `94e0d660a1` build'i (unda A23/A24/A25 YO'Q).
+**✅ `b19d83c2a1` o'rnatildi va sinovdan O'TDI** (T49, 2026-10-10):
+7.2.10 + PC'dagi 21 commit (A23+A24 `0c1a158c32`, A25 `b0e933957e`, sync
+scope/`edit_date`). `install-staged.sh` 21:10:55 da o'rnatdi. Zaxiralar:
+`Release\_tdata-backup-pre-b19d83c2a1-20261008-20261010-211055` (100 MB),
+`db\pre-b19d83c2a1-20261008-20261010-211055` (62 MB), eski exe (10-07
+build'i) `Telegram.exe.pre-b19d83c2a1-20261008-20261010-211055`.
 
-**Build QAYTA QILINMAYDI** — nusxasi laptopda saqlangan:
-`C:\TBuild\staged\b19d83c2a1-20261008\` (`Telegram.exe`, `SHA256.txt`,
-`HOLAT.txt`, `build.log`). Mos PDB faqat `out\Release\Telegram.pdb` da
-(3.64 GB, nusxalanmagan) — keyingi build uni qayta yozadi.
+| Sinov | Natija |
+|---|---|
+| Start bloki | 1-start 3638 ms, 2-start (iliq) **846 ms** — 7.2.7 bazasi 1380-1774 ms, regressiya YO'Q |
+| A25 startdagi holat | 2-startdan ~100 s keyin 18 ta `status` qatori (10 tasi `offline:*`); eski build'da startdan keyingi 2 daqiqada 0 |
+| A25 sarlavha | Faollik oynasi sarlavhasi Telegram'dagi last-seen bilan mos (foydalanuvchi tekshirdi) |
+| A25 startdagi qotish | Yozuvlar tushgan paytda (21:28:29) `main thread blocked` yo'q |
+| A23 | 1-2 qadam O'TDI: disk ildizi -> `<disk>/customizationMainFolder` taklif qilinadi; arxiv ichidagi papka rad etiladi |
+| Xatolar | 0 `App Error`, CustomMod xato qatori yo'q |
 
-**Keyingi sessiya tartibi:**
-1. Telegram TO'LIQ yopiladi ->
-   `bash /c/TBuild/install-staged.sh b19d83c2a1-20261008`
-   (`--check` bilan oldindan tekshirish mumkin). Skript SHA256 ni
-   tekshiradi, tdata (user_data'siz) va bazani zaxiralaydi, eski exe'ni
-   `Telegram.exe.pre-…` qilib qo'yadi.
-2. Ketma-ket IKKI start: iliq start 7.2.7 bazasi (1380-1774 ms) bilan
-   solishtiriladi; birinchi start sovuq bo'lishi mumkin (T46).
-3. Sinovlar o'z bo'limlarida: A25, A23. A24 — 2 qurilma + sync server kerak.
-4. Keyin: A26 -> A22 -> A21 -> A7 reliz (avval VPS mirrorlari).
+**Sinalmagan:** A25 "davrlar" (22.09 ro'yxati qisqa ulanish guruhlari)
+alohida ko'rilmadi; A23 3-4 qadam (haqiqiy ko'chirish) asosiy laptopda
+qilinmadi; A24 va sync o'zgarishlari 2 qurilma + sync server talab qiladi.
+Start sinovi loglari: `C:\TBuild\starttest-20261010\` (kuzatuvchi
+`C:\TBuild\watch-starttest.sh`).
+
+**Keyingi tartib:** A26 (start'dagi 90 s kutish) -> A22 -> A21 -> A7 reliz
+(avval VPS mirrorlari).
 
 **PC holati (09-30):** disk ishlari YOPILDI. E: yangi Toshiba (toza), D:
 pending 349 -> 0 (yumshoq xato, sog'lom), arxiv `E:\customizationMainFolder`.
@@ -134,7 +136,7 @@ T49 build sinovdan o'tgandan KEYIN. A3.1 (alohida SQLite ulanishi) rejada qoladi
 OpenAL (~3 s) + D3D11 RHI probe (~2 s); S1 (`use-qt-rhi=false`) sinovi
 bilan birga tekshiriladi.
 
-## 🔴 A25 — Faollik tarixi: startdagi holat yozilmaydi va 3 ta nuqson (2026-10-06)
+## ✅ A25 — Faollik tarixi: startdagi holat yozilmaydi va 3 ta nuqson (2026-10-06; `b0e933957e`, 10-10 sinovdan o'tdi)
 
 **Holat:** 🟡 KOD TAYYOR 2026-10-06 (PC'da, BUILD QILINMAGAN). Tekshirildi
 (haqiqiy DB, kontakt `8720525440`). Qilingani: (1) `ScheduleStartupStatusCatchUp`
@@ -215,7 +217,7 @@ Asl tavsif:
 
 ---
 
-## 🔴 A23 — Arxiv papkasi sifatida disk ildizini tanlashga ruxsat bor (2026-09-29)
+## ✅ A23 — Arxiv papkasi sifatida disk ildizini tanlashga ruxsat bor (2026-09-29; 10-10: 1-2 qadam o'tdi, 3-4 ko'chirish sinalmagan)
 
 **Holat:** 🟡 KOD TAYYOR 2026-09-30 (PC'da, BUILD QILINMAGAN) — laptop
 build + sinov kerak. Nima qilindi:
