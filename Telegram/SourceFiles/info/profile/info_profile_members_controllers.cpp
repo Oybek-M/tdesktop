@@ -500,6 +500,27 @@ void MemberListRow::paintRemove(
 	p.setOpacity(o);
 }
 
+int MemberListRow::paintNameIconGetLeadingWidth(
+		Painter &p,
+		Fn<void()> repaint,
+		crl::time now,
+		int nameLeft,
+		int nameTop,
+		int outerWidth,
+		bool selected) {
+	if (!_refreshCallback) {
+		_refreshCallback = repaint;
+	}
+	return PeerListRow::paintNameIconGetLeadingWidth(
+		p,
+		std::move(repaint),
+		now,
+		nameLeft,
+		nameTop,
+		outerWidth,
+		selected);
+}
+
 void MemberListRow::elementsPaint(
 		Painter &p,
 		int outerWidth,

@@ -42,23 +42,6 @@ inline const char *cGUIDStr() {
 	return gGuidStr;
 }
 
-// CustomMod update-signing public key (replaces the official Telegram
-// key). Must stay byte-identical to the PublicKey/PublicBetaKey pair in
-// Telegram/SourceFiles/_other/packer.cpp — packer signs with the private
-// half of this key, and UnpackUpdate() below verifies with this half.
-// Private key: DesktopPrivate/packer_private.h (never in this repo).
-// Only one channel is used, so the beta key intentionally equals the
-// stable key.
-static const char *UpdatesPublicKey = "\
------BEGIN RSA PUBLIC KEY-----\n\
-MIGJAoGBAOXeKQU8R3n8JhbFKD2sl6tFLyf0UWfHftCX6J8rZTxwT7Q6CMf8EZak\n\
-nfR55LjoT37Ay39ci1yfV722GK30Sc6XnwsYXud2gbEzGyHLNvXxju/G/5FC+Hnr\n\
-RwY8CPlP2wB9bXQbVpy6Q6k8l8Aj8OTjvIBu5GRrC3elhCP7b74rAgMBAAE=\n\
------END RSA PUBLIC KEY-----\
-";
-
-static const char *UpdatesPublicBetaKey = UpdatesPublicKey;
-
 #if defined TDESKTOP_API_ID && defined TDESKTOP_API_HASH
 
 constexpr auto ApiId = TDESKTOP_API_ID;
