@@ -115,7 +115,11 @@ Qolgan (tdesktop'ga bog'liq emas): RAM sinovi, D: -> E: ko'chirish
 
 ---
 
-## 🔴 A27 — Self-update'ni 7.3.x imzo sxemasiga ko'chirish (2026-10-11; A7 relizidan OLDIN SHART)
+## 🟡 A27 — Self-update'ni 7.3.x imzo sxemasiga ko'chirish (2026-10-11; A7 relizidan OLDIN SHART)
+
+**JARAYONDA (2026-10-13):** dizayn, progress ro'yxati va sinov rejasi —
+`docs/self-update/a27-v2-signing.md`. Keyingi sessiya o'sha fayldagi
+"Progress" bo'limidan davom etadi.
 
 Upstream 7.3.0 yangilanish paketlarini tekshirishni `core/update_keys.cpp`
 (`RootPublicKeyPem()`) va `core/update_verify` (`Updates::VerifyUpdate`)
