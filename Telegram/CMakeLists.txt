@@ -1231,6 +1231,8 @@ PRIVATE
     custom_sync_keyshare.h
     custom_settings.cpp
     custom_settings.h
+    custom_startup_quiet.cpp
+    custom_startup_quiet.h
     custom_upstream_checker.cpp
     custom_upstream_checker.h
     custom_activity_history.cpp

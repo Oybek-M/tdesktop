@@ -2,7 +2,7 @@
 
 #include "custom_db.h"
 #include "custom_settings.h"
-#include "base/call_delayed.h"
+#include "custom_startup_quiet.h"
 #include "core/application.h"
 #include "crl/crl.h"
 #include "ui/boxes/confirm_box.h"
@@ -17,10 +17,6 @@
 
 namespace CustomMediaQuota {
 namespace {
-
-// Start tinchligi: main_session.cpp dagi kStartupQuietMs bilan bir xil
-// maqsad -- texnik xizmat startning og'ir qismi tugagach boshlansin.
-constexpr auto kStartupScanDelayMs = crl::time(90 * 1000);
 
 // Fon skaneri UI oqimidan mustaqil yozadi — atomik.
 std::atomic<long long> gUsedBytes{ 0 };
@@ -55,14 +51,15 @@ void Init() {
     //    skanerdan chiqadi. Skaner UI oqimida qilinsa ishga tushish
     //    sekinlashardi (o'n minglab fayl), shuning uchun crl::async.
     //
-    //    2026-09-12: bundan tashqari skaner endi startdan 90 soniya keyin
+    //    2026-09-12: bundan tashqari skaner start tinchigandan keyin
     //    boshlanadi. Fon oqimida bo'lsa ham, o'n minglab faylni yurish
     //    DISK bo'yicha bazani o'qish bilan raqobatlashadi -- startdagi
     //    qotishning bir qismi shundan edi. Kvota raqami darhol kerak
     //    emas: yuqoridagi SQL yig'indisi allaqachon berilgan, skaner
     //    faqat indeksdan oldingi (v7 gacha) fayllarni qo'shadi.
+    //    A26 (2026-10-13): qat'iy 90 s o'rniga custom_startup_quiet.h.
     const auto mediaDir = CustomSettings::ArchiveMediasDir();
-    base::call_delayed(kStartupScanDelayMs, [mediaDir] {
+    CustomStartupQuiet::OnCalm("MediaQuotaScan", [mediaDir] {
         // Navbat orqali: skaner compaction yoki avto-zaxira bilan bir
         // vaqtda ishlamasin (hammasi bitta diskka tegadi).
         CustomDB::Maintenance::Enqueue("MediaQuotaScan", [mediaDir] {

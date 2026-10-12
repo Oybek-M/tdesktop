@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "custom_branding.h"
 #include "custom_db.h"
 #include "custom_settings.h"
+#include "custom_startup_quiet.h"
 #include "custom_upstream_checker.h"
 
 #include "data/data_abstract_structure.h"
@@ -358,8 +359,12 @@ void StartMainThreadStallWatch() {
 		return;
 	}
 	since.start();
+	// A26: shu tiklar "start tinchidi" signalining manbai ham
+	// (custom_startup_quiet.h).
+	CustomStartupQuiet::Start();
 	watch = new base::Timer([] {
 		const auto late = since.restart() - kTickMs;
+		CustomStartupQuiet::NoteTick(late);
 		if (late >= kSuspendGapMs) {
 			LOG(("CustomMod Perf: taymer %1 ms kechikdi "
 				"(tizim uyqusi bo'lishi mumkin, qotish deb hisoblanmadi)"

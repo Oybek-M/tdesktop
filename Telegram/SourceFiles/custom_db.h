@@ -35,7 +35,8 @@ void PerfNote(const char *name, qint64 ns);
 //
 // Nima uchun: 2026-09-12 gacha compaction, media skaneri va avto-zaxira
 // bir-biridan mustaqil `crl::async` bilan ishga tushardi. Ular endi
-// startni bloklamaydi (hammasi start+90 s dan keyin), lekin BIR-BIRINI
+// startni bloklamaydi (hammasi start tinchigandan keyin --
+// custom_startup_quiet.h), lekin BIR-BIRINI
 // bloklashi mumkin edi: hammasi bitta FULLMUTEX SQLite ulanishi va bitta
 // diskka tegadi. Navbat orqali bir vaqtda faqat BITTA og'ir ish ketadi.
 //

@@ -66,6 +66,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "custom_db.h"
 #include "custom_media_quota.h"
 #include "custom_settings.h"
+#include "custom_startup_quiet.h"
 #include "custom_sync.h"
 #include "lang/lang_keys.h"
 #include "core/application.h"
@@ -81,11 +82,6 @@ namespace Main {
 namespace {
 
 constexpr auto kTmpPasswordReserveTime = TimeId(10);
-
-// CUSTOM 2026-09-12: start tinchligi oynasi. Texnik xizmat ishlari shu
-// vaqtdan keyin boshlanadi -- startning eng og'ir qismi (chatlar, xabar
-// ob'ektlari, media) tugab ulgursin.
-constexpr auto kStartupQuietMs = crl::time(90 * 1000);
 
 [[nodiscard]] QString ValidatedInternalLinksDomain(
 		not_null<const Session*> session) {
@@ -263,14 +259,20 @@ Session::Session(
 		// gacha cho'zilgan. Endi start tinchiganidan keyin bajariladi.
 		// RestoreDeletedChats kechiktirilMAYDI -- u foydalanuvchiga
 		// ko'rinadigan ish (saqlangan chatlarni ro'yxatga qaytarish).
-		base::call_delayed(kStartupQuietMs, this, [] {
+		//
+		// A26 (2026-10-13): qat'iy 90 s o'rniga asosiy oqim tinchiganda
+		// (custom_startup_quiet.h; 90 s -- yuqori chegara). Bu ish
+		// tugaguncha faollik tarixi keshi yuklanmaydi va hech narsa
+		// yozilmaydi -- ya'ni kutish qancha qisqa bo'lsa, shuncha kam
+		// yo'qotiladi.
+		CustomStartupQuiet::OnCalm("GlobalMaintenance", crl::guard(this, [] {
 			// 2026-09-13: bu ishlar GLOBAL -- media_index ham,
 			// activity_history ham akkaunt bo'yicha ajratilmagan. Ilgari har
 			// Session (ya'ni har akkaunt) ularni qaytadan bajarardi: 2
 			// akkauntda compaction 427 + 238 ms, ikkinchisi butunlay ortiqcha.
-			// Endi jarayon davomida BIR marta. Birinchi Session 90 soniya
-			// ichida yopilsa (logout), bayroq qo'yilmaydi va ishni keyingisi
-			// bajaradi.
+			// Endi jarayon davomida BIR marta. Birinchi Session tinchlik
+			// kelguncha yopilsa (logout), guard ishni bekor qiladi, bayroq
+			// qo'yilmaydi va ishni keyingisi bajaradi.
 			static auto sGlobalMaintenanceDone = false;
 			if (sGlobalMaintenanceDone) {
 				return;
@@ -314,7 +316,7 @@ Session::Session(
 			// Faollik tarixini siqish -- navbatda Reconcile'dan KEYIN.
 			// Tugagach keshni O'ZI qayta yuklaydi.
 			CustomDB::CompactActivityHistoryAsync();
-		});
+		}));
 		// Kvota ogohlantirishi bu yerdan OLIB TASHLANDI (26-09) — u endi
 		// yuqoridagi Maintenance navbatida, ResyncFromDisk() dan keyin
 		// ko'rsatiladi, ya'ni raqam har doim to'g'ri bo'ladi. Yon ta'siri

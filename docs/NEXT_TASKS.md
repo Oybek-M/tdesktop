@@ -25,8 +25,11 @@ bizniki** (A27).
 | Start bloki | 1-start 2891 ms (sovuq), 2-start (iliq) **1025 ms** — 7.2.10: 846 ms, 7.2.7 bazasi 1380-1774 ms; bitta o'lchov, keyingi startlarda qayta ko'rish |
 | Umumiy ishlash | Foydalanuvchi tekshirdi: ishlayapti |
 
-Start sinovi loglari: `C:\TBuild\starttest-20261013\` (kuzatuvchi
-`C:\TBuild\watch-starttest-v731.sh`). Build saboqlari (prepare'ni Git
+Start sinovi loglari SAQLANMAGAN: kuzatuvchi
+(`C:\TBuild\watch-starttest-v731.sh`) `starttest-20261013` papkasini
+yaratmagan (`mkdir -p` yo'q) va nusxalar jimgina yozilmagan — raqamlar
+kuzatuvchining stdout'idan. Keyingi kuzatuvchilarda papkani oldindan
+yaratish kerak. Build saboqlari (prepare'ni Git
 Bash'dan chaqirish, ucrt64 PATH, LNK1102/LNK1180, C: tozalash) — `MEMORY.md`
 T50.
 
@@ -42,7 +45,8 @@ kechqurun foydalanuvchi laptop'da TDLib Docker build'ini ishga tushiradi
 (~40-60 daqiqa, ~6 GB RAM) — shu paytda tdesktop build BOSHLANMAYDI.
 Boshlanish/tugashni CustomSync sessiyasi xabar qiladi.
 
-**Keyingi tartib:** A26 (start'dagi 90 s kutish) -> A22 -> A21 -> A7 reliz
+**Keyingi tartib:** A26 (start'dagi 90 s kutish; KOD YOZILDI, build
+kutilmoqda — A27 bilan bitta build'da o'rnatiladi) -> A22 -> A21 -> A7 reliz
 (avval VPS mirrorlari; A7 dan OLDIN foydalanuvchi
 `DesktopPrivate\update-v2\` dagi maxfiy kalitlarni oflayn zaxiralaydi).
 
@@ -165,6 +169,24 @@ qisqartirish mumkinmi?
 **G'oya:** qat'iy vaqt o'rniga "UI bo'shadi" signali (masalan, birinchi
 chat ro'yxati chizilgandan keyin asosiy oqim bir necha soniya band
 bo'lmasa); 90 s faqat yuqori chegara bo'lib qoladi.
+
+**🟡 KOD YOZILDI (2026-10-13, laptop), BUILD QILINMAGAN.** O'lchov (7.3.1
+iliq start logi): chat ro'yxatlari +4 s / +9 s da yuklangan, lekin
+`ActivityCacheLoad` faqat +94 s da (birinchi marta `CompactActivityHistoryAsync`
+ichida; `WarmActivityCache()` hech qayerda chaqirilmaydi) — ya'ni har startda
+~94 s faollik tarixi umuman yozilmasdi. Yechim: yangi `custom_startup_quiet.{h,cpp}`
+— `OnCalm(name, callback)`: callback asosiy oqim RO'YXATDAN O'TGANDAN KEYIN
+ketma-ket 8 s tinch bo'lganda (qotish kuzatuvchisi tiki kechikishi < 150 ms)
+va startdan kamida 20 s o'tgach chaqiriladi; yuqori chegara — ro'yxatdan
+o'tgandan 90 s. Manba: `application.cpp` dagi qotish kuzatuvchisi
+(`Start()` + `NoteTick(late)`). Ulangan 3 joy: `main_session.cpp`
+(GlobalMaintenance, `crl::guard(this)`), `custom_media_quota.cpp`
+(MediaQuotaScan), `custom_sync.cpp` (birinchi sikl signal kelganda DARHOL —
+`syncNow()`; ilgari +90 s). Log: `CustomMod Perf: start tinchidi -> <nom>
+(start+N ms, kutildi M ms, tinch|yuqori chegara)`.
+**Sinov (build'dan keyin):** log'da uchala "start tinchidi" qatori ~+20-30 s
+da, `ActivityCacheLoad` ham shu atrofda; "main thread blocked" startdagidan
+ko'paymagan; sync birinchi sikli shu paytda.
 **Shart:** A25 o'zgarishlari (startdagi holatni yozish) ko'rib chiqilib,
 T49 build sinovdan o'tgandan KEYIN. A3.1 (alohida SQLite ulanishi) rejada qoladi.
 **Eslatma:** 7.2.10 startidagi 5.2-7.5 s asosiy oqim bloki CustomMod emas —

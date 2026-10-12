@@ -517,7 +517,8 @@ void RecordPhotoOnlineMoment(
 }
 
 // A25: start paytida kontaktlar holati serverdan keladi, lekin RecordField
-// kesh tayyor bo'lmaguncha (start + ~90 s) jimgina qaytadi, keyin esa bu
+// kesh tayyor bo'lmaguncha (start tinchiguncha: A26 dan beri odatda ~20 s,
+// ko'pi bilan ~90 s) jimgina qaytadi, keyin esa bu
 // holat qayta otilmaydi (o'zgarmagan) -- ilova yopiq bo'lgan vaqtdagi
 // oxirgi holat bazaga UMUMAN tushmasdi.
 //
@@ -786,9 +787,10 @@ void Init(not_null<Main::Session*> session) {
 			sRecordedStoryDates.emplace(peerId, storyDate);
 		}
 
-		// Kesh tayyor bo'lmasa RecordField jimgina qaytadi (start+90 s
-		// oynasi). Story signali bu oynada ko'p keladi (getAllStories),
-		// shuning uchun keyinroq bir marta qayta urinamiz.
+		// Kesh tayyor bo'lmasa RecordField jimgina qaytadi (start tinchigan
+		// paytgacha -- custom_startup_quiet.h). Story signali bu oynada ko'p
+		// keladi (getAllStories), shuning uchun keyinroq bir marta qayta
+		// urinamiz.
 		if (!CustomDB::IsActivityCacheReady()) {
 			static auto sRetryScheduled = base::flat_set<PeerId>();
 			if (!sRetryScheduled.contains(peerId)) {
