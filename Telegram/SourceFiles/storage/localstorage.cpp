@@ -561,8 +561,12 @@ const QString &readAutoupdatePrefixRaw() {
 	// who already has this binary has the update content anyway, same
 	// reasoning as the RSA key split (docs/self-update/key-management.md).
 	// Runtime-overridable via writeAutoupdatePrefix() without a rebuild.
+	// A27: '/v2' -- 7.3+ klient faqat V2 (Ed25519) paketni tushunadi, eski
+	// 7.2.x klientlar esa '/secure' dagi v1 (RSA) lentani o'qiydi. Ikki format
+	// bitta lentada bo'lsa, eski klientlar V2 paketni yuklab, rad etaverardi
+	// (docs/self-update/a27-v2-signing.md).
 	return AutoupdatePrefix(
-		"https://cmupdate:3GnYk0nPYUH90hew5DIRqm1R@updates.2007.uz/secure");
+		"https://cmupdate:3GnYk0nPYUH90hew5DIRqm1R@updates.2007.uz/secure/v2");
 }
 
 void writeAutoupdatePrefix(const QString &prefix) {

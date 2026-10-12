@@ -72,10 +72,27 @@ bilan almashtirish mumkin bo'ladi.
 ## 5. Progress
 
 - [x] Upstream sxemasini o'rganish, dizayn (2026-10-13)
-- [ ] Kalitlar va manifest (DesktopPrivate + `Resources/update`)
-- [ ] Standart prefiks `/secure/v2`
-- [ ] `publish.ps1` V2 bayroqlari
+- [x] Kalitlar va manifest (2026-10-13): OpenSSL 3.2.2 (`genpkey -algorithm
+  ed25519`; manifest `pkeyutl -sign -rawin`, `printf` bilan yangi qatorsiz).
+  `DesktopPrivate\update-v2\`: `root-private.pem`, `root-public.pem`,
+  `signing-oy-2026a-{private,public}.pem`, `manifest.min.json`, `manifest.sig`.
+  Repo'ga faqat ochiq uchtasi; PEM LF bilan (Git'ning openssl'i CRLF yozadi).
+  Manifest `issued` 1791836894, `expires` +10 yil.
+- [x] Packer sinovi: 7.3.1 `Packer.exe ... -target win64 -channel stable
+  -keys-loc ...\Resources\update -local-key ...\signing-oy-2026a-private.pem
+  -local-key-id oy-2026a` -> `td-update-win-x64-7003002` ("written
+  successfully" — yozishdan oldin o'zi tekshiradi). V2 paket NOMI:
+  `td-update-win-x64-<versiya>`.
+- [x] Standart prefiks `/secure/v2` (`storage/localstorage.cpp`)
+- [x] `publish.ps1` V2 bayroqlari + `current6` (eski skript `current4` yozardi —
+  7.x klientlar `current6` so'raydi, ya'ni avvaldan 404 edi) + barcha
+  mirrorlarda `v2/` papka. `release.ps1 -DryRun` O'TDI: paket
+  `td-update-win-x64-7003001`, lenta
+  `{"win64":{"stable":{"link":"/win/td-update-win-x64-7003001","released":7003001}}}`.
+  API yo'li (`-Api`, release-api.ps1) `/v2` joylashuvini server tomonida
+  bilishi kerak — A7 da CustomSync sessiyasi bilan.
 - [ ] Build (CustomSync sessiyasini oldindan ogohlantirish)
 - [ ] Sinov 1-3
-- [ ] Merge qoidasi hujjatda (Resources/update — bizniki)
+- [x] Merge qoidasi: `Telegram/Resources/update/*` — DOIM bizniki (biz
+  o'zgartirganimiz uchun upstream o'zgartirsa git konflikt ko'rsatadi)
 - [ ] VPS tomoni + reliz — A7 da

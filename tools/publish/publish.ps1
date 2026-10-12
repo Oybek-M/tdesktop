@@ -99,7 +99,18 @@ $RepoRoot     = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $VersionFile  = Join-Path $RepoRoot "Telegram\SourceFiles\core\version.h"
 $PackerExe    = Join-Path $RepoRoot "out\Release\Packer.exe"
 $DesktopPrivateDir = Join-Path $RepoRoot "..\DesktopPrivate"
-$PrivateKey   = Join-Path $DesktopPrivateDir "customsync-updates-private.pem"
+# A27 (7.3+): paket V2 (Ed25519) bilan imzolanadi. Maxfiy imzolovchi kalit
+# faqat DesktopPrivate'da; ochiq qismlar (ildiz kaliti, manifest va uning
+# imzosi) repo'dagi Resources/update'da -- Packer ularni -keys-loc dan o'qiydi.
+$V2SigningKey = Join-Path $DesktopPrivateDir "update-v2\signing-oy-2026a-private.pem"
+$V2KeyId      = "oy-2026a"
+$V2KeysLoc    = Join-Path $RepoRoot "Telegram\Resources\update"
+# Windows'da Platform::AutoUpdateVersion() = 6, klient "<prefix>/current6"
+# ni so'raydi (eski "current4" 7.x klientlar uchun 404 berardi).
+$FeedName     = "current6"
+# 7.3+ klientning standart prefiksi ".../secure/v2" (localstorage.cpp):
+# v1 va V2 paketlar hech qachon bitta lentada bo'lmasligi uchun.
+$FeedSubdir   = "v2"
 $SecretsFile  = Join-Path $DesktopPrivateDir "vps-mirror-secrets.txt"
 $WorkDir      = Join-Path $env:TEMP "customsync-release-$([guid]::NewGuid().ToString('N').Substring(0,8))"
 
@@ -118,8 +129,13 @@ function Fail($message) {
 # protection IS that path segment being unguessable. Hardcoding it
 # here would publish it to anyone who reads this file on GitHub.
 
-if (-not (Test-Path $PrivateKey)) {
-    Fail "Private key not found at $PrivateKey. Without it, Packer.exe cannot sign anything - check docs/self-update/key-management.md."
+if (-not (Test-Path $V2SigningKey)) {
+    Fail "V2 signing key not found at $V2SigningKey. Without it, Packer.exe cannot sign anything - check docs/self-update/a27-v2-signing.md."
+}
+foreach ($name in @("root-public.pem", "manifest.min.json", "manifest.sig")) {
+    if (-not (Test-Path (Join-Path $V2KeysLoc $name))) {
+        Fail "Missing $name in $V2KeysLoc - check docs/self-update/a27-v2-signing.md."
+    }
 }
 if (-not (Test-Path $PackerExe)) {
     Fail "Packer.exe not found at $PackerExe. Build it first: cmake --build out --target Packer --config Release"
@@ -181,7 +197,10 @@ if (-not $stagingEntries) {
 $packerPathArgs = foreach ($entry in $stagingEntries) { "-path"; $entry.FullName }
 Push-Location $WorkDir
 try {
-    & $PackerExe @packerPathArgs -version $version -target win64
+    # Packer V2 paketni yozishdan oldin o'zi tekshiradi (VerifyPackedV2).
+    & $PackerExe @packerPathArgs -version $version -target win64 `
+        -channel stable -keys-loc $V2KeysLoc `
+        -local-key $V2SigningKey -local-key-id $V2KeyId
     if ($LASTEXITCODE -ne 0) {
         Fail "Packer.exe exited with code $LASTEXITCODE"
     }
@@ -189,7 +208,7 @@ try {
     Pop-Location
 }
 
-$packageName = "tx64upd$version"
+$packageName = "td-update-win-x64-$version"
 $packagePath = Join-Path $WorkDir $packageName
 if (-not (Test-Path $packagePath)) {
     Fail "Packer did not produce the expected file: $packageName"
@@ -214,7 +233,7 @@ $manifest = @{
     }
 } | ConvertTo-Json -Compress -Depth 5
 
-$manifestPath = Join-Path $WorkDir "current4"
+$manifestPath = Join-Path $WorkDir $FeedName
 Set-Content -Path $manifestPath -Value $manifest -NoNewline -Encoding utf8
 
 Write-Host "Manifest: $manifest" -ForegroundColor Cyan
@@ -235,7 +254,7 @@ function Upload-Vps($label, $remotePath) {
         if ($LASTEXITCODE -ne 0) { throw "ssh mkdir failed" }
         & scp $packagePath "${SshHost}:$remotePath/win/$packageName"
         if ($LASTEXITCODE -ne 0) { throw "scp package failed" }
-        & scp $manifestPath "${SshHost}:$remotePath/current4"
+        & scp $manifestPath "${SshHost}:$remotePath/$FeedName"
         if ($LASTEXITCODE -ne 0) { throw "scp manifest failed" }
         $results[$label] = @{ ok = $true }
     } catch {
@@ -264,17 +283,17 @@ if ($Api) {
     }
 } else {
 
-Upload-Vps "vps-secure" "/var/www/updates/secure"
-Upload-Vps "vps-pub"    "/var/www/updates/$($Secrets.pub_prefix)"
+Upload-Vps "vps-secure" "/var/www/updates/secure/$FeedSubdir"
+Upload-Vps "vps-pub"    "/var/www/updates/$($Secrets.pub_prefix)/$FeedSubdir"
 
 Write-Host "Uploading to GitHub ($GithubRepo)..." -ForegroundColor Cyan
 try {
     $ghWorkDir = Join-Path $WorkDir "gh-repo"
     & gh repo clone $GithubRepo $ghWorkDir -- --depth 1
     if ($LASTEXITCODE -ne 0) { throw "gh repo clone failed" }
-    New-Item -ItemType Directory -Force -Path (Join-Path $ghWorkDir "win") | Out-Null
-    Copy-Item $packagePath (Join-Path $ghWorkDir "win\$packageName")
-    Copy-Item $manifestPath (Join-Path $ghWorkDir "current4")
+    New-Item -ItemType Directory -Force -Path (Join-Path $ghWorkDir "$FeedSubdir\win") | Out-Null
+    Copy-Item $packagePath (Join-Path $ghWorkDir "$FeedSubdir\win\$packageName")
+    Copy-Item $manifestPath (Join-Path $ghWorkDir "$FeedSubdir\$FeedName")
     Push-Location $ghWorkDir
     try {
         & git add -A
@@ -336,8 +355,8 @@ $secureAuthHeader = @{
         [Text.Encoding]::ASCII.GetBytes("$($Secrets.secure_user):$($Secrets.secure_pass)")
     )
 }
-Verify-Url "vps-secure" "https://updates.2007.uz/secure/win/$packageName" $secureAuthHeader
-Verify-Url "vps-pub"    "https://updates.2007.uz/$($Secrets.pub_prefix)/win/$packageName"
+Verify-Url "vps-secure" "https://updates.2007.uz/secure/$FeedSubdir/win/$packageName" $secureAuthHeader
+Verify-Url "vps-pub"    "https://updates.2007.uz/$($Secrets.pub_prefix)/$FeedSubdir/win/$packageName"
 
 # --- Step 6: summary ---------------------------------------------------
 

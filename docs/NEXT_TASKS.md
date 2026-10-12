@@ -10,6 +10,8 @@
 va `origin/Oybek` ga push qilindi. Yangi reliz bor-yo'qligini tekshirish
 (repo'da `upstream` remote YO'Q — faqat o'qiydi):
 `git ls-remote --tags --refs https://github.com/telegramdesktop/tdesktop.git 'v7.*'`
+Merge'da `Telegram/Resources/update/*` (yangilanish kalitlari) — **DOIM
+bizniki** (A27).
 
 **✅ `9a730f3c41` o'rnatildi va sinovdan O'TDI** (T50, 2026-10-13 01:07,
 `install-staged.sh`). Nusxa `C:\TBuild\staged\9a730f3c41-20261013\` (exe

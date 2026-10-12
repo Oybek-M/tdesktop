@@ -1,5 +1,10 @@
 # Update-signing key — joylashuvi va boshqaruvi
 
+> **⚠️ 7.3+ (A27, 2026-10-13):** bu fayldagi 1024-bit RSA kalit faqat eski
+> 7.2.x klientlar (v1 paket, `/secure` lentasi) uchun. 7.3+ klientlar V2
+> (Ed25519) paketni tekshiradi — kalitlar `DesktopPrivate\update-v2\`,
+> to'liq tavsif `a27-v2-signing.md`.
+
 **Holat:** kalit yaratildi va tekshirildi. Repozitoriyga **hech qachon**
 kiritilmaydi.
 
