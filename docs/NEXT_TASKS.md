@@ -377,8 +377,14 @@ sanoqlar):**
   barobar); butun bazada matnsiz yozuvlar: chiquvchi 381 (366 tasi fayl
   yo'li umuman yo'q media), kiruvchi 640 (595 tasi shunday). Ya'ni
   foydalanuvchi yuborgan rasm/fayl
-  o'chirilsa, uning fayli odatda arxivda yo'q va xabar chatga qaytmaydi
-  (nima uchun arxivlanmagani — kod bo'yicha tekshirilmagan).
+  o'chirilsa, uning fayli odatda arxivda yo'q va xabar chatga qaytmaydi.
+  Nima uchun (kod o'qishdan xulosa, sinovda TASDIQLANMAGAN): arxivga fayl
+  faqat YUKLAB OLISH yo'lidan tushadi — L1 (foydalanuvchi ochgan), L2
+  `MaybeDownloadMedia` (faqat `ShouldMediaBackup` yoqilgan chatda; fayl
+  allaqachon diskda bo'lsa `filepath(true)` sharti bilan darhol qaytadi), L3
+  `TryRescueMedia` (o'chirilganda; faqat hujjatlar va faqat media backup
+  yoqilgan chatda). Chiquvchi media'ni foydalanuvchi o'z diskidan yuboradi —
+  yuklab olish bo'lmaydi, demak arxiv nusxasi ham paydo bo'lmaydi.
   Variantlar (foydalanuvchi qarori kerak, 08-27 qarori "arvohlar" sababli
   qabul qilingan edi): (a) shunday yozuvlar uchun "📎 media (fayl
   arxivlanmagan)" belgisi — faqat `account_id` aniq bo'lganlarda; (b)
