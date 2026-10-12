@@ -1,40 +1,36 @@
 # CustomMod — Keyingi Tasklar Ro'yxati
 
-**Oxirgi yangilanish:** 2026-10-10 (`b19d83c2a1` o'rnatildi va sinovdan O'TDI; keyingisi A26)
+**Oxirgi yangilanish:** 2026-10-13 (upstream v7.3.1 `9a730f3c41` build qilindi, o'rnatildi va sinovdan O'TDI; keyingisi A27)
 
 ---
 
-## 🟡 2026-10-10 holati — keyingi sessiya shu yerdan boshlaydi
+## 🟡 2026-10-13 holati — keyingi sessiya shu yerdan boshlaydi
 
-**Upstream:** v7.2.8+v7.2.9+v7.2.10 merge qilindi (`94e0d660a1`, T48).
-Yangi reliz bor-yo'qligini tekshirish (repo'da `upstream` remote YO'Q —
-faqat o'qiydi):
+**Upstream:** v7.3.0+v7.3.1 merge qilindi (`9a730f3c41`, 866 commit, T50)
+va `origin/Oybek` ga push qilindi. Yangi reliz bor-yo'qligini tekshirish
+(repo'da `upstream` remote YO'Q — faqat o'qiydi):
 `git ls-remote --tags --refs https://github.com/telegramdesktop/tdesktop.git 'v7.*'`
 
-**✅ `b19d83c2a1` o'rnatildi va sinovdan O'TDI** (T49, 2026-10-10):
-7.2.10 + PC'dagi 21 commit (A23+A24 `0c1a158c32`, A25 `b0e933957e`, sync
-scope/`edit_date`). `install-staged.sh` 21:10:55 da o'rnatdi. Zaxiralar:
-`Release\_tdata-backup-pre-b19d83c2a1-20261008-20261010-211055` (100 MB),
-`db\pre-b19d83c2a1-20261008-20261010-211055` (62 MB), eski exe (10-07
-build'i) `Telegram.exe.pre-b19d83c2a1-20261008-20261010-211055`.
+**✅ `9a730f3c41` o'rnatildi va sinovdan O'TDI** (T50, 2026-10-13 01:07,
+`install-staged.sh`). Nusxa `C:\TBuild\staged\9a730f3c41-20261013\` (exe
+`7.3.1.0`, 255 MB). Zaxiralar:
+`Release\_tdata-backup-pre-9a730f3c41-20261013-20261013-010713` (107 MB),
+`db\pre-9a730f3c41-20261013-20261013-010713` (61 MB), eski exe
+`Telegram.exe.pre-9a730f3c41-20261013-20261013-010713`.
 
 | Sinov | Natija |
 |---|---|
-| Start bloki | 1-start 3638 ms, 2-start (iliq) **846 ms** — 7.2.7 bazasi 1380-1774 ms, regressiya YO'Q |
-| A25 startdagi holat | 2-startdan ~100 s keyin 18 ta `status` qatori (10 tasi `offline:*`); eski build'da startdan keyingi 2 daqiqada 0 |
-| A25 sarlavha | Faollik oynasi sarlavhasi Telegram'dagi last-seen bilan mos (foydalanuvchi tekshirdi) |
-| A25 startdagi qotish | Yozuvlar tushgan paytda (21:28:29) `main thread blocked` yo'q |
-| A23 | 1-2 qadam O'TDI: disk ildizi -> `<disk>/customizationMainFolder` taklif qilinadi; arxiv ichidagi papka rad etiladi |
-| Xatolar | 0 `App Error`, CustomMod xato qatori yo'q |
+| Start bloki | 1-start 2891 ms (sovuq), 2-start (iliq) **1025 ms** — 7.2.10: 846 ms, 7.2.7 bazasi 1380-1774 ms; bitta o'lchov, keyingi startlarda qayta ko'rish |
+| Umumiy ishlash | Foydalanuvchi tekshirdi: ishlayapti |
 
-**Sinalmagan:** A25 "davrlar" (22.09 ro'yxati qisqa ulanish guruhlari)
-alohida ko'rilmadi; A23 3-4 qadam (haqiqiy ko'chirish) asosiy laptopda
-qilinmadi; A24 va sync o'zgarishlari 2 qurilma + sync server talab qiladi.
-Start sinovi loglari: `C:\TBuild\starttest-20261010\` (kuzatuvchi
-`C:\TBuild\watch-starttest.sh`).
+Start sinovi loglari: `C:\TBuild\starttest-20261013\` (kuzatuvchi
+`C:\TBuild\watch-starttest-v731.sh`). Build saboqlari (prepare'ni Git
+Bash'dan chaqirish, ucrt64 PATH, LNK1102/LNK1180, C: tozalash) — `MEMORY.md`
+T50.
 
-**Keyingi tartib:** A26 (start'dagi 90 s kutish) -> A22 -> A21 -> A7 reliz
-(avval VPS mirrorlari).
+**Keyingi tartib:** A27 (self-update imzo sxemasi, A7 dan OLDIN SHART) ->
+A26 (start'dagi 90 s kutish) -> A22 -> A21 -> A7 reliz (avval VPS
+mirrorlari).
 
 **PC holati (09-30):** disk ishlari YOPILDI. E: yangi Toshiba (toza), D:
 pending 349 -> 0 (yumshoq xato, sog'lom), arxiv `E:\customizationMainFolder`.
@@ -116,6 +112,26 @@ Qolgan (tdesktop'ga bog'liq emas): RAM sinovi, D: -> E: ko'chirish
 ### ~~NEXT-9: Per-Chat "Barchasini tozalash"~~ ✅ T43 da tugadi
 
 ### ~~NEXT-10: Background AntiDelete — msgDate==0 fallback~~ ✅ T44 da tugadi
+
+---
+
+## 🔴 A27 — Self-update'ni 7.3.x imzo sxemasiga ko'chirish (2026-10-11; A7 relizidan OLDIN SHART)
+
+Upstream 7.3.0 yangilanish paketlarini tekshirishni `core/update_keys.cpp`
+(`RootPublicKeyPem()`) va `core/update_verify` (`Updates::VerifyUpdate`)
+ga ko'chirdi, packer V2 formatiga o'tdi, v1 paketlarni ochish olib
+tashlandi. Merge'da `config.h` dagi bizning `UpdatesPublicKey` blokimiz olib
+tashlandi (kalit `Telegram/build/_other/packer.cpp` va git tarixida qoldi).
+Natija: bizning RSA kalit bilan imzolangan self-update paketlari endi
+tekshiruvdan O'TMAYDI.
+
+Hozircha xavfsiz: yangilanish manbai faqat VPS mirror, MtpChecker
+o'chirilgan (`core/update_checker.cpp`).
+
+Qilish kerak: yangi sxemani o'rganib, o'z kalitimiz bilan moslash (maxfiy
+kalit repo'ga TUSHMAYDI), packer'ni V2 formatiga o'tkazish, VPS mirror'dagi
+paket formatini yangilash va test nusxada to'liq yangilanish siklini sinash.
+Aniq dizayn — alohida reja.
 
 ---
 
