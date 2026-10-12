@@ -47,6 +47,14 @@ Boshlanish/tugashni CustomSync sessiyasi xabar qiladi.
 
 **Keyingi tartib:** A26 (start'dagi 90 s kutish; KOD YOZILDI, build
 kutilmoqda — A27 bilan bitta build'da o'rnatiladi) -> A22 -> A21 -> A7 reliz
+
+**A21 holati (2026-10-13 tekshirildi):** Task C UI'si (`7896c40ccf` +
+`1c6202bf5b`, Ombor -> "👤 Egasi noma'lum yozuvlar") o'rnatilgan build'da BOR.
+Kod ishi qolmagan — qolgani FOYDALANUVCHI qarori: qaysi chat qaysi
+akkauntniki. Baza nusxasida (10-13): 30 noaniq peer / 11 173 qator (eng
+kattasi `562952328991389` — 6 253); `account_id = 0` jami 14 944 (backup
+14 110, deleted 833). Tavsiya: avval kichik peer'da sinash (spec §7).
+Tafsilot: `docs/superpowers/specs/2026-09-05-a21-false-positive-deletions.md`.
 (avval VPS mirrorlari; A7 dan OLDIN foydalanuvchi
 `DesktopPrivate\update-v2\` dagi maxfiy kalitlarni oflayn zaxiralaydi).
 
@@ -348,6 +356,29 @@ chalkashlik dastlabki nuqsonning o'zi bo'lishi ehtimoli yuqori.
 
 **Sinov usuli:** log'da `reinserted`/`window` sonlarini kuzatish. Ular 0
 bo'lsa tuzatish yo'li umuman bosilmagan degani.
+
+**Baza tahlili (2026-10-13, faqat NUSXADA — `db\pre-9a730f3c41-...`, faqat
+sanoqlar):**
+- `msg_date = 0` gipotezasi RAD ETILDI: o'chirilgan 4066 yozuvdan bor-yo'g'i
+  2 tasi (2026-06-07 dagi, mazmunsiz, `account_id = 0`) — ular baribir
+  "bo'sh" deb tashlanadi, `currentSecsSinceEpoch()` fallback'i amalda ishlamaydi.
+- "O'zim yozgan xabarlar qolib ketadi" — kuchli nomzod: fayli ARXIVLANMAGAN
+  media xabarlar. Inject qoidasi (2026-08-27): matn yo'q va fayl diskda yo'q
+  -> ko'rsatilmaydi (`skippedEmpty`). `7053823996` chatida 752 o'chirilgan
+  yozuvdan 42 tasi shunday (kiruvchi 14, CHIQUVCHI 28 — chiquvchilar ikki
+  barobar); butun bazada matnsiz yozuvlar: chiquvchi 381 (366 tasi fayl
+  yo'li umuman yo'q media), kiruvchi 640 (595 tasi shunday). Ya'ni
+  foydalanuvchi yuborgan rasm/fayl
+  o'chirilsa, uning fayli odatda arxivda yo'q va xabar chatga qaytmaydi
+  (nima uchun arxivlanmagani — kod bo'yicha tekshirilmagan).
+  Variantlar (foydalanuvchi qarori kerak, 08-27 qarori "arvohlar" sababli
+  qabul qilingan edi): (a) shunday yozuvlar uchun "📎 media (fayl
+  arxivlanmagan)" belgisi — faqat `account_id` aniq bo'lganlarda; (b)
+  chiquvchi media'ni yuborish paytida arxivlash.
+- Tartib chalkashligi (1-band) baza bilan tushuntirilmaydi — `insertMessageToBlocks`
+  sana bo'yicha qo'yadi, chat ichida sana va ID monoton. Keyingi qadam:
+  inject'dan keyin bloklarda sana tartibi buzilgan qo'shni juftlarni sanab
+  log'ga yozish (diagnostika), foydalanuvchi bilan qayta sinash.
 
 ---
 

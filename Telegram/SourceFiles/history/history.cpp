@@ -2625,14 +2625,33 @@ void History::loadDeletedMessages() {
 		injectedCount++;
 	}
 	if (injectedCount > 0 || reinserted > 0) {
+		// A22 diagnostika (2026-10-13): bloklarda sanasi oldingisidan
+		// ESKI bo'lgan qo'shni juftlar soni. insertMessageToBlocks() sana
+		// bo'yicha qo'yadi, server xabarlari ham amalda sana tartibida --
+		// ya'ni 0 dan katta son biror xabar noto'g'ri joyda turganini
+		// bildiradi. "Tartib chalkash" shikoyati shu son bilan log'dan
+		// tasdiqlanadi yoki rad etiladi. Faqat log yoziladigan paytda
+		// hisoblanadi -- bitta o'tish, yuklangan oyna bo'yicha.
+		auto orderBreaks = 0;
+		auto previousDate = std::optional<TimeId>();
+		for (const auto &block : blocks) {
+			for (const auto &view : block->messages) {
+				const auto date = view->data()->date();
+				if (previousDate && date < *previousDate) {
+					++orderBreaks;
+				}
+				previousDate = date;
+			}
+		}
 		// LOG(), qDebug() EMAS -- qDebug log.txt ga tushmaydi.
 		// `reinserted` va `window` ataylab log'da: ular bo'lmasa
 		// "nega ko'rinmayapti?" savoliga log'dan javob topilmaydi.
 		LOG(("CustomMod: injected %1 deleted messages for peer %2 "
-			"| reinserted %3 | skipped: empty %4, foreign %5, window %6"
+			"| reinserted %3 | skipped: empty %4, foreign %5, window %6 "
+			"| order breaks %7"
 			).arg(injectedCount).arg(peer->id.value
 			).arg(reinserted).arg(skippedEmpty).arg(skippedForeign
-			).arg(skippedWindow));
+			).arg(skippedWindow).arg(orderBreaks));
 	}
 }
 
