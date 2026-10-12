@@ -1,6 +1,6 @@
 # CustomMod — Keyingi Tasklar Ro'yxati
 
-**Oxirgi yangilanish:** 2026-10-13 (upstream v7.3.1 `9a730f3c41` build qilindi, o'rnatildi va sinovdan O'TDI; keyingisi A27)
+**Oxirgi yangilanish:** 2026-10-13 (v7.3.1 `9a730f3c41` o'rnatildi va sinovdan O'TDI; A27 `7ece589feb` build O'TDI, statik sinov O'TDI, o'rnatish kutilmoqda; keyingisi A26)
 
 ---
 
@@ -30,9 +30,21 @@ Start sinovi loglari: `C:\TBuild\starttest-20261013\` (kuzatuvchi
 Bash'dan chaqirish, ucrt64 PATH, LNK1102/LNK1180, C: tozalash) — `MEMORY.md`
 T50.
 
-**Keyingi tartib:** A27 (self-update imzo sxemasi, A7 dan OLDIN SHART) ->
-A26 (start'dagi 90 s kutish) -> A22 -> A21 -> A7 reliz (avval VPS
-mirrorlari).
+**🟡 A27 build `7ece589feb` O'TDI, O'RNATILMAGAN** (2026-10-13 01:43):
+`C:\TBuild\staged\7ece589feb-20261013\` (SHA256 `037f4f20cc6dfd0f...`).
+Statik sinov O'TDI (exe ichida faqat bizning V2 kalitlar, prefiks
+`/secure/v2`). O'rnatish — foydalanuvchi Telegram'ni yopganda
+(`install-staged.sh`); PC — qo'lda. To'liq sikl sinovi — A7 da. Tafsilot:
+`docs/self-update/a27-v2-signing.md` "Progress".
+
+**⚠️ Build vaqti cheklovi (CustomSync sessiyasidan, 2026-10-13):** bugun
+kechqurun foydalanuvchi laptop'da TDLib Docker build'ini ishga tushiradi
+(~40-60 daqiqa, ~6 GB RAM) — shu paytda tdesktop build BOSHLANMAYDI.
+Boshlanish/tugashni CustomSync sessiyasi xabar qiladi.
+
+**Keyingi tartib:** A26 (start'dagi 90 s kutish) -> A22 -> A21 -> A7 reliz
+(avval VPS mirrorlari; A7 dan OLDIN foydalanuvchi
+`DesktopPrivate\update-v2\` dagi maxfiy kalitlarni oflayn zaxiralaydi).
 
 **PC holati (09-30):** disk ishlari YOPILDI. E: yangi Toshiba (toza), D:
 pending 349 -> 0 (yumshoq xato, sog'lom), arxiv `E:\customizationMainFolder`.
@@ -119,9 +131,10 @@ Qolgan (tdesktop'ga bog'liq emas): RAM sinovi, D: -> E: ko'chirish
 
 ## 🟡 A27 — Self-update'ni 7.3.x imzo sxemasiga ko'chirish (2026-10-11; A7 relizidan OLDIN SHART)
 
-**JARAYONDA (2026-10-13):** dizayn, progress ro'yxati va sinov rejasi —
-`docs/self-update/a27-v2-signing.md`. Keyingi sessiya o'sha fayldagi
-"Progress" bo'limidan davom etadi.
+**KOD TAYYOR, BUILD O'TDI (2026-10-13, `7ece589feb`):** o'z Ed25519
+kalitlarimiz, prefiks `/secure/v2`, `publish.ps1` V2. Qolgani: o'rnatish
+(laptop + PC) va to'liq sikl sinovi A7 da. Dizayn, progress va sinov
+natijalari — `docs/self-update/a27-v2-signing.md`.
 
 Upstream 7.3.0 yangilanish paketlarini tekshirishni `core/update_keys.cpp`
 (`RootPublicKeyPem()`) va `core/update_verify` (`Updates::VerifyUpdate`)

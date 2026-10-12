@@ -63,11 +63,31 @@ bilan almashtirish mumkin bo'ladi.
 
 ## 4. Sinov rejasi (VPS va haqiqiy tdata'ga tegmaydi)
 
-1. Packer paketni yozgach o'zi tekshiradi (`VerifyPackedV2`).
-2. To'liq sikl: alohida sinov papkasidagi A27 klient + `tdata/prefix` ->
-   `http://127.0.0.1:<port>` (lokal HTTP server: `current6` + V2 paket).
-   Kutilgan: yuklab olish -> `VerifyUpdate` o'tadi -> "ready".
-3. Salbiy sinov: upstream kalit bilan imzolangan / buzilgan paket rad etiladi.
+1. Packer paketni yozgach o'zi tekshiradi (`VerifyPackedV2`) — O'TDI. Bu
+   tekshiruv klient ishlatadigan AYNAN o'sha `Core::Updates::VerifyUpdate`
+   (`packer.cpp:355`, `core/update_verify.cpp`) va `-keys-loc` dagi uchala
+   faylni ishlatadi.
+2. Statik tekshiruv (2026-10-13) — O'TDI: A27 `Telegram.exe` ichida
+   `root-public.pem` (113 B), `manifest.min.json` (239 B), `manifest.sig`
+   (64 B) — repo'dagi bizniki bilan bayt-ma-bayt bir xil, har biri 1 marta;
+   upstream'ning uchala fayli (`9a730f3c41` dagi) — 0 marta; prefiks
+   `updates.2007.uz/secure/v2` — bor. Ya'ni 1-bandda tekshirilgan kod + baytlar
+   = klientdagi kod + baytlar.
+3. Saqlangan manifest (o'tish xavfsizligi): `HeldManifest()`
+   (`update_checker.cpp`) tdata'dagi manifestni BIZNING ildiz kaliti bilan
+   tekshiradi — eski build yozgan upstream manifest (bo'lsa) rad etiladi va
+   ichki (bizniki) ishlatiladi. Ya'ni mavjud tdata ustiga o'rnatish xavfsiz.
+4. **To'liq sikl (yuklash -> tekshirish -> "ready" -> almashtirish) — A7
+   da**, haqiqiy o'rnatma `/secure/v2` dan o'zini yangilaganda. Alohida sinov
+   nusxasi bu mashinada QILINMAYDI: CustomMod arxiv papkasi
+   (`ArchiveRoot()`) reyestrdagi umumiy QSettings
+   (`CustomMod/TelegramDesktop`, `archiveRootPath`) dan olinadi — har qanday
+   nusxa foydalanuvchining HAQIQIY bazasini ochadi (2026-08-27 dagi
+   WAL/SHM buzilishiga o'xshash xavf).
+5. Salbiy sinov (buzilgan / begona kalit bilan imzolangan paket rad
+   etiladi) — upstream'ning o'z testi `tests/test_update_verify.cpp`
+   qamrab olgan; bizda build qilinmagan (CMake'ni
+   `-DTDESKTOP_BUILD_UPDATE_TESTS=ON` bilan qayta sozlash kerak — ixtiyoriy).
 
 ## 5. Progress
 
@@ -91,8 +111,14 @@ bilan almashtirish mumkin bo'ladi.
   `{"win64":{"stable":{"link":"/win/td-update-win-x64-7003001","released":7003001}}}`.
   API yo'li (`-Api`, release-api.ps1) `/v2` joylashuvini server tomonida
   bilishi kerak — A7 da CustomSync sessiyasi bilan.
-- [ ] Build (CustomSync sessiyasini oldindan ogohlantirish)
-- [ ] Sinov 1-3
+- [x] Build (2026-10-13 01:43, `7ece589feb`, `-m:4 -MP4`): nusxa
+  `C:\TBuild\staged\7ece589feb-20261013\` (SHA256 `037f4f20cc6dfd0f...`).
+  Packer/Updater qayta build bo'lmadi (kalitlarni ish vaqtida o'qiydi).
+- [x] Sinov 1-3 (4-bo'lim) — O'TDI
+- [ ] O'rnatish: laptop (foydalanuvchi Telegram'ni yopganda,
+  `install-staged.sh`) va PC (qo'lda). Undan keyin ham, A7 gacha, lenta
+  bo'sh — yangilanish kelmaydi, xavf yo'q.
+- [ ] Sinov 4 (to'liq sikl) — A7 da
 - [x] Merge qoidasi: `Telegram/Resources/update/*` — DOIM bizniki (biz
   o'zgartirganimiz uchun upstream o'zgartirsa git konflikt ko'rsatadi)
 - [ ] VPS tomoni + reliz — A7 da
