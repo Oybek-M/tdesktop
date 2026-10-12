@@ -116,7 +116,8 @@ bilan almashtirish mumkin bo'ladi.
   Packer/Updater qayta build bo'lmadi (kalitlarni ish vaqtida o'qiydi).
 - [x] Sinov 1-3 (4-bo'lim) — O'TDI
 - [ ] O'rnatish: laptop (foydalanuvchi Telegram'ni yopganda,
-  `install-staged.sh`) va PC (qo'lda). Undan keyin ham, A7 gacha, lenta
+  `install-staged.sh f829aa2e78-20261013` — A27+A26 bitta build'da) va PC
+  (qo'lda). Undan keyin ham, A7 gacha, lenta
   bo'sh — yangilanish kelmaydi, xavf yo'q.
 - [ ] Sinov 4 (to'liq sikl) — A7 da
 - [x] Merge qoidasi: `Telegram/Resources/update/*` — DOIM bizniki (biz

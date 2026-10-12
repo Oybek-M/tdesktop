@@ -1,6 +1,6 @@
 # CustomMod — Keyingi Tasklar Ro'yxati
 
-**Oxirgi yangilanish:** 2026-10-13 (v7.3.1 `9a730f3c41` o'rnatildi va sinovdan O'TDI; A27 `7ece589feb` build O'TDI, statik sinov O'TDI, o'rnatish kutilmoqda; keyingisi A26)
+**Oxirgi yangilanish:** 2026-10-13 03:45 (o'rnatishga tayyor: `f829aa2e78` = A27 + A26 + A22 diagnostika, BUILD O'TDI, SINOVDAN O'TMAGAN; foydalanuvchi Telegram'ni yopishi kerak)
 
 ---
 
@@ -33,20 +33,28 @@ yaratish kerak. Build saboqlari (prepare'ni Git
 Bash'dan chaqirish, ucrt64 PATH, LNK1102/LNK1180, C: tozalash) — `MEMORY.md`
 T50.
 
-**🟡 A27 build `7ece589feb` O'TDI, O'RNATILMAGAN** (2026-10-13 01:43):
-`C:\TBuild\staged\7ece589feb-20261013\` (SHA256 `037f4f20cc6dfd0f...`).
-Statik sinov O'TDI (exe ichida faqat bizning V2 kalitlar, prefiks
-`/secure/v2`). O'rnatish — foydalanuvchi Telegram'ni yopganda
-(`install-staged.sh`); PC — qo'lda. To'liq sikl sinovi — A7 da. Tafsilot:
-`docs/self-update/a27-v2-signing.md` "Progress".
+**🟡 O'RNATISH UCHUN TAYYOR: `f829aa2e78`** (2026-10-13 03:42, BUILD O'TDI,
+SINOVDAN O'TMAGAN) = A27 (o'z V2 kalitlar, `/secure/v2`) + A26 (start
+tinchligi signali) + A22 diagnostikasi (`order breaks`). Nusxa
+`C:\TBuild\staged\f829aa2e78-20261013\` (SHA256 `e4123aaf0a5dcb39...`),
+`install-staged.sh --check` O'TDI (faqat Telegram ochiq edi). Statik
+sinov: exe ichida faqat bizning V2 kalitlar, `/secure/v2`, yangi log
+satrlari bor. Oraliq nusxalar: `7ece589feb-20261013` (faqat A27),
+`dc9c3251cb-20261013` (A27+A26).
+**O'rnatish:** foydalanuvchi Telegram'ni TO'LIQ yopadi ->
+`bash /c/TBuild/install-staged.sh f829aa2e78-20261013`; PC — qo'lda.
+**Sinov (o'rnatgandan keyin):** log'da `start tinchidi -> GlobalMaintenance
+/ MediaQuotaScan / CustomSync` ~+20-30 s da; `ActivityCacheLoad` shu
+atrofda; "main thread blocked" startdagidan ko'paymagan; chat ochilganda
+inject log'ida `order breaks` soni (A22). Self-update to'liq sikli — A7 da.
 
 **⚠️ Build vaqti cheklovi (CustomSync sessiyasidan, 2026-10-13):** bugun
 kechqurun foydalanuvchi laptop'da TDLib Docker build'ini ishga tushiradi
 (~40-60 daqiqa, ~6 GB RAM) — shu paytda tdesktop build BOSHLANMAYDI.
 Boshlanish/tugashni CustomSync sessiyasi xabar qiladi.
 
-**Keyingi tartib:** A26 (start'dagi 90 s kutish; KOD YOZILDI, build
-kutilmoqda — A27 bilan bitta build'da o'rnatiladi) -> A22 -> A21 -> A7 reliz
+**Keyingi tartib:** A26 (start'dagi 90 s kutish; BUILD O'TDI, o'rnatish+sinov
+kutilmoqda — `f829aa2e78` da A27 bilan birga) -> A22 -> A21 -> A7 reliz
 
 **A21 holati (2026-10-13 tekshirildi):** Task C UI'si (`7896c40ccf` +
 `1c6202bf5b`, Ombor -> "👤 Egasi noma'lum yozuvlar") o'rnatilgan build'da BOR.
@@ -178,7 +186,7 @@ qisqartirish mumkinmi?
 chat ro'yxati chizilgandan keyin asosiy oqim bir necha soniya band
 bo'lmasa); 90 s faqat yuqori chegara bo'lib qoladi.
 
-**🟡 KOD YOZILDI (2026-10-13, laptop), BUILD QILINMAGAN.** O'lchov (7.3.1
+**🟡 BUILD O'TDI (`dc9c3251cb`, 03:32; o'rnatiladigan nusxa `f829aa2e78`), SINOVDAN O'TMAGAN.** O'lchov (7.3.1
 iliq start logi): chat ro'yxatlari +4 s / +9 s da yuklangan, lekin
 `ActivityCacheLoad` faqat +94 s da (birinchi marta `CompactActivityHistoryAsync`
 ichida; `WarmActivityCache()` hech qayerda chaqirilmaydi) — ya'ni har startda
