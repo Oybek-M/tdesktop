@@ -1,6 +1,6 @@
 # CustomMod — Keyingi Tasklar Ro'yxati
 
-**Oxirgi yangilanish:** 2026-10-13 08:00 (`f829aa2e78` = A27 + A26 + A22 diagnostika O'RNATILDI, start sinovi O'TDI: start tinchidi +20 s, faollik keshi +21 s, ilgari +94 s)
+**Oxirgi yangilanish:** 2026-10-13 08:25 (o'rnatilgan: `f829aa2e78`; o'rnatishga tayyor: `df785ce63a` = A22 A+C — faylsiz o'chirilgan media; foydalanuvchi Telegram'ni yopishi kerak)
 
 ---
 
@@ -344,7 +344,39 @@ ko'chirildi, reestr `E:/customizationMainFolder`.
 
 ### A22 — Tiklangan xabarlar tartibidagi qoldiq chalkashlik
 
-**Holat:** ochiq, PRIORITET PAST (resurs bo'lganda ko'riladi).
+**Holat:** 🟡 2-band uchun A+C KOD YOZILDI (`df785ce63a`, 2026-10-13,
+foydalanuvchi "A va C" ni tanladi). BUILD O'TDI (08:21), SINOVDAN O'TMAGAN:
+`C:\TBuild\staged\df785ce63a-20261013\` (SHA256 `b72a33d54f2547f1...`,
+`--check` O'TDI) — o'rnatish uchun foydalanuvchi Telegram'ni yopishi kerak:
+`bash /c/TBuild/install-staged.sh df785ce63a-20261013`. 1-band
+(tartib) — diagnostika (`order breaks`) o'rnatilgan, 10-13 startida 0.
+
+**A+C nima qiladi (`df785ce63a`):**
+- Qo'shimcha topilma: faylsiz deb yashirilgan 649 ta egasi aniq yozuvdan
+  101 tasining fayli arxivda BOR edi (media_index 'present'), faqat yozuvga
+  bog'lanmagan — ovozli xabar Telegram keshida fayl emas (`filepath()` bo'sh,
+  `TryRescueMedia` "allaqachon arxivda" deb qaytadi), rasm esa o'chirilganda
+  ekranda bo'lmagan.
+- A/bog'lash: inject va `setDeletedLocally()` fayl topilmasa media_index'dagi
+  'present' faylni oladi — FAQAT aniq `account_id` (legacy 0 emas: shaxsiy
+  chatlarda msg_id'lar akkauntlar orasida to'qnashadi). Yangi CustomDB:
+  `GetMediaIndexForPeer`, `PresentMediaRelPath`, `SetDeletedMediaPath`.
+- A/belgi: fayli yo'q, media bo'lgani aniq (`is_media` yoki media_index
+  yozuvi) va egasi aniq yozuv — `📎 Rasm/Video/Ovozli xabar/Fayl: nom, N MB
+  (hajmi chegaradan katta edi | kvota to'lgan edi | serverdan olib bo'lmadi |
+  yuklab olinmoqda | fayl saqlanmagan)`. Legacy (account 0) yozuvlar avvalgidek
+  yashirin (A21 da biriktirilgach ko'rinadi).
+- C: `CustomArchive::RescueDeletedPhoto()` — o'chirilganda rasm xotirada
+  bo'lmasa `photo->load()` (avval Telegram keshi, keyin server), kelganda
+  `medias/images/<peer>_<msg>.jpg` ga yoziladi, media_index 'present' (l3) va
+  o'chirilgan xabar yozuviga bog'lanadi; 10 daqiqada kelmasa 'missing'
+  (`reference_expired`). MarkDeleted() dan KEYIN chaqiriladi.
+- Log: `... | media: linked N, placeholder M`.
+**Sinov (o'rnatgandan keyin):** `7053823996` chatida avval yashirin bo'lgan
+42 ta media xabar endi ko'rinishi kerak (hammasi egasi aniq: 6 tasi arxivdagi
+fayli bilan, 36 tasi 📎 belgi bilan — 10-13 nusxasi bo'yicha); log'da `linked`/`placeholder` > 0; biror rasm
+xabarni boshqa qurilmadan o'chirib, arxivga `medias/images/` tushishini va
+chatda rasm bilan qaytishini tekshirish.
 
 T47 tuzatishidan keyin qo'lda sinov **90% mos** keldi: `7053823996` chatida
 iyul-avgust o'chirilgan xabarlari chiqdi va boshqa chatga o'tib qaytilganda
