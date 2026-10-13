@@ -2441,6 +2441,63 @@ void History::loadDeletedMessages() {
 	int skippedForeign = 0; // boshqa akkauntniki deb topilgan
 	int skippedWindow = 0;  // yuklangan oynadan tashqarida (keyin qo'yiladi)
 	int reinserted = 0;     // ko'rinishdan tushib qolgani qaytarildi
+	int linkedMedia = 0;    // A22: fayl media_index orqali topildi
+	int placeholders = 0;   // A22: faylsiz media belgi bilan ko'rsatildi
+
+	// A22 (2026-10-13): shu chat media_index'i -- faqat KERAK bo'lganda
+	// (fayli topilmagan yozuv uchrasa) bitta so'rov bilan olinadi.
+	auto mediaIndexLoaded = false;
+	auto mediaIndex = QHash<long long, CustomDB::MediaIndexEntry>();
+	const auto findIndexed = [&](long long msgId)
+	-> const CustomDB::MediaIndexEntry* {
+		if (!mediaIndexLoaded) {
+			mediaIndexLoaded = true;
+			mediaIndex = CustomDB::GetMediaIndexForPeer(key);
+		}
+		const auto i = mediaIndex.constFind(msgId);
+		return (i != mediaIndex.cend()) ? &i.value() : nullptr;
+	};
+	const auto resolveArchivePath = [](const QString &path) {
+		return QFileInfo(path).isRelative()
+			? (CustomSettings::ArchiveRoot() + u"/"_q + path)
+			: path;
+	};
+	// Faylsiz media uchun belgi matni: turi, hajmi va nega saqlanmagani
+	// (media_index'da bo'lsa) -- foydalanuvchi "bu yerda nima bo'lgan edi"
+	// degan savolga javob olsin.
+	const auto missingMediaText = [](const CustomDB::MediaIndexEntry *e) {
+		auto what = u"Media"_q;
+		auto why = u"fayl saqlanmagan"_q;
+		if (e) {
+			if (e->kind == u"image"_q) {
+				what = u"Rasm"_q;
+			} else if (e->kind == u"video"_q) {
+				what = u"Video"_q;
+			} else if (e->kind == u"voice"_q) {
+				what = u"Ovozli xabar"_q;
+			} else if (e->kind == u"file"_q) {
+				what = e->fileName.isEmpty()
+					? u"Fayl"_q
+					: (u"Fayl: "_q + e->fileName);
+			}
+			if (e->size > 0) {
+				what += u", %1 MB"_q.arg(
+					e->size / (1024. * 1024.), 0, 'f', 1);
+			}
+			if (e->reason == u"too_large"_q) {
+				why = u"hajmi chegaradan katta edi, saqlanmagan"_q;
+			} else if (e->reason == u"quota_full"_q) {
+				why = u"kvota to'lgan edi, saqlanmagan"_q;
+			} else if (e->status == u"pending"_q) {
+				// Shu seansda boshlangan yuklash (eskisini start'dagi
+				// ReconcileMediaIndex() 'missing' ga tushiradi).
+				why = u"yuklab olinmoqda"_q;
+			} else if (e->status == u"missing"_q) {
+				why = u"serverdan olib bo'lmadi"_q;
+			}
+		}
+		return u"📎 %1 (%2)"_q.arg(what, why);
+	};
 	for (const auto &msg : deleted) {
 		// Xabar allaqachon mavjudmi (serverdan yuklangan yoki avval
 		// inject qilingan).
@@ -2538,13 +2595,31 @@ void History::loadDeletedMessages() {
 		// (a) matn bor, YOKI (b) media fayli HAQIQATAN diskda mavjud.
 		// Yozuv bazada QOLADI (statistika va kelajakdagi tiklash uchun),
 		// shunchaki chatga qo'yilmaydi.
-		QString localPath = msg.mediaPath;
+		QString localPath = msg.mediaPath.isEmpty()
+			? QString()
+			: resolveArchivePath(msg.mediaPath);
+		// A22 (2026-10-13): yozuvda yo'l yo'q yoki fayl yo'q -- lekin fayl
+		// L2/L3 orqali arxivda bo'lishi mumkin, faqat yozuvga
+		// bog'lanmagan (bazada 101 ta, 34 tasi foydalanuvchining o'zi
+		// yuborgan). Faqat egasi ANIQ yozuvlar uchun -- GetMediaIndexForPeer
+		// legacy (0) qatorlarni olmaydi.
+		const CustomDB::MediaIndexEntry *indexed = nullptr;
+		if (msg.accountId != 0
+			&& (localPath.isEmpty() || !QFile::exists(localPath))) {
+			indexed = findIndexed(msg.msgId);
+			if (indexed
+				&& indexed->status == u"present"_q
+				&& !indexed->relPath.isEmpty()) {
+				const auto candidate = resolveArchivePath(indexed->relPath);
+				if (QFile::exists(candidate)) {
+					localPath = candidate;
+					++linkedMedia;
+				}
+			}
+		}
 		DocumentData *document = nullptr;
 		QFileInfo fileInfo;
 		if (!localPath.isEmpty()) {
-			if (QFileInfo(localPath).isRelative()) {
-				localPath = CustomSettings::ArchiveRoot() + u"/"_q + localPath;
-			}
 			fileInfo = QFileInfo(localPath);
 			if (QFile::exists(localPath)) {
 				// Sun'iy DocumentId. msg.msgId'ni yakka o'zi ishlatib
@@ -2573,9 +2648,27 @@ void History::loadDeletedMessages() {
 
 		// Mazmun tekshiruvi (yuqoridagi izohga qarang). `document`
 		// null bo'lmasa — media fayli diskda TOPILDI degani.
+		//
+		// A22 (2026-10-13): fayli yo'q, lekin media bo'lgani ANIQ va egasi
+		// ANIQ yozuv endi belgi bilan ko'rsatiladi -- ilgari u butunlay
+		// yashirilardi va foydalanuvchi o'zi yuborgan rasm/ovozli xabar
+		// "yo'qolgan" deb o'ylardi (bazada egasi aniq 649 ta). 08-27 dagi
+		// "arvoh" xavfi legacy (account_id = 0) yozuvlardan edi -- ular
+		// avvalgidek yashiriladi (A21 da biriktirilgach ko'rinadi).
+		auto placeholder = false;
 		if (msg.text.isEmpty() && !document) {
-			skippedEmpty++;
-			continue;
+			if (msg.accountId == 0) {
+				skippedEmpty++;
+				continue;
+			}
+			if (!indexed) {
+				indexed = findIndexed(msg.msgId);
+			}
+			if (!msg.isMedia && !indexed) {
+				skippedEmpty++;
+				continue;
+			}
+			placeholder = true;
 		}
 
 		TextWithEntities displayText;
@@ -2583,6 +2676,9 @@ void History::loadDeletedMessages() {
 			((msg.accountId == 0) ? legacyMarker : marker) + "\n\n");
 		if (!msg.text.isEmpty()) {
 			displayText.append(TextWithEntities{ msg.text });
+		} else if (placeholder) {
+			displayText.append(TextWithEntities{ missingMediaText(indexed) });
+			++placeholders;
 		} else {
 			displayText.append(TextWithEntities{
 				u"📎 Fayl: "_q + fileInfo.fileName() });
@@ -2648,10 +2744,11 @@ void History::loadDeletedMessages() {
 		// "nega ko'rinmayapti?" savoliga log'dan javob topilmaydi.
 		LOG(("CustomMod: injected %1 deleted messages for peer %2 "
 			"| reinserted %3 | skipped: empty %4, foreign %5, window %6 "
-			"| order breaks %7"
+			"| order breaks %7 | media: linked %8, placeholder %9"
 			).arg(injectedCount).arg(peer->id.value
 			).arg(reinserted).arg(skippedEmpty).arg(skippedForeign
-			).arg(skippedWindow).arg(orderBreaks));
+			).arg(skippedWindow).arg(orderBreaks
+			).arg(linkedMedia).arg(placeholders));
 	}
 }
 

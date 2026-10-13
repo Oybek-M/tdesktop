@@ -1988,6 +1988,79 @@ bool HasPresentMediaIndexEntry(const PeerKey &key, long long msgId) {
     return found;
 }
 
+QHash<long long, MediaIndexEntry> GetMediaIndexForPeer(const PeerKey &key) {
+    Init();
+    QHash<long long, MediaIndexEntry> result;
+    if (!gDb || key.accountId == 0) return result;
+    sqlite3_stmt *stmt = nullptr;
+    // PRIMARY KEY (account_id, peer_id, msg_id) indeksi bo'yicha qidiradi.
+    if (sqlite3_prepare_v2(gDb,
+            "SELECT msg_id, kind, file_name, rel_path, size, status, reason "
+            "FROM media_index WHERE account_id = ? AND peer_id = ?",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, key.accountId);
+        bindText(stmt, 2, key.peerId);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            MediaIndexEntry entry;
+            entry.peerId = key.peerId;
+            entry.msgId = sqlite3_column_int64(stmt, 0);
+            entry.kind = colText(stmt, 1);
+            entry.fileName = colText(stmt, 2);
+            entry.relPath = colText(stmt, 3);
+            entry.size = sqlite3_column_int64(stmt, 4);
+            entry.status = colText(stmt, 5);
+            entry.reason = colText(stmt, 6);
+            result.insert(entry.msgId, entry);
+        }
+        sqlite3_finalize(stmt);
+    }
+    return result;
+}
+
+QString PresentMediaRelPath(const PeerKey &key, long long msgId) {
+    Init();
+    QString result;
+    if (!gDb || key.accountId == 0) return result;
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(gDb,
+            "SELECT rel_path FROM media_index "
+            "WHERE account_id = ? AND peer_id = ? AND msg_id = ? "
+            "AND status = 'present' LIMIT 1",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, key.accountId);
+        bindText(stmt, 2, key.peerId);
+        sqlite3_bind_int64(stmt, 3, msgId);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            result = colText(stmt, 0);
+        }
+        sqlite3_finalize(stmt);
+    }
+    return result;
+}
+
+void SetDeletedMediaPath(
+        const PeerKey &key,
+        long long msgId,
+        const QString &relPath) {
+    Init();
+    if (!gDb || key.accountId == 0 || relPath.isEmpty()) return;
+    sqlite3_stmt *stmt = nullptr;
+    // Mavjud yo'lni HECH QACHON almashtirmaydi: u MarkDeleted() yoki avvalgi
+    // bog'lashniki va to'g'ri deb hisoblanadi.
+    if (sqlite3_prepare_v2(gDb,
+            "UPDATE actioned_messages SET media_path = ? "
+            "WHERE peer_id = ? AND msg_id = ? AND type = 'deleted' "
+            "AND account_id = ? AND COALESCE(media_path, '') = ''",
+            -1, &stmt, nullptr) == SQLITE_OK) {
+        bindText(stmt, 1, toRelativePath(relPath));
+        bindText(stmt, 2, key.peerId);
+        sqlite3_bind_int64(stmt, 3, msgId);
+        sqlite3_bind_int64(stmt, 4, key.accountId);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+}
+
 QVector<MediaPeerSummary> GetMediaPeerSummaries() {
     Init();
     QVector<MediaPeerSummary> result;

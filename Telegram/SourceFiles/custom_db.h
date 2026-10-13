@@ -4,6 +4,7 @@
 #include <QtCore/QDateTime>
 #include <QtCore/QJsonArray>
 #include <QtCore/QVector>
+#include <QtCore/QHash>
 #include <QtCore/QHashFunctions>
 #include <QtCore/QElapsedTimer>
 #include <functional>
@@ -291,6 +292,29 @@ void SetMediaIndexStatus(
 [[nodiscard]] bool HasPresentMediaIndexEntry(
     const PeerKey &key,
     long long msgId);
+
+// A22 (2026-10-13): o'chirilgan xabar yozuvi fayl yo'lisiz qolgan bo'lsa
+// ham, fayl L2/L3 orqali arxivda BOR bo'lishi mumkin -- ikkisi
+// bog'lanmagan (bazada 101 ta shunday yozuv topildi: ovozli xabar Telegram
+// keshida fayl emas, rasm o'chirilganda ekranda bo'lmagan). Ikkala funksiya
+// ham faqat ANIQ account_id bo'yicha qidiradi, legacy (0) ni EMAS: turli
+// akkauntlarning shaxsiy chatlarida msg_id'lar to'qnashadi va begona fayl
+// ko'rsatilib qolardi.
+//
+// Chatning barcha media_index yozuvlari, msg_id bo'yicha (inject uchun --
+// bitta so'rov bilan butun yuklangan oyna).
+[[nodiscard]] QHash<long long, MediaIndexEntry> GetMediaIndexForPeer(
+    const PeerKey &key);
+// Bitta xabarning 'present' faylining nisbiy yo'li (yo'q bo'lsa bo'sh).
+[[nodiscard]] QString PresentMediaRelPath(
+    const PeerKey &key,
+    long long msgId);
+// Kech saqlangan faylni (o'chirilgandan keyin qutqarilgan rasm) o'chirilgan
+// xabar yozuviga bog'laydi. Faqat yo'li BO'SH yozuvga tegadi.
+void SetDeletedMediaPath(
+    const PeerKey &key,
+    long long msgId,
+    const QString &relPath);
 
 // Eksport tanlash oynasi uchun: media'si BOR chatlar, hajmi bo'yicha
 // kamayish tartibida. Foydalanuvchi qaysi chatni eksportga qo'shishni

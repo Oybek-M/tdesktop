@@ -178,8 +178,17 @@ struct PendingPhoto {
 	QString peerId;
 	long long msgId = 0;
 	unsigned int msgDate = 0;
+	// A22-C: o'chirilgan xabar rasmini qutqarish (L3). Tugagach fayl
+	// o'chirilgan xabar yozuviga bog'lanadi; o'chirilgan xabarning
+	// file_reference'i eskirgan bo'lishi mumkin, shuning uchun abadiy
+	// kutilmaydi (kRescuePhotoTimeout).
+	QString layer = u"l2"_q;
+	bool linkDeleted = false;
+	crl::time startedAt = 0;
 };
 std::vector<PendingPhoto> gPendingPhotos;
+
+constexpr auto kRescuePhotoTimeout = crl::time(10 * 60 * 1000);
 
 void RecordPhotoIndex(
 		not_null<HistoryItem*> item,
@@ -187,7 +196,8 @@ void RecordPhotoIndex(
 		const QString &status,
 		const QString &reason,
 		const QString &relPath,
-		long long size) {
+		long long size,
+		const QString &layer = u"l2"_q) {
 	auto entry = CustomDB::MediaIndexEntry();
 	entry.peerId = QString::number(item->history()->peer->id.value);
 	entry.msgId = static_cast<long long>(item->id.bare);
@@ -200,7 +210,7 @@ void RecordPhotoIndex(
 	entry.msgDate = static_cast<unsigned int>(item->date());
 	entry.archivedAt = static_cast<unsigned int>(
 		QDateTime::currentSecsSinceEpoch());
-	entry.layer = u"l2"_q;
+	entry.layer = layer;
 	entry.status = status;
 	entry.reason = reason;
 	// 2026-08-24: nomni SHU YERDA ham eslab qolamiz. MaybeArchiveItem()
@@ -381,16 +391,81 @@ void CheckPendingPhotos() {
 					entry.msgDate = it->msgDate;
 					entry.archivedAt = static_cast<unsigned int>(
 						QDateTime::currentSecsSinceEpoch());
-					entry.layer = u"l2"_q;
+					entry.layer = it->layer;
 					entry.status = u"present"_q;
 					CustomDB::UpsertMediaIndex(CustomDB::PeerKey{it->accountId, it->peerId}, entry);
 					CustomMediaQuota::AddBytes(bytes.size());
+					if (it->linkDeleted) {
+						CustomDB::SetDeletedMediaPath(
+							CustomDB::PeerKey{it->accountId, it->peerId},
+							it->msgId,
+							it->relPath);
+					}
 				}
 			}
+			done = true;
+		} else if (it->linkDeleted
+			&& (crl::now() - it->startedAt > kRescuePhotoTimeout)) {
+			// Keshda yo'q va serverdan ham kelmadi (o'chirilgan xabarning
+			// file_reference'i yangilanmaydi) -- ko'rinishni ushlab turmaymiz.
+			CustomDB::SetMediaIndexStatus(
+				CustomDB::PeerKey{it->accountId, it->peerId},
+				it->msgId,
+				u"missing"_q,
+				u"reference_expired"_q);
 			done = true;
 		}
 		it = done ? gPendingPhotos.erase(it) : std::next(it);
 	}
+}
+
+void RescueDeletedPhoto(
+		not_null<HistoryItem*> item,
+		not_null<PhotoData*> photo) {
+	const auto peer = item->history()->peer;
+	if (peer->isSelf()) {
+		return; // MaybeDownloadMedia() dagi kabi qattiq istisno
+	}
+	const auto key = CustomDB::Key(item);
+	const auto msgId = static_cast<long long>(item->id.bare);
+	// L2 bilan BIR XIL yo'l: rasm avval L2 orqali saqlangan bo'lsa, qayta
+	// yuklanmaydi -- faqat bog'lanadi.
+	const auto relPath = u"medias/images/"_q + key.peerId + u"_"_q
+		+ QString::number(msgId) + u".jpg"_q;
+	const auto fullPath = CustomSettings::ArchiveRoot() + u"/"_q + relPath;
+	if (QFile::exists(fullPath)) {
+		CustomDB::SetDeletedMediaPath(key, msgId, relPath);
+		return;
+	}
+	if (CustomMediaQuota::IsFull()) {
+		RecordPhotoIndex(item, photo, u"missing"_q, u"quota_full"_q,
+			QString(), 0, u"l3"_q);
+		return;
+	}
+	QDir().mkpath(QFileInfo(fullPath).absolutePath());
+
+	auto view = photo->createMediaView();
+	photo->load(
+		Data::PhotoSize::Large,
+		Data::FileOriginMessage(item->fullId()));
+	auto pending = PendingPhoto{
+		photo,
+		std::move(view),
+		relPath,
+		fullPath,
+		key.accountId,
+		key.peerId,
+		msgId,
+		static_cast<unsigned int>(item->date()) };
+	pending.layer = u"l3"_q;
+	pending.linkDeleted = true;
+	pending.startedAt = crl::now();
+	gPendingPhotos.push_back(std::move(pending));
+	RecordPhotoIndex(item, photo, u"pending"_q, u"rescue_downloading"_q,
+		relPath, 0, u"l3"_q);
+	// Yuborilgan rasm odatda Telegram keshida turadi -- darhol tekshiramiz,
+	// aks holda yangi yuklash bo'lmasa downloaderTaskFinished otilmaydi.
+	CheckPendingPhotos();
 }
 
 namespace {

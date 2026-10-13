@@ -5,6 +5,7 @@
 
 class HistoryItem;
 class DocumentData;
+class PhotoData;
 
 namespace Main {
 class Session;
@@ -78,6 +79,17 @@ void RestoreDeletedChats(not_null<Main::Session*> session);
 // fayl lokal keshda TOPILMAGAN holatda (topilgan bo'lsa u yerda
 // nusxalanadi).
 void TryRescueMedia(not_null<HistoryItem*> item);
+
+// A22-C (2026-10-13): rasm uchun L3. setDeletedLocally() rasmni faqat
+// o'sha payt xotirada ochiq (activeMediaView) bo'lsa saqlardi -- ekranda
+// bo'lmagan rasm, ayniqsa foydalanuvchi o'zi yuborgani, yo'qolardi (bazada
+// oktyabrning o'zida 98 ta faylsiz o'chirilgan media yozuvi). Endi rasm
+// Telegram keshidan (bo'lmasa serverdan) olinadi va kelganda o'chirilgan
+// xabar yozuviga bog'lanadi. MarkDeleted() dan KEYIN chaqirilishi shart:
+// bog'lash mavjud yozuvni yangilaydi.
+void RescueDeletedPhoto(
+	not_null<HistoryItem*> item,
+	not_null<PhotoData*> photo);
 
 // Arxivga yuklash tugagach data_document.cpp dagi finishLoad() shu
 // funksiyani chaqiradi va media_index yozuvi 'pending' dan 'present' ga

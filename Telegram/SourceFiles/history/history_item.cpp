@@ -3612,6 +3612,9 @@ void HistoryItem::restoreFromCustomDB() {
 void HistoryItem::setDeletedLocally() {
 	_isDeletedLocally = true;
 	QString destPath;
+	// A22-C: xotirada ham, arxivda ham topilmagan rasm -- MarkDeleted()
+	// dan KEYIN qutqariladi (pastga qarang).
+	PhotoData *rescuePhoto = nullptr;
 
 	// E23: Save media to unified customizationMainFolder/medias/ tree on deletion.
 	if (const auto m = media()) {
@@ -3666,6 +3669,26 @@ void HistoryItem::setDeletedLocally() {
 					}
 				}
 			}
+			if (destPath.isEmpty()) {
+				rescuePhoto = photo;
+			}
+		}
+
+		// A22 (2026-10-13): fayl L2/L3 orqali arxivda BO'LISHI mumkin, lekin
+		// yuqoridagi yo'llar uni ko'rmaydi: ovozli xabar Telegram keshida
+		// fayl emas (filepath() bo'sh, TryRescueMedia esa "allaqachon
+		// arxivda" deb qaytadi), rasm esa hozir ekranda emas. Natijada
+		// yozuv yo'lsiz qolib, xabar chatga qaytmasdi (bazada 101 ta).
+		if (destPath.isEmpty()) {
+			const auto archived = CustomDB::PresentMediaRelPath(
+				CustomDB::Key(this),
+				static_cast<long long>(id.bare));
+			if (!archived.isEmpty()
+				&& QFile::exists(
+					CustomSettings::ArchiveRoot() + u"/"_q + archived)) {
+				destPath = archived;
+				rescuePhoto = nullptr;
+			}
 		}
 	}
 
@@ -3674,6 +3697,9 @@ void HistoryItem::setDeletedLocally() {
 	const auto    origDate  = static_cast<unsigned int>(date());
 	const bool    origOut   = out();
 	CustomDB::MarkDeleted(id.bare, CustomDB::Key(this), destPath, origText, origDate, origOut);
+	if (rescuePhoto) {
+		CustomArchive::RescueDeletedPhoto(this, rescuePhoto);
+	}
 
 	// Modifying the text globally so it appears everywhere (chat, replies, recent messages list)
 	const auto deletedMarker = QString::fromUtf8(
