@@ -1,6 +1,6 @@
 # CustomMod — Keyingi Tasklar Ro'yxati
 
-**Oxirgi yangilanish:** 2026-10-13 03:45 (o'rnatishga tayyor: `f829aa2e78` = A27 + A26 + A22 diagnostika, BUILD O'TDI, SINOVDAN O'TMAGAN; foydalanuvchi Telegram'ni yopishi kerak)
+**Oxirgi yangilanish:** 2026-10-13 08:00 (`f829aa2e78` = A27 + A26 + A22 diagnostika O'RNATILDI, start sinovi O'TDI: start tinchidi +20 s, faollik keshi +21 s, ilgari +94 s)
 
 ---
 
@@ -33,7 +33,18 @@ yaratish kerak. Build saboqlari (prepare'ni Git
 Bash'dan chaqirish, ucrt64 PATH, LNK1102/LNK1180, C: tozalash) — `MEMORY.md`
 T50.
 
-**🟡 O'RNATISH UCHUN TAYYOR: `f829aa2e78`** (2026-10-13 03:42, BUILD O'TDI,
+**✅ `f829aa2e78` O'RNATILDI (2026-10-13 07:55:44) va start sinovi O'TDI:**
+zaxiralar `Release\_tdata-backup-pre-f829aa2e78-20261013-20261013-075544`
+(108 MB), `db\pre-f829aa2e78-20261013-20261013-075544` (61 MB). Log nusxasi
+`C:\TBuild\starttest-20261013-f829\`. 1-start (exe almashgandan keyin):
+blok 2858 ms (7.3.1 ning 1-starti 2891 ms — regressiya emas); chatlar +5/+11 s;
+**`start tinchidi` start+20 258 ms** (MediaQuotaScan, GlobalMaintenance x2 —
+ikkinchisi bayroq tufayli bo'sh), `ActivityCacheLoad` **+21 s (ilgari +94 s)**,
+ReconcileMediaIndex 669 ms fon oqimida, keyin "main thread blocked" YO'Q.
+CustomSync qatori yo'q — laptopda `syncEnabled=false` (kutilgan). A22: start
+paytidagi 20 ta inject log'ida `order breaks 0`. PC — hali qo'lda o'rnatilmagan.
+
+(Avvalgi holat:) **O'RNATISH UCHUN TAYYOR: `f829aa2e78`** (2026-10-13 03:42, BUILD O'TDI,
 SINOVDAN O'TMAGAN) = A27 (o'z V2 kalitlar, `/secure/v2`) + A26 (start
 tinchligi signali) + A22 diagnostikasi (`order breaks`). Nusxa
 `C:\TBuild\staged\f829aa2e78-20261013\` (SHA256 `e4123aaf0a5dcb39...`),
