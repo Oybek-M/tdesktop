@@ -97,6 +97,8 @@ $ErrorActionPreference = "Stop"
 
 $RepoRoot     = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $VersionFile  = Join-Path $RepoRoot "Telegram\SourceFiles\core\version.h"
+# A7: reliz kanali va tartib raqami (klient ham aynan shu fayldan oladi).
+$ReleaseFile  = Join-Path $RepoRoot "Telegram\SourceFiles\custom_release.h"
 $PackerExe    = Join-Path $RepoRoot "out\Release\Packer.exe"
 $DesktopPrivateDir = Join-Path $RepoRoot "..\DesktopPrivate"
 # A27 (7.3+): paket V2 (Ed25519) bilan imzolanadi. Maxfiy imzolovchi kalit
@@ -176,6 +178,46 @@ if ($versionContent -notmatch 'constexpr auto AppVersion = (\d+);') {
 $version = [int]$Matches[1]
 Write-Host "Version: $version" -ForegroundColor Cyan
 
+# A7: asosiy versiya upstream bilan bir xil qoladi, o'z relizlarimiz
+# "canary-public" kanalida "<versiya> canary #N" bo'lib chiqadi
+# (docs/self-update/a7-canary-releases.md). Paket nomi, Packer argumentlari
+# va feed yozuvi shunga qarab tanlanadi.
+$releaseContent = Get-Content $ReleaseFile -Raw
+if ($releaseContent -match 'kUpdateChannel = Core::Updates::Channel::CanaryPublic;') {
+    if ($releaseContent -notmatch 'constexpr auto kCounter = (\d+);') {
+        Fail "Could not parse kCounter out of $ReleaseFile"
+    }
+    $counter = [int]$Matches[1]
+    if ($counter -le 0) {
+        Fail "kCounter must be positive for the canary-public channel ($ReleaseFile)"
+    }
+    if ($Api) {
+        # Releases API feed'ga faqat "released" yozadi, "counter" ni
+        # bilmaydi -- canary relizi hozircha faqat scp yo'lidan chiqadi.
+        Fail "-Api does not support canary releases yet; run without -Api (scp path)."
+    }
+    $packerChannelArgs = @("-channel", "canary-public", "-counter", "$counter")
+    $packageName = "td-update-win-x64-$version-canary-$counter"
+    $feedEntry = @{ canary = @{
+        released = $version
+        counter  = $counter
+        link     = "/win/$packageName"
+    } }
+    $releaseLabel = "$version canary #$counter"
+    Write-Host "Channel: canary-public #$counter" -ForegroundColor Cyan
+} elseif ($releaseContent -match 'kUpdateChannel = Core::Updates::Channel::Stable;') {
+    $packerChannelArgs = @("-channel", "stable")
+    $packageName = "td-update-win-x64-$version"
+    $feedEntry = @{ stable = @{
+        released = $version
+        link     = "/win/$packageName"
+    } }
+    $releaseLabel = "$version"
+    Write-Host "Channel: stable" -ForegroundColor Cyan
+} else {
+    Fail "Unsupported kUpdateChannel in $ReleaseFile (expected Stable or CanaryPublic)"
+}
+
 # --- Step 2: sign with Packer ----------------------------------------------
 #
 # Packer computes the archive-relative name of each file by stripping a
@@ -199,7 +241,7 @@ Push-Location $WorkDir
 try {
     # Packer V2 paketni yozishdan oldin o'zi tekshiradi (VerifyPackedV2).
     & $PackerExe @packerPathArgs -version $version -target win64 `
-        -channel stable -keys-loc $V2KeysLoc `
+        @packerChannelArgs -keys-loc $V2KeysLoc `
         -local-key $V2SigningKey -local-key-id $V2KeyId
     if ($LASTEXITCODE -ne 0) {
         Fail "Packer.exe exited with code $LASTEXITCODE"
@@ -208,7 +250,6 @@ try {
     Pop-Location
 }
 
-$packageName = "td-update-win-x64-$version"
 $packagePath = Join-Path $WorkDir $packageName
 if (-not (Test-Path $packagePath)) {
     Fail "Packer did not produce the expected file: $packageName"
@@ -225,12 +266,7 @@ Write-Host "Package: $packageName ($((Get-Item $packagePath).Length) bytes, sha2
 # client silently rejects or 404s the manifest.
 
 $manifest = @{
-    win64 = @{
-        stable = @{
-            released = $version
-            link     = "/win/$packageName"
-        }
-    }
+    win64 = $feedEntry
 } | ConvertTo-Json -Compress -Depth 5
 
 $manifestPath = Join-Path $WorkDir $FeedName
@@ -297,7 +333,7 @@ try {
     Push-Location $ghWorkDir
     try {
         & git add -A
-        & git commit -m "release: version $version"
+        & git commit -m "release: version $releaseLabel"
         if ($LASTEXITCODE -ne 0) { throw "git commit failed (maybe nothing changed?)" }
         & git push
         if ($LASTEXITCODE -ne 0) { throw "git push failed" }
@@ -361,7 +397,7 @@ Verify-Url "vps-pub"    "https://updates.2007.uz/$($Secrets.pub_prefix)/$FeedSub
 # --- Step 6: summary ---------------------------------------------------
 
 Write-Host ""
-Write-Host "=== Release $version summary ===" -ForegroundColor Cyan
+Write-Host "=== Release $releaseLabel summary ===" -ForegroundColor Cyan
 foreach ($label in $results.Keys) {
     $r = $results[$label]
     if ($r.ok) {

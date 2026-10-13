@@ -171,6 +171,8 @@ private:
 	std::optional<QString> parseOldResponse(
 		const QByteArray &response) const;
 	std::optional<QString> parseResponse(const QByteArray &response) const;
+	std::optional<QString> parseCanaryResponse(
+		const QByteArray &response) const;
 	QString validateLatestUrl(
 		uint64 availableVersion,
 		bool isAvailableAlpha,
@@ -819,6 +821,9 @@ std::optional<QString> HttpChecker::parseOldResponse(
 
 std::optional<QString> HttpChecker::parseResponse(
 		const QByteArray &response) const {
+	if constexpr (BuildIsCanary) {
+		return parseCanaryResponse(response);
+	}
 	auto bestAvailableVersion = 0ULL;
 	auto bestIsAvailableAlpha = false;
 	auto bestLink = QString();
@@ -849,6 +854,73 @@ std::optional<QString> HttpChecker::parseResponse(
 		bestAvailableVersion,
 		bestIsAvailableAlpha,
 		Local::readAutoupdatePrefix() + bestLink);
+}
+
+// CustomMod (A7): canary-public build feed'dagi "canary" yozuvini o'qiydi:
+//   "win64": { "canary": { "released": 7003001, "counter": 3,
+//     "link": "/win/td-update-win-x64-7003001-canary-3" } }
+// "stable" yozuvi ham ko'riladi, lekin faqat asosiy versiyasi kattaroq
+// bo'lsa: ChannelPolicyAllows() canary build'ga boshqasini baribir
+// o'rnattirmaydi. Shu yo'l bilan oddiy versiyaga qaytish ham mumkin.
+std::optional<QString> HttpChecker::parseCanaryResponse(
+		const QByteArray &response) const {
+	auto error = QJsonParseError{ 0, QJsonParseError::NoError };
+	const auto document = QJsonDocument::fromJson(response, &error);
+	if (error.error != QJsonParseError::NoError) {
+		LOG(("Update Error: Failed to parse canary feed, error: %1"
+			).arg(error.errorString()));
+		return std::nullopt;
+	}
+	const auto platform = Platform::AutoUpdateKey();
+	const auto types = document.object().value(platform).toObject();
+	if (types.isEmpty()) {
+		LOG(("Update Error: Platform '%1' not found in canary feed."
+			).arg(platform));
+		return std::nullopt;
+	}
+	const auto key = testing() ? u"testing"_q : u"released"_q;
+	// Qiymat raqam yoki satr bo'lishi mumkin; 32 bitdan oshsa yaroqsiz.
+	const auto number = [](const QJsonValue &value) -> quint32 {
+		const auto result = value.isString()
+			? value.toString().toULongLong()
+			: value.isDouble()
+			? quint64(base::SafeRound(value.toDouble()))
+			: quint64(0);
+		return (result > 0xFFFFFFFFULL) ? 0 : quint32(result);
+	};
+	const auto running = RunningUpdateVersion();
+	auto bestVersion = quint64(0);
+	auto bestLink = QString();
+	const auto consider = [&](const QString &type, bool canary) {
+		const auto map = types.value(type).toObject();
+		const auto released = number(map.value(key));
+		const auto counter = canary
+			? number(map.value(u"counter"_q))
+			: quint32(0);
+		const auto link = map.value(u"link"_q).toString();
+		if (!released || (canary && !counter) || link.isEmpty()) {
+			return;
+		}
+		const auto version = Updates::MakeUpdateVersion(released, counter);
+		const auto allowed = canary
+			? (version > running)
+			: (released > Updates::UpdateVersionBase(running));
+		if (allowed && version > bestVersion) {
+			bestVersion = version;
+			bestLink = link;
+		}
+	};
+	consider(u"canary"_q, true);
+	consider(u"stable"_q, false);
+	if (!bestVersion) {
+		return QString();
+	}
+	LOG(("Update Info: Canary feed offers %1 #%2, running %3 #%4."
+		).arg(Updates::UpdateVersionBase(bestVersion)
+		).arg(Updates::UpdateVersionCounter(bestVersion)
+		).arg(Updates::UpdateVersionBase(running)
+		).arg(Updates::UpdateVersionCounter(running)));
+	return Local::readAutoupdatePrefix() + bestLink;
 }
 
 QString HttpChecker::validateLatestUrl(
@@ -1718,15 +1790,12 @@ void Updater::start(bool forceWait) {
 		}
 #endif // !Q_OS_WIN && !Q_OS_MAC
 	} else if (sendRequest) {
-		if (BuildIsCanary) {
-			// Canary builds discover updates only through their own MTP
-			// channels, the v1 HTTP feed serves other channels.
-			startImplementation(&_httpImplementation, nullptr);
-		} else {
-			startImplementation(
-				&_httpImplementation,
-				std::make_unique<HttpChecker>(_testing));
-		}
+		// CustomMod (A7): canary build'lar ham HTTP mirror'dan oladi --
+		// upstream'dagi MTP canary kanallari bizda yo'q (MtpChecker::start).
+		// Feed'dagi "canary" yozuvini parseCanaryResponse() o'qiydi.
+		startImplementation(
+			&_httpImplementation,
+			std::make_unique<HttpChecker>(_testing));
 		// CustomMod: MTP tarmog'i ishga tushirilmaydi -- yangilanish
 		// faqat yuqoridagi HTTP mirror'dan keladi. nullptr avvalgi
 		// tekshiruvchini tozalaydi, canary tarmog'idagi kabi.

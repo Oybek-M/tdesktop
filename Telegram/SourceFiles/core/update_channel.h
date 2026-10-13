@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "core/update_verify.h"
 #include "core/version.h"
+#include "custom_release.h"
 
 #include <QtCore/QString>
 
@@ -34,9 +35,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Core {
 
-inline constexpr auto BuildUpdateChannel = Updates::Channel(
-	TDESKTOP_UPDATE_CHANNEL);
-inline constexpr auto CanaryBuildCounter = quint32(TDESKTOP_CANARY_COUNTER);
+// CustomMod (A7): kanal va hisoblagich CMake'dan emas, custom_release.h dan
+// olinadi -- sababi o'sha faylda.
+inline constexpr auto BuildUpdateChannel = CustomRelease::kUpdateChannel;
+inline constexpr auto CanaryBuildCounter = quint32(CustomRelease::kCounter);
 inline constexpr auto BuildIsCanary
 	= (BuildUpdateChannel == Updates::Channel::CanaryPublic)
 	|| (BuildUpdateChannel == Updates::Channel::CanaryPrivate);
