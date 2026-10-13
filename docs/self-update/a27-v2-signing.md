@@ -56,7 +56,8 @@ Hozircha xavfsiz: manba faqat VPS mirror, MtpChecker o'chirilgan.
 | O'tish | O'rnatilgan klientlar (laptop 7.3.1, PC 7.2.x) A27 build'ini qo'lda oladi (`install-staged.sh`); shundan keyin V2 self-update ishlaydi |
 | VPS | `/secure/v2/` va yuklash kaliti — CustomSync sessiyasi qiladi (A7 paytida; u VPS'ni boshqaradi) |
 
-**Kalit zaxirasi (A7 dan OLDIN, foydalanuvchi qiladi):** `DesktopPrivate\
+**Kalit zaxirasi (A7 dan OLDIN, foydalanuvchi qiladi) — ✅ 2026-10-13
+foydalanuvchi qo'lda arxivlab oldi (joyi faqat unga ma'lum):** `DesktopPrivate\
 update-v2\` dagi maxfiy kalitlarni oflayn joyga (USB / parol menejeri) nusxalash.
 Ildiz kaliti yo'qolsa, kelajakdagi barcha klientlarni faqat qo'lda o'rnatish
 bilan almashtirish mumkin bo'ladi.

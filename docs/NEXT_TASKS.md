@@ -75,7 +75,7 @@ kattasi `562952328991389` — 6 253); `account_id = 0` jami 14 944 (backup
 14 110, deleted 833). Tavsiya: avval kichik peer'da sinash (spec §7).
 Tafsilot: `docs/superpowers/specs/2026-09-05-a21-false-positive-deletions.md`.
 (avval VPS mirrorlari; A7 dan OLDIN foydalanuvchi
-`DesktopPrivate\update-v2\` dagi maxfiy kalitlarni oflayn zaxiralaydi).
+`DesktopPrivate\update-v2\` dagi maxfiy kalitlarni oflayn zaxiralaydi — ✅ 10-13 bajarildi).
 
 **PC holati (09-30):** disk ishlari YOPILDI. E: yangi Toshiba (toza), D:
 pending 349 -> 0 (yumshoq xato, sog'lom), arxiv `E:\customizationMainFolder`.
