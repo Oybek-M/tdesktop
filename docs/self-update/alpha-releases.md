@@ -1,5 +1,8 @@
 # Alpha relizlar — o'z yangilanishlarimizni chiqarish
 
+> ⚠️ **7.3.x da ESKIRGAN (2026-10-13).** V2 imzosi alpha bilan ishlamaydi.
+> Hozirgi yo'l — `a7-canary-releases.md` ("canary #N").
+
 **Sana:** 2026-08-15
 
 ## Muammo

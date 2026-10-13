@@ -1,10 +1,24 @@
 # CustomMod — Keyingi Tasklar Ro'yxati
 
-**Oxirgi yangilanish:** 2026-10-13 08:25 (o'rnatilgan: `f829aa2e78`; o'rnatishga tayyor: `df785ce63a` = A22 A+C — faylsiz o'chirilgan media; foydalanuvchi Telegram'ni yopishi kerak)
+**Oxirgi yangilanish:** 2026-10-13 23:45 (o'rnatilgan: `df785ce63a` = A22 A+C, 23:08; A7 = "canary #N" relizlari — kod tayyor, build CustomSync TDLib build'idan KEYIN)
 
 ---
 
 ## 🟡 2026-10-13 holati — keyingi sessiya shu yerdan boshlaydi
+
+**🆕 23:45 (eng yangi):**
+- `df785ce63a` (A22 A+C) 23:08 da O'RNATILDI. Zaxiralar:
+  `Release\_tdata-backup-pre-df785ce63a-20261013-20261013-230809`,
+  `db\pre-df785ce63a-20261013-20261013-230809`. 23:11 startida bitta chatda
+  97 fayl bog'landi + 2 belgi, boshqasida 5 belgi. Start bloki 3780 ms
+  bo'ldi (exe almashgandan keyingi birinchi start, Docker yuklamasi
+  ostida), iliq startni qayta o'lchash kerak.
+- A7: foydalanuvchi "alpha N" ni tanladi. 7.3.x da alpha V2 bilan
+  ishlamaydi, uning o'rinbosari — **canary #N**. Kod, manifest v2 va
+  `publish.ps1` TAYYOR, dry-run O'TDI. Batafsil pastdagi A7 bo'limida.
+- ⚠️ CustomSync: Docker WSL VM yarata olmayapti (HCS
+  ERROR_NO_SYSTEM_RESOURCES), shuning uchun Windows qayta yuklanadi. TDLib
+  build reboot'dan KEYIN boshlanadi. U tugaguncha tdesktop build YO'Q.
 
 **Upstream:** v7.3.0+v7.3.1 merge qilindi (`9a730f3c41`, 866 commit, T50)
 va `origin/Oybek` ga push qilindi. Yangi reliz bor-yo'qligini tekshirish
@@ -159,6 +173,38 @@ Qolgan (tdesktop'ga bog'liq emas): RAM sinovi, D: -> E: ko'chirish
 ### ~~NEXT-10: Background AntiDelete — msgDate==0 fallback~~ ✅ T44 da tugadi
 
 ---
+
+## 🟡 A7 — O'z relizlarimiz "canary #N" + self-update to'liq sikli (2026-10-13)
+
+**Qaror (foydalanuvchi, 10-13):** asosiy versiya upstream bilan bir xil
+qoladi, relizlar "alpha N" ko'rinishida chiqadi. Iloji bo'lmasa — oxirgi
+chora asosiy versiyani oshirish. Hammaga yuboriladi; eski
+versiyadagilarga 1 marta qo'lda o'rnatiladi.
+
+**Topilma:** 7.3.x da eski alpha V2 bilan ISHLAMAYDI:
+- Packer `-channel` ni `-alpha` bilan qabul qilmaydi;
+- launcher alpha'da bo'sh kalit bilan crash bo'ladi va ma'lumotni
+  `TelegramForcePortable` ga ko'chiradi.
+
+V2 dagi o'rinbosari — **canary-public #N** (`7.3.1 canary #N`). U
+tanlandi, shuning uchun asosiy versiyani oshirish SHART EMAS va
+`custom_upstream_checker` o'zgarmaydi.
+
+**Holat:** KOD TAYYOR (10-13): `custom_release.h`, `HttpChecker` canary
+feed'i, manifest v2 (`canary-public`) va `publish.ps1`. Dry-run O'TDI
+(Packer `td-update-win-x64-7003001-canary-1` ni imzoladi va o'zi
+tekshirdi). Qolgani:
+1. Build (CustomSync TDLib build'i tugagach), keyin laptop'ga o'rnatish.
+   Canary'ga o'tishda Telegram target'i to'liq qayta kompilyatsiya
+   BO'LMAYDI: hisoblagich sarlavha faylida.
+2. VPS: `/secure/v2` + reliz SSH kaliti (CustomSync sessiyasi) va yarim
+   yuklangan 7.2.7 ni tekshirish.
+3. PC va akamga #1 ni 1 marta qo'lda o'rnatish.
+4. e2e: `kCounter` = 2 -> build -> `release.ps1` (VPS/GitHub'ga chiqarish
+   uchun foydalanuvchi ruxsati kerak) -> laptop #1 dan #2 ga o'zi
+   yangilanadi.
+
+Tafsilot: `docs/self-update/a7-canary-releases.md`.
 
 ## 🟡 A27 — Self-update'ni 7.3.x imzo sxemasiga ko'chirish (2026-10-11; A7 relizidan OLDIN SHART)
 
@@ -345,10 +391,12 @@ ko'chirildi, reestr `E:/customizationMainFolder`.
 ### A22 — Tiklangan xabarlar tartibidagi qoldiq chalkashlik
 
 **Holat:** 🟡 2-band uchun A+C KOD YOZILDI (`df785ce63a`, 2026-10-13,
-foydalanuvchi "A va C" ni tanladi). BUILD O'TDI (08:21), SINOVDAN O'TMAGAN:
-`C:\TBuild\staged\df785ce63a-20261013\` (SHA256 `b72a33d54f2547f1...`,
-`--check` O'TDI) — o'rnatish uchun foydalanuvchi Telegram'ni yopishi kerak:
-`bash /c/TBuild/install-staged.sh df785ce63a-20261013`. 1-band
+foydalanuvchi "A va C" ni tanladi). BUILD O'TDI (08:21) va 23:08 da
+O'RNATILDI. 23:11 startida ishladi: bitta chatda 97 fayl bog'landi + 2
+belgi, boshqasida 5 belgi. Qolgani foydalanuvchi sinovi:
+- chat `7053823996` da 42 media yozuvi kutiladi (6 tasi fayl bilan, 36
+  tasi belgi bilan);
+- boshqa qurilmadan rasm o'chirib, rasm qutqarilishini tekshirish. 1-band
 (tartib) — diagnostika (`order breaks`) o'rnatilgan, 10-13 startida 0.
 
 **A+C nima qiladi (`df785ce63a`):**
