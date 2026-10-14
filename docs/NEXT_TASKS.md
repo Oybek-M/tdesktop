@@ -6,7 +6,7 @@
 
 ## 🟡 2026-10-13 holati — keyingi sessiya shu yerdan boshlaydi
 
-**🆕 10-15 01:10 (eng yangi):** CustomSync: sync serveri ochildi
+**🆕 10-15 01:10 (eng yangi):** CustomSync: sync serveri egasi p4 apply qilgach ochiladi
 (`https://sync.2007.uz`). O'rnatilgan build'da `CUSTOM_SYNC_HAS_WEBSOCKETS` BOR
 (exe'da `/ws/notify`) — ro'yxatdan o'tishni hozirgi build bilan qilsa
 bo'ladi (admin kodi egasi ekranida, 10 daqiqa; keyin arxiv paroli;
