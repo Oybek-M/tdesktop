@@ -84,7 +84,8 @@ va `CanaryVersionSuffix()`.
       `{"win64":{"canary":{"released":7003001,"counter":1,"link":"/win/td-update-win-x64-7003001-canary-1"}}}`
 - [x] Build (2026-10-14 09:22): `C:\TBuild\staged\efde411217-20261014\`
       (SHA256 `5f9e30dc4f132fdd...`); exe ichida manifest v2 bor
-- [ ] Laptop'ga o'rnatish (Telegram yopilganda)
+- [x] Laptop'ga o'rnatildi (2026-10-14 23:51): log'da `canary: #1`; feed
+      hali yo'q -> `Update Error: ... 203` (404) kutilgan
 - [ ] VPS: reliz SSH kaliti hali ruxsat etilmagan (`Permission denied
       (publickey)`); `/secure/v2` ni `publish.ps1` o'zi yaratadi. Yarim
       yuklangan 7.2.7 ni tekshirish

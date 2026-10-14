@@ -1,12 +1,21 @@
 # CustomMod — Keyingi Tasklar Ro'yxati
 
-**Oxirgi yangilanish:** 2026-10-14 09:30 (o'rnatilgan: `df785ce63a` = A22 A+C; o'rnatishga tayyor: `efde411217` = A7 "7.3.1 canary #1" — foydalanuvchi Telegram'ni yopishi kerak)
+**Oxirgi yangilanish:** 2026-10-14 23:55 (o'rnatilgan: `efde411217` = A7 "7.3.1 canary #1", 23:51 — start sinovi O'TDI)
 
 ---
 
 ## 🟡 2026-10-13 holati — keyingi sessiya shu yerdan boshlaydi
 
-**🆕 10-14 09:30 (eng yangi):**
+**🆕 10-14 23:55 (eng yangi):** canary #1 O'RNATILDI (23:51). Zaxiralar:
+`Release\_tdata-backup-pre-efde411217-20261014-20261014-235131` (103 MB),
+`db\pre-efde411217-20261014-20261014-235131` (61 MB). 23:52 startida:
+`Launched version: 7003001, ..., canary: #1` ✅; `start tinchidi` +20 s ✅;
+`Update Error: could not get current version 203` — KUTILGAN (VPS'da
+`/secure/v2/current6` hali yo'q, 404; canary 10–15 daqiqada qayta so'raydi).
+Start bloki 3571 ms (exe almashgandan keyingi birinchi start) — iliq
+startni qayta o'lchash kerak. Log nusxalari: `C:\TBuild\starttest-20261014-a7\`.
+
+**10-14 09:30:**
 - A7 canary #1 BUILD O'TDI (09:22, inkremental ~10 daqiqa). Nusxa:
   `C:\TBuild\staged\efde411217-20261014\` (SHA256 `5f9e30dc4f132fdd...`,
   `--check` O'TDI; exe ichida manifest v2 va canary feed kodi bor).
@@ -210,7 +219,7 @@ feed'i, manifest v2 (`canary-public`) va `publish.ps1`. Dry-run O'TDI
 (Packer `td-update-win-x64-7003001-canary-1` ni imzoladi va o'zi
 tekshirdi). BUILD O'TDI (10-14 09:22): `staged\efde411217-20261014`.
 Qolgani:
-1. Laptop'ga o'rnatish (Telegram yopilganda).
+1. ✅ Laptop'ga o'rnatildi (10-14 23:51), log'da `canary: #1`.
 2. VPS: reliz SSH kaliti hali ruxsat etilmagan (`Permission denied`) —
    `customsync-release.pub` ni `authorized_keys` ga qo'shish (CustomSync
    sessiyasi yoki foydalanuvchi). Shu bilan birga yarim yuklangan 7.2.7 ni
