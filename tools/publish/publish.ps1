@@ -29,6 +29,10 @@
     Must use key-based auth - this script never handles the VPS
     password. See "SSH KEY SETUP" below if not configured yet.
 
+.PARAMETER SshUser
+    SFTP-only release user on the VPS (default customsync-release).
+    Passed as user@host, so it overrides any User line in ~/.ssh/config.
+
 .PARAMETER GithubRepo
     owner/repo for the private releases mirror, e.g. Oybek-M/tdesktop-releases.
 
@@ -59,12 +63,16 @@
 .NOTES
     SSH KEY SETUP (one-time, not done by this script):
       1. ssh-keygen -t ed25519 -f $env:USERPROFILE\.ssh\customsync-release
-      2. ssh-copy-id -i $env:USERPROFILE\.ssh\customsync-release.pub root@<vps-ip>
-         (or manually append the .pub content to /root/.ssh/authorized_keys)
+      2. The VPS owner adds the .pub key for the SFTP-only user
+         customsync-release (2026-10-14 plan, prepared by the
+         customsync-server session): nologin shell, ChrootDirectory
+         /var/www/updates, ForceCommand internal-sftp -u 0022,
+         AuthorizedKeysFile /etc/ssh/authorized_keys/%u with "restrict".
+         R and R/win (see Upload-Vps) are pre-created and owned by that
+         user. No root key - the VPS was compromised in 2026-09.
       3. Add to ~/.ssh/config:
              Host customsync-vps
                  HostName <vps-ip>
-                 User root
                  IdentityFile ~/.ssh/customsync-release
     A dedicated key (not your everyday one) makes it easy to revoke
     release access later without touching anything else.
@@ -77,6 +85,9 @@ param(
 
     [Parameter(Mandatory = $false)]
     [string]$SshHost = "customsync-vps",
+
+    [Parameter(Mandatory = $false)]
+    [string]$SshUser = "customsync-release",
 
     [Parameter(Mandatory = $false)]
     [string]$GithubRepo = "Oybek-M/tdesktop-releases",
@@ -165,6 +176,15 @@ foreach ($key in @("secure_user", "secure_pass", "pub_prefix")) {
     if (-not $Secrets.ContainsKey($key)) {
         Fail "Secrets file is missing '$key='"
     }
+}
+
+# pub_prefix (umumiy mirror'ning yashirin yo'li) konsolga chiqmasin: skript
+# Claude orqali ishga tushirilsa, chiqish suhbat tarixiga tushadi.
+function Hide-Secret([string]$text) {
+    if ($Secrets.pub_prefix) {
+        return $text.Replace($Secrets.pub_prefix, '<pub_prefix>')
+    }
+    return $text
 }
 
 New-Item -ItemType Directory -Path $WorkDir | Out-Null
@@ -283,19 +303,43 @@ if ($DryRun) {
 
 $results = @{}
 
+# 2026-10-14 (A7): VPS'ga faqat SFTP orqali, cheklangan foydalanuvchi bilan
+# yoziladi (ChrootDirectory /var/www/updates, ForceCommand internal-sftp).
+# Shell buyrug'i yo'q; R va R/win serverda oldindan yaratilgan. Paket ham,
+# feed ham vaqtinchalik nom bilan yuklanib, so'ng posix-rename bilan
+# almashtiriladi (sftp `rename` server qo'llasa shuni ishlatadi): klient
+# hech qachon chala faylni ko'rmaydi. Lokal yo'l "/" bilan, chunki sftp
+# buyrug'idagi "\" ni escape deb o'qiydi.
 function Upload-Vps($label, $remotePath) {
     Write-Host "Uploading to VPS ($label)..." -ForegroundColor Cyan
     try {
-        & ssh $SshHost "mkdir -p $remotePath/win"
-        if ($LASTEXITCODE -ne 0) { throw "ssh mkdir failed" }
-        & scp $packagePath "${SshHost}:$remotePath/win/$packageName"
-        if ($LASTEXITCODE -ne 0) { throw "scp package failed" }
-        & scp $manifestPath "${SshHost}:$remotePath/$FeedName"
-        if ($LASTEXITCODE -ne 0) { throw "scp manifest failed" }
+        $batchPath = Join-Path $WorkDir "sftp-$label.txt"
+        $localDir = $WorkDir.Replace('\', '/')
+        @(
+            "lcd `"$localDir`""
+            "put $packageName $remotePath/win/$packageName.part"
+            "rename $remotePath/win/$packageName.part $remotePath/win/$packageName"
+            "put $FeedName $remotePath/$FeedName.tmp"
+            "rename $remotePath/$FeedName.tmp $remotePath/$FeedName"
+        ) | Set-Content -Path $batchPath -Encoding ascii
+        # sftp chiqishini (stderr ham) niqoblab chiqaramiz. PS 5.1 da
+        # EAP=Stop + 2>&1 birinchi stderr qatorida to'xtatadi, shuning
+        # uchun shu yerda vaqtincha Continue.
+        $prevEap = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            & sftp -q -b $batchPath "$SshUser@$SshHost" 2>&1 | ForEach-Object {
+                Write-Host ("  " + (Hide-Secret "$_"))
+            }
+            $code = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $prevEap
+        }
+        if ($code -ne 0) { throw "sftp exited with code $code" }
         $results[$label] = @{ ok = $true }
     } catch {
-        Write-Host "  Warning: $label upload failed - $_" -ForegroundColor Yellow
-        $results[$label] = @{ ok = $false; error = $_.ToString() }
+        Write-Host "  Warning: $label upload failed - $(Hide-Secret "$_")" -ForegroundColor Yellow
+        $results[$label] = @{ ok = $false; error = (Hide-Secret $_.ToString()) }
     }
 }
 
@@ -319,8 +363,9 @@ if ($Api) {
     }
 } else {
 
-Upload-Vps "vps-secure" "/var/www/updates/secure/$FeedSubdir"
-Upload-Vps "vps-pub"    "/var/www/updates/$($Secrets.pub_prefix)/$FeedSubdir"
+# Yo'llar chroot (/var/www/updates) ichida.
+Upload-Vps "vps-secure" "/secure/$FeedSubdir"
+Upload-Vps "vps-pub"    "/$($Secrets.pub_prefix)/$FeedSubdir"
 
 Write-Host "Uploading to GitHub ($GithubRepo)..." -ForegroundColor Cyan
 try {
@@ -362,7 +407,7 @@ function Verify-Url($label, $url, $headers = @{}) {
     if (-not $results.ContainsKey($label) -or -not $results[$label].ok) {
         return  # already failed to upload, nothing to verify
     }
-    Write-Host "Verifying $label ($url)..." -ForegroundColor Cyan
+    Write-Host "Verifying $label ($(Hide-Secret $url))..." -ForegroundColor Cyan
     $checkPath = Join-Path $WorkDir "verify-$label"
     try {
         Invoke-WebRequest -Uri $url -Headers $headers -OutFile $checkPath -ErrorAction Stop
@@ -375,7 +420,7 @@ function Verify-Url($label, $url, $headers = @{}) {
         }
     } catch {
         $results[$label] = @{ ok = $false; error = "re-download failed: $_" }
-        Write-Host "  Re-download failed: $_" -ForegroundColor Red
+        Write-Host "  Re-download failed: $(Hide-Secret "$_")" -ForegroundColor Red
     }
 }
 
