@@ -88,14 +88,14 @@ va `CanaryVersionSuffix()`.
 - [ ] VPS: reliz SSH kaliti hali ruxsat etilmagan (`Permission denied
       (publickey)`); `/secure/v2` ni `publish.ps1` o'zi yaratadi. Yarim
       yuklangan 7.2.7 ni tekshirish
-      - 10-14: CustomSync root o'rniga cheklangan reliz foydalanuvchisini
-        taklif qildi (faqat `/var/www/updates` ga yozadi, `restrict`). Bu
-        egasining qarori. `publish.ps1` ning SSH amallari (har mirror,
-        R = `.../secure/v2` va `.../<pub_prefix>/v2`): `mkdir -p R/win`;
-        paketni scp bilan `R/win/` ga; feed'ni scp bilan `R/current6` ga
-        (ustiga yozadi). mv/chmod/rm yo'q. SFTP-only tanlansa, skript
-        `sftp -b` ga o'tkaziladi va feed atomik almashtiriladi
-        (posix-rename).
+      - 10-14: VPS'ga root kaliti EMAS, SFTP-only foydalanuvchi
+        `customsync-release` bilan yoziladi (CustomSync rejasi: chroot
+        `/var/www/updates`, `ForceCommand internal-sftp`; kalit qo'shish
+        egasining qarori). `publish.ps1` (`2eeff6ae42`) `sftp -b` ishlatadi:
+        `R/win/<paket>.part` va `R/current6.tmp` ni yuklab, posix-rename
+        bilan almashtiradi (R = `/secure/v2`, `/<pub_prefix>/v2`). Shell
+        buyrug'i yo'q, `pub_prefix` chiqishda niqoblanadi. Serverga
+        ulanmasdan soxta sftp bilan sinalgan.
 - [ ] PC va akamga #1 ni 1 marta qo'lda o'rnatish
 - [ ] e2e: `kCounter` = 2 -> build -> reliz -> laptop #1 dan #2 ga o'zi
       yangilanadi
