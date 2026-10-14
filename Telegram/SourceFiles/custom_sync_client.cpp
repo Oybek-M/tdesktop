@@ -995,9 +995,6 @@ QUrl Client::makeWebSocketUrl() const {
     } else if (url.scheme() == QStringLiteral("http")) {
         url.setScheme(QStringLiteral("ws"));
     }
-    QUrlQuery query;
-    query.addQueryItem(QStringLiteral("access_token"), _accessToken);
-    url.setQuery(query);
     return url;
 }
 
@@ -1036,7 +1033,12 @@ void Client::startWebSocket() {
     if (_wsReconnectTimer) {
         _wsReconnectTimer->stop();
     }
-    _socket->open(makeWebSocketUrl());
+    // Token URL'da emas, sarlavhada: nginx error.log (masalan backend
+    // restart paytidagi 502 da) so'rov qatorini to'liq yozadi. Server
+    // /ws/notify da Authorization: Bearer ni qabul qiladi (2026-10-15).
+    QNetworkRequest request(makeWebSocketUrl());
+    request.setRawHeader("Authorization", "Bearer " + _accessToken.toUtf8());
+    _socket->open(request);
 }
 
 void Client::stopWebSocket() {
