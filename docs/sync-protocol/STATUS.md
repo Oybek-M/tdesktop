@@ -1,6 +1,6 @@
 # Loyihalar holati — HAR SESSIYA SHU YERDAN BOSHLANADI
 
-Oxirgi yangilanish: **2026-09-14**
+Oxirgi yangilanish: **2026-10-14**
 
 > ✅ **2026-08-26 dagi ko'p akkauntli aralashuv xatosi HAL QILINDI.**
 > Protokol tomoni: spec §0.12 (`record_id` ga `account_hash`),
@@ -17,8 +17,8 @@ Oxirgi yangilanish: **2026-09-14**
 
 | Loyiha | Holat | Keyingi qadam |
 |---|---|---|
-| **tdesktop** (CustomMod) | 🟡 Plan 02 dan 10/11 task kodda tayyor; **to'liq build KUTILMOQDA** | Build (uyda) → qo'lda regressiya → Task 9 |
-| **customsync-server** | 🟡 01a, 01b ✅; **plan 04 jarayonda** (Task 1-3, 6 ✅) | 04 Task 7 (rejalashtirilgan purge + sweep) |
+| **tdesktop** (CustomMod) | 🟡 Upstream v7.3.1 ✅; V2 imzo (A27) ✅; A26, A22 o'rnatildi. **A7:** relizlar "7.3.1 canary #N" — kod tayyor, build jarayonda (2026-10-14) | A7: canary #1 o'rnatish → VPS `/secure/v2` → e2e. Batafsil: `docs/NEXT_TASKS.md` |
+| **customsync-server** | 🟡 01a, 01b ✅; 04: 5/6 (Task 1-3, 6, 7 ✅); 05 ✅ (Task 10 ⏸ bloklangan); .NET 10 LTS, 617 test. **Capture deploy jarayonda:** TDLib 1.8.67 build qilindi, kit tayyor (`87f24c2`) | Egasi: VPS'da capture deploy (plan → apply → telegram → status); keyin plan 03 |
 | **server-controller** | ⚪ boshlanmagan | 01a/01b tugagach |
 | **tmobile-android** | ⚪ muhokama qilinmagan | — |
 | **tmobile-ios** | ⚪ muhokama qilinmagan | — |
@@ -375,7 +375,7 @@ global sozlamami yoki har chat uchun alohidami?
 
 **Repo:** https://github.com/Oybek-M/customsync-server (public, MIT)
 **Papka:** `Projects programming\Telegram\customsync-server`
-**Branch:** `Oybek` — `dotnet test`: **152 test, hammasi o'tadi** (2026-09-14)
+**Branch:** `Oybek` — `dotnet test`: **617 test, hammasi o'tadi** (2026-10-14)
 
 🔴 **Aniq holat va keyingi qadam shu loyihaning `PROGRESS.md`
 faylida.** Quyidagisi faqat qisqacha.
@@ -386,8 +386,8 @@ faylida.** Quyidagisi faqat qisqacha.
 | **01b** — sync yadrosi | ✅ 9 task'ning hammasi, deploy fayllari bilan |
 | 02 — tdesktop agenti | ✅ 11 task'ning hammasi kodda; v7.2.6 merge'idan keyin build o'tdi |
 | 03 — web controller | ⚪ boshlanmagan |
-| **04** — storage lifecycle | 🟡 Task 1-3, 6 ✅ (har birida tekshiruvda xato topilib tuzatildi). Keyingisi: 7. Task 4-5 keyinga, 8 → plan 03 |
-| 05 — capture xizmati | ⚪ 04 dan keyin. `libtdjson` tahlili `PROGRESS.md` da |
+| **04** — storage lifecycle | 🟡 5/6: Task 1-3, 6, 7 ✅. Task 4-5 keyinga, 8 → plan 03 |
+| **05** — capture xizmati | ✅ (Task 10 ⏸ bloklangan). Capture deploy jarayonda: TDLib 1.8.67 (`bc9c263`) build qilindi, kit `87f24c2` |
 | 06 — reliz boshqaruvi | 🟡 Task 1-4 bajarilgan (2026-09-03) |
 
 **Kelishilgan tartib (2026-09-09):** `04 → 05 → 03 → read_at → TO'LIQ DEPLOY`.
