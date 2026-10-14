@@ -82,8 +82,11 @@ va `CanaryVersionSuffix()`.
 - [x] Dry-run: Packer `td-update-win-x64-7003001-canary-1` ni imzoladi
       va o'zi tekshirdi (`VerifyPackedV2`). Feed:
       `{"win64":{"canary":{"released":7003001,"counter":1,"link":"/win/td-update-win-x64-7003001-canary-1"}}}`
-- [ ] Build (CustomSync TDLib build'i tugagach) -> laptop'ga o'rnatish
-- [ ] VPS: `/secure/v2` va reliz SSH kaliti (CustomSync sessiyasi); yarim
+- [x] Build (2026-10-14 09:22): `C:\TBuild\staged\efde411217-20261014\`
+      (SHA256 `5f9e30dc4f132fdd...`); exe ichida manifest v2 bor
+- [ ] Laptop'ga o'rnatish (Telegram yopilganda)
+- [ ] VPS: reliz SSH kaliti hali ruxsat etilmagan (`Permission denied
+      (publickey)`); `/secure/v2` ni `publish.ps1` o'zi yaratadi. Yarim
       yuklangan 7.2.7 ni tekshirish
 - [ ] PC va akamga #1 ni 1 marta qo'lda o'rnatish
 - [ ] e2e: `kCounter` = 2 -> build -> reliz -> laptop #1 dan #2 ga o'zi

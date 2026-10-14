@@ -1,12 +1,27 @@
 # CustomMod — Keyingi Tasklar Ro'yxati
 
-**Oxirgi yangilanish:** 2026-10-13 23:45 (o'rnatilgan: `df785ce63a` = A22 A+C, 23:08; A7 = "canary #N" relizlari — kod tayyor, build CustomSync TDLib build'idan KEYIN)
+**Oxirgi yangilanish:** 2026-10-14 09:30 (o'rnatilgan: `df785ce63a` = A22 A+C; o'rnatishga tayyor: `efde411217` = A7 "7.3.1 canary #1" — foydalanuvchi Telegram'ni yopishi kerak)
 
 ---
 
 ## 🟡 2026-10-13 holati — keyingi sessiya shu yerdan boshlaydi
 
-**🆕 23:45 (eng yangi):**
+**🆕 10-14 09:30 (eng yangi):**
+- A7 canary #1 BUILD O'TDI (09:22, inkremental ~10 daqiqa). Nusxa:
+  `C:\TBuild\staged\efde411217-20261014\` (SHA256 `5f9e30dc4f132fdd...`,
+  `--check` O'TDI; exe ichida manifest v2 va canary feed kodi bor).
+  O'rnatish uchun foydalanuvchi Telegram'ni yopishi kerak:
+  `bash /c/TBuild/install-staged.sh efde411217-20261014`. Sinov: log'da
+  `Launched version: 7003001, ..., canary: #1`, Settings'da
+  "7.3.1 canary #1".
+- VPS: reliz kaliti (`~/.ssh/customsync-release`, host `customsync-vps`)
+  serverda hali RUXSAT ETILMAGAN (`Permission denied (publickey)`).
+  `.pub` kalit VPS'ning `authorized_keys` iga qo'shilmaguncha
+  `release.ps1` yuklay olmaydi. `/secure/v2` papkasini skript o'zi
+  yaratadi (`mkdir -p`).
+- TDLib build tugadi (CustomSync, 10-14 00:35) — build cheklovi yo'q.
+
+**23:45 (10-13):**
 - `df785ce63a` (A22 A+C) 23:08 da O'RNATILDI. Zaxiralar:
   `Release\_tdata-backup-pre-df785ce63a-20261013-20261013-230809`,
   `db\pre-df785ce63a-20261013-20261013-230809`. 23:11 startida bitta chatda
@@ -193,12 +208,13 @@ tanlandi, shuning uchun asosiy versiyani oshirish SHART EMAS va
 **Holat:** KOD TAYYOR (10-13): `custom_release.h`, `HttpChecker` canary
 feed'i, manifest v2 (`canary-public`) va `publish.ps1`. Dry-run O'TDI
 (Packer `td-update-win-x64-7003001-canary-1` ni imzoladi va o'zi
-tekshirdi). Qolgani:
-1. Build (CustomSync TDLib build'i tugagach), keyin laptop'ga o'rnatish.
-   Canary'ga o'tishda Telegram target'i to'liq qayta kompilyatsiya
-   BO'LMAYDI: hisoblagich sarlavha faylida.
-2. VPS: `/secure/v2` + reliz SSH kaliti (CustomSync sessiyasi) va yarim
-   yuklangan 7.2.7 ni tekshirish.
+tekshirdi). BUILD O'TDI (10-14 09:22): `staged\efde411217-20261014`.
+Qolgani:
+1. Laptop'ga o'rnatish (Telegram yopilganda).
+2. VPS: reliz SSH kaliti hali ruxsat etilmagan (`Permission denied`) —
+   `customsync-release.pub` ni `authorized_keys` ga qo'shish (CustomSync
+   sessiyasi yoki foydalanuvchi). Shu bilan birga yarim yuklangan 7.2.7 ni
+   tekshirish.
 3. PC va akamga #1 ni 1 marta qo'lda o'rnatish.
 4. e2e: `kCounter` = 2 -> build -> `release.ps1` (VPS/GitHub'ga chiqarish
    uchun foydalanuvchi ruxsati kerak) -> laptop #1 dan #2 ga o'zi
