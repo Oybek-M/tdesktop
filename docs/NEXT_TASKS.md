@@ -6,7 +6,17 @@
 
 ## 🟡 2026-10-13 holati — keyingi sessiya shu yerdan boshlaydi
 
-**🆕 10-14 23:55 (eng yangi):** canary #1 O'RNATILDI (23:51). Zaxiralar:
+**🆕 10-15 01:10 (eng yangi):** CustomSync: sync serveri ochildi
+(`https://sync.2007.uz`). O'rnatilgan build'da `CUSTOM_SYNC_HAS_WEBSOCKETS` BOR
+(exe'da `/ws/notify`) — ro'yxatdan o'tishni hozirgi build bilan qilsa
+bo'ladi (admin kodi egasi ekranida, 10 daqiqa; keyin arxiv paroli;
+02-task11-manual-checklist §4). Xavfsizlik tavsiyasi bajarildi
+(`80489011e3`): WebSocket token'i URL o'rniga `Authorization: Bearer`
+sarlavhasida. Shu commit = **canary #2** (`kCounter` = 2), BUILD O'TDI:
+`staged/80489011e3-20261015`. Qo'lda O'RNATILMAYDI — A7 e2e'da VPS
+orqali #1 -> #2 yangilanish bo'lib chiqadi.
+
+**10-14 23:55:** canary #1 O'RNATILDI (23:51). Zaxiralar:
 `Release\_tdata-backup-pre-efde411217-20261014-20261014-235131` (103 MB),
 `db\pre-efde411217-20261014-20261014-235131` (61 MB). 23:52 startida:
 `Launched version: 7003001, ..., canary: #1` ✅; `start tinchidi` +20 s ✅;
