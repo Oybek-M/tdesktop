@@ -581,31 +581,39 @@ void fillSyncTab(
 	}
 
 	Ui::AddSkip(sDiag, 4);
-	const auto cursor = CustomSync::Outbox::GetState(QStringLiteral("pull_cursor"), QStringLiteral("0"));
-	const auto cursorText = (cursor == u"0"_q || cursor.isEmpty())
-		? u"Server pull kursori (pull_cursor): 0 (hali sinxronlanmagan)"_q
-		: (u"Server pull kursori (pull_cursor): "_q + cursor + u" (sinxronlangan)"_q);
-	sDiag->add(
+	const auto cursorLabel = sDiag->add(
 		object_ptr<Ui::FlatLabel>(
 			sDiag,
-			rpl::single(cursorText),
+			rpl::single(QString()),
 			st::customModHintLabel),
 		st::boxRowPadding);
 
 	Ui::AddSkip(sDiag, 4);
-	const auto hasDiagKey = !CustomSync::Outbox::MasterKey().isEmpty();
-	const auto diagFp = CustomSync::Outbox::KeyFingerprint();
-	sDiag->add(
+	const auto diagKeyLabel = sDiag->add(
 		object_ptr<Ui::FlatLabel>(
 			sDiag,
-			rpl::single(hasDiagKey
-				? u"Lokal master kalit: mavjud (FP: %1) ✓"_q.arg(diagFp)
-				: u"Lokal master kalit: yo'q — ro'yxatdan o'ting"_q),
+			rpl::single(QString()),
 			st::customModHintLabel),
 		st::boxRowPadding);
 
+	// A28 (2026-10-15): ilgari bu matnlar tab ochilganda bir marta yozilardi
+	// va tab qayta ochilguncha eskirib qolardi (ro'yxatdan o'tib kalit
+	// olingach ham "Lokal master kalit: yo'q" turardi). Endi updateStatus()
+	// har chaqirilganda yangilanadi.
+	const auto updateDiagnostics = [=] {
+		const auto cursor = CustomSync::Outbox::GetState(QStringLiteral("pull_cursor"), QStringLiteral("0"));
+		cursorLabel->setText((cursor == u"0"_q || cursor.isEmpty())
+			? u"Server pull kursori (pull_cursor): 0 (hali sinxronlanmagan)"_q
+			: (u"Server pull kursori (pull_cursor): "_q + cursor + u" (sinxronlangan)"_q));
+		const auto hasDiagKey = !CustomSync::Outbox::MasterKey().isEmpty();
+		diagKeyLabel->setText(hasDiagKey
+			? u"Lokal master kalit: mavjud (FP: %1) ✓"_q.arg(CustomSync::Outbox::KeyFingerprint())
+			: u"Lokal master kalit: yo'q — ro'yxatdan o'ting"_q);
+	};
+
 	// ─── Statusni yangilash funksiyasi ────────────────────────────────────────
 	const auto updateStatus = [=](const CustomSync::SyncStatus &st) {
+		updateDiagnostics();
 		const auto orch = CustomSync::GetOrchestrator();
 		if (!orch || !CustomSettings::SyncEnabled()) {
 			orchStateLabel->setText(u"Holat: Sinxronizatsiya to'xtatilgan (yoqilmagan)"_q);
@@ -740,10 +748,19 @@ void fillSyncTab(
 			enrollBtn->setEnabled(true);
 			if (!success) {
 				client->deleteLater();
-				enrollStatusLabel->setText(u"Ro'yxatdan o'tishda xatolik: %1"_q.arg(error));
+				// A29: qurilma allaqachon ro'yxatdan o'tgan bo'lsa, holat
+				// yozuvi xato bilan almashtirilmaydi -- xato ikkinchi qatorda.
+				const auto devId = CustomSync::Outbox::GetState(QStringLiteral("device_id"));
+				enrollStatusLabel->setText(devId.isEmpty()
+					? u"Ro'yxatdan o'tishda xatolik: %1"_q.arg(error)
+					: u"Holat: Qurilma ro'yxatdan o'tgan ✓ (ID: %1)\nQayta ro'yxatdan o'tish bo'lmadi: %2"_q.arg(devId, error));
 				Ui::Toast::Show(u"Server xatosi: %1"_q.arg(error));
 				return;
 			}
+			// A29 (2026-10-15): bir martalik kod ishlatildi -- maydon
+			// tozalanadi. Ilgari ikkinchi bosish o'sha kodni qayta yuborib
+			// invalid_or_used_code olardi va holat yozuvini almashtirardi.
+			codeInput->setText(QString());
 
 			const auto newDevId = CustomSync::Outbox::GetState(QStringLiteral("device_id"));
 			enrollStatusLabel->setText(u"Qurilma ro'yxatdan o'tdi ✓ (ID: %1). Serverdagi kalitlar tekshirilmoqda…"_q.arg(newDevId));

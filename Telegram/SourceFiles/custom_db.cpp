@@ -240,13 +240,19 @@ static void MaybeBackupBeforeMigration() {
     // Sxema versiyasini ALOHIDA, faqat-o'qish ulanish orqali o'qiymiz:
     // asosiy ulanish hali ochilmagan va uni shu yerda ochib qo'ysak
     // WAL fayllari paydo bo'lib, nusxa yaxlitligini buzardi.
-    int version = 0;
+    // -1 = versiyani o'qib bo'lmadi (A30, 2026-10-15). Ilgari 0 qolardi va
+    // nusxa "premigrate-v0" deb nomlanardi: 10-15 08:27 da eski jarayon
+    // yopilayotganda (checkpoint) baza band bo'lib, sog'lom v17 baza "v0"
+    // nusxasini oldi. Endi qisqa kutiladi; baribir o'qilmasa nusxa
+    // olinadi (xavfsiz tomoni), lekin nomi "unknown".
+    int version = -1;
     sqlite3 *probe = nullptr;
     if (sqlite3_open_v2(
             path.toUtf8().constData(),
             &probe,
             SQLITE_OPEN_READONLY,
             nullptr) == SQLITE_OK) {
+        sqlite3_busy_timeout(probe, 3000);
         sqlite3_stmt *stmt = nullptr;
         if (sqlite3_prepare_v2(probe,
                 "SELECT version FROM schema_version WHERE rowid = 1",
@@ -265,9 +271,9 @@ static void MaybeBackupBeforeMigration() {
 
     const auto stamp = QDateTime::currentDateTime()
         .toString(u"yyyyMMdd-HHmmss"_q);
-    const auto target = QString(u"%1.premigrate-v%2-%3.bak"_q)
+    const auto target = QString(u"%1.premigrate-%2-%3.bak"_q)
         .arg(path)
-        .arg(version)
+        .arg((version < 0) ? u"unknown"_q : (u"v"_q + QString::number(version)))
         .arg(stamp);
     if (QFile::copy(path, target)) {
         qDebug() << "[CustomMod] Pre-migration backup:" << target;
