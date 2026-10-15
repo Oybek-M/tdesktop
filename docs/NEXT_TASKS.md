@@ -12,11 +12,28 @@ mos (GitHub `a05dc48`). 1-urinishda ikkala VPS mirror sftp "Connection
 closed" (exit 255) bilan yiqildi; `release.ps1` ni qayta ishga tushirish
 o'tdi. Laptop (#2) 21:18 da `Canary feed offers 7003001 #3` ni topdi,
 21:19 da yuklab ochdi: `tupdates/temp/ready` bor, `version` = canary #3,
-exe SHA staged build bilan mos. O'rnatish Telegram keyingi safar qayta
-ishga tushganda bo'ladi (`canary: #3` qatorini tekshirish qoldi). PC va
+exe SHA staged build bilan mos. 21:46 da foydalanuvchi qayta ishga
+tushirdi: log'da `canary: #3`, exe SHA mos, `Update Error` yo'q —
+**e2e #2 -> #3 O'TDI**. PC va
 akam hali #1/#2 ni ham o'rnatmagan: foydalanuvchi keyinroq eng yangisini
 1 marta qo'lda o'rnatadi. **Keyingisi:** CustomSync "secrets yangilandi"
 desa — canary #4 (yangi parol bilan, kCounter = 4).
+
+**🆕 A32 — GitHub mirror hajmi (10-15 21:50; faqat tahlil, HALI
+BOSHLANMAGAN):** `Oybek-M/tdesktop-releases` PRIVATE: klientlar undan
+o'qiy olmaydi, u faqat zaxira/arxiv. Hajmi ~375 MB, 12 commit: 7.0.7
+(test, keyin o'chirilgan), 7.0.9 ×2, 7.1.1 ×3, canary #2, canary #3 ×2.
+Har paket ~57 MB. GitHub 50 MB dan kattasiga ogohlantiradi, 100 MB dan
+kattasini push'da rad etadi, paket esa upstream bilan o'sib boradi.
+GitHub Release'lar yo'q. Taklif:
+1. `publish.ps1` GitHub qadamini Release asset'ga o'tkazish
+   (`gh release create v7003001-canary-N <paket> --repo ...`). Asset 2 GiB
+   gacha bo'lishi mumkin, trafik cheklovi yo'q, git tarixi o'smaydi.
+   Git'da faqat kichik `current6` qoladi.
+2. Eski paket blob'larini tarixdan tozalash (orphan branch yoki
+   filter-repo + force-push). Bu qaytarib bo'lmaydigan amal, FAQAT
+   egasining aniq ruxsati bilan.
+3. Git LFS'da saqlash/trafik kvotasi bor, Release asset'dan afzalligi yo'q.
 
 **10-15 19:55:** canary #3 A31 bilan BUILD O'TDI (19:47):
 `staged/b307fe98e4-20261015` (SHA256 `5164804557376427...`). Tekshirildi:

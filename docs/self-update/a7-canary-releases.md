@@ -112,7 +112,11 @@ Har bir mirror o'z SHA'si bilan tekshiriladi, shuning uchun bu xavfsiz.
       `a05dc48`). 1-urinishda ikkala VPS mirror sftp "Connection closed"
       (exit 255) bilan yiqildi, qayta ishga tushirish o'tdi. Laptop #2
       21:18 da topdi, 21:19 da yuklab ochdi (exe SHA staged bilan mos);
-      o'rnatish keyingi qayta ishga tushirishda
+      21:46 da qayta ishga tushirildi: `canary: #3`, exe SHA mos —
+      e2e #2 -> #3 O'TDI
+- [ ] A32: GitHub mirror'ni Release asset'larga o'tkazish (repo ~375 MB,
+      har paket ~57 MB, 100 MB dan katta fayl push'da rad etiladi).
+      Batafsil: `docs/NEXT_TASKS.md`
 - [ ] #4: CustomSync /secure parolini almashtirgach (yangi login
       htpasswd'ga qo'shiladi, eskisi o'tish davrida qoladi) yangi parol
       bilan build. Eski login barcha mashinalar #4+ ga o'tgach o'chiriladi
