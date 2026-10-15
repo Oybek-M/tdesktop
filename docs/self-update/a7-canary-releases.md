@@ -119,4 +119,4 @@ Har bir mirror o'z SHA'si bilan tekshiriladi, shuning uchun bu xavfsiz.
       Batafsil: `docs/NEXT_TASKS.md`
 - [ ] #4: CustomSync /secure parolini almashtirgach (yangi login
       htpasswd'ga qo'shiladi, eskisi o'tish davrida qoladi) yangi parol
-      bilan build. Eski login barcha mashinalar #4+ ga o'tgach o'chiriladi
+      bilan build. 10-15 21:52: almashtirildi, secrets fayli yangilandi. Eski login barcha mashinalar #4+ ga o'tgach o'chiriladi

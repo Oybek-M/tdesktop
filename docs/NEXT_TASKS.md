@@ -16,8 +16,17 @@ exe SHA staged build bilan mos. 21:46 da foydalanuvchi qayta ishga
 tushirdi: log'da `canary: #3`, exe SHA mos, `Update Error` yo'q —
 **e2e #2 -> #3 O'TDI**. PC va
 akam hali #1/#2 ni ham o'rnatmagan: foydalanuvchi keyinroq eng yangisini
-1 marta qo'lda o'rnatadi. **Keyingisi:** CustomSync "secrets yangilandi"
-desa — canary #4 (yangi parol bilan, kCounter = 4).
+1 marta qo'lda o'rnatadi. **Keyingisi — canary #4:** CustomSync 21:52 da
+"secrets yangilandi" deb yozdi: `vps-mirror-secrets.txt` da yangi login va
+parol (LF, BOM'siz), `pub_prefix` o'zgarmadi. O'tish davrida eski login
+ham ishlaydi (ikkalasi 403 = auth o'tdi, katalog yopiq; parolsiz 401).
+Qadamlar (foydalanuvchi ruxsati bilan): kCounter = 4 -> build (configure
+`CMAKE_CONFIGURE_DEPENDS` orqali o'zi qayta ishlaydi) ->
+`gen/custom_update_auth.h` yangi login bilan mosligini tekshirish
+(qiymatni chop etmay) -> dry-run -> ruxsat bilan reliz. #3 klientlar #4 ni
+eski login bilan oladi. Eski loginni o'chirish laptop, PC va akam #4+ ga
+o'tgach, egasining buyrug'i bilan bo'ladi; o'tganlarini CustomSync'ga
+yozish kerak.
 
 **🆕 A32 — GitHub mirror hajmi (10-15 21:50; faqat tahlil, HALI
 BOSHLANMAGAN):** `Oybek-M/tdesktop-releases` PRIVATE: klientlar undan
