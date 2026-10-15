@@ -6,7 +6,29 @@
 
 ## 🟡 2026-10-13 holati — keyingi sessiya shu yerdan boshlaydi
 
-**🆕 10-15 08:45 (eng yangi):** ✅ **A7 e2e O'TDI** — canary #2 VPS'ga
+**⏸ 10-15 09:15 — PAUZA (foydalanuvchi: limit oz). Keyingi sessiya SHU YERDAN:**
+- Kodda tayyor, push qilingan: A28-A30 (`a9389507ce`, kCounter = 3) va
+  **A31** (`b307fe98e4`): `/secure` login:parol manbadan olib tashlandi.
+  Endi CMake configure paytida `DesktopPrivate/vps-mirror-secrets.txt`
+  (`secure_user=`, `secure_pass=`) dan `out/Telegram/gen/custom_update_auth.h`
+  ga yozadi; faqat localstorage.cpp o'qiydi.
+- Build: `a9389507ce` (#3, A31'siz) 09:02 da boshlangan, pauza paytida
+  link bosqichida edi — natija `C:/TBuild/build-gentle.log` da. UNI CHIQARMANG.
+- **Keyingi qadamlar:**
+  1. A31 bilan qayta build (CMakeLists o'zgargani uchun configure qayta
+     ishlaydi; localstorage.cpp + link).
+  2. exe'da prefiks oldingi bilan bir xilligini tekshirish: secrets
+     faylidan o'qib, faqat MOSLIK SONINI chiqarish, parolni chop etmaslik.
+  3. `staged/b307fe98e4-20261015` ga saqlash → `release.ps1 -DryRun` →
+     foydalanuvchi ruxsati bilan #3 relizi (`*>&1` ishlatsa ham endi
+     yiqilmaydi).
+  4. CustomSync'ga xabar berish: "build fayldan o'qiydi" — shundan keyin
+     ular parolni o'tish davri bilan almashtiradi (yangi parol qo'shiladi,
+     eskisi hamma yangi build'ga o'tguncha qoladi).
+- Foydalanuvchida: PC va akamning kompyuteriga canary #2 ni qo'lda
+  o'rnatish (`staged/80489011e3-20261015`); A22 sinovi; A21.
+
+**10-15 08:45:** ✅ **A7 e2e O'TDI** — canary #2 VPS'ga
 chiqarildi (secure + pub, SHA tasdiqlandi; GitHub mirror qo'lda,
 tdesktop-releases `09010a7`), laptop #1 08:24 da topdi, yukladi, foydalanuvchi
 "Update Telegram" bosdi -> 08:28 `canary: #2`. Sync ulandi (08:22):
