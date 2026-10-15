@@ -6,7 +6,16 @@
 
 ## 🟡 2026-10-13 holati — keyingi sessiya shu yerdan boshlaydi
 
-**⏸ 10-15 09:15 — PAUZA (foydalanuvchi: limit oz). Keyingi sessiya SHU YERDAN:**
+**🆕 10-15 19:55 (eng yangi):** canary #3 A31 bilan BUILD O'TDI (19:47):
+`staged/b307fe98e4-20261015` (SHA256 `5164804557376427...`). Tekshirildi:
+`gen/custom_update_auth.h` secrets bilan mos, exe'dagi yangilanish URL'i #2
+dagi bilan bir xil (parol chop etilmadi). Dry-run O'TDI
+(`td-update-win-x64-7003001-canary-3`). **Reliz foydalanuvchi ruxsatini
+kutmoqda.** CustomSync'ga "tayyor" yozildi: parol almashtirish (o'tish davri
+bilan) endi ularda; yangi parol kelgach — canary #4 (yangi parol bilan).
+`a9389507ce` build'i (A31'siz) ISHLATILMAYDI.
+
+**⏸ 10-15 09:15 — PAUZA (tarix):**
 - Kodda tayyor, push qilingan: A28-A30 (`a9389507ce`, kCounter = 3) va
   **A31** (`b307fe98e4`): `/secure` login:parol manbadan olib tashlandi.
   Endi CMake configure paytida `DesktopPrivate/vps-mirror-secrets.txt`
