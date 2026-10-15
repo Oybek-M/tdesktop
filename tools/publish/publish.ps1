@@ -367,31 +367,30 @@ if ($Api) {
 Upload-Vps "vps-secure" "/secure/$FeedSubdir"
 Upload-Vps "vps-pub"    "/$($Secrets.pub_prefix)/$FeedSubdir"
 
-Write-Host "Uploading to GitHub ($GithubRepo)..." -ForegroundColor Cyan
+Write-Host "Uploading to GitHub ($GithubRepo) as a release asset..." -ForegroundColor Cyan
+# A32 (2026-10-16): paket git tarixiga emas, GitHub Release asset'iga
+# yuklanadi. Git'da har ~57 MB lik paket repo'ni abadiy kattalashtirardi,
+# 100 MB dan katta faylni esa GitHub push'da rad etadi. Asset 2 GiB gacha
+# bo'lishi mumkin. Tag = paket nomi, shuning uchun har reliz alohida.
+# Qayta ishga tushirilsa mavjud reliz asset'lari --clobber bilan almashadi.
 # gh/git progress'ni stderr'ga yozadi. Skript chiqishi qayta yo'naltirilsa
 # (masalan `release.ps1 *>&1`), PS 5.1 EAP=Stop da birinchi stderr qatori
 # xato bo'lib to'xtatardi (2026-10-15, canary #2 da GitHub shu sabab
 # yiqildi). throw va -ErrorAction Stop baribir to'xtatadi.
+$ghTag = $packageName
 $prevEap = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
 try {
-    $ghWorkDir = Join-Path $WorkDir "gh-repo"
-    & gh repo clone $GithubRepo $ghWorkDir -- --depth 1
-    if ($LASTEXITCODE -ne 0) { throw "gh repo clone failed" }
-    New-Item -ItemType Directory -Force -Path (Join-Path $ghWorkDir "$FeedSubdir\win") -ErrorAction Stop | Out-Null
-    Copy-Item $packagePath (Join-Path $ghWorkDir "$FeedSubdir\win\$packageName") -ErrorAction Stop
-    Copy-Item $manifestPath (Join-Path $ghWorkDir "$FeedSubdir\$FeedName") -ErrorAction Stop
-    Push-Location $ghWorkDir
-    try {
-        & git add -A
-        & git commit -m "release: version $releaseLabel"
-        if ($LASTEXITCODE -ne 0) { throw "git commit failed (maybe nothing changed?)" }
-        & git push
-        if ($LASTEXITCODE -ne 0) { throw "git push failed" }
-        $results["github"] = @{ ok = $true }
-    } finally {
-        Pop-Location
+    & gh release view $ghTag --repo $GithubRepo *> $null
+    if ($LASTEXITCODE -eq 0) {
+        & gh release upload $ghTag $packagePath $manifestPath --repo $GithubRepo --clobber
+        if ($LASTEXITCODE -ne 0) { throw "gh release upload failed" }
+    } else {
+        & gh release create $ghTag $packagePath $manifestPath --repo $GithubRepo `
+            --title "$releaseLabel" --notes "CustomMod $releaseLabel ($packageName)"
+        if ($LASTEXITCODE -ne 0) { throw "gh release create failed" }
     }
+    $results["github"] = @{ ok = $true }
 } catch {
     Write-Host "  Warning: GitHub upload failed - $_" -ForegroundColor Yellow
     $results["github"] = @{ ok = $false; error = $_.ToString() }
@@ -446,6 +445,32 @@ $secureAuthHeader = @{
 }
 Verify-Url "vps-secure" "https://updates.2007.uz/secure/$FeedSubdir/win/$packageName" $secureAuthHeader
 Verify-Url "vps-pub"    "https://updates.2007.uz/$($Secrets.pub_prefix)/$FeedSubdir/win/$packageName"
+
+# GitHub asset'i ham qayta yuklab tekshiriladi (A32): repo private, shuning
+# uchun URL emas, gh orqali.
+if ($results.ContainsKey("github") -and $results["github"].ok) {
+    Write-Host "Verifying github (release $ghTag)..." -ForegroundColor Cyan
+    $ghCheckDir = Join-Path $WorkDir "verify-github"
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        New-Item -ItemType Directory -Force -Path $ghCheckDir -ErrorAction Stop | Out-Null
+        & gh release download $ghTag --repo $GithubRepo --pattern $packageName --dir $ghCheckDir --clobber
+        if ($LASTEXITCODE -ne 0) { throw "gh release download failed" }
+        $remoteHash = (Get-FileHash (Join-Path $ghCheckDir $packageName) -Algorithm SHA256 -ErrorAction Stop).Hash
+        if ($remoteHash -ne $localHash) {
+            $results["github"] = @{ ok = $false; error = "checksum mismatch: local=$localHash remote=$remoteHash" }
+            Write-Host "  MISMATCH - github is serving a corrupted file" -ForegroundColor Red
+        } else {
+            Write-Host "  OK - checksum matches" -ForegroundColor Green
+        }
+    } catch {
+        $results["github"] = @{ ok = $false; error = "re-download failed: $_" }
+        Write-Host "  Re-download failed: $_" -ForegroundColor Red
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
+}
 
 # --- Step 6: summary ---------------------------------------------------
 
