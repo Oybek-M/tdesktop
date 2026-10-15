@@ -9,6 +9,17 @@ Format: `## YYYY-MM-DD — sarlavha`
 
 ---
 
+## 2026-10-15 — server: refresh rotatsiyasiga imtiyoz oynasi
+
+**Nima:** almashtirilgan refresh token `auth.refresh_grace_seconds` (standart 120 s) ichida aynan o'sha yangi tokenni qaytaradi, yangi zanjir ochilmaydi. Oyna tugagach yoki yangi token ishlatilgach eski token 401 oladi (customsync-server `fa742ba`, hali deploy qilinmagan).
+
+**Nima uchun:** refresh javobi yo'qolsa, eski token bilan qayta urinish qurilmani bloklamasin.
+
+**Ta'sirlanadi:**
+- tdesktop: o'zgarish shart emas (orqaga mos).
+
+---
+
 ## 2026-09-30 — `setting` yozuvining `occurred_at` i endi qiymat versiyasi (A24)
 
 **Nima:**
