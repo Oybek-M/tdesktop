@@ -39,7 +39,7 @@ hech biriga ega emas:
 | Feed o'qish | `core/update_checker.cpp` `HttpChecker::parseCanaryResponse()`: `win64.canary = {released, counter, link}`. `stable` yozuvi faqat asos kattaroq bo'lsa olinadi. Log satri: `Update Info: Canary feed offers <asos> #<N>, running ...` |
 | MTP canary | Upstream canary'ni Telegram kanalidan oladi. Bizda bu yo'l o'chiq (`MtpChecker::start` -> `fail`), canary build ham `HttpChecker` ishlatadi |
 | Manifest v2 | `Telegram/Resources/update/manifest.min.json`: `canary-public -> [["oy-2026a"]]` qo'shildi, ildiz kaliti bilan qayta imzolandi (`manifest.sig`). v1 zaxirasi: `DesktopPrivate\update-v2\manifest-v1.*`. Paket ichida v2 bor, shuning uchun v1 ni saqlagan klient ham uni o'zlashtiradi |
-| Reliz | `tools/publish/publish.ps1` `custom_release.h` ni o'qiydi. Packer'ga `-channel canary-public -counter N` beradi, paket nomi `td-update-win-x64-<ver>-canary-<N>`, feed yozuvi `canary`. `-Api` yo'li canary'ni hali qo'llamaydi, chunki server feed'ga `counter` yozmaydi. Hozircha faqat scp yo'li ishlaydi |
+| Reliz | `tools/publish/publish.ps1` `custom_release.h` ni o'qiydi. Packer'ga `-channel canary-public -counter N` beradi, paket nomi `td-update-win-x64-<ver>-canary-<N>`, feed yozuvi `canary`. `-Api` yo'li canary'ni hali qo'llamaydi, chunki server feed'ga `counter` yozmaydi. Hozircha faqat sftp yo'li ishlaydi |
 
 ## Kanal siyosati (`ChannelPolicyAllows`, upstream)
 
@@ -74,7 +74,13 @@ va `CanaryVersionSuffix()`.
    foydalanuvchi ruxsati bilan `release.ps1` ni ishga tushiring.
 4. Klient log'ida `Canary feed offers ...` qatori chiqishi kerak. Keyin
    yuklab olish va qayta ishga tushirish bo'ladi, oxirida versiya `#N`
-   ko'rsatadi.
+   ko'rsatadi. Bu qator faqat yangiroq versiya topilganda yoziladi:
+   yangilanish yo'q tekshiruv (debug rejimsiz) log'da iz qoldirmaydi.
+
+Bir mirror yiqilsa (masalan, sftp `Connection closed`), `release.ps1` ni
+qayta ishga tushirish kifoya. Packer deterministik emas: qayta ishga
+tushirishda paket baytlari o'zgaradi va GitHub'ga yangi commit tushadi.
+Har bir mirror o'z SHA'si bilan tekshiriladi, shuning uchun bu xavfsiz.
 
 ## Holat
 
@@ -101,3 +107,12 @@ va `CanaryVersionSuffix()`.
 - [x] e2e (2026-10-15): canary #2 (`80489011e3`) VPS'ga chiqdi, laptop
       #1 -> #2 o'zi yangilandi (08:24 topdi, 08:28 `canary: #2`). GitHub
       mirror qo'lda (`publish.ps1` tuzatildi, `b2d0bb5568`)
+- [x] #3 (2026-10-15 21:15): `b307fe98e4` (A28–A31; /secure login:parol
+      manbadan chiqarildi) uchala mirror'ga chiqdi, SHA mos (GitHub
+      `a05dc48`). 1-urinishda ikkala VPS mirror sftp "Connection closed"
+      (exit 255) bilan yiqildi, qayta ishga tushirish o'tdi. Laptop #2
+      21:18 da topdi, 21:19 da yuklab ochdi (exe SHA staged bilan mos);
+      o'rnatish keyingi qayta ishga tushirishda
+- [ ] #4: CustomSync /secure parolini almashtirgach (yangi login
+      htpasswd'ga qo'shiladi, eskisi o'tish davrida qoladi) yangi parol
+      bilan build. Eski login barcha mashinalar #4+ ga o'tgach o'chiriladi

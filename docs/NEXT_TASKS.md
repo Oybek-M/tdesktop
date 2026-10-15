@@ -6,7 +6,19 @@
 
 ## 🟡 2026-10-13 holati — keyingi sessiya shu yerdan boshlaydi
 
-**🆕 10-15 19:55 (eng yangi):** canary #3 A31 bilan BUILD O'TDI (19:47):
+**🆕 10-15 21:15 (eng yangi):** canary #3 (`b307fe98e4`) foydalanuvchi
+ruxsati bilan CHIQARILDI: vps-secure, vps-pub, github — uchalasi OK, SHA
+mos (GitHub `a05dc48`). 1-urinishda ikkala VPS mirror sftp "Connection
+closed" (exit 255) bilan yiqildi; `release.ps1` ni qayta ishga tushirish
+o'tdi. Laptop (#2) 21:18 da `Canary feed offers 7003001 #3` ni topdi,
+21:19 da yuklab ochdi: `tupdates/temp/ready` bor, `version` = canary #3,
+exe SHA staged build bilan mos. O'rnatish Telegram keyingi safar qayta
+ishga tushganda bo'ladi (`canary: #3` qatorini tekshirish qoldi). PC va
+akam hali #1/#2 ni ham o'rnatmagan: foydalanuvchi keyinroq eng yangisini
+1 marta qo'lda o'rnatadi. **Keyingisi:** CustomSync "secrets yangilandi"
+desa — canary #4 (yangi parol bilan, kCounter = 4).
+
+**10-15 19:55:** canary #3 A31 bilan BUILD O'TDI (19:47):
 `staged/b307fe98e4-20261015` (SHA256 `5164804557376427...`). Tekshirildi:
 `gen/custom_update_auth.h` secrets bilan mos, exe'dagi yangilanish URL'i #2
 dagi bilan bir xil (parol chop etilmadi). Dry-run O'TDI
