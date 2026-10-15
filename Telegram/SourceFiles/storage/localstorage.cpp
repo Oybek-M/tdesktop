@@ -34,6 +34,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QDirIterator>
 #include <QtCore/QSaveFile>
 
+#include "custom_update_auth.h" // A31: gen/, CMake yaratadi
+
 #ifndef Q_OS_WIN
 #include <unistd.h>
 #endif // Q_OS_WIN
@@ -565,8 +567,12 @@ const QString &readAutoupdatePrefixRaw() {
 	// 7.2.x klientlar esa '/secure' dagi v1 (RSA) lentani o'qiydi. Ikki format
 	// bitta lentada bo'lsa, eski klientlar V2 paketni yuklab, rad etaverardi
 	// (docs/self-update/a27-v2-signing.md).
-	return AutoupdatePrefix(
-		"https://cmupdate:3GnYk0nPYUH90hew5DIRqm1R@updates.2007.uz/secure/v2");
+	// A31 (2026-10-15): login:parol manbada EMAS -- repo public, avvalgisi
+	// git tarixiga tushgan. CMake uni DesktopPrivate/vps-mirror-secrets.txt
+	// dan gen/custom_update_auth.h ga yozadi; fayl bo'lmasa auth'siz.
+	return AutoupdatePrefix((sizeof(CUSTOM_UPDATE_AUTH) > 1)
+		? "https://" CUSTOM_UPDATE_AUTH "@updates.2007.uz/secure/v2"
+		: "https://updates.2007.uz/secure/v2");
 }
 
 void writeAutoupdatePrefix(const QString &prefix) {

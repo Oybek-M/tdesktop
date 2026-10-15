@@ -117,6 +117,37 @@ if (TARGET Qt6::WebSockets)
     target_compile_definitions(Telegram PRIVATE CUSTOM_SYNC_HAS_WEBSOCKETS)
 endif()
 
+# A31 (2026-10-15): /secure yangilanish mirror'ining basic-auth login:paroli
+# manbada EMAS (repo public -- avvalgisi git tarixiga tushgan). Configure
+# paytida DesktopPrivate/vps-mirror-secrets.txt dan (git'da yo'q; publish.ps1
+# ham shuni o'qiydi) olinib gen/ ga sarlavha bo'lib yoziladi. Uni faqat
+# localstorage.cpp o'qiydi: kompilyator bayroqlari o'zgarmaydi (to'liq qayta
+# kompilyatsiya ham, PCH ogohlantirishi ham yo'q). file(CONFIGURE) faqat
+# mazmun o'zgarganda yozadi.
+set(custom_update_secrets ${CMAKE_SOURCE_DIR}/../DesktopPrivate/vps-mirror-secrets.txt)
+set(custom_update_auth "")
+if (EXISTS ${custom_update_secrets})
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${custom_update_secrets})
+    file(STRINGS ${custom_update_secrets} custom_update_lines)
+    foreach (custom_update_line IN LISTS custom_update_lines)
+        if (custom_update_line MATCHES "^secure_user=([A-Za-z0-9._-]+)?$")
+            set(custom_update_user ${CMAKE_MATCH_1})
+        elseif (custom_update_line MATCHES "^secure_pass=([A-Za-z0-9._-]+)?$")
+            set(custom_update_pass ${CMAKE_MATCH_1})
+        endif()
+    endforeach()
+    if (custom_update_user AND custom_update_pass)
+        set(custom_update_auth "${custom_update_user}:${custom_update_pass}")
+    else()
+        message(WARNING "vps-mirror-secrets.txt: secure_user/secure_pass topilmadi yoki ruxsat etilmagan belgi bor ([A-Za-z0-9._-]) -- yangilanish auth'siz so'raladi")
+    endif()
+endif()
+file(CONFIGURE OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/gen/custom_update_auth.h
+    CONTENT "#pragma once
+#define CUSTOM_UPDATE_AUTH \"@custom_update_auth@\"
+"
+    @ONLY)
+
 if (NOT DESKTOP_APP_DISABLE_SWIFT6)
     telegram_add_apple_swift_runtime(Telegram)
 endif()
