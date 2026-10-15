@@ -18,7 +18,7 @@ Oxirgi yangilanish: **2026-10-14**
 | Loyiha | Holat | Keyingi qadam |
 |---|---|---|
 | **tdesktop** (CustomMod) | 🟡 Upstream v7.3.1 ✅; V2 imzo (A27) ✅; A26, A22 o'rnatildi. **A7:** relizlar "7.3.1 canary #N" — kod tayyor, build jarayonda (2026-10-14) | A7: canary #1 o'rnatish → VPS `/secure/v2` → e2e. Batafsil: `docs/NEXT_TASKS.md` |
-| **customsync-server** | 🟡 01a, 01b ✅; 04: 5/6 (Task 1-3, 6, 7 ✅); 05 ✅ (Task 10 ⏸ bloklangan); .NET 10 LTS, 617 test. **Capture deploy jarayonda:** TDLib 1.8.67 build qilindi, kit tayyor (`87f24c2`) | Egasi: VPS'da capture deploy (plan → apply → telegram → status); keyin plan 03 |
+| **customsync-server** | 🟡 01a, 01b ✅; 04: 5/6 (Task 1-3, 6, 7 ✅); 05 ✅ (Task 10 ⏸ bloklangan); .NET 10 LTS, 617 test. **2026-10-15: API va capture VPS'da, sync ulandi** (tdesktop + capture bitta arxivda) — `9b42e36` | tdesktop pull/merge tasdig'i; EF SQL log darajasi; ro'yxatdan o'tish kodini normallashtirish; keyin plan 03 |
 | **server-controller** | ⚪ boshlanmagan | 01a/01b tugagach |
 | **tmobile-android** | ⚪ muhokama qilinmagan | — |
 | **tmobile-ios** | ⚪ muhokama qilinmagan | — |

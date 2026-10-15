@@ -6,7 +6,25 @@
 
 ## 🟡 2026-10-13 holati — keyingi sessiya shu yerdan boshlaydi
 
-**🆕 10-15 01:10 (eng yangi):** CustomSync: sync serveri egasi p4 apply qilgach ochiladi
+**🆕 10-15 08:45 (eng yangi):** ✅ **A7 e2e O'TDI** — canary #2 VPS'ga
+chiqarildi (secure + pub, SHA tasdiqlandi; GitHub mirror qo'lda,
+tdesktop-releases `09010a7`), laptop #1 08:24 da topdi, yukladi, foydalanuvchi
+"Update Telegram" bosdi -> 08:28 `canary: #2`. Sync ulandi (08:22):
+`pull_cursor` = 93, capture'ning 22 deleted + 3 edited yozuvi arxivda, outbox 0.
+⚠️ Upstream log satri `/secure` URL'idagi basic-auth login:parolni yozardi —
+log nusxalarida yashirildi, kod `b2d0bb5568` da tuzatildi (keyingi canary'da).
+Parol suhbat tarixiga ham tushdi — almashtirish foydalanuvchi qarori
+(yangi parol build'ga kiritiladi, nginx o'tish davrida ikkalasini qabul qiladi).
+Yangi tasklar (CustomSync UX topilmalari + baza zaxirasi):
+- **A28:** Sync tab'idagi diagnostika bloki tab qayta ochilguncha
+  yangilanmaydi ("Lokal master kalit: yo'q", kalit esa bor).
+- **A29:** muvaffaqiyatli ro'yxatdan o'tgach tugmani qayta bosish
+  `invalid_or_used_code` ni ko'rsatib, holat yozuvini almashtiradi.
+- **A30:** `MaybeBackupBeforeMigration` versiyani o'qiy olmasa (eski jarayon
+  yopilayotgan payt) `premigrate-v0` nusxasini oladi — 10-15 08:27 da
+  62 MB ortiqcha nusxa; baza sog'lom (v17, quick_check ok).
+
+**10-15 01:10:** CustomSync: sync serveri egasi p4 apply qilgach ochiladi
 (`https://sync.2007.uz`). O'rnatilgan build'da `CUSTOM_SYNC_HAS_WEBSOCKETS` BOR
 (exe'da `/ws/notify`) — ro'yxatdan o'tishni hozirgi build bilan qilsa
 bo'ladi (admin kodi egasi ekranida, 10 daqiqa; keyin arxiv paroli;

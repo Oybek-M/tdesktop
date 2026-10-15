@@ -98,5 +98,6 @@ va `CanaryVersionSuffix()`.
         buyrug'i yo'q, `pub_prefix` chiqishda niqoblanadi. Serverga
         ulanmasdan soxta sftp bilan sinalgan.
 - [ ] PC va akamga #1 ni 1 marta qo'lda o'rnatish
-- [ ] e2e: `kCounter` = 2 -> build -> reliz -> laptop #1 dan #2 ga o'zi
-      yangilanadi
+- [x] e2e (2026-10-15): canary #2 (`80489011e3`) VPS'ga chiqdi, laptop
+      #1 -> #2 o'zi yangilandi (08:24 topdi, 08:28 `canary: #2`). GitHub
+      mirror qo'lda (`publish.ps1` tuzatildi, `b2d0bb5568`)
