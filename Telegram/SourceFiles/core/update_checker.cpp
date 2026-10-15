@@ -955,7 +955,10 @@ HttpLoader::HttpLoader(const QString &url)
 }
 
 void HttpLoader::startLoading() {
-	LOG(("Update Info: Loading using HTTP from '%1'.").arg(_url));
+	// CustomMod: /secure prefiksida basic-auth login:parol URL ichida --
+	// log'ga yozilmasin (2026-10-15 da log nusxasida topilgan).
+	LOG(("Update Info: Loading using HTTP from '%1'."
+		).arg(QUrl(_url).toDisplayString(QUrl::RemoveUserInfo)));
 
 	_thread = std::make_unique<QThread>();
 	_actor = new HttpLoaderActor(this, _thread.get(), _url);

@@ -368,13 +368,19 @@ Upload-Vps "vps-secure" "/secure/$FeedSubdir"
 Upload-Vps "vps-pub"    "/$($Secrets.pub_prefix)/$FeedSubdir"
 
 Write-Host "Uploading to GitHub ($GithubRepo)..." -ForegroundColor Cyan
+# gh/git progress'ni stderr'ga yozadi. Skript chiqishi qayta yo'naltirilsa
+# (masalan `release.ps1 *>&1`), PS 5.1 EAP=Stop da birinchi stderr qatori
+# xato bo'lib to'xtatardi (2026-10-15, canary #2 da GitHub shu sabab
+# yiqildi). throw va -ErrorAction Stop baribir to'xtatadi.
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
 try {
     $ghWorkDir = Join-Path $WorkDir "gh-repo"
     & gh repo clone $GithubRepo $ghWorkDir -- --depth 1
     if ($LASTEXITCODE -ne 0) { throw "gh repo clone failed" }
-    New-Item -ItemType Directory -Force -Path (Join-Path $ghWorkDir "$FeedSubdir\win") | Out-Null
-    Copy-Item $packagePath (Join-Path $ghWorkDir "$FeedSubdir\win\$packageName")
-    Copy-Item $manifestPath (Join-Path $ghWorkDir "$FeedSubdir\$FeedName")
+    New-Item -ItemType Directory -Force -Path (Join-Path $ghWorkDir "$FeedSubdir\win") -ErrorAction Stop | Out-Null
+    Copy-Item $packagePath (Join-Path $ghWorkDir "$FeedSubdir\win\$packageName") -ErrorAction Stop
+    Copy-Item $manifestPath (Join-Path $ghWorkDir "$FeedSubdir\$FeedName") -ErrorAction Stop
     Push-Location $ghWorkDir
     try {
         & git add -A
@@ -389,6 +395,8 @@ try {
 } catch {
     Write-Host "  Warning: GitHub upload failed - $_" -ForegroundColor Yellow
     $results["github"] = @{ ok = $false; error = $_.ToString() }
+} finally {
+    $ErrorActionPreference = $prevEap
 }
 
 } # end of the scp path
