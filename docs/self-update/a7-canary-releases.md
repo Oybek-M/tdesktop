@@ -114,9 +114,9 @@ Har bir mirror o'z SHA'si bilan tekshiriladi, shuning uchun bu xavfsiz.
       21:18 da topdi, 21:19 da yuklab ochdi (exe SHA staged bilan mos);
       21:46 da qayta ishga tushirildi: `canary: #3`, exe SHA mos —
       e2e #2 -> #3 O'TDI
-- [ ] A32: GitHub mirror'ni Release asset'larga o'tkazish (repo ~375 MB,
+- [x] A32 1-qism (`74037eba40`): GitHub mirror Release asset'larga o'tdi; 2-qism (eski blob'larni tarixdan tozalash) ruxsat kutadi. Avval: (repo ~375 MB,
       har paket ~57 MB, 100 MB dan katta fayl push'da rad etiladi).
       Batafsil: `docs/NEXT_TASKS.md`
-- [ ] #4: CustomSync /secure parolini almashtirgach (yangi login
+- [x] #4 (2026-10-16 08:00, `e1ea5976d9`): yangi login/parol bilan chiqdi, 3 mirror OK. CustomSync /secure parolini almashtirgach (yangi login
       htpasswd'ga qo'shiladi, eskisi o'tish davrida qoladi) yangi parol
       bilan build. 10-15 21:52: almashtirildi, secrets fayli yangilandi. Eski login barcha mashinalar #4+ ga o'tgach o'chiriladi

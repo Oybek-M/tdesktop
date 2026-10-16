@@ -6,7 +6,20 @@
 
 ## 🟡 2026-10-13 holati — keyingi sessiya shu yerdan boshlaydi
 
-**🆕 10-15 21:15 (eng yangi):** canary #3 (`b307fe98e4`) foydalanuvchi
+**🆕 10-16 08:00 (eng yangi): canary #4 CHIQDI** (`e1ea5976d9`,
+`staged/e1ea5976d9-20261016`, exe SHA `994f3a6c8c5faa64...`). /secure
+uchun yangi login/parol exe'da (header mos, exe'da yangi URL 1 ta, eski
+login 0 ta; qiymatlar chop etilmadi). vps-secure, vps-pub va github OK, SHA
+mos. GitHub endi **Release asset** (A32 1-qism, `74037eba40`): tag =
+paket nomi, git tarixi o'smaydi. Laptop'da Telegram 07:50 da yopilgan,
+#4 ochilgandan 10–15 daqiqa keyin keladi; `canary: #4` ni tekshirish
+qoldi. **Qolganlari:** (1) PC va akamga #4 ni 1 marta qo'lda o'rnatish
+(`install-staged.sh e1ea5976d9-20261016`, Telegram yopiq holda);
+(2) uchala mashina #4 da bo'lgach CustomSync'ga yozish, shunda eski login
+o'chiriladi; (3) A32 2-qism: tdesktop-releases tarixidagi eski paket
+blob'larini tozalash (force-push) faqat egasining aniq ruxsati bilan.
+
+**10-15 21:15:** canary #3 (`b307fe98e4`) foydalanuvchi
 ruxsati bilan CHIQARILDI: vps-secure, vps-pub, github — uchalasi OK, SHA
 mos (GitHub `a05dc48`). 1-urinishda ikkala VPS mirror sftp "Connection
 closed" (exit 255) bilan yiqildi; `release.ps1` ni qayta ishga tushirish
