@@ -16,8 +16,13 @@ paket nomi, git tarixi o'smaydi. Laptop'da Telegram 07:50 da yopilgan,
 qoldi. **Qolganlari:** (1) PC va akamga #4 ni 1 marta qo'lda o'rnatish
 (`install-staged.sh e1ea5976d9-20261016`, Telegram yopiq holda);
 (2) uchala mashina #4 da bo'lgach CustomSync'ga yozish, shunda eski login
-o'chiriladi; (3) A32 2-qism: tdesktop-releases tarixidagi eski paket
-blob'larini tozalash (force-push) faqat egasining aniq ruxsati bilan.
+o'chiriladi; (3) ✅ A32 2-qism (10-16, ruxsat bilan): tdesktop-releases
+`main` = 1 ta orphan commit `ab87705` (README, current4, v2/current6),
+force-push qilindi; #4 Release asset joyida. To'liq eski tarix zaxirasi:
+`C:\TBuildackups	desktop-releases-mirror-20261016.git` (mirror, fsck ok,
+12 commit, 423 MiB). GitHub `size` hali ~433 MB ko'rsatadi: eski obyektlar
+GitHub'ning o'z GC'sigacha qoladi (zudlik bilan kerak bo'lsa GitHub
+Support'dan purge so'raladi).
 
 **10-15 21:15:** canary #3 (`b307fe98e4`) foydalanuvchi
 ruxsati bilan CHIQARILDI: vps-secure, vps-pub, github — uchalasi OK, SHA
