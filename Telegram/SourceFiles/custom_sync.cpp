@@ -5,6 +5,7 @@
 #ifndef SYNC_SELFTEST
 #include "custom_sync_client.h"
 #include "custom_sync_outbox.h"
+#include "custom_db.h"
 #include "custom_settings.h"
 #include "custom_startup_quiet.h"
 
@@ -353,9 +354,17 @@ void Orchestrator::onCycleFinished(
 
     Q_UNUSED(pushed);
     Q_UNUSED(pushFailed);
-    Q_UNUSED(rejected);
 
     const bool success = error.isEmpty() && (merged >= 0);
+    // Rad etilgan yozuv (peer/account hash mos emas, noma'lum kind) qayta
+    // kelmaydi -- cursor baribir suriladi. Hech bo'lmasa log'da iz qolsin.
+    if (rejected > 0) {
+        LOG(("CustomMod Sync: pull'da %1 ta yozuv rad etildi.").arg(rejected));
+    }
+    // Ochiq tarixlar merge natijasini darrov ko'rsatsin.
+    if (success && merged > 0) {
+        CustomDB::RequestHistoryReload();
+    }
     const bool pendingNotify = _pendingNotify;
     _pendingNotify = false;
 

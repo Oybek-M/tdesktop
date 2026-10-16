@@ -378,6 +378,19 @@ Session::Session(not_null<Main::Session*> session)
 	CustomDB::SetImportReloadCallback([this] {
 		_histories->forEachLoaded([this](not_null<History*> history) {
 			history->loadDeletedMessages();
+			// Sync merge (2026-10-16): allaqachon qurilgan xabarlarga yangi
+			// O'CHIRILDI/TAHRIRLANDI holatini qo'llash. restoreFromCustomDB()
+			// ikki marta belgi qo'ymaydi, shuning uchun qayta chaqirish xavfsiz.
+			for (const auto &block : history->blocks) {
+				for (const auto &view : block->messages) {
+					const auto item = view->data();
+					const auto before = item->originalText().text;
+					item->restoreFromCustomDB();
+					if (item->originalText().text != before) {
+						requestItemTextRefresh(item);
+					}
+				}
+			}
 			notifyHistoryChangeDelayed(history);
 		});
 		sendHistoryChangeNotifications();

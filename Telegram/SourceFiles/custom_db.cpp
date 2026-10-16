@@ -4612,6 +4612,59 @@ void SetImportReloadCallback(ReloadCallback cb) {
     gReloadCallback = std::move(cb);
 }
 
+void RequestHistoryReload() {
+    // 2026-10-16: sync merge'dan keyin ochiq tarix yangilanmasdi --
+    // CustomSync start+20 s da boshlanadi, tarix esa undan oldin yuklanadi,
+    // natijada boshqa qurilmadan kelgan o'chirish/tahrir faqat qayta
+    // ochilganda ko'rinardi. Debounce: bir necha sikl ketma-ket kelsa,
+    // qayta yuklash bitta bo'ladi.
+    static QTimer *timer = nullptr;
+    if (!timer) {
+        timer = new QTimer();
+        timer->setSingleShot(true);
+        timer->setInterval(1500);
+        QObject::connect(timer, &QTimer::timeout, [] {
+            if (gReloadCallback) {
+                gReloadCallback();
+            }
+        });
+    }
+    timer->start();
+}
+
+void SaveSyncedEditBackup(
+        const PeerKey &key,
+        long long msgId,
+        const QString &oldText,
+        bool isOut,
+        unsigned int msgDate) {
+    if (key.peerId.isEmpty() || oldText.isEmpty()) return;
+    Init();
+    if (!gDb) return;
+
+    ActionedMessage msg;
+    msg.accountId = key.accountId;
+    msg.peerId = key.peerId;
+    msg.msgId = msgId;
+    msg.type = "backup";
+    msg.originalText = oldText;
+    msg.isOut = isOut;
+    msg.msgDate = msgDate;
+    msg.timestamp = QDateTime::currentDateTime();
+    SaveActionedMessage(msg);
+
+    // GetEditHistory() shu to'plamga qarab SQL'ga boradi -- yangi backup
+    // darrov ko'rinsin (SaveMessage() dagi kabi).
+    EnsurePeerCacheLoaded(key);
+    {
+        QMutexLocker locker(&gCacheMutex);
+        gEditBackupIds[key].insert(msgId);
+        if (!gEditedCache[key].contains(msgId)) {
+            gEditedCache[key][msgId] = oldText;
+        }
+    }
+}
+
 void StartAutoBackup() {
     // 3 daqiqa: start (chatlar yuklanishi, xabar ob'ektlari qurilishi)
     // tugab, ilova tinchiganidan keyin. Ilgari 5 soniya edi va aynan

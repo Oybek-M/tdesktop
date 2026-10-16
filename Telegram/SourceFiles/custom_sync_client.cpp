@@ -766,6 +766,10 @@ MergeResult MergeRecord(
             ? QDateTime::fromSecsSinceEpoch(record.observedAt)
             : QDateTime::currentDateTime();
         CustomDB::SaveActionedMessage(msg);
+        // Tahrir tarixi (TAHRIRLANDI bloki) 'backup' qatorlaridan quriladi,
+        // 'edited' qatoridan emas -- jonli tahrirda SaveMessage() yozadi.
+        // Usiz sync'dan kelgan tahrir faqat "edited" yorlig'i bilan qolardi.
+        CustomDB::SaveSyncedEditBackup(key, record.msgId, oldText, isOut, msg.msgDate);
         Outbox::SaveRecordMap(record.recordId, record.kind, key.accountId, key.peerId, record.msgId, record.occurredAt);
         return { MergeStatus::Merged, QString() };
     }

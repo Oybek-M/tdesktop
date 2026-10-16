@@ -445,6 +445,17 @@ void StartAutoBackup();
 // The callback should refresh all open history views (call loadDeletedMessages on each peer).
 using ReloadCallback = std::function<void()>;
 void SetImportReloadCallback(ReloadCallback cb);
+// Sync merge'dan keyin ochiq tarixlarni qayta chizish (gReloadCallback).
+// Ketma-ket pull sikllari bitta qayta yuklashga birlashtiriladi.
+void RequestHistoryReload();
+// Sync orqali kelgan tahrirning eski matni uchun 'backup' qatori.
+// Tahrir tarixi (TAHRIRLANDI bloki) faqat 'backup' qatorlaridan quriladi.
+void SaveSyncedEditBackup(
+    const PeerKey &key,
+    long long msgId,
+    const QString &oldText,
+    bool isOut,
+    unsigned int msgDate);
 
 void ExportDatabase(const QString &targetPath);
 void ImportDatabase(const QString &sourcePath);
