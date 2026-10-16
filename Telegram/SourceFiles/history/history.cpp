@@ -2440,6 +2440,7 @@ void History::loadDeletedMessages() {
 	int skippedEmpty = 0;   // mazmuni yo'qligi uchun chizilmagan
 	int skippedForeign = 0; // boshqa akkauntniki deb topilgan
 	int skippedWindow = 0;  // yuklangan oynadan tashqarida (keyin qo'yiladi)
+	int existingCount = 0;  // xabar obyekti allaqachon bor (qo'yilmadi)
 	int reinserted = 0;     // ko'rinishdan tushib qolgani qaytarildi
 	int linkedMedia = 0;    // A22: fayl media_index orqali topildi
 	int placeholders = 0;   // A22: faylsiz media belgi bilan ko'rsatildi
@@ -2521,6 +2522,8 @@ void History::loadDeletedMessages() {
 				insertMessageToBlocks(existing);
 				owner().requestItemViewRefresh(existing);
 				reinserted++;
+			} else {
+				existingCount++;
 			}
 			continue;
 		}
@@ -2749,6 +2752,15 @@ void History::loadDeletedMessages() {
 			).arg(reinserted).arg(skippedEmpty).arg(skippedForeign
 			).arg(skippedWindow).arg(orderBreaks
 			).arg(linkedMedia).arg(placeholders));
+	} else if (CustomDB::InjectionVerbose()) {
+		// A22 (2026-10-16): sync'dan keyin yozuv qo'yilmasa sababi
+		// ko'rinmasdi -- yuqoridagi LOG faqat qo'yilganda yoziladi.
+		LOG(("CustomMod: sync reload peer %1 | deleted %2, injected 0 "
+			"| existing %3 | skipped: empty %4, foreign %5, window %6 "
+			"| loaded top %7 bottom %8"
+			).arg(peer->id.value).arg(deleted.size()).arg(existingCount
+			).arg(skippedEmpty).arg(skippedForeign).arg(skippedWindow
+			).arg(loadedAtTop() ? 1 : 0).arg(loadedAtBottom() ? 1 : 0));
 	}
 }
 

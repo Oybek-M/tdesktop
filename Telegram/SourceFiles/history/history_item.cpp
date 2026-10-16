@@ -3594,13 +3594,36 @@ void HistoryItem::restoreFromCustomDB() {
 					}
 				}
 				if (hasRealEdit) {
-					// Count how many unique old versions we have (each backup = one edit).
-					const int nextN = editVersions.size();
+					// 2026-10-16: ilgari faqat OXIRGI eski versiya chiqardi
+					// ("TAHRIRLANDI 3" ostida 1- va 2-versiya yo'q edi). Endi jonli
+					// tahrirdagi kabi butun zanjir: v1 -> 1 -> v2 -> 2 -> ... -> hozirgi.
+					// Ketma-ket takror va hozirgi matnga teng oxirgi versiyalar
+					// tashlanadi (boshlang'ich saqlash yozuvlari).
+					QVector<QString> versions;
+					for (const auto &ver : editVersions) {
+						const auto trimmed = ver.trimmed();
+						if (trimmed.isEmpty()
+							|| (!versions.isEmpty()
+								&& versions.back().trimmed() == trimmed)) {
+							continue;
+						}
+						versions.push_back(ver);
+					}
+					while (!versions.isEmpty()
+						&& versions.back().trimmed() == currentText) {
+						versions.pop_back();
+					}
+					if (versions.isEmpty()) {
+						versions.push_back(lastBackup);
+					}
 					auto restored = TextWithEntities();
-					restored.append(lastBackup);
-					restored.append(QString::fromUtf8(
-						"\n\n\xe2\x80\x94\xe2\x80\x94 TAHRIRLANDI %1 \xe2\x80\x94\xe2\x80\x94\n")
-						.arg(nextN));
+					for (int i = 0; i != versions.size(); ++i) {
+						if (i > 0) {
+							restored.append(QString::fromUtf8("\n"));
+						}
+						restored.append(versions[i]);
+						restored.append(QString::fromUtf8("\n\n\xe2\x80\x94\xe2\x80\x94 TAHRIRLANDI %1 \xe2\x80\x94\xe2\x80\x94\n").arg(i + 1));
+					}
 					restored.append(std::move(_text));
 					_text = std::move(restored);
 				}

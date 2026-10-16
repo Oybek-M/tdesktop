@@ -376,6 +376,7 @@ Session::Session(not_null<Main::Session*> session)
 
 	// Register hot-reload callback: after ImportFullBackup(), refresh all open histories.
 	CustomDB::SetImportReloadCallback([this] {
+		CustomDB::SetInjectionVerbose(true);
 		_histories->forEachLoaded([this](not_null<History*> history) {
 			history->loadDeletedMessages();
 			// Sync merge (2026-10-16): allaqachon qurilgan xabarlarga yangi
@@ -393,6 +394,7 @@ Session::Session(not_null<Main::Session*> session)
 			}
 			notifyHistoryChangeDelayed(history);
 		});
+		CustomDB::SetInjectionVerbose(false);
 		sendHistoryChangeNotifications();
 	});
 

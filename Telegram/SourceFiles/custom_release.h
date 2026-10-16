@@ -26,6 +26,6 @@
 namespace CustomRelease {
 
 inline constexpr auto kUpdateChannel = Core::Updates::Channel::CanaryPublic;
-inline constexpr auto kCounter = 5;
+inline constexpr auto kCounter = 6;
 
 } // namespace CustomRelease

@@ -448,6 +448,10 @@ void SetImportReloadCallback(ReloadCallback cb);
 // Sync merge'dan keyin ochiq tarixlarni qayta chizish (gReloadCallback).
 // Ketma-ket pull sikllari bitta qayta yuklashga birlashtiriladi.
 void RequestHistoryReload();
+// Sync qayta yuklashi paytida loadDeletedMessages() har bir chat uchun
+// nega yozuv qo'yilmaganini ham log'ga yozadi (A22, 2026-10-16).
+void SetInjectionVerbose(bool verbose);
+[[nodiscard]] bool InjectionVerbose();
 // Sync orqali kelgan tahrirning eski matni uchun 'backup' qatori.
 // Tahrir tarixi (TAHRIRLANDI bloki) faqat 'backup' qatorlaridan quriladi.
 void SaveSyncedEditBackup(

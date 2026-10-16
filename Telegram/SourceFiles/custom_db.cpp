@@ -4612,6 +4612,16 @@ void SetImportReloadCallback(ReloadCallback cb) {
     gReloadCallback = std::move(cb);
 }
 
+static bool gInjectionVerbose = false;
+
+void SetInjectionVerbose(bool verbose) {
+    gInjectionVerbose = verbose;
+}
+
+bool InjectionVerbose() {
+    return gInjectionVerbose;
+}
+
 void RequestHistoryReload() {
     // 2026-10-16: sync merge'dan keyin ochiq tarix yangilanmasdi --
     // CustomSync start+20 s da boshlanadi, tarix esa undan oldin yuklanadi,
