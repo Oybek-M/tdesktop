@@ -6,7 +6,7 @@
 
 ## 🟡 2026-10-13 holati — keyingi sessiya shu yerdan boshlaydi
 
-**🆕 10-16 11:25 (eng yangi): canary #5 CHIQDI** (`e98ab68c6a`,
+**🆕 10-16 11:25 (eng yangi): canary #5 CHIQDI** (laptop 11:26 da yuklab oldi, exe SHA mos; o'rnatish Telegram qayta ochilganda) (`e98ab68c6a`,
 `staged/e98ab68c6a-20261016`, exe SHA `ab5f7205eb1adf83...`), 3 mirror OK.
 CustomSync xabari bo'yicha tuzatishlar: (1) merge'dan keyin ochiq tarix
 yangilanadi (`RequestHistoryReload`, 1.5 s debounce, qurilgan xabarlarga
@@ -471,7 +471,9 @@ nol yozuv ham ehtimol shu (ilova yopiq bo'lgan -- tasdiqlanmagan).
 
 ## 🔴 A24 — Scope `setting` qo'llanishidagi ikki kamchilik (2026-09-29)
 
-**Holat:** 🟡 KOD TAYYOR 2026-09-30 (PC'da, BUILD QILINMAGAN). Spec
+**Holat (10-16 tekshirildi):** kod `0c1a158c32` da, `b19d83c2a1` merge orqali
+v7.2.10 build'iga kirgan (10-10 o'rnatilgan) va hozirgi canary'larda bor —
+faqat foydalanuvchi sinovi qoldi. Avvalgi yozuv: KOD TAYYOR 2026-09-30. Spec
 §3.2.1a va CHANGELOG 2026-09-30. Yo'l-yo'lakay 3-kamchilik topildi va
 tuzatildi: startdagi qayta yuborish `occurred_at = hozir` bilan ketardi,
 ya'ni eskirgan qurilma ishga tushishi bilan yangiroq o'zgarishni bosib
