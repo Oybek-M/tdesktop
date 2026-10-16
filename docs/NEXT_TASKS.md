@@ -14,8 +14,8 @@ yangilanadi (`RequestHistoryReload`, 1.5 s debounce, qurilgan xabarlarga
 'backup' qatorini ham yozadi -> TAHRIRLANDI bloki ko'rinadi; (3) rad
 etilgan yozuvlar soni log'ga yoziladi. "log.txt band" (tez qayta ochish)
 upstream xatti-harakati, o'zgartirilmadi; rad etilgan yozuvda cursor
-surilishi ataylab (qayta urinish foyda bermaydi). **Foydalanuvchi sinovi
-kerak:** Telegram yopiq holda boshqa qurilmadan peer'ga yozish, tahrirlash,
+surilishi ataylab (qayta urinish foyda bermaydi). **✅ 10-16 foydalanuvchi sinovi O'TDI** (#5 o'rnatildi, ikkinchi akkauntdagi
+boshqa qurilma o'zgarishlari qabul qilindi). Sinov ssenariysi: Telegram yopiq holda boshqa qurilmadan peer'ga yozish, tahrirlash,
 o'chirish -> Telegram'ni ochish -> qayta ochmasdan O'CHIRILDI va
 TAHRIRLANDI 1 ko'rinishi.
 
