@@ -12,8 +12,8 @@ uchun yangi login/parol exe'da (header mos, exe'da yangi URL 1 ta, eski
 login 0 ta; qiymatlar chop etilmadi). vps-secure, vps-pub va github OK, SHA
 mos. GitHub endi **Release asset** (A32 1-qism, `74037eba40`): tag =
 paket nomi, git tarixi o'smaydi. Laptop'da Telegram 07:50 da yopilgan,
-#4 ochilgandan 10–15 daqiqa keyin keladi; `canary: #4` ni tekshirish
-qoldi. **Qolganlari:** (1) PC va akamga #4 ni 1 marta qo'lda o'rnatish
+08:33 da #4 yuklandi va o'rnatildi, 08:36 da `canary: #4` bilan
+ishga tushdi, exe SHA mos — **laptop #4 da (e2e #3 -> #4 O'TDI)**. **Qolganlari:** (1) PC va akamga #4 ni 1 marta qo'lda o'rnatish
 (`install-staged.sh e1ea5976d9-20261016`, Telegram yopiq holda);
 (2) uchala mashina #4 da bo'lgach CustomSync'ga yozish, shunda eski login
 o'chiriladi; (3) ✅ A32 2-qism (10-16, ruxsat bilan): tdesktop-releases
