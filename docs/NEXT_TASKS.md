@@ -19,7 +19,7 @@ qoldi. **Qolganlari:** (1) PC va akamga #4 ni 1 marta qo'lda o'rnatish
 o'chiriladi; (3) ✅ A32 2-qism (10-16, ruxsat bilan): tdesktop-releases
 `main` = 1 ta orphan commit `ab87705` (README, current4, v2/current6),
 force-push qilindi; #4 Release asset joyida. To'liq eski tarix zaxirasi:
-`C:\TBuildackups	desktop-releases-mirror-20261016.git` (mirror, fsck ok,
+`C:\TBuild\backups\tdesktop-releases-mirror-20261016.git` (mirror, fsck ok,
 12 commit, 423 MiB). GitHub `size` hali ~433 MB ko'rsatadi: eski obyektlar
 GitHub'ning o'z GC'sigacha qoladi (zudlik bilan kerak bo'lsa GitHub
 Support'dan purge so'raladi).
