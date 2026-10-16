@@ -6,7 +6,9 @@
 
 ## 🟡 2026-10-13 holati — keyingi sessiya shu yerdan boshlaydi
 
-**🆕 10-16 11:25 (eng yangi): canary #5 CHIQDI** (laptop 11:26 da yuklab oldi, exe SHA mos; o'rnatish Telegram qayta ochilganda) (`e98ab68c6a`,
+**🆕 10-16 kechqurun:** egasi eski /secure loginni o'chirishga ruxsat berdi, buyruq CustomSync'ga yuborildi. Eski login kerak emas: PC stable build'da (canary'ni baribir qo'lda o'rnatadi), akamda dastur yo'q. CustomSync natijasi (eski login 401, yangisi o'tadi) kutilmoqda. Qolgan sinovlar keyinroq: avval A22, keyin NEXT-7 (T33/T36/T38), A24 PC'ga #5 o'rnatilgach.
+
+**10-16 11:25: canary #5 CHIQDI** (laptop 11:26 da yuklab oldi, exe SHA mos; o'rnatish Telegram qayta ochilganda) (`e98ab68c6a`,
 `staged/e98ab68c6a-20261016`, exe SHA `ab5f7205eb1adf83...`), 3 mirror OK.
 CustomSync xabari bo'yicha tuzatishlar: (1) merge'dan keyin ochiq tarix
 yangilanadi (`RequestHistoryReload`, 1.5 s debounce, qurilgan xabarlarga
