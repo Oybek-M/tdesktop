@@ -6,7 +6,18 @@
 
 ## 🟡 2026-10-13 holati — keyingi sessiya shu yerdan boshlaydi
 
-**🆕 10-16 kechqurun:** egasi eski /secure loginni o'chirishga ruxsat berdi, buyruq CustomSync'ga yuborildi. Eski login kerak emas: PC stable build'da (canary'ni baribir qo'lda o'rnatadi), akamda dastur yo'q. CustomSync natijasi (eski login 401, yangisi o'tadi) kutilmoqda. Qolgan sinovlar keyinroq: avval A22, keyin NEXT-7 (T33/T36/T38), A24 PC'ga #5 o'rnatilgach.
+**🆕 10-16 22:25 (eng yangi): canary #6 CHIQDI** (`bba2ed9e33`, staged
+`bba2ed9e33-20261016`, exe SHA `ee5f2adf41799c6e...`), 3 mirror OK.
+(1) AntiEdit: qayta ochilganda butun tahrir zanjiri (ilgari faqat oxirgi eski
+versiya). (2) A22 diagnostikasi: sync qayta yuklashida yozuv qo'yilmasa log'da
+`CustomMod: sync reload peer ...` (existing/empty/foreign/window). A22 2-sinov
+(Telegram yopiq holda rasm yuborib o'chirish): o'chirish sync orqali 21:11:33 da
+KELDI (msg 403340, is_media, fayl yo'q -- kutilgan), lekin chatga qo'yilmadi;
+sababi #6 log'idan aniqlanadi -- sinov takrorlanishi kerak. **Eski /secure
+login 22:20 da o'chirildi** (CustomSync: eski 401, yangisi 200); PC'ga endi
+faqat #4+ build qo'lda o'rnatiladi.
+
+**10-16 kechqurun:** egasi eski /secure loginni o'chirishga ruxsat berdi, buyruq CustomSync'ga yuborildi. Eski login kerak emas: PC stable build'da (canary'ni baribir qo'lda o'rnatadi), akamda dastur yo'q. CustomSync natijasi (eski login 401, yangisi o'tadi) kutilmoqda. Qolgan sinovlar keyinroq: avval A22, keyin NEXT-7 (T33/T36/T38), A24 PC'ga #5 o'rnatilgach.
 
 **10-16 11:25: canary #5 CHIQDI** (laptop 11:26 da yuklab oldi, exe SHA mos; o'rnatish Telegram qayta ochilganda) (`e98ab68c6a`,
 `staged/e98ab68c6a-20261016`, exe SHA `ab5f7205eb1adf83...`), 3 mirror OK.
