@@ -13,7 +13,7 @@ versiya). (2) A22 diagnostikasi: sync qayta yuklashida yozuv qo'yilmasa log'da
 `CustomMod: sync reload peer ...` (existing/empty/foreign/window). A22 2-sinov
 (Telegram yopiq holda rasm yuborib o'chirish): o'chirish sync orqali 21:11:33 da
 KELDI (msg 403340, is_media, fayl yo'q -- kutilgan), lekin chatga qo'yilmadi;
-#6 log'i sababini ko'rsatdi: startda chatdan faqat oxirgi bo'lak yuklangan, yozuv oynadan tashqarida (`window 1`) -- bu ataylab. 22:34 da chat ochilganda qo'yildi (`injected 6 ... placeholder 2`), foydalanuvchi tasdiqladi: **✅ A22 2-sinov O'TDI**. Tahrir zanjiri (Гулбахор) ham to'g'ri ko'rindi: **✅ AntiEdit zanjiri O'TDI**. A22 dan qolgani: chat `7053823996` (Mastura | A) dagi 42 media yozuvini ko'rish. **Eski /secure
+#6 log'i sababini ko'rsatdi: startda chatdan faqat oxirgi bo'lak yuklangan, yozuv oynadan tashqarida (`window 1`) -- bu ataylab. 22:34 da chat ochilganda qo'yildi (`injected 6 ... placeholder 2`), foydalanuvchi tasdiqladi: **✅ A22 2-sinov O'TDI**. Tahrir zanjiri (Гулбахор) ham to'g'ri ko'rindi: **✅ AntiEdit zanjiri O'TDI**. A22 1-sinov ham 22:37 da O'TDI: chat `7053823996` da `injected 781 | order breaks 0 | media: linked 16, placeholder 36` (kutilgan 6 fayl + 36 belgi; fayl bilan bog'langani 16 -- kutilgandan KO'P, yaxshi), foydalanuvchi tasdiqladi. **✅ A22 YOPILDI.** Qolgan sinovlar (NEXT-7 T33/T36/T38, A24 PC bilan) shoshilinch emas; navbatda customsync-server ishi (o'z sessiyasida). **Eski /secure
 login 22:20 da o'chirildi** (CustomSync: eski 401, yangisi 200); PC'ga endi
 faqat #4+ build qo'lda o'rnatiladi.
 
