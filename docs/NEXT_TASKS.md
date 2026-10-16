@@ -13,7 +13,7 @@ versiya). (2) A22 diagnostikasi: sync qayta yuklashida yozuv qo'yilmasa log'da
 `CustomMod: sync reload peer ...` (existing/empty/foreign/window). A22 2-sinov
 (Telegram yopiq holda rasm yuborib o'chirish): o'chirish sync orqali 21:11:33 da
 KELDI (msg 403340, is_media, fayl yo'q -- kutilgan), lekin chatga qo'yilmadi;
-sababi #6 log'idan aniqlanadi -- sinov takrorlanishi kerak. **Eski /secure
+#6 log'i sababini ko'rsatdi: startda chatdan faqat oxirgi bo'lak yuklangan, yozuv oynadan tashqarida (`window 1`) -- bu ataylab. 22:34 da chat ochilganda qo'yildi (`injected 6 ... placeholder 2`), foydalanuvchi tasdiqladi: **✅ A22 2-sinov O'TDI**. Tahrir zanjiri (Гулбахор) ham to'g'ri ko'rindi: **✅ AntiEdit zanjiri O'TDI**. A22 dan qolgani: chat `7053823996` (Mastura | A) dagi 42 media yozuvini ko'rish. **Eski /secure
 login 22:20 da o'chirildi** (CustomSync: eski 401, yangisi 200); PC'ga endi
 faqat #4+ build qo'lda o'rnatiladi.
 
