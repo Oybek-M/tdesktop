@@ -6,7 +6,20 @@
 
 ## 🟡 2026-10-13 holati — keyingi sessiya shu yerdan boshlaydi
 
-**🆕 10-16 08:00 (eng yangi): canary #4 CHIQDI** (`e1ea5976d9`,
+**🆕 10-16 11:25 (eng yangi): canary #5 CHIQDI** (`e98ab68c6a`,
+`staged/e98ab68c6a-20261016`, exe SHA `ab5f7205eb1adf83...`), 3 mirror OK.
+CustomSync xabari bo'yicha tuzatishlar: (1) merge'dan keyin ochiq tarix
+yangilanadi (`RequestHistoryReload`, 1.5 s debounce, qurilgan xabarlarga
+`restoreFromCustomDB()` qayta qo'llanadi); (2) sync orqali kelgan tahrir
+'backup' qatorini ham yozadi -> TAHRIRLANDI bloki ko'rinadi; (3) rad
+etilgan yozuvlar soni log'ga yoziladi. "log.txt band" (tez qayta ochish)
+upstream xatti-harakati, o'zgartirilmadi; rad etilgan yozuvda cursor
+surilishi ataylab (qayta urinish foyda bermaydi). **Foydalanuvchi sinovi
+kerak:** Telegram yopiq holda boshqa qurilmadan peer'ga yozish, tahrirlash,
+o'chirish -> Telegram'ni ochish -> qayta ochmasdan O'CHIRILDI va
+TAHRIRLANDI 1 ko'rinishi.
+
+**10-16 08:00: canary #4 CHIQDI** (`e1ea5976d9`,
 `staged/e1ea5976d9-20261016`, exe SHA `994f3a6c8c5faa64...`). /secure
 uchun yangi login/parol exe'da (header mos, exe'da yangi URL 1 ta, eski
 login 0 ta; qiymatlar chop etilmadi). vps-secure, vps-pub va github OK, SHA
