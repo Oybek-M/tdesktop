@@ -314,7 +314,14 @@ Qolgan (tdesktop'ga bog'liq emas): RAM sinovi, D: -> E: ko'chirish
 
 ---
 
-## 🔴 A33 — Canary #6 da story'lar to'liq ko'rinmaydi (2026-10-19, OCHIQ)
+## ✅ A33 — Canary #6 da story'lar to'liq ko'rinmaydi (2026-10-19, YOPILDI)
+
+**Yechim (10-19):** ilovani to'liq qayta ishga tushirish bilan o'tdi, qayta
+chiqmagan. Ehtimoliy sabab: startdagi `stories.getAllStories`
+(`Stories::loadMore`) bir marta muvaffaqiyatsiz bo'lgan -- `fail()` faqat
+`_loadMoreRequestId` ni tozalaydi, qayta urinmaydi; keyin ro'yxatga faqat
+alohida yangilanishlar (mobilda ko'rilgan story) tushgan. Upstream kodi,
+CustomMod tegmagan. Yana takrorlansa: log'ga loadMore fail diagnostikasi.
 
 **Belgisi (foydalanuvchi, skrinshot 10-19 22:23):** chat ro'yxati tepasidagi
 story qatorida faqat MOBILDA allaqachon ko'rilgan story'lar chiqadi,
