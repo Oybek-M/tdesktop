@@ -314,6 +314,28 @@ Qolgan (tdesktop'ga bog'liq emas): RAM sinovi, D: -> E: ko'chirish
 
 ---
 
+## 🔴 A33 — Canary #6 da story'lar to'liq ko'rinmaydi (2026-10-19, OCHIQ)
+
+**Belgisi (foydalanuvchi, skrinshot 10-19 22:23):** chat ro'yxati tepasidagi
+story qatorida faqat MOBILDA allaqachon ko'rilgan story'lar chiqadi,
+ko'rilmaganlari yo'q (Personal papkasida 2 ta: RQ, r.s.t).
+
+**Tekshirildi:** `data/data_stories.cpp` dagi CustomMod qismi
+(`ShouldAnonymousStory`: markRead va incrementViews yuborilmaydi)
+story'larni YASHIRMAYDI -- sabab bu emas.
+
+**Keyingi qadamlar (gipotezalar):**
+1. Rasmiy tdesktop 7.3.1 da xuddi shu akkauntda solishtirish (upstream xatti-
+   harakatimi yoki CustomMod'mi).
+2. "All chats" va papkalarda farq bormi; yashirilgan (archived) story'lar
+   ro'yxatiga tushib qolganmi.
+3. `Data::Stories` dagi `_sources`/`_all`/`hidden` ro'yxatiga story
+   qo'shiladigan joylarda CustomMod filtrlari (WhiteList/BlackList, peer
+   sozlamalari) bormi -- `grep -rn "CustomSettings" data/data_stories*.cpp
+   dialogs/ui/dialogs_stories*`.
+4. Log'da stories so'rovlari xatolari.
+Katta tekshiruv bo'lsa -- Gemini'ga topshiriq (feedback_gemini_heavy_tasks).
+
 ## 🔜 Keyingi Tasklar (Navbat tartibida)
 
 ### NEXT-7: Runtime test (HIGH)
